@@ -1,6 +1,5 @@
 import { isChartOwner } from './chart-owners'
 import { PlayerLink } from './components/player-link'
-import { danTitle } from './dan-title'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
@@ -23,7 +22,6 @@ import type {
   ChartBase,
   Comment,
   Dan,
-  CommentList,
   CommentPage,
   CommentSort,
   CommentThread,
@@ -38,6 +36,7 @@ import { Textarea } from './components/ui/textarea'
 import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { UserAvatar } from './components/user-avatar'
+import { ProfilePlate } from './components/profile-plate'
 import { VoteControl, loginPath } from './components/vote-control'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
@@ -415,6 +414,8 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
                 {author}
               </PlayerLink>
             )}
+            {/* The title and dan the author wears, as beside names on the leaderboard. */}
+            {!gone && <ProfilePlate userId={comment.authorId} />}
             {!gone && tree.subject.isOwner(comment.authorId) && (
               <span
                 className="rounded-md bg-link/10 px-1.5 py-0.5 font-medium text-link"
@@ -846,104 +847,5 @@ export function CommentSection({
         </div>
       )}
     </section>
-  )
-}
-
-// A flat comment with the song it belongs to, for a user's history.
-function CommentSummary({ comment }: { comment: Comment }) {
-  const { t, i18n } = useTranslation()
-  const subjectTitle = comment.danId
-    ? danTitle(comment.danTitle ?? {}, i18n.resolvedLanguage)
-    : comment.chartTitle
-  return (
-    <article className="min-w-0 space-y-2 rounded-[20px] border p-4">
-      <header className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <PlayerLink
-          id={comment.authorId}
-          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
-        >
-          <UserAvatar
-            nickname={comment.author || t('messages.unknownMember')}
-            avatarUrl={comment.authorAvatarUrl}
-            className="size-5"
-            fallbackClassName="text-[10px]"
-          />
-          {comment.author || t('messages.unknownMember')}
-        </PlayerLink>
-        <span aria-hidden="true">·</span>
-        <Link to={commentSubjectPath(comment)} className="max-w-60 truncate hover:underline">
-          {subjectTitle}
-        </Link>
-        <span aria-hidden="true">·</span>
-        <RelativeTime value={comment.createdAt} />
-      </header>
-      <CommentBody text={comment.body} />
-      <footer className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span className="tabular-nums">{t('interactions.points', { count: comment.score })}</span>
-        <Link to={commentPermalink(comment)} className="text-link hover:underline">
-          {t('interactions.viewInContext')}
-        </Link>
-      </footer>
-    </article>
-  )
-}
-
-// Pages a flat comment list such as a user's history.
-export function CommentListView({
-  load,
-  empty,
-}: {
-  load: (page: number, signal: AbortSignal) => Promise<CommentList>
-  empty: string
-}) {
-  const { t } = useTranslation()
-  const [page, setPage] = useState(1)
-  const [data, setData] = useState<CommentList | null>(null)
-  const [error, setError] = useState('')
-  const loader = useRef(load)
-  loader.current = load
-  useEffect(() => {
-    const controller = new AbortController()
-    setData(null)
-    setError('')
-    loader
-      .current(page, controller.signal)
-      .then((r) => {
-        if (controller.signal.aborted) return
-        setData(r)
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [page])
-  if (error) return <Notice>{error}</Notice>
-  if (!data)
-    return (
-      <div className="space-y-3" role="status" aria-label={t('interactions.loadingComments')}>
-        <Skeleton className="h-24 rounded-[20px]" />
-        <Skeleton className="h-24 rounded-[20px]" />
-      </div>
-    )
-  if (data.items.length === 0)
-    return <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>
-  const pages = Math.max(1, Math.ceil(data.total / data.pageSize))
-  return (
-    <div className="space-y-3">
-      {data.items.map((comment) => (
-        <CommentSummary key={comment.id} comment={comment} />
-      ))}
-      {pages > 1 && (
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-sm">
-          <Button variant="outline" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-            {t('messages.previous')}
-          </Button>
-          <span>{t('messages.pagination', { page, pages })}</span>
-          <Button variant="outline" disabled={page >= pages} onClick={() => setPage((n) => n + 1)}>
-            {t('messages.next')}
-          </Button>
-        </div>
-      )}
-    </div>
   )
 }
