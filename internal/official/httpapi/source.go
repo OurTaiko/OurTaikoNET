@@ -13,6 +13,8 @@ const (
 	oidcCookie = "ourtaiko_db_oidc"
 	// Where signing in returns to when it was asked for nowhere, or nowhere allowed.
 	defaultReturn = "/"
+	// How many charts a page of the chart list has.
+	pageSize = 24
 	// Whether this is the official source. A chart's JSON has the fields of its source.
 	officialSource = true
 	// A song's ID in the official source, as chartSelect reads it.

@@ -266,13 +266,11 @@ func (s *Server) chartWhere(ctx context.Context, column string, value any) (Char
 	return c, e
 }
 
-const pageSize = 24
-
 // keywordClause matches a chart whose title, subtitle, any translation,
-// official ID or any block's maker contains the keyword q; number is
+// official ID (where the source has one) or any block's maker contains the keyword q; number is
 // keywordNumber(q). An empty keyword matches every chart.
 func keywordClause(q, number string) string {
-	return `(` + q + `='' OR c.title ILIKE '%'||` + q + `||'%' OR c.subtitle ILIKE '%'||` + q + `||'%' OR c.official_id ILIKE '%'||` + q + `||'%'
+	return `(` + q + `='' OR c.title ILIKE '%'||` + q + `||'%' OR c.subtitle ILIKE '%'||` + q + `||'%' OR ` + officialIDColumn + ` ILIKE '%'||` + q + `||'%'
  OR c.nijiiro_id=` + number + ` OR c.number_id=` + number + `
  OR EXISTS(SELECT 1 FROM chart_difficulties dm WHERE dm.chart_id=c.id AND dm.maker ILIKE '%'||` + q + `||'%')
  OR EXISTS(SELECT 1 FROM jsonb_each_text(c.title_translations) t WHERE t.value ILIKE '%'||` + q + `||'%')
@@ -304,9 +302,10 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
 	s.search(w, r, u.User.ID)
 }
 
-// search pages the chart list. Filters: keyword, owner, category, a
-// course and star level that must hold for the same block (any side),
-// whether the chart has a Nijiiro ID, and whether it has files.
+// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category,
+// a course and star level that must hold for the same block (any side), whether the chart
+// has a Nijiiro ID, and whether it has files. Every filter and order is there on both
+// sources; which of them a source's website offers is the website's business.
 func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))
@@ -370,7 +369,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		ordering = ` ORDER BY ` + stars + ` DESC NULLS LAST,c.id ASC`
 	case "updated":
 		ordering = ` ORDER BY c.update_at DESC,c.id DESC`
-	// As on Fanmade. Reddit's "hot": the vote score counts logarithmically
+	// Reddit's "hot": the vote score counts logarithmically
 	// against age, so every tenfold score keeps a chart as high as one 12.5 hours newer.
 	case "hot":
 		ordering = ` ORDER BY sign(` + chartScoreSQL + `)*log(greatest(abs(` + chartScoreSQL + `),1))+extract(epoch FROM c.created_at)/45000 DESC,c.created_at DESC,c.id DESC`

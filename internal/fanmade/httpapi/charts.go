@@ -229,6 +229,133 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
 	s.search(w, r, u.User.ID)
 }
 
+// keywordClause matches a chart whose title, subtitle, any translation,
+// official ID (where the source has one) or any block's maker contains the keyword q; number is
+// keywordNumber(q). An empty keyword matches every chart.
+func keywordClause(q, number string) string {
+	return `(` + q + `='' OR c.title ILIKE '%'||` + q + `||'%' OR c.subtitle ILIKE '%'||` + q + `||'%' OR ` + officialIDColumn + ` ILIKE '%'||` + q + `||'%'
+ OR c.nijiiro_id=` + number + ` OR c.number_id=` + number + `
+ OR EXISTS(SELECT 1 FROM chart_difficulties dm WHERE dm.chart_id=c.id AND dm.maker ILIKE '%'||` + q + `||'%')
+ OR EXISTS(SELECT 1 FROM jsonb_each_text(c.title_translations) t WHERE t.value ILIKE '%'||` + q + `||'%')
+ OR EXISTS(SELECT 1 FROM jsonb_each_text(c.subtitle_translations) t WHERE t.value ILIKE '%'||` + q + `||'%'))`
+}
+
+// keywordNumber lets a number also find the chart with that Nijiiro ID or
+// number ID; -1 matches none.
+func keywordNumber(q string) int64 {
+	if n, e := strconv.ParseInt(q, 10, 64); e == nil && n > 0 {
+		return n
+	}
+	return -1
+}
+
+// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category,
+// a course and star level that must hold for the same block (any side), whether the chart
+// has a Nijiiro ID, and whether it has files. Every filter and order is there on both
+// sources; which of them a source's website offers is the website's business.
+func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
+	query := r.URL.Query()
+	q := strings.TrimSpace(query.Get("q"))
+	if len(q) > 200 {
+		problem(w, 400, "QUERY_INVALID", "搜索内容过长")
+		return
+	}
+	page, _ := strconv.Atoi(query.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	if page > 10000 {
+		problem(w, 400, "QUERY_INVALID", "页码超出范围")
+		return
+	}
+	var flag CategoryFlags
+	if id := query.Get("category"); id != "" {
+		var ok bool
+		if flag, ok = categoryFlag(id); !ok {
+			problem(w, 400, "QUERY_INVALID", "分类不存在")
+			return
+		}
+	}
+	course := query.Get("course")
+	switch course {
+	case "", "Easy", "Normal", "Hard", "Oni", "Edit":
+	default:
+		problem(w, 400, "QUERY_INVALID", "难度必须为 Easy / Normal / Hard / Oni / Edit")
+		return
+	}
+	level := 0
+	if raw := query.Get("level"); raw != "" {
+		var e error
+		if level, e = strconv.Atoi(raw); e != nil || level < 1 || level > 10 {
+			problem(w, 400, "QUERY_INVALID", "星数必须在 1 到 10 之间")
+			return
+		}
+	}
+	mapped := query.Get("nijiiro")
+	if mapped != "" && mapped != "yes" && mapped != "no" {
+		problem(w, 400, "QUERY_INVALID", "nijiiro 必须为 yes / no")
+		return
+	}
+	files := query.Get("files")
+	if files != "" && files != "yes" && files != "no" {
+		problem(w, 400, "QUERY_INVALID", "files 必须为 yes / no")
+		return
+	}
+	// The star level a level sort ranks by: the filtered course's, else the hardest.
+	const stars = `(SELECT max(d.level) FROM chart_difficulties d WHERE d.chart_id=c.id AND ($4='' OR d.course=$4))`
+	ordering := ` ORDER BY c.created_at DESC,c.id DESC`
+	switch query.Get("order") {
+	case "", "default":
+	case "nijiiro":
+		ordering = ` ORDER BY c.nijiiro_id ASC NULLS LAST,c.id ASC`
+	case "title":
+		ordering = ` ORDER BY lower(c.title) ASC,c.id ASC`
+	case "bpm":
+		ordering = ` ORDER BY c.bpm DESC,c.id ASC`
+	case "level":
+		ordering = ` ORDER BY ` + stars + ` DESC NULLS LAST,c.id ASC`
+	case "updated":
+		ordering = ` ORDER BY c.update_at DESC,c.id DESC`
+	// Reddit's "hot": the vote score counts logarithmically
+	// against age, so every tenfold score keeps a chart as high as one 12.5 hours newer.
+	case "hot":
+		ordering = ` ORDER BY sign(` + chartScoreSQL + `)*log(greatest(abs(` + chartScoreSQL + `),1))+extract(epoch FROM c.created_at)/45000 DESC,c.created_at DESC,c.id DESC`
+	case "top":
+		ordering = ` ORDER BY ` + chartScoreSQL + ` DESC,c.created_at DESC,c.id DESC`
+	case "comments":
+		ordering = ` ORDER BY COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0) DESC,c.created_at DESC,c.id DESC`
+	default:
+		problem(w, 400, "QUERY_INVALID", "顺序必须为 default / nijiiro / title / bpm / level / updated / hot / top / comments")
+		return
+	}
+	number := keywordNumber(q)
+	where := ` WHERE ` + publishedChart + ` AND ` + keywordClause("$1", "$7") + `
+ AND ($2='' OR c.owner_ids @> ARRAY[$2::text])
+ AND ($3::int=0 OR (c.category_flags & $3::int)<>0)
+ AND (($4='' AND $5::int=0) OR EXISTS(SELECT 1 FROM chart_difficulties d
+   WHERE d.chart_id=c.id AND ($4='' OR d.course=$4) AND ($5::int=0 OR d.level=$5)))
+ AND ($6='' OR (c.nijiiro_id IS NOT NULL)=($6='yes'))
+ AND ($8='' OR (c.tja_file IS NOT NULL)=($8='yes'))`
+	args := []any{q, owner, int(flag), course, level, mapped, number, files}
+	var total int
+	if e := s.DB.QueryRow(r.Context(), `SELECT count(*) FROM charts c`+where, args...).Scan(&total); e != nil {
+		internal(w, e)
+		return
+	}
+	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, pageSize, (page-1)*pageSize)...)
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	items, e := s.readCharts(rows)
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	s.chartNames(r.Context(), items)
+	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
+}
+
 // validID reports whether id has the form of every random ID here (charts, courses,
 // playlists): 32 lowercase hex digits.
 func validID(id string) bool {
@@ -488,8 +615,6 @@ func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	}
 	return id, true
 }
-
-const pageSize = 24
 
 // playlistCharts reads published charts in the order of ids.
 func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
