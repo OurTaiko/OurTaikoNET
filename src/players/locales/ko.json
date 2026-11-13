@@ -66,7 +66,8 @@
       "dans": "단위",
       "charts": "채보",
       "playlists": "플레이리스트",
-      "comments": "댓글"
+      "comments": "댓글",
+      "overview": "개요"
     },
     "stats": {
       "plays": "플레이 기록",
@@ -80,7 +81,19 @@
     "noCharts": "아직 업로드한 채보가 없습니다.",
     "noPlaylists": "공개 플레이리스트가 아직 없습니다.",
     "noComments": "아직 댓글이 없습니다.",
-    "favorites": "즐겨찾기 {{n}}"
+    "favorites": "즐겨찾기 {{n}}",
+    "overview": {
+      "recent": "최근 플레이",
+      "both": "전체",
+      "allScores": "모든 점수",
+      "titlesNote": "어느 소스든 단위 도장에서 얻거나 플레이어가 만든 칭호입니다. 테두리가 있는 것이 착용 중입니다.",
+      "allTitles": "모든 칭호",
+      "dans": "단위",
+      "highest": "최고 단위",
+      "allDans": "모든 단위 기록",
+      "charts": "이 플레이어의 채보",
+      "allCharts": "모든 채보"
+    }
   },
   "scores": {
     "view": "보기",

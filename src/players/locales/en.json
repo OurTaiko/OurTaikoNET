@@ -66,7 +66,8 @@
       "dans": "Dan",
       "charts": "Charts",
       "playlists": "Playlists",
-      "comments": "Comments"
+      "comments": "Comments",
+      "overview": "Overview"
     },
     "stats": {
       "plays": "plays",
@@ -80,7 +81,19 @@
     "noCharts": "No charts uploaded yet.",
     "noPlaylists": "No public playlists yet.",
     "noComments": "No comments yet.",
-    "favorites": "{{n}} favorites"
+    "favorites": "{{n}} favorites",
+    "overview": {
+      "recent": "Recent plays",
+      "both": "Both",
+      "allScores": "All scores",
+      "titlesNote": "Earned from dan courses on either source, or made by a player. The ringed one is worn.",
+      "allTitles": "All titles",
+      "dans": "Dan ranks",
+      "highest": "Highest rank",
+      "allDans": "All dan results",
+      "charts": "Charts by this player",
+      "allCharts": "All charts"
+    }
   },
   "scores": {
     "view": "View",

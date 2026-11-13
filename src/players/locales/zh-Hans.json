@@ -66,7 +66,8 @@
       "dans": "段位",
       "charts": "谱面",
       "playlists": "歌单",
-      "comments": "评论"
+      "comments": "评论",
+      "overview": "概览"
     },
     "stats": {
       "plays": "游玩记录",
@@ -80,7 +81,19 @@
     "noCharts": "还没有上传谱面。",
     "noPlaylists": "还没有公开歌单。",
     "noComments": "还没有评论。",
-    "favorites": "{{n}} 次收藏"
+    "favorites": "{{n}} 次收藏",
+    "overview": {
+      "recent": "最近游玩",
+      "both": "全部",
+      "allScores": "全部成绩",
+      "titlesNote": "通过任一曲源的段位道场获得，或由玩家制作。带圈的是正在佩戴的。",
+      "allTitles": "全部称号",
+      "dans": "段位",
+      "highest": "最高段位",
+      "allDans": "全部段位记录",
+      "charts": "该玩家的谱面",
+      "allCharts": "全部谱面"
+    }
   },
   "scores": {
     "view": "显示方式",

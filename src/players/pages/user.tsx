@@ -56,16 +56,19 @@ import {
   SourceStats,
   useSourceProfiles,
 } from '@players/pages/user-works'
+import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
 
-const tabs = ['scores', 'charts', 'playlists', 'dans', 'titles', 'comments'] as const
+const tabs = ['overview', 'scores', 'charts', 'playlists', 'dans', 'titles', 'comments'] as const
 
 export function UserPage() {
   const { t } = useTranslation()
   const { id = '' } = useParams()
   const session = useSession()
   const [params, setParams] = useSearchParams()
-  const tab = tabs.find((name) => name === params.get('tab')) ?? 'scores'
+  const tab = tabs.find((name) => name === params.get('tab')) ?? 'overview'
+  const open = (name: string) =>
+    setParams(name === 'overview' ? {} : { tab: name }, { replace: true })
   const works = useSourceProfiles(id)
   const count = (field: 'chartCount' | 'playlistCount' | 'commentCount') =>
     (works.fanmade?.[field] ?? 0) + (works.official?.[field] ?? 0)
@@ -109,16 +112,11 @@ export function UserPage() {
         </CardContent>
       </Card>
       <SourceStats profiles={works} />
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          setParams(value === 'scores' ? {} : { tab: String(value) }, { replace: true })
-        }
-        className="gap-5"
-      >
-        {/* Six tabs are wider than a phone: the row scrolls sideways there. */}
+      <Tabs value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
+        {/* Seven tabs are wider than a phone: the row scrolls sideways there. */}
         <div className="-m-1 p-1 max-w-full overflow-x-auto">
           <TabsList aria-label={t('profile.sections')}>
+            <TabsTrigger value="overview">{t('profile.tabs.overview')}</TabsTrigger>
             <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
             <TabsTrigger value="charts">
               {t('profile.tabs.charts')}
@@ -136,6 +134,9 @@ export function UserPage() {
             </TabsTrigger>
           </TabsList>
         </div>
+        <TabsContent value="overview">
+          <OverviewTab id={id} plate={plate} onOpen={open} />
+        </TabsContent>
         <TabsContent value="scores">
           <ScoresTab id={id} profile={profile} />
         </TabsContent>

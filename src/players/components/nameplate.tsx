@@ -14,6 +14,28 @@ const bands: Record<TitleStyle, string> = {
     'bg-[linear-gradient(90deg,#ff5f6d,#ffc371,#fff66d,#6dff9c,#5fc8ff,#a06dff,#ff5f6d)] bg-[length:200%_100%] motion-safe:animate-[nameplate-rainbow_6s_linear_infinite]',
 }
 
+/** A title as its band alone: the strip a nameplate wears over the name. */
+export function TitleBand({
+  title,
+  className,
+}: {
+  title: NonNullable<Plate['title']>
+  className?: string
+}) {
+  const { i18n } = useTranslation()
+  return (
+    <span
+      className={cn(
+        'inline-block max-w-full truncate rounded-md px-3 py-0.5 text-sm font-bold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]',
+        bands[title.style],
+        className,
+      )}
+    >
+      {titleName(title, i18n.resolvedLanguage ?? 'zh-Hans')}
+    </span>
+  )
+}
+
 // The nameplate as the game draws it: the 段位 chip on the left, the title band over the name.
 // Without title or 段位 it is the plain guest plate.
 export function Nameplate({ plate, className }: { plate: Plate; className?: string }) {

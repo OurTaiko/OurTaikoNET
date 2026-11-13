@@ -66,7 +66,8 @@
       "dans": "段位",
       "charts": "譜面",
       "playlists": "プレイリスト",
-      "comments": "コメント"
+      "comments": "コメント",
+      "overview": "概要"
     },
     "stats": {
       "plays": "プレイ記録",
@@ -80,7 +81,19 @@
     "noCharts": "まだ譜面をアップロードしていません。",
     "noPlaylists": "公開プレイリストはまだありません。",
     "noComments": "コメントはまだありません。",
-    "favorites": "お気に入り {{n}}"
+    "favorites": "お気に入り {{n}}",
+    "overview": {
+      "recent": "最近のプレイ",
+      "both": "両方",
+      "allScores": "すべてのスコア",
+      "titlesNote": "どちらかのソースの段位道場で獲得、またはプレイヤーが作成した称号です。枠付きが着用中。",
+      "allTitles": "すべての称号",
+      "dans": "段位",
+      "highest": "最高段位",
+      "allDans": "すべての段位記録",
+      "charts": "このプレイヤーの譜面",
+      "allCharts": "すべての譜面"
+    }
   },
   "scores": {
     "view": "表示",
