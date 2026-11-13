@@ -14,10 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
-	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
 	"ourtaiko.dev/net/internal/netdb"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
-	official "ourtaiko.dev/net/internal/official/httpapi"
+	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
 
 // One program, one database: each source answers under its name at the new address and as
@@ -204,13 +203,13 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		}
 	}
 	grant(pool, true, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
 	})
 	grant(official1, true, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Official.Config.Awards.Grant(ctx, tx, official.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Official.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
 	})
 	grant(pool, false, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-undone", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-undone", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
 	})
 	var recorded string
 	if err = pool.QueryRow(ctx, `SELECT string_agg(service||':'||request_key, ',' ORDER BY service) FROM net.awards`).Scan(&recorded); err != nil || recorded != "fanmade:attempt-f,official:attempt-o" {
@@ -222,8 +221,8 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-f", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), Verdict: 4, Titles: []string{}})
-	var refused *fanmade.ProfileRejection
+	_, err = a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), Verdict: 4, Titles: []string{}})
+	var refused *songs.ProfileRejection
 	if !errors.As(err, &refused) || refused.Code != "AWARD_CONFLICT" {
 		t.Fatal("an attempt of another player:", err)
 	}

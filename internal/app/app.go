@@ -17,15 +17,14 @@ import (
 	"ourtaiko.dev/net/db"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/awards"
-	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/legacy"
 	"ourtaiko.dev/net/internal/netdb"
-	official "ourtaiko.dev/net/internal/official/httpapi"
 	profile "ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/site"
+	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
 
 // SchemaVersion is the version of ourtaiko_net this program works with.
@@ -65,8 +64,8 @@ type Config struct {
 
 // App is the running service.
 type App struct {
-	Fanmade  *fanmade.Server
-	Official *official.Server
+	Fanmade  *songs.Server
+	Official *songs.Server
 	// Players is what belongs to no source: titles, nameplates, awards, a player's scores
 	// across sources. It is OurTaikoProfile's code.
 	Players *profile.Server
@@ -151,12 +150,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	// key that API once wanted for awards is never sent, so any will do.
 	catalog := inproc.Transport{Handler: a.Players.Handler()}
 	unused := strings.Repeat("0", 64)
-	fanmadeProfile, err := fanmade.NewProfile(fanmade.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "fanmade", ServiceKey: unused})
+	fanmadeProfile, err := songs.NewProfile(songs.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "fanmade", ServiceKey: unused})
 	if err != nil {
 		a.Close()
 		return nil, err
 	}
-	officialProfile, err := official.NewProfile(official.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "official", ServiceKey: unused})
+	officialProfile, err := songs.NewProfile(songs.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "official", ServiceKey: unused})
 	if err != nil {
 		a.Close()
 		return nil, err
@@ -164,13 +163,13 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	fanmadeProfile.UseTransport(catalog)
 	officialProfile.UseTransport(catalog)
 
-	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
-		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
+	a.Fanmade = songs.New(fanmadePool, songs.Config{
+		Source: songs.Fanmade, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: fanmadeProfile, Awards: sourceAwards{a.Players, "fanmade"}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
-	a.Official = official.New(officialPool, official.Config{
-		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
+	a.Official = songs.New(officialPool, songs.Config{
+		Source: songs.Official, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: officialProfile, Awards: sourceAwards{a.Players, "official"}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
 	})
