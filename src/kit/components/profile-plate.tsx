@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
+import { SITE_API_ROOT } from '../api/config'
+import { PLAYERS_BASE } from '../source'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import ringSilver from '../assets/dan-ring-silver.png'
 import ringGold from '../assets/dan-ring-gold.png'
 import ringRainbow from '../assets/dan-ring-rainbow.png'
 
-// The title and 段位 a player wears on OurTaikoProfile (profile.ourtaiko.org), drawn next to
+// The title and 段位 a player wears (the players' pages keep them), drawn next to
 // their name. Lookups for the names on a page are gathered into one request.
-export const PROFILE_URL = ((import.meta.env.VITE_PROFILE_URL as string | undefined) || '').replace(
-  /\/$/,
-  '',
-)
+// Players' pages and their API are this site's own.
+export const PROFILE_URL = PLAYERS_BASE
+export const PLAYERS_API = SITE_API_ROOT
 export const profilePage = (id: string) => `${PROFILE_URL}/users/${encodeURIComponent(id)}`
 
 type Style = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
@@ -72,7 +73,7 @@ async function flush() {
     let found: Record<string, Plate> = {}
     try {
       const response = await fetch(
-        `${PROFILE_URL}/api/v1/nameplates?ids=${part.map((p) => p.id).join(',')}`,
+        `${PLAYERS_API}/nameplates?ids=${part.map((p) => p.id).join(',')}`,
       )
       if (response.ok) found = (await response.json()).nameplates ?? {}
     } catch {

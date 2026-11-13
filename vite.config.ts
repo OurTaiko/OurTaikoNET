@@ -5,10 +5,12 @@ import { fileURLToPath, URL } from 'node:url'
 
 const from = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 // @sitekit: what both song sources share. @fanmade and @official: each source's own parts.
+// @players: the pages about players, whichever source they play.
 export const alias = {
   '@sitekit': from('./src/kit'),
   '@fanmade': from('./src/sources/fanmade'),
   '@official': from('./src/sources/official'),
+  '@players': from('./src/players'),
 }
 
 export default defineConfig(({ mode }) => {

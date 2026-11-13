@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PROFILE_URL } from './components/profile-plate'
+import { PLAYERS_API, PROFILE_URL } from './components/profile-plate'
 import { normalizeLanguage } from './i18n'
 import { cn } from './lib/utils'
 
@@ -32,7 +32,7 @@ export const profileTitlesPage = `${PROFILE_URL}/titles`
 let catalog: Promise<ProfileTitle[]> | null = null
 
 async function readCatalog(): Promise<ProfileTitle[]> {
-  const response = await fetch(`${PROFILE_URL}/api/v1/titles`)
+  const response = await fetch(`${PLAYERS_API}/titles`)
   if (!response.ok) throw new Error(String(response.status))
   return ((await response.json()) as { titles: ProfileTitle[] }).titles
 }

@@ -29,6 +29,9 @@
       ],
       "@official/*": [
         "./src/sources/official/*"
+      ],
+      "@players/*": [
+        "./src/players/*"
       ]
     }
   },

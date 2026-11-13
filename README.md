@@ -2,16 +2,17 @@
 
 The website of OurTaiko at `net.ourtaiko.org`: one app for both song sources. Its backend is the `OurTaikoNet` repository.
 
-Status: the two song sources' pages run in one app with a switch between them, against a local backend. Not deployed. The players' pages (titles, nameplates, combined scores) and the manage panel are not here yet.
+Status: the two song sources' pages and the players' pages run in one app, against a local backend. Not deployed.
 
 ## How it is put together
 
-A page belongs to the source its address starts with: `/fanmade/…` or `/official/…`. Each source's pages are a single-page app under that prefix; the switch in the header loads the other source's pages anew, with its own charts, text and colours. An address outside both goes to the source used last.
+The site has three areas, told apart by how the address starts: the two song sources, `/fanmade/…` and `/official/…`, and the pages about players, `/players/…`. Each is a single-page app under its prefix, loaded only when one of its pages is opened; going from one area to another loads the page anew. An address outside all three goes to the source used last.
 
 | Folder | What it is |
 |---|---|
 | `src/kit` | What both sources share: pages, components, the API client. From OurTaikoSiteKit's `web/src` |
 | `src/sources/fanmade`, `src/sources/official` | Each source's own parts: its chart card and search, upload form, metadata editor, text. From the two old sites' `web/src`. Loaded only on that source's pages |
+| `src/players` | The pages about players, whichever source they play: scores on both, titles, dan badges, nameplate, and for the site's administrator the manage panel (user groups). From OurTaikoProfile's `web/src` |
 | `src/TJARenderer` | The chart renderer, another project's source kept as it came |
 | `contracts/validation.json` | Upload rules shared with the backend, which has the same file |
 
@@ -28,7 +29,7 @@ pnpm lint && pnpm format:check && pnpm build
 
 ## Not here yet
 
-- The players' pages and the manage panel for user groups.
+- The players' pages keep the look they had on the old site (their own header, font and components), not the song pages' look.
 - The browser chart editor's build (431 MB in the old Fanmade site's `public/edit`): where it is to be hosted is undecided, so the editor page has nothing to load.
 - The old sites' browser tests (Playwright).
 - How the built site is served and deployed.

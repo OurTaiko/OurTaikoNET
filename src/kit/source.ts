@@ -17,3 +17,6 @@ export const SOURCE: SourceId =
   (typeof location === 'undefined' ? null : sourceOf(location.pathname)) ?? 'fanmade'
 /** Where this source's pages start; the router's basename. */
 export const BASE = `/${SOURCE}`
+
+/** Where the pages about players start: their scores on every source, titles, nameplate. */
+export const PLAYERS_BASE = '/players'
