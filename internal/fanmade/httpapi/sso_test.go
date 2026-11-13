@@ -22,8 +22,10 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	handler := app.Handler()
 	token := seedWebSession(t, app, id)
+	// A player's row is their id, when they first signed in and were last active, and their
+	// user groups: no name, password or administrator flag.
 	var columns int
-	if e = pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='net' AND table_name='users'`).Scan(&columns); e != nil || columns != 3 {
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='net' AND table_name='users'`).Scan(&columns); e != nil || columns != 4 {
 		t.Fatal("unexpected identity/activity columns", columns, e)
 	}
 	call := func(method, path, csrf string) *httptest.ResponseRecorder {

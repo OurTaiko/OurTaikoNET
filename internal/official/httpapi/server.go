@@ -41,6 +41,11 @@ type Config struct {
 	// Awards, when set, records what 段位 attempts earn in the attempt's own transaction;
 	// Profile is then used for its title catalog only.
 	Awards Awarder
+	// Manager, when set, says who may do what this code calls an administrator's work
+	// (User.IsAdmin): edit or remove anyone's content here, and whatever else is checked
+	// against it. The account center's own administrator flag is then not used. OurTaikoNet
+	// sets it to membership of a user group.
+	Manager func(ctx context.Context, userID string) (bool, error)
 	// SessionCookie names the cookie a website session is kept in; empty is this site's own
 	// name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
 	SessionCookie string

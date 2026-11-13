@@ -10,6 +10,7 @@ Status: the database layer and a first backend exist and pass their tests locall
 | Backend (Go, this repository) | The three old backends' code runs in one program on the one database: `internal/fanmade`, `internal/official` and `internal/profile`, not merged yet. All three test suites pass here |
 | `internal/site` | The new address: each source under `/api/v1/sources/<source>/`, players' routes (titles, nameplates, all their scores) under `/api/v1/` |
 | `internal/legacy` | The old host names, answered as the old sites answered. The only place that knows about them |
+| `internal/groups` | User groups, one bit each on a player's row: who may do the work each part reserves for its managers. The account center only says who the site's administrator is; the administrator assigns groups under `/api/v1/admin/` |
 | `internal/inproc` | The one call the parts still make over HTTP inside the program: the sources reading the title catalog. A stage: it is to become a direct call |
 | Website | Not started; separate repository |
 

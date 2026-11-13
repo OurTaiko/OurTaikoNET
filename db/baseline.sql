@@ -43,7 +43,7 @@ CREATE SCHEMA net;
 -- Name: SCHEMA net; Type: COMMENT; Schema: -; Owner: -
 --
 
-COMMENT ON SCHEMA net IS 'Shared by both song sources: players, sign-in, roles, titles, and one parent table over each source''s scores and dan attempts.';
+COMMENT ON SCHEMA net IS 'Shared by both song sources: players and their groups, sign-in, titles, and one parent table over each source''s scores and dan attempts.';
 
 
 --
@@ -1332,6 +1332,34 @@ ALTER TABLE net.awards ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
+-- Name: group_changes; Type: TABLE; Schema: net; Owner: -
+--
+
+CREATE TABLE net.group_changes (
+    id bigint NOT NULL,
+    user_id text NOT NULL,
+    groups_before integer NOT NULL,
+    groups_after integer NOT NULL,
+    changed_by text NOT NULL,
+    changed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: group_changes_id_seq; Type: SEQUENCE; Schema: net; Owner: -
+--
+
+ALTER TABLE net.group_changes ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME net.group_changes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: nameplates; Type: TABLE; Schema: net; Owner: -
 --
 
@@ -1354,21 +1382,6 @@ CREATE TABLE net.oidc_flows (
     verifier text NOT NULL,
     return_path text NOT NULL,
     expires_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: roles; Type: TABLE; Schema: net; Owner: -
---
-
-CREATE TABLE net.roles (
-    user_id text NOT NULL,
-    role text NOT NULL,
-    source text,
-    granted_by text,
-    granted_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT roles_role_check CHECK ((role = 'admin'::text)),
-    CONSTRAINT roles_source_check CHECK ((source = ANY (ARRAY['fanmade'::text, 'official'::text])))
 );
 
 
@@ -1468,7 +1481,9 @@ CREATE TABLE net.users (
     id text NOT NULL,
     first_login_at timestamp with time zone,
     last_active_at timestamp with time zone,
-    CONSTRAINT users_activity_order CHECK (((first_login_at IS NULL) OR ((last_active_at IS NOT NULL) AND (last_active_at >= first_login_at))))
+    groups integer DEFAULT 0 NOT NULL,
+    CONSTRAINT users_activity_order CHECK (((first_login_at IS NULL) OR ((last_active_at IS NOT NULL) AND (last_active_at >= first_login_at)))),
+    CONSTRAINT users_groups CHECK ((groups >= 0))
 );
 
 
@@ -2299,6 +2314,14 @@ ALTER TABLE ONLY net.awards
 
 
 --
+-- Name: group_changes group_changes_pkey; Type: CONSTRAINT; Schema: net; Owner: -
+--
+
+ALTER TABLE ONLY net.group_changes
+    ADD CONSTRAINT group_changes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: nameplates nameplates_pkey; Type: CONSTRAINT; Schema: net; Owner: -
 --
 
@@ -2312,14 +2335,6 @@ ALTER TABLE ONLY net.nameplates
 
 ALTER TABLE ONLY net.oidc_flows
     ADD CONSTRAINT oidc_flows_pkey PRIMARY KEY (state_hash);
-
-
---
--- Name: roles roles_user_id_role_source_key; Type: CONSTRAINT; Schema: net; Owner: -
---
-
-ALTER TABLE ONLY net.roles
-    ADD CONSTRAINT roles_user_id_role_source_key UNIQUE NULLS NOT DISTINCT (user_id, role, source);
 
 
 --
@@ -2949,6 +2964,13 @@ CREATE INDEX awards_user ON net.awards USING btree (user_id, created_at DESC);
 
 
 --
+-- Name: group_changes_user; Type: INDEX; Schema: net; Owner: -
+--
+
+CREATE INDEX group_changes_user ON net.group_changes USING btree (user_id, changed_at DESC);
+
+
+--
 -- Name: oidc_flows_expiry; Type: INDEX; Schema: net; Owner: -
 --
 
@@ -2974,6 +2996,13 @@ CREATE INDEX titles_owner ON net.titles USING btree (owner_id) WHERE (owner_id I
 --
 
 CREATE INDEX users_first_login ON net.users USING btree (first_login_at DESC NULLS LAST, id);
+
+
+--
+-- Name: users_in_groups; Type: INDEX; Schema: net; Owner: -
+--
+
+CREATE INDEX users_in_groups ON net.users USING btree (id) WHERE (groups <> 0);
 
 
 --
@@ -3990,6 +4019,22 @@ ALTER TABLE ONLY net.awards
 
 
 --
+-- Name: group_changes group_changes_changed_by_fkey; Type: FK CONSTRAINT; Schema: net; Owner: -
+--
+
+ALTER TABLE ONLY net.group_changes
+    ADD CONSTRAINT group_changes_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES net.users(id);
+
+
+--
+-- Name: group_changes group_changes_user_id_fkey; Type: FK CONSTRAINT; Schema: net; Owner: -
+--
+
+ALTER TABLE ONLY net.group_changes
+    ADD CONSTRAINT group_changes_user_id_fkey FOREIGN KEY (user_id) REFERENCES net.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: nameplates nameplates_title_id_fkey; Type: FK CONSTRAINT; Schema: net; Owner: -
 --
 
@@ -4003,22 +4048,6 @@ ALTER TABLE ONLY net.nameplates
 
 ALTER TABLE ONLY net.nameplates
     ADD CONSTRAINT nameplates_user_id_fkey FOREIGN KEY (user_id) REFERENCES net.users(id);
-
-
---
--- Name: roles roles_granted_by_fkey; Type: FK CONSTRAINT; Schema: net; Owner: -
---
-
-ALTER TABLE ONLY net.roles
-    ADD CONSTRAINT roles_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES net.users(id) ON DELETE SET NULL;
-
-
---
--- Name: roles roles_user_id_fkey; Type: FK CONSTRAINT; Schema: net; Owner: -
---
-
-ALTER TABLE ONLY net.roles
-    ADD CONSTRAINT roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES net.users(id) ON DELETE CASCADE;
 
 
 --

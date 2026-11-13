@@ -3,8 +3,8 @@
 --
 -- The whole import is one transaction: it either replaces everything or changes nothing.
 -- It can be run again at any time. Each run replaces all song and player data with the
--- sources' current state; net.roles and net.sessions are left alone, and net.users only
--- gains rows.
+-- sources' current state; net.sessions and players' groups are left alone, and net.users
+-- only gains rows.
 --
 -- It stops with an error when a source has a table or column this database does not know,
 -- when a foreign key does not hold afterwards, or when a table's row count or content

@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
+	"ourtaiko.dev/net/internal/groups"
 )
 
 const defaultSessionCookie, flowCookie = "ourtaiko_profile_session", "ourtaiko_profile_oidc"
@@ -25,7 +26,32 @@ type User struct {
 	AvatarURL         string `json:"avatarUrl"`
 	EmailVerified     bool   `json:"emailVerified"`
 	IsAdmin           bool   `json:"isAdmin"`
+	// SiteAdmin is the account center's administrator of this site: they manage it, which
+	// includes every player's groups, and are in no group for it. Groups are the user groups
+	// the player is in (package groups). With Config.Groups, IsAdmin, which guards the title
+	// catalog and grants, is membership of TITLE_MANAGER; without, it is SiteAdmin.
+	SiteAdmin bool     `json:"siteAdmin"`
+	Groups    []string `json:"groups"`
 }
+
+// identity asks the account center who a token belongs to and adds what the site itself
+// knows about them.
+func (s *Server) identity(ctx context.Context, kind, token string) (User, error) {
+	u, e := s.Config.SSO.identity(ctx, kind, token)
+	if e != nil {
+		return u, e
+	}
+	u.SiteAdmin, u.Groups = u.IsAdmin, []string{}
+	if s.Config.Groups {
+		set, e := groups.Of(ctx, s.DB, u.ID)
+		if e != nil {
+			return u, e
+		}
+		u.Groups, u.IsAdmin = set.Names(), set.Has(groups.TitleManager)
+	}
+	return u, nil
+}
+
 type session struct {
 	User          User
 	CSRF          string
@@ -62,7 +88,7 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 
 // devUser is the only account of a server running without an account center.
 func devUser(id string) User {
-	return User{ID: id, Username: "dev", Nickname: "本地开发用户", EmailVerified: true, IsAdmin: true}
+	return User{ID: id, Username: "dev", Nickname: "本地开发用户", EmailVerified: true, IsAdmin: true, SiteAdmin: true, Groups: groups.Known().Names()}
 }
 
 func (s *Server) current(r *http.Request) (session, error) {
@@ -83,7 +109,7 @@ func (s *Server) current(r *http.Request) (session, error) {
 			return session{}, e
 		}
 	}
-	u, e := s.Config.SSO.identity(r.Context(), "web", v.Token)
+	u, e := s.identity(r.Context(), "web", v.Token)
 	if e != nil {
 		return session{}, e
 	}
@@ -115,6 +141,16 @@ func (s *Server) required(w http.ResponseWriter, r *http.Request, csrf bool) (se
 func (s *Server) admin(w http.ResponseWriter, r *http.Request) (session, bool) {
 	v, ok := s.required(w, r, r.Method != "GET")
 	if ok && !v.User.IsAdmin {
+		problem(w, 403, "FORBIDDEN", "需要管理员权限")
+		return v, false
+	}
+	return v, ok
+}
+
+// siteAdmin is required() for the site's administrator.
+func (s *Server) siteAdmin(w http.ResponseWriter, r *http.Request) (session, bool) {
+	v, ok := s.required(w, r, r.Method != "GET")
+	if ok && !v.User.SiteAdmin {
 		problem(w, 403, "FORBIDDEN", "需要管理员权限")
 		return v, false
 	}
@@ -251,7 +287,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	u, e := s.Config.SSO.identity(ctx, "web", token.AccessToken)
+	u, e := s.identity(ctx, "web", token.AccessToken)
 	if e != nil || u.ID != idToken.Subject {
 		revoke()
 		fail()

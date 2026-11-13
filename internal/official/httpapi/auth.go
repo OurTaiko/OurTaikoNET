@@ -58,6 +58,17 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 	return v, e
 }
 
+// identity asks the account center who a token belongs to. Whether they administer this
+// site's content is the account center's answer, unless Config.Manager decides it.
+func (s *Server) identity(ctx context.Context, kind, token string) (User, error) {
+	u, e := s.Config.SSO.identity(ctx, kind, token)
+	if e != nil || s.Config.Manager == nil {
+		return u, e
+	}
+	u.IsAdmin, e = s.Config.Manager(ctx, u.ID)
+	return u, e
+}
+
 type activityWriter interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }
@@ -99,7 +110,7 @@ func (s *Server) current(r *http.Request) (session, error) {
 				return session{}, e
 			}
 		}
-		u, e := s.Config.SSO.identity(r.Context(), "web", v.Token)
+		u, e := s.identity(r.Context(), "web", v.Token)
 		if e != nil {
 			return session{}, e
 		}
@@ -128,7 +139,7 @@ func (s *Server) gameSession(r *http.Request) (session, error) {
 		}
 		v.User = devUser(s.Config.DevUserID)
 	} else {
-		u, e := s.Config.SSO.identity(r.Context(), "game", token)
+		u, e := s.identity(r.Context(), "game", token)
 		if e != nil {
 			return v, e
 		}
@@ -281,7 +292,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	u, e := s.Config.SSO.identity(ctx, "web", token.AccessToken)
+	u, e := s.identity(ctx, "web", token.AccessToken)
 	if e != nil || u.ID != idToken.Subject {
 		revoke()
 		fail()

@@ -3,23 +3,30 @@
 \set ON_ERROR_STOP 1
 SET search_path = net;
 
-COMMENT ON SCHEMA net IS 'Shared by both song sources: players, sign-in, roles, titles, and one parent table over each source''s scores and dan attempts.';
+COMMENT ON SCHEMA net IS 'Shared by both song sources: players and their groups, sign-in, titles, and one parent table over each source''s scores and dan attempts.';
 
 CREATE TABLE schema_migrations (
   version int PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Who may do what. The site administrator is the SSO Application's administrator and is not
--- listed here; that person grants these. source NULL means both sources.
-CREATE TABLE roles (
+-- What a player may do beyond what every player may: user groups, one bit each. The bits and
+-- their names are in internal/groups; the database only keeps the number. The account
+-- center says who the site's administrator is and nothing else; the administrator gives and
+-- takes groups in the site's manage panel, and is in none by being administrator.
+ALTER TABLE users ADD COLUMN groups integer NOT NULL DEFAULT 0 CONSTRAINT users_groups CHECK (groups >= 0);
+CREATE INDEX users_in_groups ON users (id) WHERE groups <> 0;
+
+-- Every change of a player's groups: who made it and what it was.
+CREATE TABLE group_changes (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id text NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  role text NOT NULL CHECK (role IN ('admin')),
-  source text CHECK (source IN ('fanmade', 'official')),
-  granted_by text REFERENCES users (id) ON DELETE SET NULL,
-  granted_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE NULLS NOT DISTINCT (user_id, role, source)
+  groups_before integer NOT NULL,
+  groups_after integer NOT NULL,
+  changed_by text NOT NULL REFERENCES users (id),
+  changed_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX group_changes_user ON group_changes (user_id, changed_at DESC);
 
 -- Every play of both sources. fanmade.scores and official.scores stay the tables they were,
 -- each with its foreign key to its own chart_difficulties; this is the two together.

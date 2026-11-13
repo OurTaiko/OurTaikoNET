@@ -256,7 +256,8 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 }
 
 // accountCenter stands in for the account center's internal API: the access token
-// "tok:<player id>" is that player's, until it is revoked.
+// "tok:<player id>" is that player's, until it is revoked; "adm:<player id>" is the same for
+// someone the account center calls this site's administrator.
 func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 	t.Helper()
 	revoked = &sync.Map{}
@@ -266,6 +267,11 @@ func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		id, ok := strings.CutPrefix(body.AccessToken, "tok:")
+		admin := false
+		if !ok {
+			id, ok = strings.CutPrefix(body.AccessToken, "adm:")
+			admin = ok
+		}
 		_, gone := revoked.Load(body.AccessToken)
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -273,7 +279,7 @@ func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 			revoked.Store(body.AccessToken, true)
 			w.Write([]byte(`{"ok":true}`))
 		case r.URL.Path == "/internal/v1/web/introspect" && ok && !gone:
-			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": id, "username": "player", "nickname": "Player", "isAdmin": false, "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
+			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": id, "username": "player", "nickname": "Player", "isAdmin": admin, "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
 		default:
 			w.WriteHeader(401)
 			w.Write([]byte(`{"code":"UNAUTHORIZED","message":"no"}`))
@@ -391,5 +397,187 @@ func TestOneSignInForTheWholeSite(t *testing.T) {
 		if w.Code == 200 && strings.Contains(w.Body.String(), player) {
 			t.Errorf("%s still knows the player after signing out: %s", path, w.Body.String())
 		}
+	}
+}
+
+// wholeSite is the whole program on a database of the test's own, with the stand-in account center.
+func wholeSite(t *testing.T) (*App, http.Handler, *pgxpool.Pool) {
+	t.Helper()
+	pool, url := netdbtest.NewURL(t, "fanmade")
+	issuer, _ := accountCenter(t)
+	key, secret := strings.Repeat("k", 64), strings.Repeat("b", 64)
+	const callback = "http://localhost/api/v1/auth/sso/callback"
+	fanmadeSSO, err := fanmade.NewSSO(fanmade.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	officialSSO, err := official.NewSSO(official.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileSSO, err := profile.NewSSO(profile.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(context.Background(), Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), FanmadeSSO: fanmadeSSO, OfficialSSO: officialSSO, ProfileSSO: profileSSO})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(a.Close)
+	return a, a.Handler(), pool
+}
+
+// The account center's administrator manages the site and is in no group; what a part's code
+// calls an administrator's work is for the members of that part's group, which only the
+// site's administrator gives and takes.
+func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
+	a, h, pool := wholeSite(t)
+	ctx := context.Background()
+	boss, player := strings.Repeat("a", 31)+"1", strings.Repeat("b", 31)+"2"
+	type who struct{ cookie, csrf string }
+	signIn := func(id, token string) *who {
+		t.Helper()
+		cookie, _, err := a.Players.OpenSession(ctx, id, token, "refresh", time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &who{cookie: cookie}
+	}
+	call := func(w *who, method, path, body string, out any) int {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Host = "net.ourtaiko.org"
+		r.Header.Set("Origin", "http://localhost")
+		if body != "" {
+			r.Header.Set("Content-Type", "application/json")
+		}
+		if w != nil {
+			r.AddCookie(&http.Cookie{Name: SessionCookie, Value: w.cookie})
+			r.Header.Set("X-CSRF-Token", w.csrf)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		if out != nil {
+			if err := json.Unmarshal(rec.Body.Bytes(), out); err != nil {
+				t.Fatalf("%s %s: %d %s", method, path, rec.Code, rec.Body.String())
+			}
+		}
+		return rec.Code
+	}
+	type me struct {
+		User struct {
+			IsAdmin   bool     `json:"isAdmin"`
+			SiteAdmin bool     `json:"siteAdmin"`
+			Groups    []string `json:"groups"`
+		} `json:"user"`
+		CSRFToken string `json:"csrfToken"`
+	}
+	look := func(w *who, path string) me {
+		t.Helper()
+		var v me
+		if status := call(w, "GET", path, "", &v); status != 200 {
+			t.Fatal(path, status)
+		}
+		return v
+	}
+	manages := func(w *who) string {
+		t.Helper()
+		out := []string{}
+		for _, part := range []string{"/api/v1/sources/official/me", "/api/v1/sources/fanmade/me", "/api/v1/me"} {
+			if look(w, part).User.IsAdmin {
+				out = append(out, part)
+			}
+		}
+		return strings.Join(out, ",")
+	}
+	admin, someone := signIn(boss, "adm:"+boss), signIn(player, "tok:"+player)
+	admin.csrf, someone.csrf = look(admin, "/api/v1/me").CSRFToken, look(someone, "/api/v1/me").CSRFToken
+
+	// The administrator is the site's administrator and nothing else.
+	if v := look(admin, "/api/v1/me"); !v.User.SiteAdmin || len(v.User.Groups) != 0 || manages(admin) != "" {
+		t.Fatalf("the administrator: %+v, manages %q", v.User, manages(admin))
+	}
+	if status := call(admin, "POST", "/api/v1/sources/official/charts", "{}", nil); status != 403 {
+		t.Fatal("the administrator uploaded an official chart without the group:", status)
+	}
+	if status := call(admin, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","style":"gold","official":true}`, nil); status != 403 {
+		t.Fatal("the administrator kept the title catalog without the group:", status)
+	}
+	// A player is nobody special and cannot use the manage panel.
+	if v := look(someone, "/api/v1/me"); v.User.SiteAdmin || len(v.User.Groups) != 0 || manages(someone) != "" {
+		t.Fatalf("a player: %+v", v.User)
+	}
+	for _, c := range []struct{ method, path, body string }{
+		{"GET", "/api/v1/admin/groups", ""}, {"GET", "/api/v1/admin/users", ""},
+		{"PUT", "/api/v1/admin/users/" + player + "/groups", `{"groups":["OFFICIAL_MANAGER"]}`},
+	} {
+		if status := call(someone, c.method, c.path, c.body, nil); status != 403 {
+			t.Fatalf("a player used %s %s: %d", c.method, c.path, status)
+		}
+		if status := call(nil, c.method, c.path, c.body, nil); status != 401 {
+			t.Fatalf("nobody used %s %s: %d", c.method, c.path, status)
+		}
+	}
+
+	// The administrator gives the player OFFICIAL_MANAGER.
+	var catalog struct {
+		Groups []struct {
+			Name string `json:"name"`
+			Bit  int    `json:"bit"`
+		} `json:"groups"`
+	}
+	if status := call(admin, "GET", "/api/v1/admin/groups", "", &catalog); status != 200 || len(catalog.Groups) != 3 || catalog.Groups[0].Name != "OFFICIAL_MANAGER" || catalog.Groups[0].Bit != 1 {
+		t.Fatalf("group catalog: %d %+v", status, catalog)
+	}
+	give := "/api/v1/admin/users/" + player + "/groups"
+	stale := &who{cookie: admin.cookie, csrf: "not-the-token"}
+	if status := call(stale, "PUT", give, `{"groups":["OFFICIAL_MANAGER"]}`, nil); status != 403 {
+		t.Fatal("groups given without the session's CSRF token:", status)
+	}
+	if status := call(admin, "PUT", give, `{"groups":["ADMIN"]}`, nil); status != 422 {
+		t.Fatal("a group that does not exist:", status)
+	}
+	if status := call(admin, "PUT", give, `{"groups":["OFFICIAL_MANAGER"]}`, nil); status != 200 {
+		t.Fatal("giving a group:", status)
+	}
+	if v := look(someone, "/api/v1/me"); len(v.User.Groups) != 1 || v.User.Groups[0] != "OFFICIAL_MANAGER" || v.User.SiteAdmin {
+		t.Fatalf("the player after: %+v", v.User)
+	}
+	// It is the official source's group and no other part's.
+	if got := manages(someone); got != "/api/v1/sources/official/me" {
+		t.Fatal("OFFICIAL_MANAGER manages", got)
+	}
+	if status := call(someone, "POST", "/api/v1/sources/official/charts", "{}", nil); status == 403 || status == 401 {
+		t.Fatal("an official manager may not upload:", status)
+	}
+	// Being in a group does not let anyone give groups.
+	if status := call(someone, "PUT", "/api/v1/admin/users/"+boss+"/groups", `{"groups":[]}`, nil); status != 403 {
+		t.Fatal("a group member gave groups:", status)
+	}
+	var listed struct {
+		Users []struct {
+			ID     string   `json:"id"`
+			Groups []string `json:"groups"`
+		} `json:"users"`
+	}
+	if status := call(admin, "GET", "/api/v1/admin/users", "", &listed); status != 200 || len(listed.Users) != 1 || listed.Users[0].ID != player {
+		t.Fatalf("members: %d %+v", status, listed)
+	}
+
+	// The other two groups, then none.
+	call(admin, "PUT", give, `{"groups":["FANMADE_MANAGER","TITLE_MANAGER"]}`, nil)
+	if got := manages(someone); got != "/api/v1/sources/fanmade/me,/api/v1/me" {
+		t.Fatal("FANMADE_MANAGER and TITLE_MANAGER manage", got)
+	}
+	if status := call(someone, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","style":"gold","official":true}`, nil); status == 403 {
+		t.Fatal("a title manager may not keep the catalog")
+	}
+	call(admin, "PUT", give, `{"groups":[]}`, nil)
+	if got := manages(someone); got != "" {
+		t.Fatal("after the groups were taken the player still manages", got)
+	}
+	var changes int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.group_changes WHERE user_id=$1 AND changed_by=$2`, player, boss).Scan(&changes); err != nil || changes != 3 {
+		t.Fatal("recorded changes:", changes, err)
 	}
 }

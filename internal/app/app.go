@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/db"
 	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
+	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/legacy"
@@ -133,6 +134,14 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.pools = append(a.pools, shared)
 
+	// What each part's code calls an administrator is, here, a member of that part's user
+	// group. The account center's administrator manages the site and is in no group for it.
+	in := func(group groups.Set) func(context.Context, string) (bool, error) {
+		return func(ctx context.Context, user string) (bool, error) {
+			set, err := groups.Of(ctx, shared, user)
+			return set.Has(group), err
+		}
+	}
 	fanmadeSite, officialSite := cfg.FanmadeSite, cfg.OfficialSite
 	if fanmadeSite == "" {
 		fanmadeSite = cfg.Origin + "/fanmade"
@@ -142,7 +151,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.ProfileSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
-		SessionCookie: SessionCookie,
+		SessionCookie: SessionCookie, Groups: true,
 		Sources: []profile.Source{
 			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
@@ -171,12 +180,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.FanmadeSSO, TrustedProxies: cfg.TrustedProxies,
-		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players}, SessionCookie: SessionCookie,
+		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
 	a.Official = official.New(officialPool, official.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.OfficialSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
-		Profile: officialProfile, Awards: officialAwards{a.Players}, SessionCookie: SessionCookie,
+		Profile: officialProfile, Awards: officialAwards{a.Players}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
 	})
 	if err = errors.Join(a.Fanmade.EnsureStorage(), a.Official.EnsureStorage()); err != nil {
 		a.Close()

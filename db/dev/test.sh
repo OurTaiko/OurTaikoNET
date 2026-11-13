@@ -57,18 +57,18 @@ echo "== import"
 export SRC_HOST="$PGHOST" SRC_PORT="$PGPORT"
 shown "$quiet" "$here/import.sh" "$(url otn_test_net)" otn_test_fanmade otn_test_official otn_test_profile
 
-echo "== import again (must give the same result, and keep roles)"
-psql -X -q -v ON_ERROR_STOP=1 "$(url otn_test_net)" -c "INSERT INTO net.roles (user_id, role, source) VALUES (repeat('a', 32), 'admin', 'official')"
+echo "== import again (must give the same result, and keep players' groups)"
+psql -X -q -v ON_ERROR_STOP=1 "$(url otn_test_net)" -c "UPDATE net.users SET groups = 5 WHERE id = repeat('a', 32)"
 shown true "$here/import.sh" "$(url otn_test_net)" otn_test_fanmade otn_test_official otn_test_profile
 shown "$notices" psql -X -q -v ON_ERROR_STOP=1 "$(url otn_test_net)" <<EOF
 DO \$\$
 BEGIN
   IF (SELECT count(*) FROM net.import_runs) <> 2 THEN RAISE EXCEPTION 'expected two import runs'; END IF;
-  IF (SELECT count(*) FROM net.roles) <> 1 THEN RAISE EXCEPTION 'the second import lost net.roles'; END IF;
+  IF (SELECT groups FROM net.users WHERE id = repeat('a', 32)) <> 5 THEN RAISE EXCEPTION 'the second import lost a player''s groups'; END IF;
   IF (SELECT report FROM net.import_runs ORDER BY finished_at LIMIT 1) <> (SELECT report FROM net.import_runs ORDER BY finished_at DESC LIMIT 1) THEN
     RAISE EXCEPTION 'the second import gave a different report';
   END IF;
-  RAISE NOTICE 'ok: second import matches the first, roles kept';
+  RAISE NOTICE 'ok: second import matches the first, groups kept';
 END \$\$;
 EOF
 

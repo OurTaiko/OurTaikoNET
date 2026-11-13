@@ -29,6 +29,10 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// The song sources whose plays are shown, in display order.
 	Sources []Source
+	// Groups turns user groups on (package groups): the title catalog and grants are then for
+	// TITLE_MANAGER, and the account center's administrator manages players' groups under
+	// /api/v1/admin/. Without it the administrator does the titles, as on the old site.
+	Groups bool
 	// SessionCookie names the cookie a website session is kept in; empty is the players' site's
 	// own name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
 	SessionCookie string
@@ -125,6 +129,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/admin/titles/{id}", s.deleteTitle)
 	mux.HandleFunc("POST /api/v1/admin/grants", s.grantTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/grants", s.revokeTitle)
+	mux.HandleFunc("GET /api/v1/admin/groups", s.groupCatalog)
+	mux.HandleFunc("GET /api/v1/admin/users", s.groupMembers)
+	mux.HandleFunc("PUT /api/v1/admin/users/{id}/groups", s.giveGroups)
 	mux.HandleFunc("POST /internal/v1/awards", s.award)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { problem(w, 404, "NOT_FOUND", "接口不存在") })
 	mux.HandleFunc("/internal/", func(w http.ResponseWriter, r *http.Request) { problem(w, 404, "NOT_FOUND", "接口不存在") })
