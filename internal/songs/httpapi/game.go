@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/signin"
 )
 
 // The game API, as OurTaikoPlay speaks it: chart blocks as slots of course × side
@@ -66,7 +67,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		result.User.AvatarURL = s.Config.SSO.AvatarURL(result.User)
 	}
-	if e := recordUserActivity(r.Context(), s.DB, result.User.ID, true); e != nil {
+	if e := signin.RecordActivity(r.Context(), s.DB, result.User.ID, true); e != nil {
 		internal(w, e)
 		return
 	}

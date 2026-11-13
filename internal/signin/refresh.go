@@ -1,4 +1,4 @@
-package httpapi
+package signin
 
 import (
 	"context"
@@ -11,11 +11,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Serialize rotations across requests and API instances. Finish persisting a rotated
-// credential even if a tab cancels its request, without extending the login deadline.
-func (s *Server) refreshWebSession(r *http.Request) (session, error) {
-	var v session
-	cookie, err := r.Cookie(s.sessionCookie())
+// refresh renews the account center's tokens of the request's session when they are about to
+// run out. Rotations are serialized across requests and API instances, and a rotated
+// credential is saved even if the tab cancels its request, without extending the session.
+func (s *Sessions) refresh(r *http.Request) (Session, error) {
+	var v Session
+	cookie, err := r.Cookie(s.Cookie)
 	if err != nil {
 		return v, pgx.ErrNoRows
 	}
@@ -37,14 +38,14 @@ func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 	if !deadline.After(time.Now()) {
 		return v, pgx.ErrNoRows
 	}
-	v.Token, err = s.Config.SSO.Unseal(access, digest)
+	v.Token, err = s.SSO.Unseal(access, digest)
 	if err != nil {
 		return v, err
 	}
 	if len(refresh) == 0 {
 		return v, pgx.ErrNoRows
 	}
-	v.RefreshToken, err = s.Config.SSO.Unseal(refresh, "refresh:"+digest)
+	v.RefreshToken, err = s.SSO.Unseal(refresh, "refresh:"+digest)
 	if err != nil {
 		return v, err
 	}
@@ -52,36 +53,36 @@ func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 		v.AccessExpires = *accessExpiry
 		return v, nil
 	}
-	_, cfg, err := s.Config.SSO.OIDC(ctx)
+	_, cfg, err := s.SSO.OIDC(ctx)
 	if err != nil {
 		return v, err
 	}
 	// Force renewal inside our own expiry window, not oauth2's implicit window.
-	token, err := cfg.TokenSource(oidc.ClientContext(ctx, s.Config.SSO.HTTP), &oauth2.Token{RefreshToken: v.RefreshToken}).Token()
+	token, err := cfg.TokenSource(oidc.ClientContext(ctx, s.SSO.HTTP), &oauth2.Token{RefreshToken: v.RefreshToken}).Token()
 	if err != nil {
 		var remote *oauth2.RetrieveError
 		if errors.As(err, &remote) && remote.ErrorCode == "invalid_grant" {
 			if _, err = tx.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, digest); err != nil {
-				return session{}, err
+				return Session{}, err
 			}
 			if err = tx.Commit(ctx); err != nil {
-				return session{}, err
+				return Session{}, err
 			}
-			return session{}, pgx.ErrNoRows
+			return Session{}, pgx.ErrNoRows
 		}
 		// Never log token endpoint bodies or clear sessions for transient outages.
-		return session{}, errors.New("SSO session renewal failed")
+		return Session{}, errors.New("SSO session renewal failed")
 	}
 	if token.AccessToken == "" || token.RefreshToken == "" || !token.Expiry.After(time.Now()) {
-		return session{}, errors.New("invalid SSO renewal response")
+		return Session{}, errors.New("invalid SSO renewal response")
 	}
-	// The normal current() path performs live introspection before authorization.
-	_, err = tx.Exec(ctx, `UPDATE sessions SET upstream_token=$2,upstream_refresh_token=$3,upstream_expires_at=$4 WHERE token_hash=$1`, digest, s.Config.SSO.Seal(token.AccessToken, digest), s.Config.SSO.Seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
+	// Current asks the account center about the player before anything is authorized.
+	_, err = tx.Exec(ctx, `UPDATE sessions SET upstream_token=$2,upstream_refresh_token=$3,upstream_expires_at=$4 WHERE token_hash=$1`, digest, s.SSO.Seal(token.AccessToken, digest), s.SSO.Seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
 	if err != nil {
-		return session{}, err
+		return Session{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return session{}, err
+		return Session{}, err
 	}
 	v.Token, v.RefreshToken, v.AccessExpires = token.AccessToken, token.RefreshToken, token.Expiry
 	return v, nil

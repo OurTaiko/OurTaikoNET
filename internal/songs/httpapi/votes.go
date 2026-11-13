@@ -155,7 +155,7 @@ func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
 // viewer is the signed-in user by the website cookie alone, without asking the
 // account center; empty for a guest.
 func (s *Server) viewer(r *http.Request) string {
-	v, e := s.localSession(r)
+	v, e := s.sessions().Local(r)
 	if e != nil {
 		return ""
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Notification kinds the server emits, in the order the settings page lists
@@ -53,7 +54,7 @@ func nullable(s string) *string {
 
 // notify records a notice in the caller's transaction. Nobody is notified
 // about their own actions, and muted kinds are skipped.
-func notify(ctx context.Context, db activityWriter, n Notice) error {
+func notify(ctx context.Context, db execer, n Notice) error {
 	if n.Recipient == "" || n.Recipient == n.Actor {
 		return nil
 	}
@@ -78,7 +79,7 @@ func notify(ctx context.Context, db activityWriter, n Notice) error {
 // notifyUpvoteMilestone notifies an author when an upvote count lands exactly
 // on a milestone. link names the chart, course and comment; the dedupe key
 // keeps a withdrawn and recast vote quiet.
-func notifyUpvoteMilestone(ctx context.Context, db activityWriter, kind, recipient string, link Notice, upvotes int) error {
+func notifyUpvoteMilestone(ctx context.Context, db execer, kind, recipient string, link Notice, upvotes int) error {
 	if !slices.Contains(upvoteMilestones, upvotes) {
 		return nil
 	}
@@ -407,4 +408,9 @@ func (s *Server) RunNotificationPrune(ctx context.Context) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// execer is the pool or a transaction.
+type execer interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }

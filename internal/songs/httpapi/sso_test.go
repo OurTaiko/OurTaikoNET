@@ -126,11 +126,11 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 		t.Fatal("tampered ciphertext accepted")
 	}
 	for _, input := range []string{"https://evil.example", "//evil.example", "/\\evil.example", "/x\r\ny"} {
-		if Fanmade.safeReturn(input) != "/upload" {
+		if New(nil, Config{}).sessions().SafeReturn(input) != "/upload" {
 			t.Fatal(input)
 		}
 	}
-	if Fanmade.safeReturn("/me/charts?page=2") != "/me/charts?page=2" {
+	if New(nil, Config{}).sessions().SafeReturn("/me/charts?page=2") != "/me/charts?page=2" {
 		t.Fatal("lost valid return path")
 	}
 }
