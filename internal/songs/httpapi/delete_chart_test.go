@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const owner, other, manager = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9", "5f63f79d876d201a13f8710453636837"
 	tokens := map[string]string{owner: strings.Repeat("1", 64), other: strings.Repeat("2", 64), manager: strings.Repeat("3", 64)}

@@ -83,7 +83,7 @@ func TestNormalizeScoreReplay(t *testing.T) {
 }
 
 func TestScoreReplayCompatibility(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const user = "89b6ef3a5cb57b6e04f74711d15a8a5f"
 	const song = "11111111111111111111111111111111"

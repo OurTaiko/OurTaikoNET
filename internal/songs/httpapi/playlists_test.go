@@ -32,8 +32,11 @@ func resetRateLimit(s *Server) {
 }
 
 func TestPlaylistLifecycle(t *testing.T) {
-	c, s := interactionFixture(t)
+	world := interactionWorldOf(t, Fanmade)
+	c, s := world.c, world.s
 	ctx := context.Background()
+	// The two charts by name, where a result lists several.
+	named := strings.NewReplacer(world.song, "song", world.other, "other").Replace
 	for _, body := range []string{`{}`, `{"name":"  "}`, `{"name":"` + strings.Repeat("歌", 51) + `"}`, `{"name":"a","categoryId":"none"}`,
 		`{"name":"a","description":"` + strings.Repeat("字", 501) + `"}`, `{"name":"a\u0007"}`} {
 		if code := c.do("owner", "POST", "/api/v1/playlists", body, nil); code != 400 {
@@ -56,7 +59,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 			t.Fatal("private visibility", user, code)
 		}
 	}
-	for _, write := range [][2]string{{"PATCH", path}, {"DELETE", path}, {"PUT", path + "/items/song"}, {"DELETE", path + "/items/song"}, {"PUT", path + "/order"}, {"PUT", path + "/favorite"}} {
+	for _, write := range [][2]string{{"PATCH", path}, {"DELETE", path}, {"PUT", path + "/items/" + world.song + ""}, {"DELETE", path + "/items/" + world.song + ""}, {"PUT", path + "/order"}, {"PUT", path + "/favorite"}} {
 		if code := c.do("alice", write[0], write[1], `{}`, nil); code != 404 {
 			t.Fatal("private playlist reachable", write, code)
 		}
@@ -69,10 +72,10 @@ func TestPlaylistLifecycle(t *testing.T) {
 			t.Fatalf("add %s by %s: %d want %d", chart, user, code, want)
 		}
 	}
-	add("owner", "song", 201)
-	add("owner", "song", 200)
+	add("owner", world.song, 201)
+	add("owner", world.song, 200)
 	add("owner", "missing", 404)
-	add("owner", "other", 201)
+	add("owner", world.other, 201)
 	detail := func(user string) Playlist {
 		t.Helper()
 		var v Playlist
@@ -81,7 +84,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 		}
 		return v
 	}
-	if v := detail("owner"); playlistIDs(v.Charts) != "song,other" || v.ChartCount != 2 || v.Charts[0].Uploader == "" {
+	if v := detail("owner"); named(playlistIDs(v.Charts)) != "song,other" || v.ChartCount != 2 || v.Charts[0].Uploader == "" {
 		t.Fatalf("order %s %+v", playlistIDs(v.Charts), v)
 	}
 	order := func(body string, want int) {
@@ -90,20 +93,20 @@ func TestPlaylistLifecycle(t *testing.T) {
 			t.Fatalf("order %s: %d want %d", body, code, want)
 		}
 	}
-	order(`{"chartIds":["other","other"]}`, 400)
-	order(`{"chartIds":["other","gone"]}`, 409)
-	order(`{"chartIds":["other","song"]}`, 200)
-	if v := detail("owner"); playlistIDs(v.Charts) != "other,song" {
+	order(`{"chartIds":["`+world.other+`","`+world.other+`"]}`, 400)
+	order(`{"chartIds":["`+world.other+`","gone"]}`, 409)
+	order(`{"chartIds":["`+world.other+`","`+world.song+`"]}`, 200)
+	if v := detail("owner"); named(playlistIDs(v.Charts)) != "other,song" {
 		t.Fatal("reordered", playlistIDs(v.Charts))
 	}
 	// Songs the request leaves out keep their place behind the listed ones.
-	order(`{"chartIds":["song"]}`, 200)
-	if v := detail("owner"); playlistIDs(v.Charts) != "song,other" {
+	order(`{"chartIds":["`+world.song+`"]}`, 200)
+	if v := detail("owner"); named(playlistIDs(v.Charts)) != "song,other" {
 		t.Fatal("partial order", playlistIDs(v.Charts))
 	}
 
 	var mine MyPlaylists
-	if code := c.do("owner", "GET", "/api/v1/me/playlists?chart=other", "", &mine); code != 200 || len(mine.Owned) != 1 || len(mine.Favorites) != 0 ||
+	if code := c.do("owner", "GET", "/api/v1/me/playlists?chart="+world.other, "", &mine); code != 200 || len(mine.Owned) != 1 || len(mine.Favorites) != 0 ||
 		mine.Owned[0].ContainsChart == nil || !*mine.Owned[0].ContainsChart || mine.MaxItems != maxPlaylistItems {
 		t.Fatalf("mine %d %+v", code, mine)
 	}
@@ -120,7 +123,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if code := c.do("alice", "PATCH", path, `{"name":"Stolen"}`, nil); code != 403 {
 		t.Fatal("foreign edit", code)
 	}
-	add("alice", "song", 403)
+	add("alice", world.song, 403)
 	if code := c.do("", "GET", path, "", &p); code != 200 || len(p.Charts) != 2 {
 		t.Fatal("public detail", code)
 	}
@@ -221,13 +224,13 @@ func TestPlaylistLifecycle(t *testing.T) {
 	kinds := func(items []GamePlaylist) string {
 		out := []string{}
 		for _, v := range items {
-			out = append(out, v.Kind+":"+v.Title+":"+v.Genre+":"+strings.Join(v.ChartIDs, "+"))
+			out = append(out, v.Kind+":"+v.Title+":"+v.Genre+":"+named(strings.Join(v.ChartIDs, "+")))
 		}
 		return strings.Join(out, " ")
 	}
 	c.do("owner", "PATCH", "/api/v1/playlists/"+empty.ID, `{"public":false}`, nil)
-	c.do("owner", "PUT", "/api/v1/playlists/"+empty.ID+"/items/other", `{}`, nil)
-	c.do("alice", "PUT", "/api/v1/charts/other/vote", `{"value":1}`, nil)
+	c.do("owner", "PUT", "/api/v1/playlists/"+empty.ID+"/items/"+world.other+"", `{}`, nil)
+	c.do("alice", "PUT", "/api/v1/charts/"+world.other+"/vote", `{"value":1}`, nil)
 	if got := kinds(game(playlistOwner)); !strings.HasPrefix(got, "owned:Empty:VARIETY:other owned:Mine:GAME:song+other system:") || strings.Contains(got, "Liked") {
 		t.Fatal("owner folders", got)
 	}
@@ -267,7 +270,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 		t.Fatalf("guest systems %d %+v", code, systems)
 	}
 	var liked Playlist
-	if code := c.do("alice", "GET", "/api/v1/playlists/liked", "", &liked); code != 200 || playlistIDs(liked.Charts) != "other" || !liked.System || liked.Public {
+	if code := c.do("alice", "GET", "/api/v1/playlists/liked", "", &liked); code != 200 || playlistIDs(liked.Charts) != world.other || !liked.System || liked.Public {
 		t.Fatalf("liked %d %+v", code, liked)
 	}
 	if code := c.do("", "GET", "/api/v1/playlists/liked", "", nil); code != 401 {
@@ -276,7 +279,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if code := c.do("", "GET", "/api/v1/playlists/daily", "", &liked); code != 200 || len(liked.Charts) != 2 {
 		t.Fatal("daily", code, len(liked.Charts))
 	}
-	for _, write := range [][2]string{{"PATCH", ""}, {"DELETE", ""}, {"PUT", "/items/song"}, {"PUT", "/favorite"}} {
+	for _, write := range [][2]string{{"PATCH", ""}, {"DELETE", ""}, {"PUT", "/items/" + world.song + ""}, {"PUT", "/favorite"}} {
 		if code := c.do("alice", write[0], "/api/v1/playlists/liked"+write[1], `{}`, nil); code != 404 {
 			t.Fatal("system playlist written", write, code)
 		}
@@ -284,13 +287,13 @@ func TestPlaylistLifecycle(t *testing.T) {
 
 	resetRateLimit(s)
 	// A deleted song leaves the playlist.
-	if code := c.do("owner", "DELETE", "/api/v1/charts/song", `{}`, nil); code != 200 {
+	if code := c.do("owner", "DELETE", "/api/v1/charts/"+world.song+"", `{}`, nil); code != 200 {
 		t.Fatal("delete song", code)
 	}
-	if v := detail("alice"); playlistIDs(v.Charts) != "other" || v.ChartCount != 1 {
+	if v := detail("alice"); playlistIDs(v.Charts) != world.other || v.ChartCount != 1 {
 		t.Fatal("deleted song listed", playlistIDs(v.Charts))
 	}
-	if code := c.do("owner", "DELETE", path+"/items/other", `{}`, nil); code != 200 {
+	if code := c.do("owner", "DELETE", path+"/items/"+world.other+"", `{}`, nil); code != 200 {
 		t.Fatal("remove", code)
 	}
 	if v := detail("alice"); len(v.Charts) != 0 {
@@ -322,7 +325,8 @@ func TestPlaylistLifecycle(t *testing.T) {
 }
 
 func TestPlaylistLimits(t *testing.T) {
-	c, s := interactionFixture(t)
+	world := interactionWorldOf(t, Fanmade)
+	c, s := world.c, world.s
 	ctx := context.Background()
 	// Stored playlists have ids of 32 hex digits; these are 1, 2, … padded with zeros.
 	firstListed := strings.Repeat("0", 31) + "1"
@@ -356,7 +360,7 @@ func TestPlaylistLimits(t *testing.T) {
 	if _, e := s.DB.Exec(ctx, `INSERT INTO playlist_items(playlist_id,chart_id,position) SELECT lpad('1',32,'0'),'c'||n,n FROM generate_series(1,$1) n`, maxPlaylistItems); e != nil {
 		t.Fatal(e)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/song", `{}`, nil); code != 409 {
+	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/"+world.song+"", `{}`, nil); code != 409 {
 		t.Fatal("add to a full playlist", code)
 	}
 	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/c7", `{}`, nil); code != 200 {

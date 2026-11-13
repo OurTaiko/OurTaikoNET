@@ -46,7 +46,7 @@ func TestAudioStreamHTTP(t *testing.T) {
 	}
 }
 func testAudioStreamHTTP(t *testing.T, remote bool) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	storage := t.TempDir()
 	// No SSO configuration: streaming must never call nickname/auth services.

@@ -20,7 +20,7 @@ func TestRekeyFiles(t *testing.T) {
 	for _, remote := range []bool{false, true} {
 		t.Run(fmt.Sprint("s3=", remote), func(t *testing.T) {
 			ctx := context.Background()
-			pool := scoreTestDB(t)
+			pool := testDB(t, Fanmade)
 			const owner = "d46774d30dd13b92d9e536808da468a4"
 			if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
 				t.Fatal(err)

@@ -11,53 +11,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	"ourtaiko.dev/net/internal/web"
 )
 
-// scoreTestDB gives a test its own ourtaiko_net, opened for the fanmade source, and beside it
-// what the fake account center of testServer knows: its accounts (test_sso_users; adding one
-// also makes the player known to the site) and the tokens it has given out (test_sessions: a
-// website session by the hash of its cookie, a game token by the hash of "game:" and the
-// token). testServer opens a real website session for each of the former.
-func scoreTestDB(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	pool := netdbtest.New(t, "fanmade")
-	ctx := context.Background()
-	var err error
-	if _, err = pool.Exec(ctx, `
-CREATE TABLE test_sso_users (id text PRIMARY KEY, username text NOT NULL UNIQUE, password_hash text NOT NULL, nickname text,
- email_verified_at timestamptz, is_admin boolean NOT NULL DEFAULT false);
-CREATE FUNCTION test_sso_user() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
- IF NEW.nickname IS NULL THEN NEW.nickname := NEW.username; END IF;
- INSERT INTO users(id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
- RETURN NEW;
-END $$;
-CREATE TRIGGER test_sso_user BEFORE INSERT ON test_sso_users FOR EACH ROW EXECUTE FUNCTION test_sso_user();
-CREATE TABLE test_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL, csrf_token text NOT NULL, expires_at timestamptz NOT NULL)`); err != nil {
-		t.Fatal(err)
-	}
-	// Fixtures register a file under an arbitrary key and reference its ID.
-	if _, err = pool.Exec(ctx, `CREATE FUNCTION test_file(key text, name text, digest text, size bigint) RETURNS bigint LANGUAGE sql AS $$
- INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension)
- VALUES(key,name,digest,size,COALESCE(lower(substring(name from '\.([A-Za-z0-9]+)$')),'bin'))
- ON CONFLICT(storage_key) DO UPDATE SET storage_key=EXCLUDED.storage_key RETURNING id $$`); err != nil {
-		t.Fatal(err)
-	}
-	// test_slot adds a chart's single block of a course, or finds it again. Its content hash
-	// is made up from the chart and course: what a real upload gets from TJAParser.
-	if _, err = pool.Exec(ctx, `CREATE FUNCTION test_slot(chart text, slot_course text, slot_level integer DEFAULT 5, slot_maker text DEFAULT '') RETURNS bigint LANGUAGE sql AS $$
- INSERT INTO chart_difficulties(chart_id,course,side,level,maker,content_hash) VALUES(chart,slot_course,'single',slot_level,slot_maker,'v1:'||encode(sha256((chart||'/'||slot_course)::bytea),'hex'))
- ON CONFLICT(chart_id,course,side) DO UPDATE SET level=chart_difficulties.level RETURNING id $$`); err != nil {
-		t.Fatal(err)
-	}
-	return pool
-}
-
 func TestSubmitScore(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const song = "11111111111111111111111111111111"
 	const origin = "http://127.0.0.1:5173"

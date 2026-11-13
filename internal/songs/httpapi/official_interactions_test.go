@@ -7,7 +7,7 @@ import (
 )
 
 func TestUserDirectory(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c := w.c
 	var dir UserDirectory
 	if code := c.do("", "GET", "/api/v1/users", "", &dir); code != 200 || dir.Total != 4 || !dir.ProfilesAvailable {
@@ -33,7 +33,7 @@ func TestUserDirectory(t *testing.T) {
 
 // An administrator deleting someone's public playlist tells its owner.
 func TestPlaylistRemovedNotice(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c := w.c
 	var p struct{ ID string }
 	if code := c.do("alice", "POST", "/api/v1/playlists", `{"name":"Mix","public":true}`, &p); code != 201 {
@@ -51,7 +51,7 @@ func TestPlaylistRemovedNotice(t *testing.T) {
 
 // Only administrators upload; an owner who is not one may still manage their charts.
 func TestUploadPermission(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	for name, want := range map[string]bool{"owner": false, "admin": true, "alice": false} {
 		if code := w.c.do(name, "POST", "/api/v1/charts", "", nil); (code == 403) == want {
 			t.Fatalf("%s upload status %d", name, code)
@@ -61,7 +61,7 @@ func TestUploadPermission(t *testing.T) {
 
 // Playlists have 32-hex IDs (R052) through creation, items, order, favorites and detail.
 func TestPlaylistIDs(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c := w.c
 	var p Playlist
 	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"P","public":true}`, &p); code != 201 || !validID(p.ID) {

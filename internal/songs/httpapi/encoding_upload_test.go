@@ -22,7 +22,7 @@ import (
 )
 
 func TestUploadStoresCanonicalUTF8(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const cookie = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`); err != nil {

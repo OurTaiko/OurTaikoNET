@@ -10,7 +10,7 @@ import (
 // The resource manifest lists the cover too, as Fanmade's does: the website's chart
 // package carries it.
 func TestResourceManifestCover(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	ctx := context.Background()
 	resource := func(extension string) (id int64, digest string) {
 		t.Helper()

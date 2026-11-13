@@ -9,9 +9,16 @@ import (
 // The chart list is the same code on both sources, so this one takes every filter and order
 // the official source's list does; a page here has this source's own number of charts.
 func TestChartListFiltersAndOrders(t *testing.T) {
-	c, s := interactionFixture(t)
+	world := interactionWorldOf(t, Fanmade)
+	c, s := world.c, world.s
 	ctx := context.Background()
-	if _, err := s.DB.Exec(ctx, `UPDATE charts SET bpm=200 WHERE id='song'`); err != nil {
+	// Other is the one with a block and a Nijiiro ID, so those orders do not fall to the IDs.
+	world.slot(t, world.other, "Oni")
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET nijiiro_id=7 WHERE id=$1`, world.other); err != nil {
+		t.Fatal(err)
+	}
+	// Song is the faster one, and by this the one changed last.
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET bpm=200 WHERE id='`+world.song+`'`); err != nil {
 		t.Fatal(err)
 	}
 	type page struct {
@@ -39,15 +46,15 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 		t.Fatalf("page %+v", p)
 	}
 	for query, want := range map[string]string{
-		"": "other", "?order=title": "other", "?order=bpm": "song", "?order=updated": "song",
-		"?order=level": "other", "?order=nijiiro": "other", "?order=top": "other",
+		"": world.other, "?order=title": world.other, "?order=bpm": world.song, "?order=updated": world.song,
+		"?order=level": world.other, "?order=nijiiro": world.other, "?order=top": world.other,
 	} {
 		if got := first(query); got != want {
 			t.Fatal(query, "starts with", got)
 		}
 	}
 	for query, want := range map[string]int{
-		"?files=yes": 2, "?files=no": 0, "?nijiiro=no": 2, "?nijiiro=yes": 0, "?q=%20Song%20": 1, "?q=nothing": 0,
+		"?files=yes": 2, "?files=no": 0, "?nijiiro=no": 1, "?nijiiro=yes": 1, "?q=%20Song%20": 1, "?q=nothing": 0,
 	} {
 		if p := list(query); p.Total != want || len(p.Items) != want {
 			t.Fatal(query, p.Total, len(p.Items))
@@ -55,8 +62,8 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 	}
 	// A number as keyword also finds the chart with that number.
 	var song Chart
-	c.do("", "GET", "/api/v1/charts/song?by=id", "", &song)
-	if p := list("?q=" + strconv.FormatInt(song.NumberID, 10)); p.Total != 1 || p.Items[0].ID != "song" {
+	c.do("", "GET", "/api/v1/charts/"+world.song+"?by=id", "", &song)
+	if p := list("?q=" + strconv.FormatInt(song.NumberID, 10)); p.Total != 1 || p.Items[0].ID != world.song {
 		t.Fatal("keyword number", p.Total)
 	}
 	for _, query := range []string{"?order=newest", "?files=maybe", "?nijiiro=1", "?level=11", "?course=Ura", "?category=missing", "?page=10001"} {

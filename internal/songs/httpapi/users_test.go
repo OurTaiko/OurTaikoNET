@@ -18,7 +18,7 @@ import (
 )
 
 func TestUserActivityMigrationAndAuthentication(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	id := web.NewID()
 	password, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
@@ -140,7 +140,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 }
 
 func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	ids := []string{}
 	for i := 0; i < 15; i++ {

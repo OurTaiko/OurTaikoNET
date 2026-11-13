@@ -28,8 +28,8 @@ func TestCoverLifecycle(t *testing.T) {
 }
 
 func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
-	// scoreTestDB creates a database of the test's own, dropped in t.Cleanup.
-	pool := scoreTestDB(t)
+	// testDB creates a database of the test's own, dropped in t.Cleanup.
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	var name string
 	if err := pool.QueryRow(ctx, `SELECT current_database()`).Scan(&name); err != nil || !strings.HasPrefix(name, "otn_test_") {

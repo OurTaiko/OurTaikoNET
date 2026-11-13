@@ -16,7 +16,7 @@ import (
 )
 
 func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	token := strings.Repeat("c", 64)
 	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','doubletest','unused');`); err != nil {

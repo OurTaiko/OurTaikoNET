@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -25,12 +24,8 @@ func (w interactionWorld) chart(id string) string {
 // registered without files; a Fanmade chart always has its files.
 func interactionWorldOf(t *testing.T, src *Source) interactionWorld {
 	t.Helper()
-	schema := "fanmade"
-	if src.Official {
-		schema = "official"
-	}
-	pool := netdbtest.New(t, schema)
-	s := New(pool, Config{Source: src, Storage: t.TempDir(), Origin: "http://localhost", SSO: fakeSSO(t)})
+	pool := testDB(t, src)
+	s := testServer(t, pool, Config{Source: src, Storage: t.TempDir(), Origin: "http://localhost"})
 	w := interactionWorld{c: newTestClient(t, s), s: s}
 	ctx := context.Background()
 	owner := testUsers["owner"].ID
@@ -76,12 +71,6 @@ func (w interactionWorld) slot(t *testing.T, chart, course string) int64 {
 		t.Fatal(err)
 	}
 	return id
-}
-
-// officialInteractionFixture is the world on the official source.
-func officialInteractionFixture(t *testing.T) interactionWorld {
-	t.Helper()
-	return interactionWorldOf(t, Official)
 }
 
 // bothSources runs a test of what the sources do alike once on each.

@@ -38,7 +38,7 @@ func TestNormalizeScoreReplayOptions(t *testing.T) {
 
 // Scores say whether their recording was kept, and it is read back with the play by anyone.
 func TestScoreReplayIsReadBack(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c, s := w.c, w.s
 	ctx := context.Background()
 	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='published' WHERE id=$1`, w.song); err != nil {

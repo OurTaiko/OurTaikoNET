@@ -15,7 +15,7 @@ import (
 )
 
 func TestWebSessionRenewal(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	ctx := context.Background()
 	id := web.NewID()

@@ -12,7 +12,7 @@ import (
 // A 段位 attempt keeps the scores of its songs (024 and 025, as Fanmade 056 and 057): the game
 // sends them with it, or for an older game they are looked for by time.
 func TestDanAttemptNamesItsScores(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	s := w.s
 	ctx := context.Background()
 	const course = "dddddddddddddddddddddddddddddddd"

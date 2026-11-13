@@ -31,7 +31,7 @@ func TestBackgroundMovie(t *testing.T) {
 	}
 }
 func testBackgroundMovie(t *testing.T, remote bool) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const owner = "89b6ef3a5cb57b6e04f74711d15a8a5f"
 	cookie := strings.Repeat("a", 64)

@@ -66,7 +66,7 @@ func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []b
 	}
 }
 func TestS3PendingRecovery(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	store := teststore.New(t)
 	app := testServer(t, pool, Config{Objects: store, Storage: t.TempDir()})

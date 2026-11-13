@@ -15,7 +15,7 @@ import (
 )
 
 func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	id := web.NewID()
 	_, e := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'Private123','公开昵称','unused')`, id)
@@ -85,7 +85,7 @@ func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func TestSSOCallbackBindingAndEncryption(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	h := app.Handler()
 	state, binding := web.NewID()+web.NewID(), web.NewID()+web.NewID()
@@ -138,7 +138,7 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 	}
 }
 func TestPublicNamesDoNotExposeLogin(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	id := web.NewID()
 	_, e := pool.Exec(context.Background(), `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'PrivateLogin','公开名','unused')`, id)
 	if e != nil {

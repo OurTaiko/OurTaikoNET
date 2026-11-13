@@ -17,7 +17,7 @@ import (
 // Songs withdrawn for a Tower or Dan course (migrations 012 and 042) keep
 // their rows and scores, and no reader exposes them.
 func TestWithdrawnChartsAPI(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`)
 	if err != nil {
@@ -112,7 +112,7 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 }
 
 func TestUploadRejectsUnsupportedCourses(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	cookie := strings.Repeat("a", 64)
 	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused');`); err != nil {

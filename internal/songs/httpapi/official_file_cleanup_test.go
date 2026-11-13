@@ -12,7 +12,7 @@ import (
 // cleaner deletes it even when the program never got to release it itself. A file something
 // still refers to is taken off the queue and kept.
 func TestQueuedFilesAreCleanedUp(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	s, ctx := w.s, context.Background()
 	store := func(extension string) (id int64, key string) {
 		digest := web.NewID() + web.NewID()

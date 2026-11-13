@@ -17,7 +17,7 @@ import (
 )
 
 func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

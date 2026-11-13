@@ -39,7 +39,7 @@ func TestBackgroundMovies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	s := w.s
 	ctx := context.Background()
 	// A chart with files whose audio stays: the movie needs no audio decoding.
@@ -94,7 +94,7 @@ func TestBackgroundMovies(t *testing.T) {
 			r.Header.Set("Prefer", "respond-async")
 		}
 		r.RemoteAddr = fmt.Sprintf("10.8.%d.1:1234", w.c.n.Add(1)&255)
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["owner"]})
+		r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens["owner"]})
 		rec := httptest.NewRecorder()
 		w.c.handler.ServeHTTP(rec, r)
 		return rec
@@ -219,7 +219,7 @@ func TestBackgroundMovies(t *testing.T) {
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
 		r.RemoteAddr = fmt.Sprintf("10.9.%d.1:1234", w.c.n.Add(1)&255)
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["owner"]})
+		r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens["owner"]})
 		rec := httptest.NewRecorder()
 		w.c.handler.ServeHTTP(rec, r)
 		return rec
@@ -275,7 +275,7 @@ func TestBackgroundMovies(t *testing.T) {
 	r.Header.Set("X-CSRF-Token", "csrf")
 	r.Header.Set("Idempotency-Key", web.NewID())
 	r.RemoteAddr = "10.8.200.1:1234"
-	r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["admin"]})
+	r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens["admin"]})
 	rec := httptest.NewRecorder()
 	w.c.handler.ServeHTTP(rec, r)
 	var published Chart

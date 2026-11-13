@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserScores(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const player = "0000000000000000000000000000abcd"
 	const other = "0000000000000000000000000000beef"

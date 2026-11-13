@@ -26,7 +26,7 @@ func TestChartReplacement(t *testing.T) {
 	}
 }
 func testChartReplacement(t *testing.T, remote bool) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	mustExec := func(sql string, args ...any) {
 		t.Helper()
@@ -357,7 +357,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 }
 
 func TestRetiredFileCleanupRetries(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	storage := t.TempDir()
 	app := testServer(t, pool, Config{Storage: storage})

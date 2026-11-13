@@ -16,7 +16,7 @@ import (
 // Uploads are UTF-8 only: the browser converts Shift-JIS and the rest first, and the form has
 // no encoding field.
 func TestUploadsAreUTF8Only(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	audio, err := os.ReadFile("../../kit/audio/testdata/vorbis.ogg")
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestUploadsAreUTF8Only(t *testing.T) {
 		r.Header.Set("X-CSRF-Token", "csrf")
 		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = "10.8.200.1:1234"
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["admin"]})
+		r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens["admin"]})
 		rec := httptest.NewRecorder()
 		w.c.handler.ServeHTTP(rec, r)
 		return rec

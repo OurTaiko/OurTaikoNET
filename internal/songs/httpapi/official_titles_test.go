@@ -17,7 +17,7 @@ import (
 // time; the BPM stays the TJA's. The stored TJA never changes, and the
 // package hands out a copy with the database's names in its headers.
 func TestTitleEditsKeepTheStoredTJA(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c, s := w.c, w.s
 	ctx := context.Background()
 	store := func(name string, data []byte) (int64, string) {

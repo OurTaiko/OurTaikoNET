@@ -47,7 +47,7 @@ func TestCDNRedirectFilename(t *testing.T) {
 	}
 }
 func TestCDNResourcesAndRoutes(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	remote := teststore.New(t)
 	if err := remote.SetPublicBaseURL("https://cdn.example/fanmade"); err != nil {
 		t.Fatal(err)

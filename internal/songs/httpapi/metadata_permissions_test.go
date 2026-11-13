@@ -15,7 +15,7 @@ import (
 )
 
 func TestMetadataAuthorOrAdmin(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES('d46774d30dd13b92d9e536808da468a4','author','unused',false),('9b893bc6d9422c93536ff0df503b81e9','another','unused',false),('5f63f79d876d201a13f8710453636837','adminuser','unused',true);`)
 	if err != nil {

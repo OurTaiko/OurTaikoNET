@@ -13,7 +13,7 @@ import (
 )
 
 func TestGameSessionIsolation(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	h, _ := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
 	_, err := pool.Exec(context.Background(), `INSERT INTO test_sso_users(id,username,password_hash) VALUES('abd722b06b5255372acb7511472ff700','gameuser',$1)`, string(h))
 	if err != nil {

@@ -38,7 +38,7 @@ func (a *awarder) Grant(ctx context.Context, tx pgx.Tx, request AwardRequest) (j
 // With an Awarder a 段位 attempt, its scores and what it earns are one transaction: when the
 // award cannot be recorded nothing is saved and the game's retry starts from nothing.
 func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const origin = "http://127.0.0.1:5173"
 	const alice, carol = "0000000000000000000000000000a11c", "0000000000000000000000000000ca01"

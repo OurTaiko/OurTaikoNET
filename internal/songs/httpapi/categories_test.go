@@ -18,7 +18,7 @@ import (
 )
 
 func TestCategoriesFlow(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const origin = "http://localhost"
 	token := strings.Repeat("a", 64)

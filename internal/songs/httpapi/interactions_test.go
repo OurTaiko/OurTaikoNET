@@ -3,8 +3,6 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,66 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 )
-
-type interactionClient struct {
-	t       *testing.T
-	handler http.Handler
-	tokens  map[string]string
-}
-
-// do sends a request as the given user ("" for a guest) and decodes the JSON reply.
-func (c interactionClient) do(user, method, path, body string, out any) int {
-	c.t.Helper()
-	var r *http.Request
-	if body == "" {
-		r = httptest.NewRequest(method, path, nil)
-	} else {
-		r = httptest.NewRequest(method, path, strings.NewReader(body))
-		r.Header.Set("Content-Type", "application/json")
-	}
-	if method != "GET" {
-		r.Header.Set("Origin", "http://localhost")
-		r.Header.Set("X-CSRF-Token", "csrf")
-	}
-	if user != "" {
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: c.tokens[user]})
-	}
-	w := httptest.NewRecorder()
-	c.handler.ServeHTTP(w, r)
-	if out != nil && w.Code < 300 {
-		if e := json.Unmarshal(w.Body.Bytes(), out); e != nil {
-			c.t.Fatal(path, e, w.Body.String())
-		}
-	}
-	return w.Code
-}
-
-func interactionFixture(t *testing.T) (interactionClient, *Server) {
-	t.Helper()
-	pool := scoreTestDB(t)
-	ctx := context.Background()
-	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES
-	 ('d46774d30dd13b92d9e536808da468a4','owner','unused',false),
-	 ('9b893bc6d9422c93536ff0df503b81e9','alice','unused',false),
-	 ('5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69','bob','unused',false),
-	 ('0a1b2c3d4e5f60718293a4b5c6d7e8f9','admin','unused',true)`); err != nil {
-		t.Fatal(err)
-	}
-	_, err := pool.Exec(ctx, `BEGIN;
-	 INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file,created_at) VALUES
-	  ('song',ARRAY['d46774d30dd13b92d9e536808da468a4'],'Song',120,10,test_file('song/tja','a.tja',repeat('a',64),14),test_file('song/audio','a.ogg',repeat('a',64),14),now()-interval '2 days'),
-	  ('other',ARRAY['d46774d30dd13b92d9e536808da468a4'],'Other',120,10,test_file('other/tja','a.tja',repeat('a',64),14),test_file('other/audio','a.ogg',repeat('a',64),14),now());
-	 COMMIT;`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := testServer(t, pool, Config{Storage: t.TempDir(), Origin: "http://localhost"})
-	tokens := map[string]string{}
-	for name, id := range map[string]string{"owner": "d46774d30dd13b92d9e536808da468a4", "alice": "9b893bc6d9422c93536ff0df503b81e9", "bob": "5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69", "admin": "0a1b2c3d4e5f60718293a4b5c6d7e8f9"} {
-		tokens[name] = seedWebSession(t, s, id)
-	}
-	return interactionClient{t, s.Handler(), tokens}, s
-}
 
 func TestChartVotes(t *testing.T) { bothSources(t, testChartVotes) }
 

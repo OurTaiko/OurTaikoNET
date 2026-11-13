@@ -16,7 +16,7 @@ import (
 )
 
 func TestDanCourses(t *testing.T) {
-	pool := scoreTestDB(t)
+	pool := testDB(t, Fanmade)
 	ctx := context.Background()
 	const origin = "http://127.0.0.1:5173"
 	const alice, boss, carol = "0000000000000000000000000000a11c", "0000000000000000000000000000b055", "0000000000000000000000000000ca01"

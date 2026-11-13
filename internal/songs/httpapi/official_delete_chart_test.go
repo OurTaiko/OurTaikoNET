@@ -11,7 +11,7 @@ import (
 // and shared files; here: who may delete on this source, and that its own way of releasing
 // files removes them.
 func TestDeleteChart(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c, s, ctx := w.c, w.s, context.Background()
 	// Each song has its own TJA; both share one audio file.
 	file := func(extension string) (id int64) {

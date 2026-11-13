@@ -10,7 +10,7 @@ import (
 // Liked Songs and Recently Acclaimed, as on Fanmade: Liked Songs is the viewer's own and
 // does not exist for a guest; Recently Acclaimed lists recent charts voted above zero.
 func TestSystemPlaylists(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	c, ctx := w.c, context.Background()
 	// System playlists list charts of the game catalog only: with a TJA and a category.
 	var tja, audio int64

@@ -14,7 +14,7 @@ import (
 // The game's preview clip: the backfill cuts one for a chart without it and leaves update_at
 // alone, the resource manifest lists it, and a new preview range replaces it.
 func TestPreviewClips(t *testing.T) {
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	s := w.s
 	ctx := context.Background()
 	source := filepath.Join(t.TempDir(), "a.ogg")

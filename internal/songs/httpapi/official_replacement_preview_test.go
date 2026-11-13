@@ -24,7 +24,7 @@ func TestReplacementPreview(t *testing.T) {
 	if !tja.Available() {
 		t.Skip("tjaparser not found: set TJAPARSER_BIN or put it on PATH")
 	}
-	w := officialInteractionFixture(t)
+	w := interactionWorldOf(t, Official)
 	s := w.s
 	ctx := context.Background()
 	source := []byte("TITLE:Original\nBPM:120\nWAVE:a.ogg\nCOURSE:Hard\nLEVEL:5\n#START\n1000,\n#END\nCOURSE:Oni\nLEVEL:8\n#START\n1100,\n#END\n")
@@ -77,7 +77,7 @@ func TestReplacementPreview(t *testing.T) {
 		r.Header.Set("X-CSRF-Token", "csrf")
 		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = fmt.Sprintf("10.9.%d.1:1234", w.c.n.Add(1)&255)
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens[user]})
+		r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens[user]})
 		rec := httptest.NewRecorder()
 		w.c.handler.ServeHTTP(rec, r)
 		return rec
