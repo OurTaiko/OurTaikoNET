@@ -98,10 +98,8 @@ func readScore(row pgx.Row) (Score, error) {
 	return v, err
 }
 
-// submitScore stores one play. Every play is its own row; the same
-// Idempotency-Key with the same body returns the stored score.
 func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, false)
+	u, ok := s.required(w, r, true)
 	if !ok {
 		return
 	}
@@ -146,7 +144,8 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	// Lock the chart against deletion and file replacement while storing.
+	// Serialize submissions against resource replacement on the same song.
+	// A replacement may have removed the block together with this very score.
 	var published bool
 	err = tx.QueryRow(r.Context(), `SELECT `+publishedChart+` FROM chart_difficulties d JOIN charts c ON c.id=d.chart_id WHERE d.id=$1 FOR SHARE OF c`, input.DifficultyID).Scan(&published)
 	found := err == nil
@@ -165,15 +164,23 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if retired {
-			problem(w, 409, "SCORE_REMOVED", "该成绩已被删除")
+			problem(w, 409, "SCORE_REMOVED", "歌曲文件已替换，此成绩已清除")
 			return
 		}
 		var oldDigest string
 		err = tx.QueryRow(r.Context(), `SELECT payload_digest FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key).Scan(&oldDigest)
 		if err == nil {
 			if oldDigest != digest {
-				problem(w, 409, "IDEMPOTENCY_CONFLICT", "此请求标识已用于不同成绩")
-				return
+				var same bool
+				err = tx.QueryRow(r.Context(), `SELECT jsonb_strip_nulls(jsonb_build_object('difficultyId',difficulty_id,'good',good,'ok',ok,'bad',bad,'score',score,'drumroll',drumroll,'max_combo',max_combo,'replay_data',replay_data,'ClearStatus',NULLIF(clear_status,0),'adlib',CASE WHEN adlib='{0,0}' THEN NULL ELSE to_jsonb(adlib) END,'mines',NULLIF(mines,0)))=$3::jsonb FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key, string(payload)).Scan(&same)
+				if err != nil {
+					internal(w, err)
+					return
+				}
+				if !same {
+					problem(w, 409, "IDEMPOTENCY_CONFLICT", "此请求标识已用于不同成绩")
+					return
+				}
 			}
 			result, err := readScore(tx.QueryRow(r.Context(), scoreSelect+` WHERE sc.user_id=$1 AND sc.idempotency_key=$2`, u.User.ID, key))
 			if err != nil {
@@ -193,7 +200,7 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !published {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		problem(w, 404, "CHART_NOT_FOUND", "歌曲不存在或已下架")
 		return
 	}
 	result, err := readScore(tx.QueryRow(r.Context(), `WITH sc AS (INSERT INTO scores

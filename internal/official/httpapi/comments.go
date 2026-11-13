@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Threaded comments on charts and 段位 courses, as on Fanmade (034, 044).
 const (
 	maxCommentRunes   = 10000
 	maxCommentDepth   = 999
@@ -55,16 +54,16 @@ const commentColumns = `m.id,m.chart_id,m.dan_id,m.parent_id,m.depth,m.author_id
  COALESCE((SELECT value FROM comment_votes v WHERE v.comment_id=m.id AND v.user_id=$1),0)`
 
 // commentTitles follows commentColumns when the thread's subject is wanted:
-// the chart's title, or the course's localized titles.
+// the song's title, or the course's localized titles.
 const commentTitles = `,c.title,d.title`
 
-// commentSubjects joins a comment m to its chart c or its course d.
+// commentSubjects joins a comment m to its song c or its course d.
 const commentSubjects = ` LEFT JOIN charts c ON c.id=m.chart_id LEFT JOIN dan_courses d ON d.id=m.dan_id`
 
-// publishedSubject keeps comments of hidden charts and deleted courses out of sight.
+// publishedSubject keeps comments of hidden songs and deleted courses out of sight.
 const publishedSubject = `((m.chart_id IS NOT NULL AND ` + publishedChart + `) OR (m.dan_id IS NOT NULL AND d.status='published'))`
 
-// commentSubject is what a thread hangs on: a published chart or 段位 course.
+// commentSubject is what a thread hangs on: a published song or 段位 course.
 type commentSubject struct {
 	chartID, danID string
 	// Who is told about new top-level comments and upvote milestones.
@@ -96,14 +95,10 @@ type rowScanner interface {
 
 func chartSubject(w http.ResponseWriter, r *http.Request, db rowScanner, lock string) (commentSubject, bool) {
 	var t commentSubject
-	id := r.PathValue("id")
-	var e error = pgx.ErrNoRows
-	if validID(id) {
-		e = db.QueryRow(r.Context(), `SELECT c.id,c.owner_ids,COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0)
-		 FROM charts c WHERE c.id=$1 AND `+publishedChart+` `+lock, id).Scan(&t.chartID, &t.owners, &t.commentCount)
-	}
+	e := db.QueryRow(r.Context(), `SELECT c.id,c.owner_ids,COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0)
+	 FROM charts c WHERE c.id=$1 AND `+publishedChart+` `+lock, r.PathValue("id")).Scan(&t.chartID, &t.owners, &t.commentCount)
 	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
 		return t, false
 	}
 	if e != nil {
@@ -170,7 +165,7 @@ type rowQuerier interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
-// readComments scans rows of commentColumns, optionally followed by commentTitles.
+// readComments scans rows of commentColumns, optionally followed by the song title.
 func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string, args ...any) ([]*Comment, error) {
 	rows, e := db.Query(ctx, sql, args...)
 	if e != nil {
@@ -198,7 +193,7 @@ func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string
 	return items, rows.Err()
 }
 
-// setSubject fills the chart or course fields from their nullable columns.
+// setSubject fills the song or course fields from their nullable columns.
 func (c *Comment) setSubject(chartID *string, danID *string, chartTitle *string, danTitle []byte) {
 	if chartID != nil {
 		c.ChartID = *chartID
@@ -275,22 +270,21 @@ func commentBody(w http.ResponseWriter, raw string) (string, bool) {
 }
 
 type commentState struct {
-	id, authorID   string
-	chartID, danID string
-	parentID       *string
-	depth, replies int
-	gone           bool
+	id, chartID, authorID, danID string
+	parentID                     *string
+	depth, replies               int
+	gone                         bool
 }
 
-// subjectWriteLock is how writers lock a comment's or vote's chart or course.
-// Votes and comments also refresh the chart's update_at (R010; Fanmade too since
-// its 051) and the course's tallies, so every writer takes the row lock it will
+// subjectWriteLock is how writers lock a comment's or vote's song or course.
+// Votes and comments also refresh the song's update_at (R010, as on OurTaiko
+// Database) and the course's tallies, so every writer takes the row lock it will
 // need up front: two writers holding FOR SHARE and both upgrading would deadlock.
 const subjectWriteLock = "FOR NO KEY UPDATE"
 
-// lockComment loads a comment of a published chart or course with the given row
-// lock, after locking its chart or course the way writers do, so a comment's
-// writers and a reply's (chart, then parent comment) always lock in one order.
+// lockComment loads a comment of a published song or course with the given row
+// lock, after locking its song or course the way writers do, so a comment's
+// writers and a reply's (song, then parent comment) always lock in one order.
 func lockComment(w http.ResponseWriter, r *http.Request, tx pgx.Tx, lock string) (commentState, bool) {
 	var c commentState
 	var chartID, danID *string
@@ -341,7 +335,7 @@ func (s *Server) danComments(w http.ResponseWriter, r *http.Request) {
 	s.subjectComments(w, r, danSubject)
 }
 
-// subjectComments returns one page of a chart's or course's top-level comments with their reply trees.
+// subjectComments returns one page of a song's or course's top-level comments with their reply trees.
 func (s *Server) subjectComments(w http.ResponseWriter, r *http.Request, load subjectLoader) {
 	sort, order, ok := commentOrder(w, r)
 	if !ok {
@@ -456,7 +450,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 	var req commentRequest
-	if !decode(w, r, &req) {
+	if !decodeLimit(w, r, &req, 65536) {
 		return
 	}
 	body, ok := commentBody(w, req.Body)
@@ -470,7 +464,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 	defer tx.Rollback(ctx)
-	// The lock also serializes with a deletion, which locks the row FOR UPDATE.
+	// The lock also serializes with a song deletion, which locks the row FOR UPDATE.
 	subject, ok := load(w, r, tx, subjectWriteLock)
 	if !ok {
 		return
@@ -491,17 +485,19 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 	id, depth, root := ID(), 0, ""
-	// Top-level comments notify the chart's owners or the course's maker, replies the parent's author.
+	// Top-level comments notify the song's uploader or the course's maker, replies the parent's author.
 	notice := Notice{Kind: "chart_comment", Actor: u.User.ID, ChartID: subject.chartID, DanID: subject.danID, CommentID: id}
 	if subject.danID != "" {
 		notice.Kind = "dan_comment"
 	}
 	if req.ParentID != nil {
-		var parentChart, parentDan *string
+		var parentChart *string
+		var parentDan *string
+		var parentAuthor string
 		var gone bool
 		// The parent row is updated by the reply counter, so lock it exclusively.
-		e = tx.QueryRow(ctx, `SELECT chart_id,dan_id,author_id,root_id,depth,deleted_at IS NOT NULL OR removed_at IS NOT NULL FROM comments WHERE id=$1 FOR UPDATE`, *req.ParentID).Scan(&parentChart, &parentDan, &notice.Recipient, &root, &depth, &gone)
-		notice.Kind = "comment_reply"
+		e = tx.QueryRow(ctx, `SELECT chart_id,dan_id,author_id,root_id,depth,deleted_at IS NOT NULL OR removed_at IS NOT NULL FROM comments WHERE id=$1 FOR UPDATE`, *req.ParentID).Scan(&parentChart, &parentDan, &parentAuthor, &root, &depth, &gone)
+		notice.Recipient, notice.Kind = parentAuthor, "comment_reply"
 		sameSubject := e == nil && ((parentChart != nil && *parentChart == subject.chartID) || (parentDan != nil && *parentDan == subject.danID))
 		if errors.Is(e, pgx.ErrNoRows) || (e == nil && !sameSubject) {
 			problem(w, 404, "COMMENT_NOT_FOUND", "回复的评论不存在或已删除")
@@ -555,7 +551,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.avatarOf(u.User)
+	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
 	respond(w, 201, items[0])
 }
 
@@ -567,7 +563,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Body string `json:"body"`
 	}
-	if !decode(w, r, &req) {
+	if !decodeLimit(w, r, &req, 65536) {
 		return
 	}
 	body, ok := commentBody(w, req.Body)
@@ -605,7 +601,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.avatarOf(u.User)
+	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
 	respond(w, 200, items[0])
 }
 
@@ -680,8 +676,8 @@ type CommentList struct {
 	PageSize int        `json:"pageSize"`
 }
 
-// visibleComment selects live comments on published charts and courses; m is
-// the comment, c its chart and d its course (see commentSubjects).
+// visibleComment selects live comments on published songs and courses; m is
+// the comment, c its song and d its course (see commentSubjects).
 const visibleComment = `m.deleted_at IS NULL AND m.removed_at IS NULL AND ` + publishedSubject
 
 // userComments is a user's public comment history, newest or top first.
@@ -704,9 +700,14 @@ func (s *Server) userComments(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	s.commentList(w, r, `m.author_id=$2`, order, page, id)
+}
+
+// commentList pages flat comments with their song titles; $2 is the filter's argument.
+func (s *Server) commentList(w http.ResponseWriter, r *http.Request, filter, order string, page int, arg string) {
 	ctx := r.Context()
 	viewer := s.viewer(r)
-	from := ` FROM comments m` + commentSubjects + ` WHERE m.author_id=$2 AND ` + visibleComment
+	from := ` FROM comments m` + commentSubjects + ` LEFT JOIN comments p ON p.id=m.parent_id WHERE ` + filter + ` AND ` + visibleComment
 	tx, e := s.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if e != nil {
 		internal(w, e)
@@ -714,12 +715,12 @@ func (s *Server) userComments(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 	result := CommentList{Page: page, PageSize: commentPageSize}
-	// The count does not report the viewer's votes, so the author becomes $1.
-	if e = tx.QueryRow(ctx, `SELECT count(*)`+strings.ReplaceAll(from, "$2", "$1"), id).Scan(&result.Total); e != nil {
+	// The count does not report the viewer's votes, so the filter argument becomes $1.
+	if e = tx.QueryRow(ctx, `SELECT count(*)`+strings.ReplaceAll(from, "$2", "$1"), arg).Scan(&result.Total); e != nil {
 		internal(w, e)
 		return
 	}
-	result.Items, e = readComments(ctx, tx, true, `SELECT `+commentColumns+commentTitles+from+` ORDER BY `+order+` LIMIT $3 OFFSET $4`, viewer, id, commentPageSize, (page-1)*commentPageSize)
+	result.Items, e = readComments(ctx, tx, true, `SELECT `+commentColumns+commentTitles+from+` ORDER BY `+order+` LIMIT $3 OFFSET $4`, viewer, arg, commentPageSize, (page-1)*commentPageSize)
 	if e == nil {
 		e = tx.Commit(ctx)
 	}

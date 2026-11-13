@@ -381,3 +381,22 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 	http.ServeContent(w, r, name, f.ModTime(), f)
 }
+
+// chartID checks the {id} path value; chart IDs are 32 lowercase hex digits, as Fanmade's.
+func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return "", false
+	}
+	return id, true
+}
+
+const playableChart = publishedChart + ` AND c.tja_file IS NOT NULL`
+
+// canManage: an owner or an administrator, as on Fanmade.
+func canManage(u User, c Chart) bool {
+	return u.IsAdmin || c.hasOwner(u.ID)
+}
+
+const pageSize = 24

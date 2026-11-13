@@ -6,8 +6,9 @@ import (
 	"time"
 )
 
-// Public catalogs stay available during an identity-provider outage. Account
-// checks never use this fallback; they always require a live SSO response.
+// publicProfiles names users for public pages. Catalogs stay available during an
+// identity-provider outage (or without SSO in development): unknown users then
+// show a placeholder. Account checks never use this fallback.
 func (s *Server) publicProfiles(ctx context.Context, ids []string) map[string]PublicProfile {
 	result := map[string]PublicProfile{}
 	unique := []string{}
@@ -17,38 +18,63 @@ func (s *Server) publicProfiles(ctx context.Context, ids []string) map[string]Pu
 			result[id] = PublicProfile{Nickname: "未知用户"}
 		}
 	}
+	if s.Config.SSO == nil || len(unique) == 0 {
+		return result
+	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	names, e := s.Config.SSO.Profiles(ctx, unique)
-	if e == nil {
+	if names, e := s.Config.SSO.Profiles(ctx, unique); e == nil {
 		for id, name := range names {
 			result[id] = name
 		}
 	}
 	return result
 }
-func (s *Server) chartNames(ctx context.Context, charts []Chart) {
-	ids := []string{}
-	for _, c := range charts {
-		ids = append(ids, c.OwnerIDs...)
+
+// avatarOf is the signed-in user's avatar, or none without SSO.
+func (s *Server) avatarOf(u User) string {
+	if s.Config.SSO == nil {
+		return ""
 	}
-	profiles := s.publicProfiles(ctx, ids)
+	return s.Config.SSO.AvatarURL(u)
+}
+
+// Public catalogs stay available during an identity-provider outage.
+func (s *Server) chartNames(ctx context.Context, charts []Chart) {
+	ids, seen := []string{}, map[string]bool{}
+	for _, c := range charts {
+		for _, id := range c.OwnerIDs {
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	profiles := s.profiles(ctx, ids)
 	for i := range charts {
 		charts[i].setOwners(profiles)
 	}
 }
 
-func (c *Chart) setUploader(p PublicProfile) {
-	c.Uploader = p.Nickname
-	c.UploaderAvatarURL = p.AvatarURL
-}
-
 func (c *Chart) hasOwner(id string) bool { return slices.Contains(c.OwnerIDs, id) }
+
 func (c *Chart) setOwners(profiles map[string]PublicProfile) {
 	c.Owners = []NotificationActor{}
 	for _, id := range c.OwnerIDs {
-		p := profiles[id]
+		p, ok := profiles[id]
+		if !ok {
+			p.Nickname = "未知用户"
+		}
 		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL})
 	}
-	c.setUploader(profiles[c.OwnerID])
+	p, ok := profiles[c.OwnerID]
+	if !ok {
+		p.Nickname = "未知用户"
+	}
+	c.setUploader(p)
+}
+
+func (c *Chart) setUploader(p PublicProfile) {
+	c.Uploader = p.Nickname
+	c.UploaderAvatarURL = p.AvatarURL
 }

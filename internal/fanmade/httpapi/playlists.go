@@ -311,3 +311,37 @@ func (s *Server) playlistDetail(w http.ResponseWriter, r *http.Request) {
 	s.playlistOwners(r.Context(), items)
 	respond(w, 200, items[0])
 }
+
+// playlistID parses a stored playlist's ID.
+func playlistID(raw string) (string, bool) {
+	return raw, validID(raw)
+}
+
+// PlaylistOwner is the public profile of a playlist's owner.
+type PlaylistOwner struct {
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarUrl"`
+}
+
+// profiles looks up public profiles; the account center being down leaves
+// them unknown rather than failing the request.
+func (s *Server) profiles(ctx context.Context, ids []string) map[string]PublicProfile {
+	found := map[string]PublicProfile{}
+	if s.Config.SSO == nil {
+		for _, id := range ids {
+			if id == s.Config.DevUserID {
+				found[id] = PublicProfile{Nickname: devUser(id).Nickname}
+			}
+		}
+		return found
+	}
+	if len(ids) > 0 {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		if result, e := s.Config.SSO.Profiles(ctx, ids); e == nil {
+			found = result
+		}
+	}
+	return found
+}
