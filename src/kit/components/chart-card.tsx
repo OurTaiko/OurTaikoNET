@@ -8,23 +8,18 @@ import { i18n } from '../i18n'
 import { coverSource } from '../cover'
 import { CategoryLabels } from '../categories'
 import { supportsChart } from '../courses'
-import { categoryStripeColor } from '../category-colors'
-import { cn } from '../lib/utils'
 import { Badge } from './ui/badge'
-import { Card, CardContent } from './ui/card'
-import { DifficultyBadges } from './difficulty-badges'
+import { LevelChips } from './difficulty-badges'
 import { useSite } from '../site'
 import { compactNumber } from './vote-control'
-import { CardCoverBackdrop, coveredTextClassName, useCardCover } from './card-cover'
+import { SongCover } from './song-cover'
 
-export function formatDuration(seconds: number) {
-  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
-}
+export { formatDuration } from './song-cover'
 
 /**
- * A chart in a list: cover, title and subtitle, a row of facts after the categories, a bottom
- * row and the difficulty bookmarks. The site fills the two rows, each item an <li>, from the
- * badges below and its own.
+ * A chart in a list: a tile with the cover on top (tempo and length over it), then title and
+ * subtitle, the courses with their star levels, the categories after the site's facts, and a
+ * bottom row. The site fills the two rows, each item an <li>, from the badges below and its own.
  */
 export function ChartCard({
   chart,
@@ -36,57 +31,41 @@ export function ChartCard({
   footer?: ReactNode
 }) {
   const { t } = useTranslation()
-  const cover = useCardCover(coverSource(chart))
-  const hasCover = !!cover.source
   if (!supportsChart(chart)) return null
   const text = chartText(chart, i18n.resolvedLanguage)
   return (
     <Link
-      className="group block rounded-[14px] outline-none focus-visible:ring-ring focus-visible:ring-3 focus-visible:ring-offset-4 min-w-0 hover:-translate-y-0.5 motion-reduce:transform-none transition-transform motion-reduce:transition-none duration-150"
+      className="group flex flex-col bg-card shadow-elev-1 hover:shadow-elev-2 rounded-[20px] outline-none focus-visible:ring-ring focus-visible:ring-3 focus-visible:ring-offset-2 min-w-0 overflow-hidden hover:-translate-y-0.5 motion-reduce:transform-none transition-[translate,box-shadow] motion-reduce:transition-none duration-200 ease-emphasized"
       data-testid="chart-card"
       to={`/charts/${chart.id}`}
     >
-      {/* Fixed height: five difficulty bookmarks, the most a song has, fit exactly. */}
-      <Card
-        size="sm"
-        className="isolate relative group-hover:shadow-drop-hover pt-6 pb-5 h-56 transition-shadow"
-      >
-        <div
-          aria-hidden="true"
-          className="top-0 z-10 absolute inset-x-0 border-b-2 border-outline h-1.5"
-          style={{ background: categoryStripeColor(chart.categoryIds) }}
-        />
-        {cover.source && <CardCoverBackdrop source={cover.source} onError={cover.onError} />}
-        <CardContent className="relative flex gap-4 pr-4 pl-6 h-full min-h-0">
-          <div className="flex flex-col flex-1 gap-4 min-w-0 min-h-0">
-            <div className={cn('space-y-0.5 min-w-0', hasCover && coveredTextClassName)}>
-              <h3 className="font-extrabold text-lg truncate" title={text.title}>
-                {text.title}
-              </h3>
-              <p
-                className={cn(
-                  'text-sm truncate',
-                  hasCover ? 'text-foreground/80' : 'text-muted-foreground',
-                )}
-                title={text.subtitle}
-              >
-                {text.subtitle}
-              </p>
-            </div>
-            {/* Two rows of facts at most; a third row is cut off whole. */}
-            <div className="max-h-[3.25rem] overflow-hidden">
-              <CategoryLabels ids={chart.categoryIds}>{facts}</CategoryLabels>
-            </div>
-            <ul
-              className="flex items-center gap-2 mt-auto"
-              aria-label={t('messages.chartInformation')}
-            >
-              {footer}
-            </ul>
-          </div>
-          <DifficultyBadges difficulties={chart.difficulties} bookmarks />
-        </CardContent>
-      </Card>
+      <SongCover
+        image={coverSource(chart)}
+        categoryIds={chart.categoryIds}
+        bpm={chart.bpm}
+        duration={chart.hasFiles === false ? undefined : chart.duration}
+      />
+      <div className="flex flex-col flex-1 gap-2 p-3 min-w-0">
+        <div className="space-y-0.5 min-w-0">
+          <h3 className="font-bold text-sm line-clamp-2 leading-snug" title={text.title}>
+            {text.title}
+          </h3>
+          <p className="min-h-4 text-muted-foreground text-xs truncate" title={text.subtitle}>
+            {text.subtitle}
+          </p>
+        </div>
+        <LevelChips difficulties={chart.difficulties} />
+        {/* Two rows of facts at most; a third row is cut off whole. */}
+        <div className="max-h-[3.25rem] overflow-hidden">
+          <CategoryLabels ids={chart.categoryIds}>{facts}</CategoryLabels>
+        </div>
+        <ul
+          className="flex flex-wrap items-center gap-1.5 mt-auto"
+          aria-label={t('messages.chartInformation')}
+        >
+          {footer}
+        </ul>
+      </div>
     </Link>
   )
 }
@@ -105,28 +84,6 @@ export function MakerBadge({ name }: { name: string }) {
           {t('messages.chartCreator')}
         </span>
         <span className="px-2 truncate">{name}</span>
-      </Badge>
-    </li>
-  )
-}
-
-/** Left out when the BPM is unknown (0). */
-export function BpmBadge({ bpm }: { bpm: number }) {
-  if (!(bpm > 0)) return null
-  return (
-    <li>
-      <Badge variant="outline" className="tabular-nums">
-        {bpm} BPM
-      </Badge>
-    </li>
-  )
-}
-
-export function DurationBadge({ seconds }: { seconds: number }) {
-  return (
-    <li>
-      <Badge variant="outline" className="tabular-nums">
-        {formatDuration(seconds)}
       </Badge>
     </li>
   )

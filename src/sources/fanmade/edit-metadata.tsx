@@ -243,7 +243,7 @@ export function EditMetadata({
             <div className="overflow-x-auto pb-1">
               <TabsList
                 aria-label={t('messages.editChartInformation')}
-                className="grid h-auto! w-full grid-cols-3 rounded-[14px] sm:grid-cols-5"
+                className="grid h-auto! w-full grid-cols-3 rounded-[20px] sm:grid-cols-5"
               >
                 {(['categories', 'preview', 'description', 'makers', 'translations'] as const).map(
                   (value) => (
@@ -268,7 +268,7 @@ export function EditMetadata({
               <CategoryPicker value={categoryIds} disabled={busy} onChange={setCategoryIds} />
             </TabsContent>
             <TabsContent value="preview" className="pt-3">
-              <fieldset disabled={busy} className="space-y-3 rounded-[14px] border p-4">
+              <fieldset disabled={busy} className="space-y-3 rounded-[20px] border p-4">
                 <legend className="px-2 font-medium">{t('messages.previewRange')}</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Label htmlFor="edit-demo-start" className="flex flex-col items-start gap-2">
@@ -353,7 +353,7 @@ export function EditMetadata({
             </TabsContent>
             <TabsContent value="translations" className="space-y-4 pt-3">
               <fieldset
-                className="min-w-0 space-y-4 rounded-[14px] border p-4 [&>legend]:px-2 [&>legend]:font-medium"
+                className="min-w-0 space-y-4 rounded-[20px] border p-4 [&>legend]:px-2 [&>legend]:font-medium"
                 disabled={busy}
               >
                 <legend>{t('messages.originalNames')}</legend>
@@ -386,7 +386,7 @@ export function EditMetadata({
               {languages.map(({ code, label, caption }) => (
                 <fieldset
                   key={code}
-                  className="min-w-0 space-y-4 rounded-[14px] border p-4 [&>legend]:px-2 [&>legend]:font-medium [&>legend_span]:ml-2 [&>legend_span]:text-xs [&>legend_span]:text-muted-foreground"
+                  className="min-w-0 space-y-4 rounded-[20px] border p-4 [&>legend]:px-2 [&>legend]:font-medium [&>legend_span]:ml-2 [&>legend_span]:text-xs [&>legend_span]:text-muted-foreground"
                   disabled={busy}
                 >
                   <legend>

@@ -5,7 +5,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@players/components/ui/select'
+} from '@sitekit/components/ui/select'
 
 export function ChoiceSelect({
   label,

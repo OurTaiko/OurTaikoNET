@@ -463,7 +463,7 @@ export function UploadPage({
   const fileTile = (kind: 'tja' | 'audio') => {
     const file = kind === 'tja' ? tja : audio
     return (
-      <Label className="flex min-w-0 flex-col items-start gap-3 rounded-[14px] border p-4 [&>span]:w-full [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-muted-foreground">
+      <Label className="flex min-w-0 flex-col items-start gap-3 rounded-[20px] border p-4 [&>span]:w-full [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-muted-foreground">
         {kind === 'tja' ? <FileMusic size={24} /> : <AudioLines size={24} />}
         <span>
           <b>{kind === 'tja' ? t('messages.tjaChart') : t('messages.oggMp3Audio')}</b>
@@ -549,7 +549,7 @@ export function UploadPage({
       ) : (
         <form className="space-y-6" onSubmit={submit}>
           {mode === 'song' ? (
-            <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+            <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
               <h2 className="text-base font-extrabold">{t('db.songInformation')}</h2>
               <div className="grid gap-4 sm:grid-cols-[1fr_1fr_8rem]">
                 <div className="space-y-2">
@@ -589,13 +589,13 @@ export function UploadPage({
             </Card>
           ) : (
             <Card
-              className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6"
+              className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6"
               onDragOver={(e) => e.preventDefault()}
               onDrop={drop}
             >
               <h2 className="text-base font-extrabold">{t('db.uploadFiles')}</h2>
               <div
-                className="flex flex-col items-center gap-2 rounded-[14px] border border-dashed p-5 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
+                className="flex flex-col items-center gap-2 rounded-[20px] border border-dashed p-5 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
                 aria-busy={reading}
               >
                 {reading ? (
@@ -685,7 +685,7 @@ export function UploadPage({
             </Card>
           )}
           {mode === 'files' && tja && (
-            <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+            <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
               <h2 className="text-base font-extrabold">{t('messages.previewRange')}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Label htmlFor="upload-demo-start" className="flex flex-col items-start gap-2">
@@ -727,7 +727,7 @@ export function UploadPage({
             </Card>
           )}
           {mode === 'files' && metadata && (
-            <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+            <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
               <h2 className="text-base font-extrabold">{t('messages.difficultiesAndCreators')}</h2>
               <p className="text-sm text-muted-foreground">
                 {metadata.maker
@@ -776,7 +776,7 @@ export function UploadPage({
               </Table>
             </Card>
           )}
-          <Card className="min-w-0 gap-5 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+          <Card className="min-w-0 gap-5 border border-border p-5 shadow-none sm:p-6">
             <h2 className="text-base font-extrabold">{t('db.record')}</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <NijiiroIdField
@@ -816,7 +816,7 @@ export function UploadPage({
           </Card>
           {/* An existing chart invites from its own page. */}
           {!existing && (
-            <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+            <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
               <UploadCollaborators
                 value={collaborators}
                 disabled={busy}

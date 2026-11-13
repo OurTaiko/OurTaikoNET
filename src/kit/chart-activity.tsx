@@ -26,19 +26,19 @@ const ChartPreview = lazy(() => import('./chart-preview'))
 const EmbeddedPlayer = lazy(() => import('./embedded-player'))
 
 const difficultyTabColors = {
-  Easy: '[--difficulty-bg:#f9a15a]',
-  Normal: '[--difficulty-bg:#8fd16a]',
-  Hard: '[--difficulty-bg:#6cc7d8]',
-  Oni: '[--difficulty-bg:#f77fab]',
-  Edit: '[--difficulty-bg:#b99ae8]',
+  Easy: '[--difficulty-bg:#c2410c]',
+  Normal: '[--difficulty-bg:#2f7d32]',
+  Hard: '[--difficulty-bg:#1565c0]',
+  Oni: '[--difficulty-bg:#c2185b]',
+  Edit: '[--difficulty-bg:#6a3fc0]',
 }
 
 const tabButtonGroupClassName =
-  'shrink-0 gap-0 overflow-hidden rounded-[10px] border-2 border-outline bg-card p-0'
+  'shrink-0 gap-0 overflow-hidden rounded-[14px] border border-border bg-card p-0'
 const tabButtonClassName =
   'h-full rounded-none px-3 text-muted-foreground shadow-none not-first:border-l! not-first:border-l-border! hover:bg-muted/50 focus-visible:z-10 focus-visible:-ring-offset-2 data-active:bg-muted data-active:text-foreground dark:hover:bg-muted/50 dark:data-active:bg-muted after:hidden'
 const difficultyTabClassName =
-  'bg-transparent font-bold text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring data-active:bg-[var(--difficulty-bg)] data-active:text-[#382d2a] data-active:hover:bg-[var(--difficulty-bg)] data-active:hover:text-[#382d2a]'
+  'bg-transparent font-bold text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring data-active:bg-[var(--difficulty-bg)] data-active:text-white data-active:hover:bg-[var(--difficulty-bg)] data-active:hover:text-white'
 
 // The chart image of one block, the embedded player playing it, or its leaderboard. A course
 // may have a single, a 1P and a 2P chart: one tab per course, then a side
@@ -108,7 +108,7 @@ export function ChartActivity({
     <Tabs
       value={tab}
       onValueChange={(value) => setTab(value as ActivityTab)}
-      className="min-w-0 gap-5 rounded-[14px] border-2 border-outline bg-card p-5 shadow-drop sm:p-6"
+      className="min-w-0 gap-5 rounded-[20px] border border-border bg-card p-5 shadow-drop sm:p-6"
       aria-label={t('messages.chartPreviewAndLeaderboard')}
       data-testid="chart-activity"
     >

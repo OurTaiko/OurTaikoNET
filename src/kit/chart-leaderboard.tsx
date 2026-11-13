@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { PlayerLink } from './components/player-link'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
 import { PlayIcon } from '@phosphor-icons/react'
 import { api } from './api/client'
 import { endpoints } from './api/endpoints'
@@ -141,9 +141,9 @@ export function ChartLeaderboard({
                     <span className="font-medium tabular-nums">#{entry.rank}</span>
                   </TableCell>
                   <TableHead scope="row">
-                    <Link
+                    <PlayerLink
                       className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
-                      to={`/users/${encodeURIComponent(entry.userId)}`}
+                      id={entry.userId}
                     >
                       <UserAvatar
                         nickname={entry.nickname}
@@ -152,7 +152,7 @@ export function ChartLeaderboard({
                         fallbackClassName="text-xs"
                       />
                       <span className="truncate">{entry.nickname}</span>
-                    </Link>
+                    </PlayerLink>
                     <ProfilePlate userId={entry.userId} className="ml-2" />
                     {entry.userId === user?.id && (
                       <span className="ml-2 rounded-md bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">

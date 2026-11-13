@@ -17,7 +17,7 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
   return (
     <div
       className={cn(
-        'flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[14px] bg-muted',
+        'flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[20px] bg-muted',
         className,
       )}
     >
@@ -34,7 +34,7 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
         <div className="flex justify-center items-center bg-cream size-full">
           <span
             aria-hidden="true"
-            className="bg-(--hero) border-[2.5px] border-outline rounded-full w-2/5 max-w-28 aspect-square shadow-[inset_0_0_0_10px_rgb(255_255_255/0.5)]"
+            className="bg-(--hero) border-[2.5px] border-border rounded-full w-2/5 max-w-28 aspect-square shadow-[inset_0_0_0_10px_rgb(255_255_255/0.5)]"
           />
           <span className="sr-only">
             {source ? t('messages.coverTemporarilyUnavailable') : t('messages.noCover')}

@@ -38,7 +38,7 @@ export function DifficultyConstants({
     <section
       aria-labelledby={heading}
       className={cn(
-        '@container rounded-[14px] border-2 border-outline bg-card p-5 shadow-drop sm:p-6',
+        '@container rounded-[20px] border border-border bg-card p-5 shadow-drop sm:p-6',
         className,
       )}
     >
@@ -49,7 +49,7 @@ export function DifficultyConstants({
         {difficulty && (
           <span
             className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-[7px] border-[1.5px] border-[#382d2a] px-2.5 text-xs font-bold whitespace-nowrap text-[#382d2a]',
+              'inline-flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-xs font-bold whitespace-nowrap text-white',
               difficultyColors[difficulty.course as keyof typeof difficultyColors] ?? 'bg-muted',
             )}
           >
@@ -69,7 +69,7 @@ export function DifficultyConstants({
             <div
               role="radiogroup"
               aria-label={t('messages.selectBranch')}
-              className="mt-4 grid grid-cols-3 overflow-hidden rounded-[10px] border-2 border-outline bg-card"
+              className="mt-4 grid grid-cols-3 overflow-hidden rounded-[14px] border border-border bg-card"
             >
               {routes.map((r) => (
                 <button
@@ -104,7 +104,7 @@ export function DifficultyConstants({
 function ConstantValues({ values }: { values: Constants }) {
   const { t } = useTranslation()
   return (
-    <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-4 rounded-[10px] border-[1.5px] border-border bg-cream p-4 @lg:w-56 @lg:shrink-0 @lg:grid-cols-1 @lg:gap-y-4">
+    <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-4 rounded-[14px] border border-border bg-cream p-4 @lg:w-56 @lg:shrink-0 @lg:grid-cols-1 @lg:gap-y-4">
       <div>
         <dt className="text-xs font-bold text-muted-foreground">{t('constants.main')}</dt>
         <dd className="mt-1 text-5xl leading-none font-extrabold tabular-nums">

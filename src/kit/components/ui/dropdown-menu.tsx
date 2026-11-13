@@ -38,7 +38,7 @@ function DropdownMenuContent({
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            'z-50 max-h-(--available-height) w-(--anchor-width) min-w-48 origin-(--transform-origin) transition-[opacity,scale,translate] duration-150 ease-out data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0 data-ending-style:duration-100 data-ending-style:ease-in motion-reduce:transition-none data-instant:transition-none overflow-x-hidden overflow-y-auto rounded-[12px] border-2 border-outline bg-popover p-1.5 text-popover-foreground shadow-[0_4px_0_var(--drop)] outline-none dark:ring-foreground/10 data-closed:overflow-hidden',
+            'z-50 max-h-(--available-height) w-(--anchor-width) min-w-48 origin-(--transform-origin) transition-[opacity,scale,translate] duration-150 ease-out data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0 data-ending-style:duration-100 data-ending-style:ease-in motion-reduce:transition-none data-instant:transition-none overflow-x-hidden overflow-y-auto rounded-[18px] border-0 bg-popover p-1.5 text-popover-foreground shadow-elev-2 outline-none dark:ring-foreground/10 data-closed:overflow-hidden',
             className,
           )}
           {...props}
@@ -132,7 +132,7 @@ function DropdownMenuSubContent({
     <DropdownMenuContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        'w-auto min-w-36 rounded-[12px] border-2 border-outline bg-popover p-1.5 text-popover-foreground shadow-[0_4px_0_var(--drop)] duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+        'w-auto min-w-36 rounded-[18px] border-0 bg-popover p-1.5 text-popover-foreground shadow-elev-2 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
         className,
       )}
       align={align}

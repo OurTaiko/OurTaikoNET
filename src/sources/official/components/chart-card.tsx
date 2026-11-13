@@ -3,12 +3,10 @@ import { FileDashedIcon } from '@phosphor-icons/react'
 import type { Chart } from '@official/api/types'
 import { Badge } from '@sitekit/components/ui/badge'
 import {
-  BpmBadge,
   BranchingBadge,
   ChartCard as SharedChartCard,
   CommentCountBadge,
   DoubleBadge,
-  DurationBadge,
   ScoreBadge,
 } from '@sitekit/components/chart-card'
 
@@ -19,10 +17,7 @@ export function ChartCard({ chart }: { chart: Chart }) {
       chart={chart}
       facts={
         <>
-          <BpmBadge bpm={chart.bpm} />
-          {chart.hasFiles ? (
-            <DurationBadge seconds={chart.duration} />
-          ) : (
+          {!chart.hasFiles && (
             <li>
               <Badge variant="outline" className="text-muted-foreground">
                 <FileDashedIcon className="size-3" aria-hidden="true" />

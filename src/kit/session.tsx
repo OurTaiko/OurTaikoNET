@@ -5,7 +5,14 @@ import { SessionContext, type SessionState } from './session-context'
 import type { ReactNode } from 'react'
 import { api, jsonRequest } from './api/client'
 import type { Session } from './api/types'
-export function SessionProvider({ children }: { children: ReactNode }) {
+/** me: where the signed-in player is described; a song source's own by default. */
+export function SessionProvider({
+  children,
+  me = endpoints.me,
+}: {
+  children: ReactNode
+  me?: string
+}) {
   const { pathname } = useLocation()
   const [session, setSession] = useState<Session>({ user: null, csrfToken: '' })
   const [loading, setLoading] = useState(true),
@@ -23,7 +30,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const current = new AbortController()
       controller = current
       const startedAt = revision.current
-      api<Session>(endpoints.me, { signal: current.signal })
+      api<Session>(me, { signal: current.signal })
         .then((next) => {
           if (!current.signal.aborted && startedAt === revision.current) {
             setSession(next)
@@ -45,7 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [pathname])
+  }, [pathname, me])
   const logout = async () => {
     await api(endpoints.logout, jsonRequest('POST', {}, session.csrfToken))
     revision.current++

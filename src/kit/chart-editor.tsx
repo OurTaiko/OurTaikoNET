@@ -313,7 +313,7 @@ export function ChartEditorPage() {
         </Notice>
       )}
       <div className="grid min-w-0 gap-6 xl:grid-cols-2">
-        <Card className="min-w-0 gap-3 overflow-hidden border-[1.5px] border-border p-0 shadow-none">
+        <Card className="min-w-0 gap-3 overflow-hidden border border-border p-0 shadow-none">
           <h2 className="px-5 pt-5 text-base font-extrabold sm:px-6">{t('editor.editorLabel')}</h2>
           <Suspense
             fallback={
@@ -335,7 +335,7 @@ export function ChartEditorPage() {
             />
           </Suspense>
         </Card>
-        <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+        <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-extrabold">{t('editor.previewHeading')}</h2>
             {blocks.keys.length > 0 && (

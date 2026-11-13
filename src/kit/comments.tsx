@@ -1,4 +1,5 @@
 import { isChartOwner } from './chart-owners'
+import { PlayerLink } from './components/player-link'
 import { danTitle } from './dan-title'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -382,18 +383,14 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
           {gone ? (
             <span className="size-6 rounded-full bg-muted" aria-hidden="true" />
           ) : (
-            <Link
-              to={`/users/${encodeURIComponent(comment.authorId)}`}
-              tabIndex={-1}
-              aria-hidden="true"
-            >
+            <PlayerLink id={comment.authorId} tabIndex={-1} aria-hidden="true">
               <UserAvatar
                 nickname={author}
                 avatarUrl={comment.authorAvatarUrl}
                 className="size-6"
                 fallbackClassName="text-xs"
               />
-            </Link>
+            </PlayerLink>
           )}
           {!collapsed && comment.replies.length > 0 && (
             <button
@@ -411,12 +408,12 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
             {gone ? (
               <span className="italic">{t('interactions.deletedAuthor')}</span>
             ) : (
-              <Link
-                to={`/users/${encodeURIComponent(comment.authorId)}`}
+              <PlayerLink
+                id={comment.authorId}
                 className="max-w-48 truncate font-medium text-foreground hover:underline"
               >
                 {author}
-              </Link>
+              </PlayerLink>
             )}
             {!gone && tree.subject.isOwner(comment.authorId) && (
               <span
@@ -763,7 +760,7 @@ export function CommentSection({
       ref={section}
       id="comments"
       aria-labelledby="comments-heading"
-      className="scroll-mt-24 space-y-6 rounded-[14px] border-2 border-outline bg-card p-6 shadow-drop sm:p-8"
+      className="scroll-mt-24 space-y-6 rounded-[20px] border border-border bg-card p-6 shadow-drop sm:p-8"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2
@@ -859,10 +856,10 @@ function CommentSummary({ comment }: { comment: Comment }) {
     ? danTitle(comment.danTitle ?? {}, i18n.resolvedLanguage)
     : comment.chartTitle
   return (
-    <article className="min-w-0 space-y-2 rounded-[14px] border p-4">
+    <article className="min-w-0 space-y-2 rounded-[20px] border p-4">
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <Link
-          to={`/users/${encodeURIComponent(comment.authorId)}`}
+        <PlayerLink
+          id={comment.authorId}
           className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
         >
           <UserAvatar
@@ -872,7 +869,7 @@ function CommentSummary({ comment }: { comment: Comment }) {
             fallbackClassName="text-[10px]"
           />
           {comment.author || t('messages.unknownMember')}
-        </Link>
+        </PlayerLink>
         <span aria-hidden="true">·</span>
         <Link to={commentSubjectPath(comment)} className="max-w-60 truncate hover:underline">
           {subjectTitle}
@@ -924,8 +921,8 @@ export function CommentListView({
   if (!data)
     return (
       <div className="space-y-3" role="status" aria-label={t('interactions.loadingComments')}>
-        <Skeleton className="h-24 rounded-[14px]" />
-        <Skeleton className="h-24 rounded-[14px]" />
+        <Skeleton className="h-24 rounded-[20px]" />
+        <Skeleton className="h-24 rounded-[20px]" />
       </div>
     )
   if (data.items.length === 0)

@@ -231,10 +231,10 @@ export function BatchUpload({
 
   return (
     <div className="space-y-6">
-      <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+      <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
         <CategoryPicker value={categoryIds} disabled={running} onChange={setCategoryIds} />
       </Card>
-      <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+      <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-extrabold">{t('folderUpload.batchTitle')}</h2>
@@ -261,7 +261,7 @@ export function BatchUpload({
             </Button>
           </div>
         </div>
-        <ul className="divide-y divide-border rounded-[14px] border-[1.5px] border-border">
+        <ul className="divide-y divide-border rounded-[20px] border border-border">
           {rows.map((row, index) => (
             <li key={row.chart.path} className="flex min-w-0 items-start gap-3 p-4">
               <Checkbox
@@ -309,7 +309,7 @@ export function BatchUpload({
           ))}
         </ul>
         {sent > 0 && !running && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-cream px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-cream px-4 py-3 text-sm">
             <span>{t('folderUpload.done', { count: sent })}</span>
             <Link className={buttonVariants({ variant: 'secondary' })} to="/me/charts">
               {t('folderUpload.myCharts')}

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { PlayerLink } from './player-link'
 import { useTranslation } from 'react-i18next'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import type { PublicUser } from '../api/types'
@@ -81,8 +81,8 @@ export function PublicUserCard({
         </div>
       </dl>
       {showSpaceLink && (
-        <Link
-          to={`/users/${encodeURIComponent(user.id)}`}
+        <PlayerLink
+          id={user.id}
           aria-label={t('messages.visitMemberSpace', { nickname })}
           className={buttonVariants({
             variant: 'outline',
@@ -91,7 +91,7 @@ export function PublicUserCard({
         >
           {t('messages.visitUserSpace')}
           <ArrowRightIcon aria-hidden="true" />
-        </Link>
+        </PlayerLink>
       )}
     </Card>
   )

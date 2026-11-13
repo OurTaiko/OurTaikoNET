@@ -189,7 +189,7 @@ export function ReplacementReview({
                 {review.keepable.map((change) => (
                   <li
                     key={change.key}
-                    className="space-y-3 rounded-[10px] border-[1.5px] border-border p-3"
+                    className="space-y-3 rounded-[14px] border border-border p-3"
                   >
                     <label className="flex items-center gap-2 font-bold">
                       <Checkbox

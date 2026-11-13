@@ -8,7 +8,7 @@
     "memberNamesUnavailable": "닉네임을 가져올 수 없습니다. 채보와 점수 통계는 계속 표시됩니다.",
     "userPublishedCharts": "이 사용자가 업로드한 채보",
     "metadataTab_translations": "번역명",
-    "exploreCharts": "태고의 달인 공식 채보 데이터베이스",
+    "exploreCharts": "공식 곡",
     "myCharts": "내 업로드",
     "publishChart": "채보 업로드",
     "noChartsYet": "데이터베이스에 아직 채보가 없습니다",
@@ -16,7 +16,7 @@
     "chartsNav": "채보 둘러보기"
   },
   "common": {
-    "siteTitle": "OurTaiko Database · 공식 채보"
+    "siteTitle": "OurTaiko · 공식"
   },
   "upload": {
     "replacement_other": "“{{previous}}”을(를) “{{title}}”(채보 블록 {{count}}개)(으)로 교체합니다."

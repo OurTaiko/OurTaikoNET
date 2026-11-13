@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { PlayerLink } from './components/player-link'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -43,7 +44,7 @@ import { PlaylistDialog, PlaylistCoverDialog } from './playlist-dialogs'
 const sorts = ['updated', 'newest', 'favorites'] as const
 type Sort = (typeof sorts)[number]
 
-const panelClassName = 'rounded-[14px] border-2 border-outline bg-card p-6 shadow-drop'
+const panelClassName = 'rounded-[20px] border border-border bg-card p-6 shadow-drop'
 
 // Public playlists, optionally of one user, with search, order and paging kept
 // in the address unless the list is embedded in another page.
@@ -463,7 +464,7 @@ export function PlaylistPage() {
     return (
       <section className="space-y-6" role="status" aria-label={t('playlists.loading')}>
         {back}
-        <Skeleton className="h-56 rounded-[14px]" />
+        <Skeleton className="h-56 rounded-[20px]" />
         <PlaylistGridSkeleton />
       </section>
     )
@@ -547,7 +548,7 @@ export function PlaylistPage() {
     <section className="space-y-6" aria-labelledby="playlist-heading">
       {back}
       <div className={cn(panelClassName, 'flex flex-col gap-6 sm:flex-row')}>
-        <div className="flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-muted sm:w-44">
+        <div className="flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-muted sm:w-44">
           {source && failedCover !== source ? (
             <img
               src={source}
@@ -573,8 +574,8 @@ export function PlaylistPage() {
           {playlist.owner && (
             <p className="flex min-w-0 items-center gap-2 text-sm">
               <span className="text-muted-foreground">{t('playlists.creator')}</span>
-              <Link
-                to={`/users/${encodeURIComponent(playlist.owner.id)}`}
+              <PlayerLink
+                id={playlist.owner.id}
                 className="flex min-w-0 items-center gap-2 font-medium hover:text-link"
               >
                 <UserAvatar
@@ -586,7 +587,7 @@ export function PlaylistPage() {
                 <span className="truncate">
                   {playlist.owner.nickname || t('messages.unknownMember')}
                 </span>
-              </Link>
+              </PlayerLink>
             </p>
           )}
           <PlaylistFacts playlist={playlist} />
@@ -655,7 +656,7 @@ export function PlaylistPage() {
       ) : arranging ? (
         <PlaylistSongOrder charts={charts} disabled={busy} onMove={move} onRemove={removeSong} />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="song-grid">
           {charts.map((chart) => (
             <SiteChartCard key={chart.id} chart={chart} />
           ))}

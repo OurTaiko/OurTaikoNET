@@ -5,17 +5,17 @@ import { Navigate } from 'react-router-dom'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { TitleStyle } from '@players/api/types'
-import { Button } from '@players/components/ui/button'
+import { Button } from '@sitekit/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@players/components/ui/card'
-import { Checkbox } from '@players/components/ui/checkbox'
-import { Input } from '@players/components/ui/input'
-import { Label } from '@players/components/ui/label'
+} from '@sitekit/components/ui/card'
+import { Checkbox } from '@sitekit/components/ui/checkbox'
+import { Input } from '@sitekit/components/ui/input'
+import { Label } from '@sitekit/components/ui/label'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
 import { Notice } from '@players/notice'

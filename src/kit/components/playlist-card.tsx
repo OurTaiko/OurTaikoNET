@@ -14,7 +14,7 @@ import { CardCoverBackdrop, coveredTextClassName, useCardCover } from './card-co
 
 const systemIds = ['liked', 'popular', 'acclaimed', 'daily'] as const
 export const emptyStateClassName =
-  'flex flex-col items-center justify-center gap-4 rounded-[14px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground'
+  'flex flex-col items-center justify-center gap-4 rounded-[20px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground'
 // The server names system playlists in English; show them in the page language.
 export function usePlaylistText() {
   const { t } = useTranslation()
@@ -75,7 +75,7 @@ export function PlaylistCard({ playlist }: { playlist: Playlist }) {
   const hasCover = !!cover.source
   return (
     <Link
-      className="group block min-w-0 rounded-[14px] outline-none transition-transform duration-150 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-4 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none"
+      className="group block min-w-0 rounded-[20px] outline-none transition-transform duration-150 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-4 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none"
       data-testid="playlist-card"
       to={`/playlists/${encodeURIComponent(playlist.id)}`}
     >
@@ -140,7 +140,7 @@ export function PlaylistGridSkeleton() {
       aria-label={t('playlists.loading')}
     >
       {[0, 1, 2].map((n) => (
-        <Skeleton className="h-44 rounded-[14px]" key={n} />
+        <Skeleton className="h-44 rounded-[20px]" key={n} />
       ))}
     </div>
   )

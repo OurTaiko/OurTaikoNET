@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { WarningCircleIcon } from '@phosphor-icons/react'
-import { cn } from '@players/lib/utils'
+import { cn } from '@sitekit/lib/utils'
 
 export function Notice({
   children,

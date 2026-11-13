@@ -23,19 +23,19 @@ import type {
 import { Nameplate } from '@players/components/nameplate'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
-import { UserAvatar } from '@players/components/user-avatar'
-import { Badge } from '@players/components/ui/badge'
-import { Button } from '@players/components/ui/button'
+import { UserAvatar } from '@sitekit/components/user-avatar'
+import { Badge } from '@sitekit/components/ui/badge'
+import { Button } from '@sitekit/components/ui/button'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from '@players/components/ui/card'
-import { Checkbox } from '@players/components/ui/checkbox'
-import { Skeleton } from '@players/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@players/components/ui/tabs'
+} from '@sitekit/components/ui/card'
+import { Checkbox } from '@sitekit/components/ui/checkbox'
+import { Skeleton } from '@sitekit/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sitekit/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -43,12 +43,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@players/components/ui/table'
+} from '@sitekit/components/ui/table'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { danName, danRings, danText, offeredDans, titleName, verdictKey } from '@players/dan'
 import { formatLocale } from '@players/i18n'
-import { cn } from '@players/lib/utils'
+import { cn } from '@sitekit/lib/utils'
 
 type Tab = 'scores' | 'titles' | 'dans'
 

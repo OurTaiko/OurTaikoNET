@@ -49,7 +49,7 @@ export function MovieSettings({
   return (
     <fieldset
       disabled={disabled}
-      className={`space-y-4 rounded-[14px] border p-4 ${className ?? ''}`}
+      className={`space-y-4 rounded-[20px] border p-4 ${className ?? ''}`}
     >
       <legend className="px-2 font-medium">{t('messages.metadataMovie')}</legend>
       <p className="text-sm text-muted-foreground">

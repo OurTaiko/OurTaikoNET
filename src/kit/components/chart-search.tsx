@@ -116,7 +116,7 @@ export function ChartSearch({
                   {categoryColor(category.id) && (
                     <span
                       aria-hidden="true"
-                      className="size-2.5 shrink-0 rounded-full border-[1.5px] border-[#382d2a]"
+                      className="size-2.5 shrink-0 rounded-full"
                       style={{ background: categoryColor(category.id) }}
                     />
                   )}

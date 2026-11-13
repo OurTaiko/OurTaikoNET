@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowClockwiseIcon, UsersIcon } from '@phosphor-icons/react'
 import { api } from './api/client'
-import { endpoints } from './api/endpoints'
+import { endpoints, withQuery } from './api/endpoints'
+import { SITE_API_ROOT } from './api/config'
 import type { UserDirectory } from './api/types'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
@@ -11,8 +12,12 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
+import { Marked } from './components/page-hero'
+import type { SourceId } from './source'
+import type { ReactNode } from 'react'
 
-export function UsersPage() {
+/** source: whose players to list; the page's own source when left out. */
+export function UsersPage({ source, children }: { source?: SourceId; children?: ReactNode }) {
   const { t } = useTranslation()
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -46,7 +51,12 @@ export function UsersPage() {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    api<UserDirectory>(endpoints.users({ q, sort, page }), { signal: controller.signal })
+    api<UserDirectory>(
+      source
+        ? withQuery(`${SITE_API_ROOT}/sources/${source}/users`, { q, sort, page })
+        : endpoints.users({ q, sort, page }),
+      { signal: controller.signal },
+    )
       .then((data) => {
         if (!controller.signal.aborted) setResult(data)
       })
@@ -57,16 +67,17 @@ export function UsersPage() {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [q, sort, page, refresh])
+  }, [q, sort, page, refresh, source])
   const update = (values: Record<string, string>) => setParams({ q, sort, page: '1', ...values })
   const busy = loading || searchPending
   return (
     <section className="space-y-8" aria-labelledby="users-heading">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div className="space-y-3">
-          <h1 id="users-heading" className="text-3xl font-extrabold sm:text-4xl">
-            {t('messages.userSquare')}
+          <h1 id="users-heading" className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+            <Marked text={t('messages.userSquare')} />
           </h1>
+          {children}
         </div>
         <Button
           variant="outline"
@@ -123,7 +134,7 @@ export function UsersPage() {
           aria-label={t('messages.loadingMembers')}
         >
           {[0, 1, 2].map((n) => (
-            <Skeleton key={n} className="h-96 rounded-[14px]" />
+            <Skeleton key={n} className="h-96 rounded-[20px]" />
           ))}
         </div>
       ) : (
@@ -142,7 +153,7 @@ export function UsersPage() {
               ))}
             </div>
           ) : (
-            <Card className="items-center gap-3 border-[1.5px] border-dashed border-input bg-cream px-6 py-12 text-center shadow-none">
+            <Card className="items-center gap-3 border border-dashed border-input bg-cream px-6 py-12 text-center shadow-none">
               <UsersIcon className="mb-2 size-8 text-muted-foreground" aria-hidden="true" />
               <h2 className="text-lg font-extrabold">
                 {q ? t('messages.noMatchingMembers') : t('messages.noMembersOnThisPage')}

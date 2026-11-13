@@ -1,11 +1,9 @@
 import type { Chart } from '@fanmade/api/types'
 import {
-  BpmBadge,
   BranchingBadge,
   ChartCard as SharedChartCard,
   CommentCountBadge,
   DoubleBadge,
-  DurationBadge,
   MakerBadge,
   ScoreBadge,
 } from '@sitekit/components/chart-card'
@@ -17,8 +15,6 @@ export function ChartCard({ chart }: { chart: Chart }) {
       facts={
         <>
           <MakerBadge name={chart.maker || chart.uploader} />
-          <BpmBadge bpm={chart.bpm} />
-          <DurationBadge seconds={chart.duration} />
         </>
       }
       footer={

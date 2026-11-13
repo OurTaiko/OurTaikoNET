@@ -1,36 +1,26 @@
 // The site has three areas, told apart by how the address starts: the two song sources,
-// /fanmade/… and /official/…, and the pages about players, /players/…. Each is a single-page
-// app of its own, loaded only when a page of it is opened.
+// /fanmade/… and /official/…, and the pages that belong to no source (home, players, titles),
+// at the top. Each is a single-page app of its own, loaded only when a page of it is opened;
+// all three wear the same frame (@sitekit/shell).
 import { createRoot } from 'react-dom/client'
-import { PLAYERS_BASE, SOURCE, sourceOf, type SourceId } from '@sitekit/source'
-
-const lastSource = 'ourtaiko-net-source'
+import { SOURCE, sitePages, sourceOf } from '@sitekit/source'
+import { rememberSource, rememberedSource } from '@sitekit/shell/site'
 
 async function start() {
   const root = createRoot(document.getElementById('root')!)
-  if (location.pathname === PLAYERS_BASE || location.pathname.startsWith(`${PLAYERS_BASE}/`)) {
+  if (sourceOf(location.pathname)) {
+    rememberSource(SOURCE)
+    const { songs } = await import('./songs')
+    root.render(await songs())
+    return
+  }
+  if (sitePages.includes(location.pathname.split('/')[1])) {
     const { players } = await import('@players/app')
     root.render(players())
     return
   }
-  // An address outside every area goes to the source used last (Fanmade the first time),
-  // keeping the rest of the address: /charts/x becomes /fanmade/charts/x.
-  if (!sourceOf(location.pathname)) {
-    let source: SourceId = 'fanmade'
-    try {
-      source = sourceOf(`/${localStorage.getItem(lastSource)}`) ?? source
-    } catch {
-      // No storage: Fanmade.
-    }
-    location.replace(`/${source}${location.pathname}${location.search}${location.hash}`)
-    return
-  }
-  try {
-    localStorage.setItem(lastSource, SOURCE)
-  } catch {
-    // The choice is simply not remembered.
-  }
-  const { songs } = await import('./songs')
-  root.render(await songs())
+  // An address from before the sources were told apart (/charts/x) goes to the source used
+  // last, Fanmade the first time, keeping the rest of the address.
+  location.replace(`/${rememberedSource()}${location.pathname}${location.search}${location.hash}`)
 }
 void start()

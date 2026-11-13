@@ -6,18 +6,18 @@ import { endpoints } from '@players/api/endpoints'
 import type { Title, TitleStyle } from '@players/api/types'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
-import { Badge } from '@players/components/ui/badge'
-import { Button } from '@players/components/ui/button'
+import { Badge } from '@sitekit/components/ui/badge'
+import { Button } from '@sitekit/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@players/components/ui/card'
-import { Input } from '@players/components/ui/input'
-import { Label } from '@players/components/ui/label'
-import { Skeleton } from '@players/components/ui/skeleton'
+} from '@sitekit/components/ui/card'
+import { Input } from '@sitekit/components/ui/input'
+import { Label } from '@sitekit/components/ui/label'
+import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { titleName } from '@players/dan'

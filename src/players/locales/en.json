@@ -1,6 +1,6 @@
 {
   "common": {
-    "siteTitle": "OurTaiko · Players",
+    "siteTitle": "OurTaiko",
     "close": "Close"
   },
   "messages": {
@@ -9,7 +9,10 @@
     "dark": "Dark",
     "system": "System",
     "pageNotFound": "Page not found",
-    "backHome": "Back to home"
+    "backHome": "Back to home",
+    "firstLogin": "First sign-in",
+    "memberNamesUnavailable": "Nicknames are temporarily unavailable. Chart and score statistics are still shown.",
+    "publicChartCount": "Uploaded charts"
   },
   "nav": {
     "main": "Main navigation",
@@ -24,8 +27,6 @@
     "charts": "Charts"
   },
   "home": {
-    "heading": "Your whole taiko journey on one page",
-    "lead": "Sign in with your OurTaiko account to see every score you set on Fanmade and Database, collect titles and dan ranks, and choose the nameplate the game shows.",
     "register": "Create an account",
     "signInFailed": "Signing in did not finish. Please try again.",
     "scoresTitle": "All your scores",
@@ -33,7 +34,27 @@
     "titlesTitle": "Titles and dan ranks",
     "titlesText": "Pass online dan courses for dan badges and titles; titles from community courses say so.",
     "plateTitle": "Nameplate",
-    "plateText": "Pick the title you wear and the 1P and 2P plates in the game follow."
+    "plateText": "Pick the title you wear and the 1P and 2P plates in the game follow.",
+    "kicker": "OurTaiko Net",
+    "headingStart": "Two libraries, ",
+    "headingMark": "one drum",
+    "lead": "Songs from players and from the official game, with everyone's scores, titles and dan ranks in one place.",
+    "songs": "{{n}} songs",
+    "fanmadeText": "Charts made and shared by players.",
+    "officialText": "Songs of the official game, kept by its managers.",
+    "browse": "Browse {{name}}",
+    "upload": "Upload a chart",
+    "dans": "Dan courses",
+    "newest": "Newest songs",
+    "newestFrom": "from both sources",
+    "plate": "Your nameplate",
+    "plateNote": "The same plate shows in the game and on every page here.",
+    "openMyPage": "Open my page",
+    "myCharts": "My charts",
+    "myPlaylists": "My playlists",
+    "signInTitle": "Sign in to keep your scores",
+    "signInText": "Sign in with your OurTaiko account to see every score you set, collect titles and dan ranks, and choose the nameplate the game shows.",
+    "loadFailed": "The songs could not be loaded."
   },
   "profile": {
     "unknownPlayer": "Player",

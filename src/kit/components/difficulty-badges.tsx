@@ -12,17 +12,39 @@ import {
   groupName,
 } from '../courses'
 
-// Fixed course colours, dark text on both themes (AA on every swatch).
+// Fixed course colours, never tinted by the accent; white text passes AA on every one.
 export const difficultyColors = {
-  Easy: 'bg-[#f9a15a]',
-  Normal: 'bg-[#8fd16a]',
-  Hard: 'bg-[#6cc7d8]',
-  Oni: 'bg-[#f77fab]',
-  Edit: 'bg-[#b99ae8]',
+  Easy: 'bg-[#c2410c]',
+  Normal: 'bg-[#2f7d32]',
+  Hard: 'bg-[#1565c0]',
+  Oni: 'bg-[#c2185b]',
+  Edit: 'bg-[#6a3fc0]',
 }
 
 const swatch =
-  'inline-flex items-center gap-1.5 border-[1.5px] border-[#382d2a] rounded-[7px] font-bold text-[#382d2a] text-xs whitespace-nowrap'
+  'inline-flex items-center gap-1.5 border-0 rounded-[7px] font-bold text-white text-xs whitespace-nowrap'
+
+/** A chart's courses as small squares with their star levels: the form a song tile shows. */
+export function LevelChips({ difficulties }: { difficulties: Difficulty[] }) {
+  const { t } = useTranslation()
+  return (
+    <ul aria-label={t('messages.chartDifficulty')} className="flex flex-wrap gap-1">
+      {groupCourses(difficulties).map((group) => (
+        <li
+          key={group.base}
+          title={groupName(group)}
+          className={cn(
+            'inline-flex justify-center items-center px-1.5 rounded-[7px] min-w-[1.625rem] h-[1.375rem] font-bold text-white text-xs tabular-nums',
+            difficultyColors[group.base as keyof typeof difficultyColors] ?? 'bg-muted',
+          )}
+        >
+          <span className="sr-only">{groupName(group)} </span>
+          {groupLevel(group)}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function DifficultyBadges({
   difficulties,

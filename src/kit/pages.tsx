@@ -1,5 +1,6 @@
 // The pages both sites share: the chart list, sign-in, a chart's page and the chart manager.
 // What a site still has its own of comes from its Site (site.tsx).
+import { PlayerLink } from './components/player-link'
 import { chartOwners, isChartOwner } from './chart-owners'
 import { CollaborationDialog } from './collaborations'
 import { AddToPlaylistDialog } from './playlist-dialogs'
@@ -47,6 +48,7 @@ import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { cn } from './lib/utils'
 import { coverSource } from './cover'
 import { PageHero } from './components/page-hero'
+import { SOURCE } from './source'
 import { EmptyState } from './components/empty-state'
 
 // A chart registered without its files yet (OurTaiko Database) has hasFiles false.
@@ -147,12 +149,12 @@ export function Library({
             <h1 className="font-extrabold text-2xl sm:text-3xl">
               {t('messages.userPublishedCharts')}
             </h1>
-            <Link to="/users" className="text-sm text-link hover:underline">
+            <a href="/players" className="text-sm text-link hover:underline">
               {t('messages.backToUserSquare')}
-            </Link>
+            </a>
           </>
         ) : (
-          <PageHero title={t('messages.exploreCharts')} />
+          <PageHero title={t('messages.exploreCharts')} kicker={t(`shell.${SOURCE}`)} />
         ))}
       {site.chartSearch({
         query: q,
@@ -172,22 +174,14 @@ export function Library({
       {error ? (
         <Notice>{error}</Notice>
       ) : loading && !data ? (
-        <div
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          aria-label={t('messages.loadingCharts')}
-        >
-          {[0, 1, 2].map((n) => (
-            <Skeleton className="h-56 rounded-[14px]" key={n} />
+        <div className="song-grid" aria-label={t('messages.loadingCharts')}>
+          {[0, 1, 2, 3, 4, 5].map((n) => (
+            <Skeleton className="aspect-[3/4] rounded-[20px]" key={n} />
           ))}
         </div>
       ) : data?.items.length ? (
         <>
-          <div
-            className={cn(
-              'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 transition-opacity',
-              loading && 'opacity-60',
-            )}
-          >
+          <div className={cn('song-grid transition-opacity', loading && 'opacity-60')}>
             {data.items.map((chart) => (
               <SiteChartCard key={chart.id} chart={chart} />
             ))}
@@ -285,7 +279,7 @@ export function Auth({ register = false }: { register?: boolean }) {
     </div>
   )
 }
-const detailCardClassName = 'rounded-[14px] border-2 border-outline bg-card p-6 shadow-drop'
+const detailCardClassName = 'rounded-[20px] border border-border bg-card p-6 shadow-drop'
 const manageItemClassName =
   'flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm text-foreground transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md'
 
@@ -472,7 +466,7 @@ export function Detail() {
     <div className="flex flex-col gap-6">
       <section
         aria-labelledby="chart-title"
-        className="overflow-hidden rounded-[14px] border-2 border-outline bg-card shadow-drop"
+        className="overflow-hidden rounded-[20px] border border-border bg-card shadow-drop"
       >
         <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-4 p-4 sm:grid-cols-[16rem_minmax(0,1fr)] sm:gap-x-8 sm:gap-y-5 sm:p-8 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-10">
           <ChartCover chart={chart} className="sm:row-span-3" />
@@ -640,7 +634,7 @@ export function Detail() {
         {/* Short labels, each tab as wide as its label needs; one that still does not fit is cut short. */}
         <TabsList
           aria-label={t('messages.chartSections')}
-          className="flex h-auto w-full gap-0.5 rounded-[12px] bg-muted p-1"
+          className="flex h-auto w-full gap-0.5 rounded-[16px] bg-muted p-1"
         >
           {pageTabs.map(([value, label]) => (
             <TabsTrigger
@@ -759,10 +753,10 @@ export function Detail() {
               <dt className="self-center">{t('collaboration.owners')}</dt>
               <dd className="flex flex-wrap gap-3">
                 {chartOwners(chart).map((owner) => (
-                  <Link
+                  <PlayerLink
                     key={owner.id}
                     className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
-                    to={`/users/${encodeURIComponent(owner.id)}`}
+                    id={owner.id}
                   >
                     <UserAvatar
                       nickname={owner.nickname}
@@ -771,7 +765,7 @@ export function Detail() {
                       fallbackClassName="text-xs"
                     />
                     <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
-                  </Link>
+                  </PlayerLink>
                 ))}
               </dd>
               {chartRecord?.(chart)}

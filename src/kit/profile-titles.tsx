@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PLAYERS_API, PROFILE_URL } from './components/profile-plate'
+import { PLAYERS_API } from './components/profile-plate'
 import { normalizeLanguage } from './i18n'
 import { cn } from './lib/utils'
 
@@ -27,7 +27,7 @@ const bands: Record<TitleStyle, string> = {
   rainbow: 'bg-[linear-gradient(90deg,#ff5f6d,#ffc371,#fff66d,#6dff9c,#5fc8ff,#a06dff)]',
 }
 
-export const profileTitlesPage = `${PROFILE_URL}/titles`
+export const profileTitlesPage = '/titles'
 
 let catalog: Promise<ProfileTitle[]> | null = null
 

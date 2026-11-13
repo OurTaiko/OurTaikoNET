@@ -416,7 +416,7 @@ export function UploadPage({
   const fileTile = (kind: 'tja' | 'audio') => {
     const file = kind === 'tja' ? tja : audio
     return (
-      <Label className="flex min-w-0 flex-col items-start gap-3 rounded-[14px] border p-4 [&>span]:w-full [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-muted-foreground">
+      <Label className="flex min-w-0 flex-col items-start gap-3 rounded-[20px] border p-4 [&>span]:w-full [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-muted-foreground">
         {kind === 'tja' ? <FileMusic size={24} /> : <AudioLines size={24} />}
         <span>
           <b>{kind === 'tja' ? t('messages.tjaChart') : t('messages.oggMp3Audio')}</b>
@@ -466,7 +466,7 @@ export function UploadPage({
           )}
           <div
             role="note"
-            className="mt-3 flex items-start gap-2 rounded-[14px] border-[1.5px] border-[#f3b13c] bg-cream px-4 py-3 text-sm font-medium"
+            className="mt-3 flex items-start gap-2 rounded-[20px] border border-[#f3b13c] bg-cream px-4 py-3 text-sm font-medium"
           >
             <WarningIcon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>{t('messages.doNotSubmitOfficialBandaiNamcoChartsOrAudio')}</span>
@@ -497,7 +497,7 @@ export function UploadPage({
             <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
               <TabsList
                 aria-label={t('messages.publishYourChart')}
-                className={`grid h-auto! w-full grid-cols-3 rounded-[14px] ${existing ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}
+                className={`grid h-auto! w-full grid-cols-3 rounded-[20px] ${existing ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}
               >
                 {(['files', 'categories', 'preview', 'description', 'makers'] as const).map(
                   (value) => (
@@ -518,10 +518,10 @@ export function UploadPage({
                 )}
               </TabsList>
               <TabsContent value="files" className="space-y-6 pt-4">
-                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-5">
+                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-5">
                   <h2 className="text-base font-extrabold">{t('messages.chooseFiles')}</h2>
                   <div
-                    className="flex flex-col items-center gap-2 rounded-[14px] border border-dashed p-6 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
+                    className="flex flex-col items-center gap-2 rounded-[20px] border border-dashed p-6 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={drop}
                     aria-busy={reading}
@@ -561,7 +561,7 @@ export function UploadPage({
                     {fileTile('audio')}
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[20px] border p-4">
                       <h3 className="text-sm font-extrabold">{t('messages.songCover')}</h3>
                       <CoverPicker
                         file={cover}
@@ -572,7 +572,7 @@ export function UploadPage({
                         }}
                       />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[20px] border p-4">
                       <h3 className="text-sm font-extrabold">{t('messages.backgroundMovie')}</h3>
                       <MoviePicker
                         file={movie}
@@ -586,7 +586,7 @@ export function UploadPage({
                         }}
                       />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[20px] border p-4">
                       <h3 className="text-sm font-extrabold">
                         {t('folderUpload.backgroundTitle')}
                       </h3>
@@ -636,7 +636,7 @@ export function UploadPage({
                 </Card>
               </TabsContent>
               <TabsContent value="categories" className="pt-4">
-                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
                   <CategoryPicker
                     value={categoryIds}
                     disabled={busy}
@@ -648,7 +648,7 @@ export function UploadPage({
                 </Card>
               </TabsContent>
               <TabsContent value="preview" className="pt-4">
-                <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+                <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
                   {metadata ? (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -709,7 +709,7 @@ export function UploadPage({
               </TabsContent>
               <TabsContent value="makers" className="pt-4">
                 {metadata ? (
-                  <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                  <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
                     <h2 className="text-base font-extrabold">
                       {t('messages.difficultiesAndCreators')}
                     </h2>
@@ -768,7 +768,7 @@ export function UploadPage({
                 )}
               </TabsContent>
               <TabsContent value="description" className="pt-4">
-                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
                   <h2 className="text-base font-extrabold">
                     {t('messages.notes')}
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -797,7 +797,7 @@ export function UploadPage({
               </TabsContent>
               {!existing && (
                 <TabsContent value="collaborators" className="pt-4">
-                  <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+                  <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
                     <UploadCollaborators
                       value={collaborators}
                       disabled={busy}

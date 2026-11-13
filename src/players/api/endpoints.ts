@@ -1,13 +1,10 @@
-import { PLAYERS_BASE } from '@sitekit/source'
-
 // Browser requests stay on the website origin, which also serves the API.
 const API_ROOT = '/api/v1'
 export const endpoints = {
   me: `${API_ROOT}/me`,
   logout: `${API_ROOT}/auth/logout`,
-  // returnTo is a page of the players' area; the site has other areas too.
   login: (returnTo: string) =>
-    `${API_ROOT}/auth/sso/login?returnTo=${encodeURIComponent(PLAYERS_BASE + returnTo)}`,
+    `${API_ROOT}/auth/sso/login?returnTo=${encodeURIComponent(returnTo)}`,
   account: (page: 'profile' | 'register') => `${API_ROOT}/auth/account/${page}`,
   nameplate: `${API_ROOT}/me/nameplate`,
   titles: `${API_ROOT}/titles`,

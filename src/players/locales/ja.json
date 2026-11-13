@@ -1,6 +1,6 @@
 {
   "common": {
-    "siteTitle": "OurTaiko · プレイヤー",
+    "siteTitle": "OurTaiko",
     "close": "閉じる"
   },
   "messages": {
@@ -9,7 +9,10 @@
     "dark": "ダーク",
     "system": "システム",
     "pageNotFound": "ページが見つかりません",
-    "backHome": "ホームに戻る"
+    "backHome": "ホームに戻る",
+    "firstLogin": "初回ログイン",
+    "memberNamesUnavailable": "ニックネームを取得できません。譜面とスコアの統計は表示されます。",
+    "publicChartCount": "アップロードした譜面"
   },
   "nav": {
     "main": "メインナビゲーション",
@@ -24,8 +27,6 @@
     "charts": "譜面"
   },
   "home": {
-    "heading": "あなたの太鼓の記録を、ひとつのページに",
-    "lead": "OurTaiko アカウントでログインすると、Fanmade と Database のスコアをまとめて確認し、称号や段位を集め、ゲームに表示するネームプレートを選べます。",
     "register": "アカウント登録",
     "signInFailed": "ログインが完了しませんでした。もう一度お試しください。",
     "scoresTitle": "すべてのスコア",
@@ -33,7 +34,27 @@
     "titlesTitle": "称号と段位",
     "titlesText": "オンライン段位に合格すると段位バッジと称号を獲得。コミュニティ段位の称号は出典を表示します。",
     "plateTitle": "ネームプレート",
-    "plateText": "着ける称号を選ぶと、ゲームの 1P・2P のネームプレートにも反映されます。"
+    "plateText": "着ける称号を選ぶと、ゲームの 1P・2P のネームプレートにも反映されます。",
+    "kicker": "OurTaiko Net",
+    "headingStart": "ふたつのライブラリ、",
+    "headingMark": "ひとつの太鼓",
+    "lead": "プレイヤーの創作譜面と公式ゲームの楽曲、みんなのスコア・称号・段位をひとつの場所に。",
+    "songs": "{{n}} 曲",
+    "fanmadeText": "プレイヤーが作って共有した譜面。",
+    "officialText": "公式ゲームの楽曲。管理者が管理しています。",
+    "browse": "{{name}}をさがす",
+    "upload": "譜面をアップロード",
+    "dans": "段位道場",
+    "newest": "新着楽曲",
+    "newestFrom": "両方のソースから",
+    "plate": "あなたのネームプレート",
+    "plateNote": "ゲームでもこのサイトのどのページでも同じプレートが表示されます。",
+    "openMyPage": "マイページを開く",
+    "myCharts": "自分の譜面",
+    "myPlaylists": "マイプレイリスト",
+    "signInTitle": "ログインしてスコアを残そう",
+    "signInText": "OurTaiko アカウントでログインすると、すべてのスコアを確認し、称号や段位を集め、ゲームに表示するネームプレートを選べます。",
+    "loadFailed": "楽曲を読み込めませんでした。"
   },
   "profile": {
     "unknownPlayer": "プレイヤー",

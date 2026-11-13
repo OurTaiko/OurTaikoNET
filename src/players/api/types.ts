@@ -2,6 +2,7 @@ export type User = {
   id: string
   username: string
   nickname: string
+  emailVerified: boolean
   avatarUrl?: string
   preferredLanguage?: string
   // Keeps the title catalog (the TITLE_MANAGER group).

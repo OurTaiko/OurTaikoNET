@@ -223,7 +223,7 @@ export function EditMetadata({
         </div>
         <p className="text-sm text-muted-foreground">{t('db.identifierHint')}</p>
         {chart.hasFiles && (
-          <fieldset disabled={busy} className="space-y-3 rounded-[14px] border p-4">
+          <fieldset disabled={busy} className="space-y-3 rounded-[20px] border p-4">
             <legend className="px-2 text-sm font-medium">{t('messages.previewRange')}</legend>
             <div className="grid gap-4 sm:grid-cols-2">
               <Label htmlFor="edit-demo-start" className="flex flex-col items-start gap-2">

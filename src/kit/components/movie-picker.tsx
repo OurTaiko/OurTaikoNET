@@ -34,7 +34,7 @@ export function MoviePicker({
       <p id={`${id}-help`} className="text-sm leading-6 text-muted-foreground">
         {file ? t('messages.movieWillBeTranscoded') : hint}
       </p>
-      <div className="flex min-h-36 flex-1 items-center justify-center overflow-hidden rounded-[14px] bg-muted p-4">
+      <div className="flex min-h-36 flex-1 items-center justify-center overflow-hidden rounded-[20px] bg-muted p-4">
         {file && preview?.file === file && unplayable !== file ? (
           <video
             src={preview.url}

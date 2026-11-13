@@ -5,17 +5,17 @@ import { Link, Navigate } from 'react-router-dom'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { Group, GroupMember } from '@players/api/types'
-import { Button } from '@players/components/ui/button'
+import { Button } from '@sitekit/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@players/components/ui/card'
-import { Checkbox } from '@players/components/ui/checkbox'
-import { Input } from '@players/components/ui/input'
-import { Label } from '@players/components/ui/label'
+} from '@sitekit/components/ui/card'
+import { Checkbox } from '@sitekit/components/ui/checkbox'
+import { Input } from '@sitekit/components/ui/input'
+import { Label } from '@sitekit/components/ui/label'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 
@@ -129,7 +129,7 @@ export function ManagePage() {
           {editing && (
             <div className="space-y-4 rounded-2xl border p-4" data-testid="manage-editing">
               <p className="text-sm">
-                <Link className="font-mono underline" to={`/users/${editing.id}`}>
+                <Link className="font-mono underline" to={`/players/${editing.id}`}>
                   {editing.id}
                 </Link>
               </p>
@@ -175,7 +175,7 @@ export function ManagePage() {
             <ul className="divide-y" data-testid="manage-members">
               {members.map((member) => (
                 <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <Link className="font-mono text-sm underline" to={`/users/${member.id}`}>
+                  <Link className="font-mono text-sm underline" to={`/players/${member.id}`}>
                     {member.id}
                   </Link>
                   <span className="flex flex-1 flex-wrap gap-1.5">

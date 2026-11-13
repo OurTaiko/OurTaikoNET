@@ -1,6 +1,6 @@
 // The pages of one song source: its charts, playlists, dan courses and players as that
 // source sees them. Which source is in the address (see @sitekit/source).
-import { StrictMode } from 'react'
+import { StrictMode, useEffect } from 'react'
 import { IconContext } from '@phosphor-icons/react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
@@ -21,7 +21,6 @@ import { SiteProvider, type Site } from '@sitekit/site'
 import { BASE, SOURCE, type SourceId } from '@sitekit/source'
 import { ThemeProvider } from '@sitekit/theme'
 import { UserSpacePage } from '@sitekit/user-space'
-import { UsersPage } from '@sitekit/users'
 import type { ComponentType } from 'react'
 import './styles.css'
 
@@ -36,6 +35,12 @@ const load: Record<
 > = {
   fanmade: () => import('@fanmade/index'),
   official: () => import('@official/index'),
+}
+
+// Players are listed once for the whole site, outside any source.
+function LeaveTo({ address }: { address: string }) {
+  useEffect(() => location.replace(address), [address])
+  return null
 }
 
 function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
@@ -55,7 +60,7 @@ function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
                       <Routes>
                         <Route element={<Layout />}>
                           <Route index element={<Library />} />
-                          <Route path="users" element={<UsersPage />} />
+                          <Route path="users" element={<LeaveTo address="/players" />} />
                           <Route path="users/:id" element={<UserSpacePage />} />
                           <Route path="me/profile" element={<ProfilePage />} />
                           <Route path="me/charts" element={<ChartManagerPage />} />
@@ -85,7 +90,7 @@ function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
                           <Route
                             path="*"
                             element={
-                              <div className="flex flex-col items-center justify-center gap-4 rounded-[14px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground">
+                              <div className="flex flex-col items-center justify-center gap-4 rounded-[20px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground">
                                 <h1 className="text-2xl font-extrabold sm:text-3xl">
                                   {t('messages.pageNotFound')}
                                 </h1>
@@ -112,7 +117,7 @@ export async function songs() {
   document.documentElement.dataset.source = SOURCE
   const { site, UpdatePage, catalogues } = await load[SOURCE]()
   addSourceCatalogues(catalogues)
-  document.title = `OurTaiko · ${site.brand}`
+  document.title = i18n.t('common.siteTitle')
   return (
     <I18nextProvider i18n={i18n}>
       <App site={site} UpdatePage={UpdatePage} />

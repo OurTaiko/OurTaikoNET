@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { Nameplate as Plate, TitleStyle } from '@players/api/types'
 import { danName, danRings, danText, titleName } from '@players/dan'
-import { cn } from '@players/lib/utils'
+import { cn } from '@sitekit/lib/utils'
 
 // The title bands of the game's nameplate (frame_top 0–4 and the rainbow band).
 const bands: Record<TitleStyle, string> = {

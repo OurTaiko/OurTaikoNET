@@ -47,13 +47,13 @@ export function UserSpacePage() {
   return (
     <section className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          to="/users"
+        <a
+          href="/players"
           className="inline-flex items-center gap-2 text-sm text-link hover:underline"
         >
           <ArrowLeftIcon aria-hidden="true" className="size-4 shrink-0" />
           {t('messages.backToUserSquare')}
-        </Link>
+        </a>
         {session.user?.id === id && (
           <Link to="/me/profile" className={buttonVariants({ variant: 'outline' })}>
             {t('messages.manageMyAccount')}
@@ -83,8 +83,8 @@ export function UserSpacePage() {
           role="status"
           aria-label={t('messages.loadingMembers')}
         >
-          <Skeleton className="h-96 rounded-[14px]" />
-          <Skeleton className="h-96 rounded-[14px]" />
+          <Skeleton className="h-96 rounded-[20px]" />
+          <Skeleton className="h-96 rounded-[20px]" />
         </div>
       ) : (
         <>

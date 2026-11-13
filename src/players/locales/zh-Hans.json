@@ -1,6 +1,6 @@
 {
   "common": {
-    "siteTitle": "OurTaiko · 玩家",
+    "siteTitle": "OurTaiko",
     "close": "关闭"
   },
   "messages": {
@@ -9,7 +9,10 @@
     "dark": "深色",
     "system": "跟随系统",
     "pageNotFound": "页面不存在",
-    "backHome": "返回首页"
+    "backHome": "返回首页",
+    "firstLogin": "首次登录",
+    "memberNamesUnavailable": "昵称暂时无法获取，谱面与成绩统计仍可查看。",
+    "publicChartCount": "上传的谱面"
   },
   "nav": {
     "main": "主导航",
@@ -24,8 +27,6 @@
     "charts": "谱面"
   },
   "home": {
-    "heading": "你的太鼓之旅，一页看全",
-    "lead": "用 OurTaiko 账号登录，查看你在 Fanmade 和 Database 的全部成绩，收集称号和段位，挑选游戏里显示的名牌。",
     "register": "注册账号",
     "signInFailed": "登录没有完成，请再试一次。",
     "scoresTitle": "全部成绩",
@@ -33,7 +34,27 @@
     "titlesTitle": "称号与段位",
     "titlesText": "挑战在线段位获得段位徽章和称号，社区段位的称号会标明来源。",
     "plateTitle": "名牌",
-    "plateText": "选好佩戴的称号，游戏里 1P、2P 的名牌都会跟着变。"
+    "plateText": "选好佩戴的称号，游戏里 1P、2P 的名牌都会跟着变。",
+    "kicker": "OurTaiko Net",
+    "headingStart": "两座曲库，",
+    "headingMark": "一面鼓",
+    "lead": "玩家自制的谱面和官方游戏的歌曲，加上所有人的成绩、称号和段位，都在这里。",
+    "songs": "{{n}} 首",
+    "fanmadeText": "玩家制作并分享的谱面。",
+    "officialText": "官方游戏的歌曲，由管理员维护。",
+    "browse": "浏览{{name}}曲库",
+    "upload": "上传谱面",
+    "dans": "段位道场",
+    "newest": "最新歌曲",
+    "newestFrom": "两座曲库合在一起",
+    "plate": "你的名牌",
+    "plateNote": "游戏里和这里的每个页面都显示同一块名牌。",
+    "openMyPage": "打开我的主页",
+    "myCharts": "我的谱面",
+    "myPlaylists": "我的歌单",
+    "signInTitle": "登录后保存你的成绩",
+    "signInText": "用 OurTaiko 账号登录，查看你的全部成绩，收集称号和段位，挑选游戏里显示的名牌。",
+    "loadFailed": "歌曲加载失败。"
   },
   "profile": {
     "unknownPlayer": "玩家",

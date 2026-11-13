@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { CrownSimpleIcon } from '@phosphor-icons/react'
-import { cn } from '@players/lib/utils'
+import { cn } from '@sitekit/lib/utils'
 
 // ClearStatus: 0 none, 1 cleared (silver), 2 full combo (gold), 3 all good (rainbow).
 export function Crown({ status }: { status: number }) {

@@ -20,5 +20,5 @@ export function categoryColor(id: string): string | undefined {
 }
 
 export function categoryStripeColor(ids: string[] = []) {
-  return colors[ids.find((id) => id in colors) ?? ''] ?? 'var(--hero)'
+  return colors[ids.find((id) => id in colors) ?? ''] ?? 'var(--primary-container)'
 }

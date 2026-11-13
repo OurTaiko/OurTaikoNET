@@ -343,7 +343,7 @@ function NotificationSettings() {
   return (
     <section
       aria-labelledby="notification-settings-heading"
-      className="space-y-4 rounded-[14px] border-2 border-outline bg-card p-6 shadow-drop"
+      className="space-y-4 rounded-[20px] border border-border bg-card p-6 shadow-drop"
     >
       <div className="space-y-1">
         <h2 id="notification-settings-heading" className="text-lg font-extrabold">
@@ -473,7 +473,7 @@ export function NotificationsPage() {
               className={cn(
                 'rounded-full px-4 py-1.5 text-sm transition-all duration-200 active:scale-[0.96] motion-reduce:transition-none',
                 filter === value
-                  ? 'border-[1.5px] border-outline bg-card font-bold shadow-[0_2px_0_var(--outline)]'
+                  ? 'border border-border bg-card font-bold shadow-elev-1'
                   : 'text-muted-foreground hover:text-foreground',
               )}
               onClick={() => {
@@ -495,15 +495,15 @@ export function NotificationsPage() {
           </div>
         ) : !data ? (
           <div className="space-y-3" role="status" aria-label={t('notificationCenter.loading')}>
-            <Skeleton className="h-20 rounded-[14px]" />
-            <Skeleton className="h-20 rounded-[14px]" />
+            <Skeleton className="h-20 rounded-[20px]" />
+            <Skeleton className="h-20 rounded-[20px]" />
           </div>
         ) : data.items.length === 0 ? (
-          <p className="rounded-[14px] bg-muted py-12 text-center text-sm text-muted-foreground">
+          <p className="rounded-[20px] bg-muted py-12 text-center text-sm text-muted-foreground">
             {filter === 'unread' ? t('notificationCenter.noUnread') : t('notificationCenter.empty')}
           </p>
         ) : (
-          <ul className="divide-y overflow-hidden rounded-[14px] border-2 border-outline bg-card shadow-drop">
+          <ul className="divide-y overflow-hidden rounded-[20px] border border-border bg-card shadow-drop">
             {data.items.map((n) => {
               const to = target(n)
               return (

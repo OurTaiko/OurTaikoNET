@@ -12,7 +12,7 @@ import ringRainbow from '../assets/dan-ring-rainbow.png'
 // Players' pages and their API are this site's own.
 export const PROFILE_URL = PLAYERS_BASE
 export const PLAYERS_API = SITE_API_ROOT
-export const profilePage = (id: string) => `${PROFILE_URL}/users/${encodeURIComponent(id)}`
+export const profilePage = (id: string) => `${PROFILE_URL}/${encodeURIComponent(id)}`
 
 type Style = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
 type Plate = {
