@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"ourtaiko.dev/net/internal/kit/tja"
-	"ourtaiko.dev/net/internal/official/database"
 )
 
 // Background movies as on Fanmade: a replacement stores the movie transcoded under its hash
@@ -65,7 +64,7 @@ func TestBackgroundMovies(t *testing.T) {
 	} else if tx, err := s.DB.Begin(ctx); err != nil {
 		t.Fatal(err)
 	} else {
-		if err = database.SetDifficulties(ctx, tx, w.song, meta.Difficulties); err == nil {
+		if err = setDifficulties(ctx, tx, w.song, meta.Difficulties); err == nil {
 			err = tx.Commit(ctx)
 		}
 		if err != nil {

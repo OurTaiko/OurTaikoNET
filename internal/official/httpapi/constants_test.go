@@ -12,7 +12,6 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/tja"
-	"ourtaiko.dev/net/internal/official/database"
 )
 
 // Difficulty constants from storing to rating: every route stored with the blocks, rated by the
@@ -58,7 +57,7 @@ func TestDifficultyConstants(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer tx.Rollback(ctx)
-		if err = database.SetDifficulties(ctx, tx, w.song, meta.Difficulties); err != nil {
+		if err = setDifficulties(ctx, tx, w.song, meta.Difficulties); err != nil {
 			t.Fatal(err)
 		}
 		if err = tx.Commit(ctx); err != nil {

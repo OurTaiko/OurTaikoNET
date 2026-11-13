@@ -23,7 +23,7 @@ type replacementBlock struct {
 
 // previewReplacement reads a new TJA for a chart as replaceFiles would,
 // without storing anything, so the uploader can review what changes before
-// sending the audio: Fanmade's POST /charts/{id}/files/preview. Previous is
+// sending the audio (POST /charts/{id}/files/preview). Previous is
 // the stored file's own reading (null for a song without files, or one that
 // can no longer be read), which tells site edits apart from changes in the file.
 func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {

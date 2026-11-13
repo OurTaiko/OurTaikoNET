@@ -1,106 +1,185 @@
 package httpapi
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"io"
+	"encoding/json"
+	"math"
 	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
+	"strings"
 
-	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/kit/audio"
 )
 
-func (s *Server) beginUpload(w http.ResponseWriter, r *http.Request, user, key, digest string) (pgx.Tx, bool) {
-	tx, err := s.DB.Begin(r.Context())
-	if err != nil {
-		internal(w, err)
-		return nil, false
+// Text fields a replacement may carry; omitted ones keep the chart's values.
+var replacementFields = append(append([]string{}, uploadFields...), "confirmReset", "keepTitles")
+
+// previewRange is the preview range of an upload: the one sent, which must lie
+// within the audio, or else the TJA's DEMOSTART (0 when outside the audio) for
+// 15 seconds. It reports false for a range outside the audio.
+func previewRange(fields map[string]string, fileStart, duration float64) (float64, float64, bool) {
+	start := fileStart
+	if start < 0 || start >= duration {
+		start = 0
 	}
-	proceed := false
+	end := start + 15
+	number := func(field string) float64 {
+		n, err := strconv.ParseFloat(strings.TrimSpace(fields[field]), 64)
+		if err != nil {
+			return math.NaN()
+		}
+		return n
+	}
+	if _, sent := fields["demoStart"]; sent {
+		start = number("demoStart")
+		end = start + 15
+	}
+	if _, sent := fields["demoEnd"]; sent {
+		end = number("demoEnd")
+	}
+	return start, end, audio.ValidPreviewRange(start, end, duration)
+}
+
+// replaceFiles replaces a chart's TJA and optionally its audio, cover, background image and
+// background movie, keeping its ID, uploader and creation time. It is processed in the
+// background as an upload is (upload_job.go). The audio is kept when none is sent, and the
+// movie while the new TJA still declares one. Scores are
+// judged block by block (setDifficulties): a block the new TJA no longer has goes with its
+// scores; a remaining block whose TJAParser content hash changed keeps its scores but they
+// stop being the latest (trigger chart_difficulties_retire_scores), and an unchanged block
+// is left alone, so header-only edits such as titles touch no score. A new audio retires
+// the scores of every block (trigger charts_retire_scores).
+// A song registered without files gets its first TJA and audio here; both are then
+// required, and there is nothing to confirm.
+func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
+	u, c, ok := s.managed(w, r)
+	if !ok {
+		return
+	}
+	key := r.Header.Get("Idempotency-Key")
+	if !keyPattern.MatchString(key) {
+		problem(w, 400, "IDEMPOTENCY_KEY_INVALID", "需要有效的上传请求标识")
+		return
+	}
+	select {
+	case s.uploads <- struct{}{}:
+		defer func() { <-s.uploads }()
+	default:
+		problem(w, 503, "UPLOAD_BUSY", "当前正在处理其他上传，请稍后重试")
+		return
+	}
+	dir, e := os.MkdirTemp(s.Config.Storage, "staging-")
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	accepted := false
 	defer func() {
-		if !proceed {
-			tx.Rollback(r.Context())
+		if !accepted {
+			os.RemoveAll(dir)
 		}
 	}()
-	if _, err = tx.Exec(r.Context(), `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, user+":"+key); err != nil {
-		internal(w, err)
-		return nil, false
+	files, fields, ok := receiveUploadForm(w, r, dir, replacementFields)
+	if !ok {
+		return
 	}
-	var chartID, previousDigest, tjaHash, audioHash, status string
-	err = tx.QueryRow(r.Context(), `SELECT COALESCE(chart_id,''),payload_digest,tja_sha256,audio_sha256,status FROM upload_requests WHERE user_id=$1 AND idempotency_key=$2`, user, key).Scan(&chartID, &previousDigest, &tjaHash, &audioHash, &status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		proceed = true
-		return tx, true
+	tf, af, cf, mv, bg := files["tja"], files["audio"], files["cover"], files["movie"], files["bgimage"]
+	if tf == nil || (!c.HasFiles && af == nil) {
+		if c.HasFiles {
+			problem(w, 400, "UPLOAD_FILES_INVALID", "必须选择新的 TJA，音频可沿用当前文件")
+		} else {
+			problem(w, 400, "UPLOAD_FILES_INVALID", "该乐曲尚无文件，必须同时选择 TJA 和一个 OGG 或 MP3 音频")
+		}
+		return
 	}
-	if err != nil {
-		internal(w, err)
-		return nil, false
+	data, ok := normalizedTJA(w, tf)
+	if !ok {
+		return
 	}
-	if previousDigest != digest {
-		problem(w, 409, "IDEMPOTENCY_CONFLICT", "此请求标识已用于不同的内容，请重新选择后提交")
-		return nil, false
-	}
-	if status == "processing" {
-		respond(w, 202, map[string]string{"status": "processing"})
-		return nil, false
-	}
-	c, err := s.readChart(tx.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, chartID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 409, "CHART_REMOVED", "该次上传的作品已删除，请重新选择文件")
-		return nil, false
-	}
-	if err != nil {
-		internal(w, err)
-		return nil, false
-	}
-	if tjaHash != c.TJAHash || audioHash != c.AudioHash {
-		problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开歌曲页面")
-		return nil, false
-	}
-	c.setOwners(s.publicProfiles(r.Context(), c.OwnerIDs))
-	respond(w, 200, c)
-	return nil, false
-}
-
-// Stage retained audio for validation and preview generation; the replacement
-// keeps referring to the same stored file. The caller has no lock yet and
-// verifies the stored hash here and again before committing.
-func (s *Server) copyAudio(ctx context.Context, c *Chart, dir string) (*stagedFile, error) {
-	in, err := s.Config.Objects.Open(ctx, c.AudioKey)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
-	f := &stagedFile{name: c.AudioName, path: filepath.Join(dir, "audio"), sha: c.AudioHash, size: c.AudioSize}
-	out, err := os.OpenFile(f.path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		return nil, err
-	}
-	h := sha256.New()
-	n, copyErr := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, c.AudioSize+1))
-	closeErr := out.Close()
-	if err := errors.Join(copyErr, closeErr); err != nil {
-		return nil, err
-	}
-	if n != c.AudioSize || hex.EncodeToString(h.Sum(nil)) != c.AudioHash {
-		return nil, errors.New("stored audio integrity mismatch")
-	}
-	return f, nil
-}
-
-// retireChart keeps a replaced chart's scores. When the audio changed they all
-// stop being scores of the current files; a changed TJA retires only the
-// blocks whose content hash changed (the chart_difficulties trigger, from
-// setDifficulties). Which older files a score belongs to is not recorded.
-func retireChart(ctx context.Context, tx pgx.Tx, chartID, description string, audioChanged bool) error {
-	if audioChanged {
-		if _, err := tx.Exec(ctx, `UPDATE scores SET is_latest=false WHERE is_latest AND difficulty_id IN (SELECT id FROM chart_difficulties WHERE chart_id=$1)`, chartID); err != nil {
-			return err
+	// Hashes only what was sent, and a request sent again is answered from its receipt before
+	// anything is judged anew: by then the chart is what the first sending made it.
+	parts := []string{"replace", c.ID, tf.name, tf.sha, fields["description"], fields["categoryIds"], fields["nijiiroId"], fields["officialId"], fields["keepTitles"], fields["demoStart"], fields["demoEnd"], fields["difficultyMakers"]}
+	for _, f := range []*stagedFile{af, cf, mv, bg} {
+		if f != nil {
+			parts = append(parts, f.name, f.sha)
 		}
 	}
-	_, err := tx.Exec(ctx, `UPDATE charts SET description=$2 WHERE id=$1`, chartID, description)
-	return err
+	digest := hash(strings.Join(parts, "\n"))
+	if s.answeredUpload(w, r, u.User.ID, key, digest, &c) {
+		return
+	}
+	if c.HasFiles && fields["confirmReset"] != "true" {
+		problem(w, 400, "REPLACEMENT_CONFIRMATION_REQUIRED", "替换需要确认：消失的谱面块连同成绩删除，其余旧成绩不再计入最新版本")
+		return
+	}
+	description := c.Description
+	if value, sent := fields["description"]; sent {
+		if !validDescription(value) {
+			problem(w, 422, "DESCRIPTION_INVALID", "说明包含无效字符")
+			return
+		}
+		description = value
+	}
+	flags, _ := encodeCategories(c.CategoryIDs)
+	if value, sent := fields["categoryIds"]; sent {
+		ids, e := categorySelection(json.RawMessage(value))
+		if e != nil {
+			problem(w, 422, "CATEGORIES_INVALID", "分类必须为已有分类 ID 的数组")
+			return
+		}
+		flags, _ = encodeCategories(ids)
+	}
+	if !ownIdentifiers(w, fields) {
+		return
+	}
+	nijiiroID, officialID := c.NijiiroID, c.OfficialID
+	if _, sentNijiiro := fields["nijiiroId"]; sentNijiiro {
+		if nijiiroID, _, ok = identifiers(fields["nijiiroId"], ""); !ok {
+			problem(w, 422, "IDENTIFIER_INVALID", "Nijiiro ID 必须为正整数")
+			return
+		}
+		if !s.nijiiroFree(w, r, nijiiroID, c.ID) {
+			return
+		}
+	}
+	if _, sentOfficial := fields["officialId"]; sentOfficial {
+		if _, officialID, ok = identifiers("", fields["officialId"]); !ok {
+			problem(w, 422, "IDENTIFIER_INVALID", "官方 ID 只能包含字母、数字、点、下划线和连字符，最长 64 个字符")
+			return
+		}
+	}
+	// A kept audio is already identified by the stored file, so the TJA's WAVE need not name
+	// it; a new audio must be the one the TJA names.
+	waveCheck := ""
+	if af != nil {
+		waveCheck = af.name
+	}
+	meta, ok := parsedTJA(w, data, waveCheck)
+	if !ok {
+		return
+	}
+	if e := applyDifficultyMakers(fields["difficultyMakers"], meta.Difficulties); e != nil {
+		problem(w, 422, "DIFFICULTY_MAKERS_INVALID", e.Error())
+		return
+	}
+	keepMovie, ok := checkMovie(w, meta, mv, &c)
+	if !ok {
+		return
+	}
+	keepBackground, ok := checkImages(w, data, cf, bg, &c)
+	if !ok {
+		return
+	}
+	if !reservePending(w, s) {
+		return
+	}
+	job := &uploadJob{
+		user: u.User.ID, key: key, dir: dir, existingID: c.ID, audioHash: c.AudioHash, movieHash: c.MovieHash,
+		coverHash: c.CoverHash, backgroundHash: c.BackgroundHash, keepBackground: keepBackground,
+		tja: tf, audio: af, cover: cf, background: bg, movie: mv, normalized: data, meta: meta,
+		description: description, flags: flags, nijiiroID: nijiiroID, officialID: officialID, fields: fields,
+		keepMovie: keepMovie, keepTitles: fields["keepTitles"] == "true",
+		async: strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async"), done: make(chan uploadResult, 1),
+	}
+	accepted = s.acceptUpload(w, r, job, digest, &c)
 }

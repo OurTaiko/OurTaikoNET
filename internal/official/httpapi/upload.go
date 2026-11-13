@@ -36,20 +36,31 @@ func uploadReadError(w http.ResponseWriter, e error) {
 		problem(w, 413, "FILE_TOO_LARGE", "文件超过上传大小限制")
 		return
 	}
-	problem(w, 400, "UPLOAD_FILES_INVALID", "上传内容不完整，请重试")
+	problem(w, 400, "UPLOAD_INTERRUPTED", "上传中断或请求格式错误，请重试")
 }
 
-// uploader requires a signed-in administrator: only administrators add charts here.
+// uploader requires someone who may add charts: anyone signed in, or on the official source
+// only its managers.
 func (s *Server) uploader(w http.ResponseWriter, r *http.Request) (session, bool) {
 	u, ok := s.required(w, r, true)
 	if !ok {
 		return u, false
 	}
-	if !u.User.IsAdmin {
+	if officialSource && !u.User.IsAdmin {
 		problem(w, 403, "UPLOAD_FORBIDDEN", "只有管理员可以上传谱面")
 		return u, false
 	}
 	return u, true
+}
+
+// ownIdentifiers refuses the identifiers of the official source's songs on a source whose
+// charts have none. It reports false after answering.
+func ownIdentifiers(w http.ResponseWriter, fields map[string]string) bool {
+	if !officialSource && fields["nijiiroId"]+fields["officialId"] != "" {
+		problem(w, 422, "IDENTIFIER_INVALID", "这个曲源的谱面没有 Nijiiro ID 和官方 ID")
+		return false
+	}
+	return true
 }
 
 // identifiers reads the optional Nijiiro and official IDs; empty means none.
@@ -73,9 +84,9 @@ func identifiers(nijiiro, official string) (*int32, *string, bool) {
 	return nijiiroID, officialID, true
 }
 
-// Text fields a chart submission may carry besides its files. title,
-// subtitle and bpm describe a song registered without files (R038); with a
-// TJA they are ignored, as the file is the source of those.
+// Text fields a chart submission may carry besides its files. title, subtitle and bpm
+// describe a song registered without files; with a TJA they are ignored, as the file is the
+// source of those.
 var uploadFields = []string{"difficultyMakers", "description", "categoryIds", "nijiiroId", "officialId", "title", "subtitle", "bpm", "demoStart", "demoEnd"}
 
 // A new chart also names the co-creators to invite; an existing one invites from its page.
@@ -183,10 +194,10 @@ func receiveUploadForm(w http.ResponseWriter, r *http.Request, dir string, allow
 	return files, fields, true
 }
 
-// upload publishes a new chart from a TJA, its audio, and an optional cover and background
-// movie, as Fanmade does: the request makes the quick checks and keeps the files; decoding,
-// transcoding and storing follow in the background (upload_job.go). A form with neither a
-// TJA nor an audio registers a song without files (createSong).
+// upload publishes a new chart from a TJA, its audio, and an optional cover, background image
+// and background movie: the request makes the quick checks and keeps the files; decoding,
+// transcoding and storing follow in the background (upload_job.go). On the official source a
+// form with neither a TJA nor an audio registers a song without files (createSong).
 func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.uploader(w, r)
 	if !ok {
@@ -226,6 +237,9 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	flags, _ := encodeCategories(categoryIDs)
+	if !ownIdentifiers(w, fields) {
+		return
+	}
 	nijiiroID, officialID, ok := identifiers(fields["nijiiroId"], fields["officialId"])
 	if !ok {
 		problem(w, 422, "IDENTIFIER_INVALID", "Nijiiro ID 必须为正整数；官方 ID 只能包含字母、数字、点、下划线和连字符，最长 64 个字符")
@@ -244,20 +258,28 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tf, af, cf, mv, bg := files["tja"], files["audio"], files["cover"], files["movie"], files["bgimage"]
-	if tf == nil && af == nil && mv == nil && bg == nil {
+	if officialSource && tf == nil && af == nil && mv == nil && bg == nil {
 		s.createSong(w, r, u, key, fields, cf, categoryIDs, flags, nijiiroID, officialID, collaborators)
 		return
 	}
 	if tf == nil || af == nil {
-		problem(w, 400, "UPLOAD_FILES_INVALID", "必须同时选择 TJA 和一个 OGG 或 MP3 音频，或两者都不选以仅登记乐曲")
+		message := "必须同时选择 TJA 和一个 OGG 或 MP3 音频"
+		if officialSource {
+			message += "，或两者都不选以仅登记乐曲"
+		}
+		problem(w, 400, "UPLOAD_FILES_INVALID", message)
 		return
 	}
-	data, meta, ok := readUploadTJA(w, tf, af.name)
+	data, ok := normalizedTJA(w, tf)
+	if !ok {
+		return
+	}
+	meta, ok := parsedTJA(w, data, af.name)
 	if !ok {
 		return
 	}
 	if e := applyDifficultyMakers(fields["difficultyMakers"], meta.Difficulties); e != nil {
-		problem(w, 422, "MAKERS_INVALID", e.Error())
+		problem(w, 422, "DIFFICULTY_MAKERS_INVALID", e.Error())
 		return
 	}
 	keepMovie, ok := checkMovie(w, meta, mv, nil)
@@ -271,7 +293,15 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	if !reservePending(w, s) {
 		return
 	}
-	parts := []string{tf.name, tf.sha, af.name, af.sha, description, strings.Join(categoryIDs, ","), fields["nijiiroId"], fields["officialId"], fields["demoStart"], fields["demoEnd"], fields["difficultyMakers"]}
+	// Makers count as they were understood: the same makers listed in another order are the
+	// same upload.
+	makers := ""
+	if fields["difficultyMakers"] != "" {
+		for _, d := range meta.Difficulties {
+			makers += d.Course + "/" + d.Side + "=" + d.Maker + "\n"
+		}
+	}
+	parts := []string{tf.name, tf.sha, af.name, af.sha, description, strings.Join(categoryIDs, ","), fields["nijiiroId"], fields["officialId"], fields["demoStart"], fields["demoEnd"], makers}
 	// A background image is listed last, so requests without one keep the digest they had.
 	for _, f := range []*stagedFile{cf, mv, bg} {
 		if f != nil {
@@ -291,37 +321,46 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	accepted = s.acceptUpload(w, r, job, hash(strings.Join(parts, "\n")), nil)
 }
 
-// readUploadTJA normalizes and validates an uploaded TJA against the audio it names
-// (waveCheck, or none when the stored audio stays). It reports false after answering.
-func readUploadTJA(w http.ResponseWriter, tf *stagedFile, waveCheck string) ([]byte, tja.Metadata, bool) {
-	invalid := func(issue *tja.Issue) {
-		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
-	}
+// invalidTJA answers an upload whose TJA has an issue.
+func invalidTJA(w http.ResponseWriter, issue *tja.Issue) {
+	respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
+}
+
+// normalizedTJA reads an uploaded TJA as UTF-8 text. From here on the file is known by that
+// text's hash, so the same chart sent in another encoding is the same upload. It reports
+// false after answering.
+func normalizedTJA(w http.ResponseWriter, tf *stagedFile) ([]byte, bool) {
 	raw, e := os.ReadFile(tf.path)
 	if e != nil {
 		internal(w, e)
-		return nil, tja.Metadata{}, false
+		return nil, false
 	}
 	data, issue := tja.NormalizeUTF8(raw)
 	if issue != nil {
-		invalid(issue)
-		return nil, tja.Metadata{}, false
+		invalidTJA(w, issue)
+		return nil, false
 	}
-	meta, issue := tja.Parse(data, waveCheck)
-	if issue != nil {
-		invalid(issue)
-		return nil, tja.Metadata{}, false
-	}
-	return data, meta, true
+	tf.sha = hash(string(data))
+	return data, true
 }
 
-// checkMovie matches the BGMOVIE a TJA declares with the movie sent, as Fanmade does; a
+// parsedTJA validates an uploaded TJA against the audio it names (waveCheck, or none when
+// the stored audio stays). It reports false after answering.
+func parsedTJA(w http.ResponseWriter, data []byte, waveCheck string) (tja.Metadata, bool) {
+	meta, issue := tja.Parse(data, waveCheck)
+	if issue != nil {
+		invalidTJA(w, issue)
+		return tja.Metadata{}, false
+	}
+	return meta, true
+}
+
+// checkMovie matches the BGMOVIE a TJA declares with the movie sent; a
 // replacement may keep the chart's stored movie (keep reports that). It reports false after
 // answering.
 func checkMovie(w http.ResponseWriter, meta tja.Metadata, mv *stagedFile, existing *Chart) (keep, ok bool) {
 	invalid := func(code, message, expected, actual string) {
-		issue := &tja.Issue{Code: code, Message: message, Expected: expected, Actual: actual}
-		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
+		invalidTJA(w, &tja.Issue{Code: code, Message: message, Expected: expected, Actual: actual})
 	}
 	switch {
 	case meta.Movie == "" && mv != nil:
@@ -338,14 +377,13 @@ func checkMovie(w http.ResponseWriter, meta tja.Metadata, mv *stagedFile, existi
 	return false, true
 }
 
-// checkImages matches the images sent with the ones the TJA names, as Fanmade does: a cover
+// checkImages matches the images sent with the ones the TJA names: a cover
 // must be PREIMAGE's when it declares one, and a background image BGIMAGE's, which it must
 // declare. A replacement still declaring BGIMAGE without a new file keeps the chart's stored
 // image (keep reports that). It reports false after answering.
 func checkImages(w http.ResponseWriter, data []byte, cf, bg *stagedFile, existing *Chart) (keep, ok bool) {
 	invalid := func(code, message, expected, actual string) {
-		issue := &tja.Issue{Code: code, Message: message, Expected: expected, Actual: actual}
-		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
+		invalidTJA(w, &tja.Issue{Code: code, Message: message, Expected: expected, Actual: actual})
 	}
 	if declared := tja.HeaderFile(tja.SongHeader(data, "PREIMAGE")); cf != nil && declared != "" && norm.NFC.String(declared) != norm.NFC.String(cf.name) {
 		invalid("TJA_PREIMAGE_MISMATCH", fmt.Sprintf("PREIMAGE 引用了「%s」，但你选择的封面是「%s」。请选择对应图片，或修改 TJA 的 PREIMAGE 后重新选择。", declared, cf.name), declared, cf.name)

@@ -1,15 +1,11 @@
 package httpapi
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/tja"
 )
@@ -25,30 +21,18 @@ type replacementBlock struct {
 	Scores int    `json:"scores"`
 }
 
-// previewReplacement reads a new TJA for a chart as the replacement would,
+// previewReplacement reads a new TJA for a chart as replaceFiles would,
 // without storing anything, so the uploader can review what changes before
-// sending the audio. Previous is the stored file's own reading (null when it
+// sending the audio (POST /charts/{id}/files/preview). Previous is
+// the stored file's own reading (null for a song without files, or one that
 // can no longer be read), which tells site edits apart from changes in the file.
 func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, true)
+	_, c, ok := s.managed(w, r)
 	if !ok {
 		return
 	}
-	c, err := s.chart(r.Context(), r.PathValue("id"))
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "歌曲不存在或已下架")
-		return
-	}
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if !c.hasOwner(u.User.ID) && !u.User.IsAdmin {
-		problem(w, 403, "FORBIDDEN", "只有上传者或管理员可以替换歌曲")
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, int64(tja.MaxTJA)+64*1024)
-	if err = r.ParseMultipartForm(int64(tja.MaxTJA) + 64*1024); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, tja.MaxTJA+64*1024)
+	if err := r.ParseMultipartForm(tja.MaxTJA + 64*1024); err != nil {
 		uploadReadError(w, err)
 		return
 	}
@@ -59,41 +43,41 @@ func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, int64(tja.MaxTJA)+1))
+	raw, err := io.ReadAll(io.LimitReader(file, tja.MaxTJA+1))
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	normalized, issue := tja.NormalizeUTF8(data)
-	if issue != nil {
+	invalid := func(issue *tja.Issue) {
 		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "validationVersion": tja.Version})
-		return
 	}
-	// As the replacement checks WAVE: against new audio, or not at all when the stored audio stays.
-	wave := tja.WaveName(normalized)
-	if name := r.FormValue("audioName"); name != "" {
-		if !tja.SafeFilename(name) || audio.MediaType(name) == "" {
-			problem(w, 400, "UPLOAD_FILES_INVALID", "音频文件名无效")
-			return
-		}
-		wave = name
-	}
-	meta, issue := tja.Parse(normalized, wave)
+	data, issue := tja.NormalizeUTF8(raw)
 	if issue != nil {
-		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "validationVersion": tja.Version})
+		invalid(issue)
 		return
 	}
-	tx, err := s.DB.Begin(r.Context())
-	if err != nil {
-		internal(w, err)
+	// As replaceFiles checks WAVE: against new audio, or not at all when the stored audio stays.
+	waveCheck := r.FormValue("audioName")
+	if waveCheck != "" && (!tja.SafeFilename(waveCheck) || audio.MediaType(waveCheck) == "") {
+		problem(w, 400, "UPLOAD_FILES_INVALID", "音频文件名无效")
 		return
 	}
-	defer tx.Rollback(r.Context())
+	meta, issue := tja.Parse(data, waveCheck)
+	if issue != nil {
+		invalid(issue)
+		return
+	}
 	var previous *tja.Metadata
-	if parsed, err := s.sourceMetadata(r.Context(), tx, c.ID); err == nil {
-		previous = &parsed
+	if c.HasFiles {
+		if in, err := s.Config.Objects.Open(r.Context(), c.TJAKey); err == nil {
+			stored, err := io.ReadAll(io.LimitReader(in, tja.MaxTJA+1))
+			in.Close()
+			if parsed, issue := tja.Parse(stored, ""); err == nil && issue == nil {
+				previous = &parsed
+			}
+		}
 	}
-	rows, err := tx.Query(r.Context(), `SELECT d.course,d.side,COALESCE(d.content_hash,''),count(sc.id) FILTER (WHERE sc.is_latest)
+	rows, err := s.DB.Query(r.Context(), `SELECT d.course,d.side,COALESCE(d.content_hash,''),count(sc.difficulty_id) FILTER (WHERE sc.is_latest)
  FROM chart_difficulties d LEFT JOIN scores sc ON sc.difficulty_id=d.id WHERE d.chart_id=$1 GROUP BY d.id ORDER BY d.id`, c.ID)
 	if err != nil {
 		internal(w, err)
@@ -140,29 +124,4 @@ func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respond(w, 200, map[string]any{"metadata": meta, "previous": previous, "blocks": blocks})
-}
-
-// sourceMetadata parses the chart's stored TJA.
-func (s *Server) sourceMetadata(ctx context.Context, tx pgx.Tx, id string) (tja.Metadata, error) {
-	var key string
-	if err := tx.QueryRow(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1`, id).Scan(&key); err != nil {
-		return tja.Metadata{}, err
-	}
-	f, err := s.Config.Objects.Open(ctx, key)
-	if err != nil {
-		return tja.Metadata{}, err
-	}
-	defer f.Close()
-	data, err := io.ReadAll(io.LimitReader(f, tja.MaxTJA+1))
-	if err != nil {
-		return tja.Metadata{}, err
-	}
-	if len(data) > tja.MaxTJA {
-		return tja.Metadata{}, fmt.Errorf("source TJA exceeds limit")
-	}
-	parsed, issue := tja.Parse(data, tja.WaveName(data))
-	if issue != nil {
-		return tja.Metadata{}, issue
-	}
-	return parsed, nil
 }

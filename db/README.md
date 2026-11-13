@@ -14,6 +14,7 @@ Rules, all checked by `check.sql`:
 
 - The two sources have the same set of tables. Only five columns differ between them (`charts.audio_file` and `tja_file` may be empty in `official`; `category_flags` and `playlists.category_flag` are narrower there; `official.charts` has `official_id`).
 - Each source queues the files its charts and playlists stop referring to (`retired_files`), by trigger, in the transaction that replaces or deletes the row. Fanmade's old database did this; the official source was given the same two triggers here (`build/alike.sql`).
+- Each source retires a chart's scores (`is_latest`) when its audio is replaced by one of other content, by trigger (`charts_retire_scores`). OurTaiko Database's old database did this for any change of the audio's record; Fanmade's program did it itself. Both have the one trigger now, also from `build/alike.sql`.
 - A connection that works on one source sets `search_path` to `<source>, net`. SQL written without schema names then finds the source's tables and the shared ones.
 - Every function of a source is pinned to that same `search_path`, so it works whoever fires it.
 - `fanmade.scores` and `official.scores` are partitions of `net.scores`, split by `source`; the same for `dan_attempts`. Each keeps its primary key on `id` and its foreign key to its own `chart_difficulties`. Across sources a score is named by `(source, id)`.

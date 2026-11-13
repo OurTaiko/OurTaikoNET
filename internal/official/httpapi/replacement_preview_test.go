@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/kit/tja"
-	"ourtaiko.dev/net/internal/official/database"
 )
 
 // A replacement's preview reads the new TJA block by block against the stored
@@ -52,7 +51,7 @@ func TestReplacementPreview(t *testing.T) {
 	}
 	tx, err := s.DB.Begin(ctx)
 	if err == nil {
-		err = database.SetDifficulties(ctx, tx, w.song, meta.Difficulties)
+		err = setDifficulties(ctx, tx, w.song, meta.Difficulties)
 	}
 	if err == nil {
 		err = tx.Commit(ctx)

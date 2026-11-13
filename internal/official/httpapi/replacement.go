@@ -40,16 +40,16 @@ func previewRange(fields map[string]string, fileStart, duration float64) (float6
 	return start, end, audio.ValidPreviewRange(start, end, duration)
 }
 
-// replaceFiles replaces a chart's TJA and optionally its audio, cover and background movie,
-// keeping its ID, uploader and creation time: the contract of Fanmade's PUT
-// /charts/{id}/files, processed in the background the same way (upload_job.go). The audio
-// is kept when none is sent, and the movie while the new TJA still declares one. Scores are
-// judged block by block (SetDifficulties): a block the new TJA no longer has goes with its
+// replaceFiles replaces a chart's TJA and optionally its audio, cover, background image and
+// background movie, keeping its ID, uploader and creation time. It is processed in the
+// background as an upload is (upload_job.go). The audio is kept when none is sent, and the
+// movie while the new TJA still declares one. Scores are
+// judged block by block (setDifficulties): a block the new TJA no longer has goes with its
 // scores; a remaining block whose TJAParser content hash changed keeps its scores but they
 // stop being the latest (trigger chart_difficulties_retire_scores), and an unchanged block
 // is left alone, so header-only edits such as titles touch no score. A new audio retires
 // the scores of every block (trigger charts_retire_scores).
-// A song registered without files (R038) gets its first TJA and audio here; both are then
+// A song registered without files gets its first TJA and audio here; both are then
 // required, and there is nothing to confirm.
 func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 	u, c, ok := s.managed(w, r)
@@ -92,6 +92,22 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	data, ok := normalizedTJA(w, tf)
+	if !ok {
+		return
+	}
+	// Hashes only what was sent, and a request sent again is answered from its receipt before
+	// anything is judged anew: by then the chart is what the first sending made it.
+	parts := []string{"replace", c.ID, tf.name, tf.sha, fields["description"], fields["categoryIds"], fields["nijiiroId"], fields["officialId"], fields["keepTitles"], fields["demoStart"], fields["demoEnd"], fields["difficultyMakers"]}
+	for _, f := range []*stagedFile{af, cf, mv, bg} {
+		if f != nil {
+			parts = append(parts, f.name, f.sha)
+		}
+	}
+	digest := hash(strings.Join(parts, "\n"))
+	if s.answeredUpload(w, r, u.User.ID, key, digest, &c) {
+		return
+	}
 	if c.HasFiles && fields["confirmReset"] != "true" {
 		problem(w, 400, "REPLACEMENT_CONFIRMATION_REQUIRED", "替换需要确认：消失的谱面块连同成绩删除，其余旧成绩不再计入最新版本")
 		return
@@ -112,6 +128,9 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		flags, _ = encodeCategories(ids)
+	}
+	if !ownIdentifiers(w, fields) {
+		return
 	}
 	nijiiroID, officialID := c.NijiiroID, c.OfficialID
 	if _, sentNijiiro := fields["nijiiroId"]; sentNijiiro {
@@ -135,12 +154,12 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 	if af != nil {
 		waveCheck = af.name
 	}
-	data, meta, ok := readUploadTJA(w, tf, waveCheck)
+	meta, ok := parsedTJA(w, data, waveCheck)
 	if !ok {
 		return
 	}
 	if e := applyDifficultyMakers(fields["difficultyMakers"], meta.Difficulties); e != nil {
-		problem(w, 422, "MAKERS_INVALID", e.Error())
+		problem(w, 422, "DIFFICULTY_MAKERS_INVALID", e.Error())
 		return
 	}
 	keepMovie, ok := checkMovie(w, meta, mv, &c)
@@ -154,13 +173,6 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 	if !reservePending(w, s) {
 		return
 	}
-	// Hashes only what was sent, so a retry is answered before the files are judged again.
-	parts := []string{"replace", c.ID, tf.name, tf.sha, fields["description"], fields["categoryIds"], fields["nijiiroId"], fields["officialId"], fields["keepTitles"], fields["demoStart"], fields["demoEnd"], fields["difficultyMakers"]}
-	for _, f := range []*stagedFile{af, cf, mv, bg} {
-		if f != nil {
-			parts = append(parts, f.name, f.sha)
-		}
-	}
 	job := &uploadJob{
 		user: u.User.ID, key: key, dir: dir, existingID: c.ID, audioHash: c.AudioHash, movieHash: c.MovieHash,
 		coverHash: c.CoverHash, backgroundHash: c.BackgroundHash, keepBackground: keepBackground,
@@ -169,5 +181,5 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 		keepMovie: keepMovie, keepTitles: fields["keepTitles"] == "true",
 		async: strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async"), done: make(chan uploadResult, 1),
 	}
-	accepted = s.acceptUpload(w, r, job, hash(strings.Join(parts, "\n")), &c)
+	accepted = s.acceptUpload(w, r, job, digest, &c)
 }

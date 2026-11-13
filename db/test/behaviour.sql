@@ -86,7 +86,15 @@ SELECT pg_temp.must(EXISTS (SELECT 1 FROM official.retired_files WHERE storage_k
   'the audio an official chart no longer uses is queued for deletion');
 SELECT pg_temp.must(NOT EXISTS (SELECT 1 FROM fanmade.retired_files WHERE storage_key = repeat('2', 64) || '.ogg'),
   'the fanmade file of the same name is not queued with it');
+-- The same audio kept under another record is not another audio: its scores stay.
+INSERT INTO fanmade.chart_resources (storage_key, original_filename, sha256, byte_size, extension)
+VALUES ('legacy/seed.ogg', 'seed.ogg', repeat('2', 64), 200, 'ogg') RETURNING id AS same_audio \gset
+UPDATE fanmade.charts SET audio_file = :same_audio WHERE id = :'f_chart';
+SELECT pg_temp.must(EXISTS (SELECT 1 FROM fanmade.scores s JOIN fanmade.chart_difficulties d ON d.id = s.difficulty_id WHERE d.chart_id = :'f_chart' AND s.is_latest),
+  'the same audio under another record keeps a fanmade chart''s scores');
 UPDATE fanmade.charts SET audio_file = 900003 WHERE id = :'f_chart';
+SELECT pg_temp.must(NOT EXISTS (SELECT 1 FROM fanmade.scores s JOIN fanmade.chart_difficulties d ON d.id = s.difficulty_id WHERE d.chart_id = :'f_chart' AND s.is_latest),
+  'new audio on a fanmade chart retires its scores');
 SELECT pg_temp.must(EXISTS (SELECT 1 FROM fanmade.retired_files WHERE storage_key = repeat('2', 64) || '.ogg'),
   'the audio a fanmade chart no longer uses is queued for deletion');
 

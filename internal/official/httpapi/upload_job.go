@@ -15,10 +15,9 @@ import (
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
-	"ourtaiko.dev/net/internal/official/database"
 )
 
-// uploadJob is an accepted upload (as Fanmade's): its files are staged and its fast checks
+// uploadJob is an accepted upload: its files are staged and its fast checks
 // passed. Decoding, transcoding and storing happen after the request returns.
 type uploadJob struct {
 	user, key, dir           string
@@ -182,8 +181,8 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	} else if j.keepMovie {
 		movieSHA = j.movieHash
 	}
-	// R007: the stored TJA names its audio and movie by content, matching their objects. A
-	// movie that was left out is no longer declared.
+	// The stored TJA names its audio and movie by content, matching their objects. A movie
+	// that was left out is no longer declared.
 	wave := current.Wave
 	if af != nil {
 		wave = af.sha + "." + fileExtension(af.name)
@@ -218,6 +217,10 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	}
 	if !ok {
 		return failed(errors.New("validated TJA lost a rewritten header"))
+	}
+	// What is stored is what was judged: the rewritten file must read as the uploaded one did.
+	if _, issue := tja.Parse(stored, wave); issue != nil {
+		return rejected(422, issue.Code, issue.Message)
 	}
 	tjaPath := filepath.Join(j.dir, "stored.tja")
 	if err := os.WriteFile(tjaPath, stored, 0600); err != nil {
@@ -295,27 +298,32 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	subtitles, _ := json.Marshal(j.meta.SubtitleTranslations)
 	id := j.existingID
 	if id != "" {
-		// Names and their translations come from the new TJA again, as on Fanmade, unless
-		// keepTitles keeps the chart's own.
-		_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2,audio_file=$3,cover_file=$4,description=$5,category_flags=$6,nijiiro_id=$7,official_id=$8,
- bpm=$11,offset_seconds=$12,demo_start=$13,demo_end=$14,duration=$15,movie_file=$19,movie_offset=$20,bgimage_file=$21,
- title=CASE WHEN $18 THEN title ELSE $9 END,subtitle=CASE WHEN $18 THEN subtitle ELSE $10 END,
- title_translations=CASE WHEN $18 THEN title_translations ELSE $16 END,subtitle_translations=CASE WHEN $18 THEN subtitle_translations ELSE $17 END WHERE id=$1`,
-			id, tjaFile, audioFile, coverFile, j.description, j.flags, j.nijiiroID, j.officialID,
+		// Names and their translations come from the new TJA again, unless keepTitles keeps the
+		// chart's own. A new audio retires the scores of every block (trigger
+		// charts_retire_scores).
+		_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2,audio_file=$3,cover_file=$4,description=$5,category_flags=$6,nijiiro_id=$7,
+ bpm=$10,offset_seconds=$11,demo_start=$12,demo_end=$13,duration=$14,movie_file=$18,movie_offset=$19,bgimage_file=$20,
+ title=CASE WHEN $17 THEN title ELSE $8 END,subtitle=CASE WHEN $17 THEN subtitle ELSE $9 END,
+ title_translations=CASE WHEN $17 THEN title_translations ELSE $15 END,subtitle_translations=CASE WHEN $17 THEN subtitle_translations ELSE $16 END WHERE id=$1`,
+			id, tjaFile, audioFile, coverFile, j.description, j.flags, j.nijiiroID,
 			j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, demoEnd, duration, titles, subtitles, j.keepTitles, movieFile, j.meta.MovieOffset, backgroundFile)
 	} else {
 		id = ID()
-		_, err = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,official_id,owner_ids,tja_file,audio_file,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end,movie_file,movie_offset,bgimage_file)
- VALUES($20,$1,$2,ARRAY[$3::text],$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$21)`,
-			j.nijiiroID, j.officialID, j.user, tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
+		_, err = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,owner_ids,tja_file,audio_file,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end,movie_file,movie_offset,bgimage_file)
+ VALUES($19,$1,ARRAY[$2::text],$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$20)`,
+			j.nijiiroID, j.user, tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
 	}
 	if nijiiroConflict(err) {
 		return rejected(409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
 	}
+	// Only the official source's songs have an official ID.
+	if err == nil && officialSource {
+		_, err = tx.Exec(ctx, `UPDATE charts SET official_id=$2 WHERE id=$1`, id, j.officialID)
+	}
 	if err != nil {
 		return failed(err)
 	}
-	if err = database.SetDifficulties(ctx, tx, id, j.meta.Difficulties); err != nil {
+	if err = setDifficulties(ctx, tx, id, j.meta.Difficulties); err != nil {
 		return failed(err)
 	}
 	if err = inviteOnPublish(ctx, tx, id, j.user, j.collaborators); err != nil {
@@ -413,6 +421,51 @@ func (s *Server) FailInterruptedUploads(ctx context.Context) error {
 	return nil
 }
 
+// answeredUpload answers a request whose key already has a receipt: with the chart it made,
+// with 202 while it is still processed, or with a conflict when the key was used for
+// something else or what it made is gone. It reports whether it answered; false means the
+// key is new.
+func (s *Server) answeredUpload(w http.ResponseWriter, r *http.Request, user, key, digest string, existing *Chart) bool {
+	ctx := r.Context()
+	var recorded, status, tjaSHA, audioSHA string
+	var recordedChart *string
+	err := s.DB.QueryRow(ctx, `SELECT payload_digest,status,chart_id,tja_sha256,audio_sha256 FROM upload_requests WHERE user_id=$1 AND idempotency_key=$2`, user, key).Scan(&recorded, &status, &recordedChart, &tjaSHA, &audioSHA)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		internal(w, err)
+		return true
+	}
+	if recorded != digest || (existing != nil && (recordedChart == nil || *recordedChart != existing.ID)) {
+		problem(w, 409, "IDEMPOTENCY_CONFLICT", "此上传请求标识已用于其他内容，请刷新页面后重试")
+		return true
+	}
+	if status == "processing" {
+		respond(w, 202, map[string]string{"status": "processing"})
+		return true
+	}
+	if recordedChart == nil {
+		problem(w, 409, "CHART_REMOVED", "该次上传的谱面已删除，请重新选择文件")
+		return true
+	}
+	c, err := s.chart(ctx, *recordedChart)
+	if errors.Is(err, pgx.ErrNoRows) {
+		problem(w, 409, "CHART_REMOVED", "该次上传的谱面已删除，请重新选择文件")
+		return true
+	}
+	if err != nil {
+		internal(w, err)
+		return true
+	}
+	if c.TJAHash != tjaSHA || c.AudioHash != audioSHA {
+		problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开谱面页面")
+		return true
+	}
+	respond(w, 200, c)
+	return true
+}
+
 // acceptUpload records an accepted upload's receipt and queues its job; the request then
 // waits for the result, or with Prefer: respond-async is answered 202 at once. A retried
 // request (same key and payload) is answered from its receipt instead. The caller has
@@ -442,38 +495,11 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 		return false
 	}
 	if tag.RowsAffected() == 0 {
-		var recorded, status, tjaSHA, audioSHA string
-		var recordedChart *string
-		if err = tx.QueryRow(ctx, `SELECT payload_digest,status,chart_id,tja_sha256,audio_sha256 FROM upload_requests WHERE user_id=$1 AND idempotency_key=$2`, j.user, j.key).Scan(&recorded, &status, &recordedChart, &tjaSHA, &audioSHA); err != nil {
-			internal(w, err)
-			return false
+		// A request with this key came first. Its receipt is gone again only if it has just
+		// been refused: this one may then be sent once more.
+		if !s.answeredUpload(w, r, j.user, j.key, digest, existing) {
+			problem(w, 503, "UPLOAD_BUSY", "当前正在处理其他上传，请稍后重试")
 		}
-		if recorded != digest || (existing != nil && (recordedChart == nil || *recordedChart != existing.ID)) {
-			problem(w, 409, "IDEMPOTENCY_CONFLICT", "此上传请求标识已用于其他内容，请刷新页面后重试")
-			return false
-		}
-		if status == "processing" {
-			respond(w, 202, map[string]string{"status": "processing"})
-			return false
-		}
-		if recordedChart == nil {
-			problem(w, 409, "CHART_REMOVED", "该次上传的谱面已删除，请重新选择文件")
-			return false
-		}
-		c, err := s.chart(ctx, *recordedChart)
-		if errors.Is(err, pgx.ErrNoRows) {
-			problem(w, 409, "CHART_REMOVED", "该次上传的谱面已删除，请重新选择文件")
-			return false
-		}
-		if err != nil {
-			internal(w, err)
-			return false
-		}
-		if c.TJAHash != tjaSHA || c.AudioHash != audioSHA {
-			problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开谱面页面")
-			return false
-		}
-		respond(w, 200, c)
 		return false
 	}
 	if err = tx.Commit(ctx); err != nil {

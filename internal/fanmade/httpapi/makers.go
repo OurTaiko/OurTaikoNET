@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -13,20 +15,8 @@ import (
 	"ourtaiko.dev/net/internal/kit/tja"
 )
 
-// Keep the first occurrence in block order, so credits never shuffle between reads.
-func difficultyMakers(difficulties []tja.Difficulty) string {
-	seen := map[string]bool{}
-	names := []string{}
-	for _, d := range difficulties {
-		name := strings.TrimSpace(d.Maker)
-		if name != "" && !seen[name] {
-			seen[name] = true
-			names = append(names, name)
-		}
-	}
-	return strings.Join(names, " | ")
-}
-
+// Makers typed on the website, one per block: an upload, a replacement or an edit may set
+// each block's maker, which otherwise comes from the TJA.
 // The client identifies blocks, but cannot change their server-parsed difficulty.
 func applyDifficultyMakers(raw string, difficulties []tja.Difficulty) error {
 	if raw == "" {
@@ -65,44 +55,67 @@ func applyDifficultyMakers(raw string, difficulties []tja.Difficulty) error {
 	return nil
 }
 
-// chartDifficulties reads a chart's blocks in the order the API lists them.
-func chartDifficulties(ctx context.Context, tx pgx.Tx, chartID string) ([]tja.Difficulty, error) {
-	rows, err := tx.Query(ctx, `SELECT d.id,d.course,d.side,d.level,d.maker,d.branching,COALESCE(d.content_hash,'') FROM chart_difficulties d WHERE d.chart_id=$1 ORDER BY `+slotOrder, chartID)
-	if err != nil {
-		return nil, err
+// Keep the first occurrence in block order, so credits never shuffle between reads.
+func difficultyMakers(difficulties []tja.Difficulty) string {
+	seen := map[string]bool{}
+	names := []string{}
+	for _, d := range difficulties {
+		name := strings.TrimSpace(d.Maker)
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (tja.Difficulty, error) {
-		var d tja.Difficulty
-		return d, row.Scan(&d.ID, &d.Course, &d.Side, &d.Level, &d.Maker, &d.Branching, &d.Hash)
-	})
+	return strings.Join(names, " | ")
 }
 
 // setDifficulties makes chart_difficulties hold exactly the given blocks of a
-// chart. A slot that remains keeps its row, and with it the ID scores refer
-// to; when its content hash changes the trigger retires the row's scores and
-// invalidates 段位 songs on it. A slot the new file no longer has is removed
-// with its scores, whose request keys are kept so a retried submission is not
-// stored again.
+// chart. Rows are rewritten only when something differs, so storing the same
+// file again neither changes their IDs nor touches the chart's update_at.
 func setDifficulties(ctx context.Context, tx pgx.Tx, chartID string, blocks []tja.Difficulty) error {
-	stored, err := chartDifficulties(ctx, tx, chartID)
+	rows, err := tx.Query(ctx, `SELECT course,side,level,maker,branching,COALESCE(content_hash,'') FROM chart_difficulties WHERE chart_id=$1`, chartID)
 	if err != nil {
 		return err
 	}
-	wanted := map[[2]string]bool{}
-	for _, d := range blocks {
-		wanted[[2]string{d.Course, d.Side}] = true
+	stored, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (tja.Difficulty, error) {
+		var d tja.Difficulty
+		return d, row.Scan(&d.Course, &d.Side, &d.Level, &d.Maker, &d.Branching, &d.Hash)
+	})
+	if err != nil {
+		return err
 	}
+	// The constants are kept by content hash (difficulty_constants), whatever the rows do.
+	for _, d := range blocks {
+		if err = constants.Store(ctx, tx, d.Hash, d.Routes); err != nil {
+			return err
+		}
+	}
+	wanted := map[[2]string]tja.Difficulty{}
+	for _, d := range blocks {
+		d.ID, d.Line, d.Routes = 0, 0, nil
+		wanted[[2]string{d.Course, d.Side}] = d
+	}
+	same := len(stored) == len(wanted) && !slices.ContainsFunc(stored, func(d tja.Difficulty) bool {
+		return !reflect.DeepEqual(wanted[[2]string{d.Course, d.Side}], d)
+	})
+	if same {
+		return nil
+	}
+	// Keep the rows, and with them the IDs scores refer to, of slots that remain. A slot the
+	// new file no longer has goes with its scores, whose request keys are kept: a retried
+	// submission of such a score is answered SCORE_REMOVED and not stored again.
 	for _, d := range stored {
-		if wanted[[2]string{d.Course, d.Side}] {
+		if _, ok := wanted[[2]string{d.Course, d.Side}]; ok {
 			continue
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO retired_score_requests(user_id,idempotency_key) SELECT user_id,idempotency_key FROM scores WHERE difficulty_id=$1 AND idempotency_key IS NOT NULL ON CONFLICT DO NOTHING`, d.ID); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO retired_score_requests(user_id,idempotency_key)
+ SELECT user_id,idempotency_key FROM scores WHERE idempotency_key IS NOT NULL AND difficulty_id IN (SELECT id FROM chart_difficulties WHERE chart_id=$1 AND course=$2 AND side=$3) ON CONFLICT DO NOTHING`, chartID, d.Course, d.Side); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `DELETE FROM scores WHERE difficulty_id=$1`, d.ID); err != nil {
+		if _, err = tx.Exec(ctx, `DELETE FROM scores WHERE difficulty_id IN (SELECT id FROM chart_difficulties WHERE chart_id=$1 AND course=$2 AND side=$3)`, chartID, d.Course, d.Side); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `DELETE FROM chart_difficulties WHERE id=$1`, d.ID); err != nil {
+		if _, err = tx.Exec(ctx, `DELETE FROM chart_difficulties WHERE chart_id=$1 AND course=$2 AND side=$3`, chartID, d.Course, d.Side); err != nil {
 			return err
 		}
 	}
@@ -111,12 +124,12 @@ func setDifficulties(ctx context.Context, tx pgx.Tx, chartID string, blocks []tj
 		if d.Hash != "" {
 			hash = &d.Hash
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level,maker,branching,content_hash) VALUES($1,$2,$3,$4,$5,$6,$7)
- ON CONFLICT(chart_id,course,side) DO UPDATE SET level=EXCLUDED.level,maker=EXCLUDED.maker,branching=EXCLUDED.branching,content_hash=COALESCE(EXCLUDED.content_hash,chart_difficulties.content_hash)`,
-			chartID, d.Course, d.Side, d.Level, d.Maker, d.Branching, hash); err != nil {
-			return err
-		}
-		if err = constants.Store(ctx, tx, d.Hash, d.Routes); err != nil {
+		// A changed content_hash retires the row's scores and invalidates 段位 songs (trigger).
+		_, err = tx.Exec(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level,maker,branching,content_hash) VALUES($1,$2,$3,$4,$5,$6,$7)
+ ON CONFLICT(chart_id,course,side) DO UPDATE SET level=EXCLUDED.level,maker=EXCLUDED.maker,branching=EXCLUDED.branching,content_hash=COALESCE(EXCLUDED.content_hash,chart_difficulties.content_hash)
+ WHERE (chart_difficulties.level,chart_difficulties.maker,chart_difficulties.branching,chart_difficulties.content_hash) IS DISTINCT FROM (EXCLUDED.level,EXCLUDED.maker,EXCLUDED.branching,COALESCE(EXCLUDED.content_hash,chart_difficulties.content_hash))`,
+			chartID, d.Course, d.Side, d.Level, d.Maker, d.Branching, hash)
+		if err != nil {
 			return err
 		}
 	}

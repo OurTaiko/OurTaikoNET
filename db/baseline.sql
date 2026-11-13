@@ -108,6 +108,25 @@ $$;
 
 
 --
+-- Name: charts_retire_scores(); Type: FUNCTION; Schema: fanmade; Owner: -
+--
+
+CREATE FUNCTION fanmade.charts_retire_scores() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'fanmade', 'net'
+    AS $$
+BEGIN
+  IF (SELECT sha256 FROM fanmade.chart_resources WHERE id = OLD.audio_file)
+     IS DISTINCT FROM (SELECT sha256 FROM fanmade.chart_resources WHERE id = NEW.audio_file) THEN
+    UPDATE fanmade.scores SET is_latest = false
+     WHERE is_latest AND difficulty_id IN (SELECT id FROM fanmade.chart_difficulties WHERE chart_id = NEW.id);
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: charts_touch_update_at(); Type: FUNCTION; Schema: fanmade; Owner: -
 --
 
@@ -479,8 +498,11 @@ CREATE FUNCTION official.charts_retire_scores() RETURNS trigger
     SET search_path TO 'official', 'net'
     AS $$
 BEGIN
-  UPDATE official.scores SET is_latest = false
-   WHERE is_latest AND difficulty_id IN (SELECT id FROM official.chart_difficulties WHERE chart_id = NEW.id);
+  IF (SELECT sha256 FROM official.chart_resources WHERE id = OLD.audio_file)
+     IS DISTINCT FROM (SELECT sha256 FROM official.chart_resources WHERE id = NEW.audio_file) THEN
+    UPDATE official.scores SET is_latest = false
+     WHERE is_latest AND difficulty_id IN (SELECT id FROM official.chart_difficulties WHERE chart_id = NEW.id);
+  END IF;
   RETURN NULL;
 END;
 $$;
@@ -3487,6 +3509,13 @@ CREATE TRIGGER charts_default_demo_end BEFORE INSERT ON fanmade.charts FOR EACH 
 --
 
 CREATE TRIGGER charts_retire_files AFTER DELETE OR UPDATE OF tja_file, audio_file, cover_file, preview_file, movie_file, bgimage_file ON fanmade.charts FOR EACH ROW EXECUTE FUNCTION fanmade.retire_chart_files();
+
+
+--
+-- Name: charts charts_retire_scores; Type: TRIGGER; Schema: fanmade; Owner: -
+--
+
+CREATE TRIGGER charts_retire_scores AFTER UPDATE OF audio_file ON fanmade.charts FOR EACH ROW WHEN ((old.audio_file IS DISTINCT FROM new.audio_file)) EXECUTE FUNCTION fanmade.charts_retire_scores();
 
 
 --

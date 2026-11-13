@@ -23,7 +23,7 @@ func songBPM(raw string) (float64, bool) {
 	return n, true
 }
 
-// createSong registers a chart that has no TJA and no audio yet (R038): a
+// createSong registers a chart that has no TJA and no audio yet: a
 // song that is known but whose files are not at hand. It keeps only what the
 // uploader says of it: title, subtitle, an optional BPM, the identifiers,
 // categories, notes and a cover. Blocks, duration and the files come later
