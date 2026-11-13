@@ -9,8 +9,10 @@ import (
 
 // A 段位 course takes votes and comments like a song: its own tallies, the
 // maker's notifications, and the comment showing the course it belongs to.
-func TestDanInteractions(t *testing.T) {
-	c, s := interactionFixture(t)
+func TestDanInteractions(t *testing.T) { bothSources(t, testDanInteractions) }
+
+func testDanInteractions(t *testing.T, w interactionWorld) {
+	c, s := w.c, w.s
 	ctx := context.Background()
 	dan := web.NewID()
 	if _, err := s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,code,exams) VALUES($1,'d46774d30dd13b92d9e536808da468a4','{"ja":"初段","en":"1st Dan"}','SHODAN','[]')`, dan); err != nil {
@@ -57,11 +59,11 @@ func TestDanInteractions(t *testing.T) {
 	}
 	// A song's comment cannot be replied to from a course, nor the reverse.
 	var songTop Comment
-	c.do("alice", "POST", "/api/v1/charts/song/comments", `{"body":"song"}`, &songTop)
+	c.do("alice", "POST", w.chart(w.song)+"/comments", `{"body":"song"}`, &songTop)
 	if code := c.do("bob", "POST", path+"/comments", `{"body":"x","parentId":"`+songTop.ID+`"}`, nil); code != 404 {
 		t.Fatal("cross-subject reply", code)
 	}
-	if code := c.do("bob", "POST", "/api/v1/charts/song/comments", `{"body":"x","parentId":"`+top.ID+`"}`, nil); code != 404 {
+	if code := c.do("bob", "POST", w.chart(w.song)+"/comments", `{"body":"x","parentId":"`+top.ID+`"}`, nil); code != 404 {
 		t.Fatal("cross-subject reply to song", code)
 	}
 	var page CommentPage
@@ -69,7 +71,7 @@ func TestDanInteractions(t *testing.T) {
 		t.Fatalf("page %d %+v", code, page)
 	}
 	var songPage CommentPage
-	c.do("", "GET", "/api/v1/charts/song/comments", "", &songPage)
+	c.do("", "GET", w.chart(w.song)+"/comments", "", &songPage)
 	if songPage.CommentCount != 1 || songPage.Total != 1 {
 		t.Fatalf("song page keeps its own count: %+v", songPage)
 	}

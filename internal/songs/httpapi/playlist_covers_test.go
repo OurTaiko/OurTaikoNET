@@ -17,12 +17,11 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// A playlist's cover on this source: the website's image and the game's small JPEG are
-// stored, served, linked for the game, and deleted once nothing refers to them. The
-// playlist code is the same text as the Fanmade source's; storing, serving and releasing
-// files are this source's own.
-func TestOfficialPlaylistCover(t *testing.T) {
-	w := officialInteractionFixture(t)
+// A playlist's cover: the website's image and the game's small JPEG are stored, served,
+// linked for the game, and deleted once nothing refers to them.
+func TestPlaylistCover(t *testing.T) { bothSources(t, testPlaylistCover) }
+
+func testPlaylistCover(t *testing.T, w interactionWorld) {
 	c, s, ctx := w.c, w.s, context.Background()
 	owner := testUsers["owner"].ID
 	var p Playlist
@@ -44,7 +43,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: c.tokens[user]})
+		r.AddCookie(&http.Cookie{Name: c.cookie, Value: c.tokens[user]})
 		rec := httptest.NewRecorder()
 		c.handler.ServeHTTP(rec, r)
 		return rec
@@ -78,7 +77,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 	// The game gets a small JPEG of the cover.
 	var gameKey, gameHash string
 	var gameSize int64
-	if e := s.DB.QueryRow(ctx, `SELECT r.storage_key,r.sha256,r.byte_size FROM playlists p JOIN chart_resources r ON r.id=p.game_cover_file WHERE p.id=$1`, p.ID).Scan(&gameKey, &gameHash, &gameSize); e != nil || !strings.HasSuffix(gameKey, ".jpg") {
+	if e := s.DB.QueryRow(ctx, `SELECT r.storage_key,r.sha256,r.byte_size FROM playlists p JOIN chart_resources r ON r.id=p.game_cover_file WHERE p.id=$1`, p.ID).Scan(&gameKey, &gameHash, &gameSize); e != nil || gameKey != gameHash+".jpg" {
 		t.Fatal("game cover", gameKey, e)
 	}
 	object, e := s.Config.Objects.Open(ctx, gameKey)
@@ -91,24 +90,31 @@ func TestOfficialPlaylistCover(t *testing.T) {
 		t.Fatal("game cover image", kind, format, e)
 	}
 
-	// Its folder in the game lists songs of the catalog: with a TJA and a category.
-	var tja, audio int64
-	digest := web.NewID() + web.NewID()
-	e = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.tja','a.tja',$1,1,'tja') RETURNING id`, digest).Scan(&tja)
-	if e == nil {
-		e = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.ogg','a.ogg',$1,1,'ogg') RETURNING id`, digest).Scan(&audio)
+	// Its folder in the game lists songs of the catalog: with files and in a category. Song is
+	// one; Other is not, for want of files on the official source and of a category on Fanmade.
+	var e2 error
+	if s.source().Official {
+		var tja, audio int64
+		digest := web.NewID() + web.NewID()
+		e2 = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.tja','a.tja',$1,1,'tja') RETURNING id`, digest).Scan(&tja)
+		if e2 == nil {
+			e2 = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.ogg','a.ogg',$1,1,'ogg') RETURNING id`, digest).Scan(&audio)
+		}
+		if e2 == nil {
+			_, e2 = s.DB.Exec(ctx, `UPDATE charts SET tja_file=$1,audio_file=$2,duration=10 WHERE id=$3`, tja, audio, w.song)
+		}
 	}
-	if e == nil {
-		_, e = s.DB.Exec(ctx, `UPDATE charts SET tja_file=$1,audio_file=$2,duration=10,category_flags=1 WHERE id=$3`, tja, audio, w.song)
+	if e2 == nil {
+		_, e2 = s.DB.Exec(ctx, `UPDATE charts SET category_flags=CASE WHEN id=$1 THEN 1 ELSE 0 END WHERE id IN ($1,$2)`, w.song, w.other)
 	}
-	if e != nil {
-		t.Fatal(e)
+	if e2 != nil {
+		t.Fatal(e2)
 	}
 	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.song, `{}`, nil); code != 201 {
 		t.Fatal("add", code)
 	}
 	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.other, `{}`, nil); code != 201 {
-		t.Fatal("add a song without files", code)
+		t.Fatal("add a song outside the catalog", code)
 	}
 	folders := func(app *Server) []GamePlaylist {
 		t.Helper()
@@ -126,7 +132,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 		}
 		return items
 	}
-	// The song that has no files yet is not in the game's folder.
+	// The song outside the catalog is not in the game's folder.
 	if own := folders(s)[0]; own.Cover != nil || strings.Join(own.ChartIDs, ",") != w.song || own.Owner == "" {
 		t.Fatalf("folder without direct downloads %+v", own)
 	}
@@ -135,7 +141,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 		t.Fatal("the account's own folders", personal)
 	}
 	// A bucket without a public address gets signed links.
-	direct := &Server{DB: s.DB, Config: Config{Source: Official, Objects: teststore.New(t), SSO: s.Config.SSO}}
+	direct := &Server{DB: s.DB, Config: Config{Source: s.source(), Objects: teststore.New(t), SSO: s.Config.SSO}}
 	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, gameKey) || link.HeadURL == "" ||
 		link.SHA256 != gameHash || link.Size != gameSize || link.ContentType != "image/jpeg" {
 		t.Fatalf("cover link %+v", link)
@@ -167,7 +173,17 @@ func TestOfficialPlaylistCover(t *testing.T) {
 	if _, e := s.DB.Exec(ctx, `UPDATE charts SET cover_file=NULL WHERE id=$1`, w.song); e != nil {
 		t.Fatal(e)
 	}
+	// The queue of replaced files leaves a cover alone while its playlist refers to it.
+	s.cleanupReplacedFiles()
+	if covers() != 2 {
+		t.Fatal("playlist cover deleted while referenced", covers())
+	}
 	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
 		t.Fatal("cover kept after its playlist", code, covers())
+	}
+	for _, key := range []string{result.CoverHash + ".webp", gameKey} {
+		if _, e := s.Config.Objects.Open(ctx, key); e == nil {
+			t.Fatal("cover object kept", key)
+		}
 	}
 }

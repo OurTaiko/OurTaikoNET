@@ -1,22 +1,14 @@
 package httpapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"image"
 	_ "image/jpeg"
-	"image/png"
-	"mime/multipart"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
-
-	"ourtaiko.dev/net/internal/songs/teststore"
-	"ourtaiko.dev/net/internal/web"
 )
 
 const (
@@ -377,138 +369,5 @@ func TestPlaylistLimits(t *testing.T) {
 	var page PlaylistPage
 	if code := c.do("", "GET", "/api/v1/playlists?page=2&owner="+playlistOwner, "", &page); code != 200 || page.Total != maxPlaylists-1 || len(page.Items) != playlistPageSize {
 		t.Fatal("second page", code, page.Total, len(page.Items))
-	}
-}
-
-func TestPlaylistCover(t *testing.T) {
-	c, s := interactionFixture(t)
-	ctx := context.Background()
-	var p Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"Covered","public":true}`, &p); code != 201 {
-		t.Fatal(code)
-	}
-	path := "/api/v1/playlists/" + p.ID + "/cover"
-	var picture bytes.Buffer
-	if e := png.Encode(&picture, image.NewNRGBA(image.Rect(0, 0, 40, 30))); e != nil {
-		t.Fatal(e)
-	}
-	upload := func(user, name string, data []byte) *httptest.ResponseRecorder {
-		var body bytes.Buffer
-		form := multipart.NewWriter(&body)
-		out, _ := form.CreateFormFile("cover", name)
-		_, _ = out.Write(data)
-		_ = form.Close()
-		r := httptest.NewRequest("PUT", path, &body)
-		r.Header.Set("Origin", "http://localhost")
-		r.Header.Set("Content-Type", form.FormDataContentType())
-		r.Header.Set("X-CSRF-Token", "csrf")
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: c.tokens[user]})
-		w := httptest.NewRecorder()
-		c.handler.ServeHTTP(w, r)
-		return w
-	}
-	if w := upload("alice", "cover.png", picture.Bytes()); w.Code != 403 {
-		t.Fatal("foreign cover", w.Code)
-	}
-	if w := upload("owner", "cover.png", []byte("not an image")); w.Code != 422 {
-		t.Fatal("invalid cover", w.Code)
-	}
-	w := upload("owner", "cover.png", picture.Bytes())
-	var result struct{ CoverHash string }
-	if e := json.Unmarshal(w.Body.Bytes(), &result); e != nil || w.Code != 200 || len(result.CoverHash) != 64 {
-		t.Fatal("cover", w.Code, w.Body.String())
-	}
-	if code := c.do("", "GET", "/api/v1/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
-		t.Fatal("cover hash", code, p.CoverHash)
-	}
-	get := func(query string) *httptest.ResponseRecorder {
-		w := httptest.NewRecorder()
-		c.handler.ServeHTTP(w, httptest.NewRequest("GET", path+query, nil))
-		return w
-	}
-	if w := get("?v=" + result.CoverHash); w.Code != 200 || w.Header().Get("Content-Type") != "image/webp" || web.Hash(w.Body.String()) != result.CoverHash {
-		t.Fatal("served cover", w.Code)
-	}
-	if w := get(""); w.Code != 404 {
-		t.Fatal("cover without its hash", w.Code)
-	}
-	// The game gets a small JPEG of the cover, linked only by servers with direct downloads.
-	var gameKey, gameHash string
-	var gameSize int64
-	if e := s.DB.QueryRow(ctx, `SELECT r.storage_key,r.sha256,r.byte_size FROM playlists p JOIN chart_resources r ON r.id=p.game_cover_file WHERE p.id=$1`, p.ID).Scan(&gameKey, &gameHash, &gameSize); e != nil || gameKey != gameHash+".jpg" {
-		t.Fatal("game cover", gameKey, e)
-	}
-	object, e := s.Config.Objects.Open(ctx, gameKey)
-	if e != nil {
-		t.Fatal(e)
-	}
-	format, kind, e := image.DecodeConfig(object)
-	object.Close()
-	if e != nil || kind != "jpeg" || format.Width != 40 || format.Height != 30 {
-		t.Fatal("game cover image", kind, format, e)
-	}
-	c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/song", `{}`, nil)
-	folders := func(app *Server) []GamePlaylist {
-		t.Helper()
-		tx, e := s.DB.Begin(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer tx.Rollback(ctx)
-		items, e := app.gamePlaylists(ctx, tx, &User{ID: playlistOwner})
-		if e == nil {
-			e = app.gamePlaylistDetails(ctx, items)
-		}
-		if e != nil || len(items) == 0 || items[0].ID != p.ID {
-			t.Fatal("game folders", e, items)
-		}
-		return items
-	}
-	if folders(s)[0].Cover != nil {
-		t.Fatal("cover linked without direct downloads")
-	}
-	direct := &Server{DB: s.DB, Config: Config{Objects: teststore.New(t), SSO: s.Config.SSO}}
-	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, gameKey) || link.HeadURL == "" ||
-		link.SHA256 != gameHash || link.Size != gameSize || link.ContentType != "image/jpeg" {
-		t.Fatalf("cover link %+v", link)
-	}
-	stored := func() int {
-		var n int
-		if e := s.DB.QueryRow(ctx, `SELECT count(*) FROM chart_resources WHERE sha256=$1`, result.CoverHash).Scan(&n); e != nil {
-			t.Fatal(e)
-		}
-		return n
-	}
-	// A song sharing the image keeps the file when the playlist releases it.
-	if _, e := s.DB.Exec(ctx, `UPDATE charts SET cover_file=(SELECT id FROM chart_resources WHERE sha256=$1) WHERE id='song'`, result.CoverHash); e != nil {
-		t.Fatal(e)
-	}
-	if code := c.do("owner", "DELETE", path, `{}`, nil); code != 200 || stored() != 1 {
-		t.Fatal("shared cover removed", code, stored())
-	}
-	if w := get("?v=" + result.CoverHash); w.Code != 404 {
-		t.Fatal("removed cover served", w.Code)
-	}
-	if w := upload("owner", "cover.png", picture.Bytes()); w.Code != 200 {
-		t.Fatal("cover again", w.Code)
-	}
-	if _, e := s.DB.Exec(ctx, `UPDATE charts SET cover_file=NULL WHERE id='song'`); e != nil {
-		t.Fatal(e)
-	}
-	s.cleanupReplacedFiles()
-	if stored() != 1 {
-		t.Fatal("playlist cover deleted while referenced")
-	}
-	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+p.ID, `{}`, nil); code != 200 || stored() != 0 {
-		t.Fatal("cover kept after its playlist", code, stored())
-	}
-	for _, key := range []string{result.CoverHash + ".webp", gameKey} {
-		if _, e := s.Config.Objects.Open(ctx, key); e == nil {
-			t.Fatal("cover object kept", key)
-		}
-	}
-	var files int
-	if e := s.DB.QueryRow(ctx, `SELECT count(*) FROM chart_resources WHERE extension IN ('webp','jpg')`).Scan(&files); e != nil || files != 0 {
-		t.Fatal("cover files kept", files, e)
 	}
 }

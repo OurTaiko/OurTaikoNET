@@ -56,6 +56,28 @@ func interactionWorldOf(t *testing.T, src *Source) interactionWorld {
 	return w
 }
 
+// addChart adds a chart of owner's with the given ID: on the official source one registered
+// without files, on Fanmade one sharing Song's.
+func (w interactionWorld) addChart(t *testing.T, id, title string) {
+	t.Helper()
+	_, err := w.s.DB.Exec(context.Background(), `INSERT INTO charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,audio_file)
+ SELECT $2,ARRAY[$1::text],$3,120,c.duration,c.demo_end,c.tja_file,c.audio_file FROM charts c WHERE c.id=$4`, testUsers["owner"].ID, id, title, w.song)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// slot adds a chart's single block of a course, or finds it again.
+func (w interactionWorld) slot(t *testing.T, chart, course string) int64 {
+	t.Helper()
+	var id int64
+	if err := w.s.DB.QueryRow(context.Background(), `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,$2,'single',5)
+ ON CONFLICT(chart_id,course,side) DO UPDATE SET level=EXCLUDED.level RETURNING id`, chart, course).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
 // officialInteractionFixture is the world on the official source.
 func officialInteractionFixture(t *testing.T) interactionWorld {
 	t.Helper()

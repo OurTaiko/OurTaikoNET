@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type interactionClient struct {
@@ -73,95 +71,6 @@ func interactionFixture(t *testing.T) (interactionClient, *Server) {
 		tokens[name] = seedWebSession(t, s, id)
 	}
 	return interactionClient{t, s.Handler(), tokens}, s
-}
-
-// GET /charts/{id}: by=number finds the chart's number, by=id its ID, by=nijiiro its Nijiiro
-// ID; without by the form
-// decides.
-func TestChartDetailBy(t *testing.T) {
-	c, s := interactionFixture(t)
-	// Without by, an ID-shaped value (32 hex digits, even all digits) is an ID, others a number.
-	for _, id := range []string{"0123456789abcdef0123456789abcdef", "12345678901234567890123456789012"} {
-		if _, err := s.DB.Exec(context.Background(), `INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES($1,ARRAY['d46774d30dd13b92d9e536808da468a4'],'Hex',120,10,test_file($1||'/tja','a.tja',repeat('a',64),14),test_file($1||'/audio','a.ogg',repeat('a',64),14))`, id); err != nil {
-			t.Fatal(err)
-		}
-		var found Chart
-		if code := c.do("", "GET", "/api/v1/charts/"+id, "", &found); code != 200 || found.ID != id {
-			t.Fatal("ID without by", id, code, found.ID)
-		}
-		if code := c.do("", "GET", "/api/v1/charts/"+id+"?by=number", "", nil); code != 404 {
-			t.Fatal("ID by number", id, code)
-		}
-	}
-	var song, other Chart
-	if code := c.do("", "GET", "/api/v1/charts/song?by=id", "", &song); code != 200 || song.ID != "song" || song.NumberID <= 0 {
-		t.Fatal("by=id", code, song.ID, song.NumberID)
-	}
-	c.do("", "GET", "/api/v1/charts/other?by=id", "", &other)
-	if other.NumberID != song.NumberID+1 {
-		t.Fatal("numbers", song.NumberID, other.NumberID)
-	}
-	number := "/api/v1/charts/" + strconv.FormatInt(song.NumberID, 10)
-	for _, path := range []string{number, number + "?by=number"} {
-		var found Chart
-		if code := c.do("", "GET", path, "", &found); code != 200 || found.ID != "song" {
-			t.Fatal("by number", path, code, found.ID)
-		}
-	}
-	for path, want := range map[string]int{
-		"/api/v1/charts/song":           404, // neither an ID's form nor a number
-		"/api/v1/charts/song?by=number": 404,
-		number + "?by=id":               404, // a number is not an ID
-		"/api/v1/charts/0":              404,
-		"/api/v1/charts/01":             404,
-		"/api/v1/charts/99999999":       404,
-		"/api/v1/charts/song?by=title":  400,
-	} {
-		if code := c.do("", "GET", path, "", nil); code != want {
-			t.Fatal(path, code, "want", want)
-		}
-	}
-	// by=nijiiro reads {id} as the Nijiiro ID, another number than the chart's own: Other has
-	// Song's number as its Nijiiro ID. The field is disabled here (059), so only the database
-	// can hold one; each names one chart.
-	setNijiiro := func(id string) error {
-		_, err := s.DB.Exec(context.Background(), `UPDATE charts SET nijiiro_id=$2 WHERE id=$1`, id, song.NumberID)
-		return err
-	}
-	if err := setNijiiro("other"); err != nil {
-		t.Fatal(err)
-	}
-	var mapped Chart
-	if code := c.do("", "GET", number+"?by=nijiiro", "", &mapped); code != 200 || mapped.ID != "other" || mapped.NijiiroID == nil || int64(*mapped.NijiiroID) != song.NumberID {
-		t.Fatal("by=nijiiro", code, mapped.ID)
-	}
-	if code := c.do("", "GET", number, "", &mapped); code != 200 || mapped.ID != "song" || mapped.NijiiroID != nil {
-		t.Fatal("number beside a Nijiiro ID", code, mapped.ID)
-	}
-	for path, want := range map[string]int{
-		"/api/v1/charts/99999999?by=nijiiro":    404,
-		"/api/v1/charts/0?by=nijiiro":           404,
-		"/api/v1/charts/01?by=nijiiro":          404,
-		"/api/v1/charts/99999999999?by=nijiiro": 404, // past int4
-		"/api/v1/charts/other?by=nijiiro":       404,
-	} {
-		if code := c.do("", "GET", path, "", nil); code != want {
-			t.Fatal(path, code, "want", want)
-		}
-	}
-	var unique *pgconn.PgError
-	if err := setNijiiro("song"); !errors.As(err, &unique) || unique.ConstraintName != "charts_nijiiro_id" {
-		t.Fatal("shared Nijiiro ID", err)
-	}
-	// No request changes it.
-	for _, body := range []string{`{"nijiiroId":7}`, `{"nijiiroId":null}`} {
-		if code := c.do("owner", "PATCH", "/api/v1/charts/other", body, nil); code != 422 {
-			t.Fatal("PATCH", body, code)
-		}
-	}
-	if code := c.do("", "GET", number+"?by=nijiiro", "", &mapped); code != 200 || mapped.ID != "other" {
-		t.Fatal("Nijiiro ID after refused edits", code, mapped.ID)
-	}
 }
 
 func TestChartVotes(t *testing.T) { bothSources(t, testChartVotes) }
@@ -566,5 +475,115 @@ func testNotificationPrune(t *testing.T, w interactionWorld) {
 	kept, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil || strings.Join(kept, ",") != "recent-read,unread" {
 		t.Fatal("pruned", kept, err)
+	}
+}
+
+// GET /charts/{id}: by=number finds the chart's number, by=id its ID, by=nijiiro its Nijiiro
+// ID; without by the form decides between the first two.
+func TestChartDetailBy(t *testing.T) { bothSources(t, testChartDetailBy) }
+
+func testChartDetailBy(t *testing.T, w interactionWorld) {
+	c, s := w.c, w.s
+	ctx := context.Background()
+	var song, other Chart
+	if code := c.do("", "GET", w.chart(w.song)+"?by=id", "", &song); code != 200 || song.ID != w.song || song.NumberID <= 0 {
+		t.Fatal("by=id", code, song.ID, song.NumberID)
+	}
+	// A new chart takes the next number.
+	c.do("", "GET", w.chart(w.other)+"?by=id", "", &other)
+	if other.NumberID != song.NumberID+1 {
+		t.Fatal("numbers", song.NumberID, other.NumberID)
+	}
+	number := w.chart(strconv.FormatInt(song.NumberID, 10))
+	for _, path := range []string{number, number + "?by=number"} {
+		var found Chart
+		if code := c.do("", "GET", path, "", &found); code != 200 || found.ID != w.song || found.NumberID != song.NumberID {
+			t.Fatal("by number", path, code, found.ID)
+		}
+	}
+	// Without by, a value in the form of an ID (32 hex digits, even all digits) is an ID,
+	// anything else a number.
+	for _, id := range []string{"0123456789abcdef0123456789abcdef", "12345678901234567890123456789012"} {
+		w.addChart(t, id, "Hex")
+		var found Chart
+		if code := c.do("", "GET", w.chart(id), "", &found); code != 200 || found.ID != id {
+			t.Fatal("ID without by", id, code, found.ID)
+		}
+		if code := c.do("", "GET", w.chart(id)+"?by=number", "", nil); code != 404 {
+			t.Fatal("ID by number", id, code)
+		}
+	}
+	for path, want := range map[string]int{
+		w.chart(w.song):                200, // without by, the form tells
+		w.chart(w.song) + "?by=number": 404,
+		number + "?by=id":              404, // a number is not an ID
+		w.chart("song"):                404, // neither an ID's form nor a number
+		w.chart("0"):                   404,
+		w.chart("01"):                  404,
+		w.chart("99999999"):            404,
+		w.chart(w.song) + "?by=title":  400,
+		w.chart(w.song) + "?by=id&x=1": 200,
+	} {
+		if code := c.do("", "GET", path, "", nil); code != want {
+			t.Fatal(path, code, "want", want)
+		}
+	}
+	// by=nijiiro reads {id} as the Nijiiro ID, which is another number than the chart's own:
+	// Other takes Song's number as its Nijiiro ID.
+	setNijiiro := func(id string) error {
+		_, err := s.DB.Exec(ctx, `UPDATE charts SET nijiiro_id=$2 WHERE id=$1`, id, song.NumberID)
+		return err
+	}
+	if err := setNijiiro(w.other); err != nil {
+		t.Fatal(err)
+	}
+	var mapped Chart
+	if code := c.do("", "GET", number+"?by=nijiiro", "", &mapped); code != 200 || mapped.ID != w.other || mapped.NijiiroID == nil || int64(*mapped.NijiiroID) != song.NumberID {
+		t.Fatal("by=nijiiro", code, mapped.ID)
+	}
+	if code := c.do("", "GET", number, "", &mapped); code != 200 || mapped.ID != w.song || mapped.NijiiroID != nil {
+		t.Fatal("number beside a Nijiiro ID", code, mapped.ID)
+	}
+	for path, want := range map[string]int{
+		w.chart("99999999") + "?by=nijiiro":    404,
+		w.chart("0") + "?by=nijiiro":           404,
+		w.chart("01") + "?by=nijiiro":          404,
+		w.chart("99999999999") + "?by=nijiiro": 404, // past int4
+		w.chart(w.other) + "?by=nijiiro":       404,
+	} {
+		if code := c.do("", "GET", path, "", nil); code != want {
+			t.Fatal(path, code, "want", want)
+		}
+	}
+	// A Nijiiro ID names one chart: the index refuses a second.
+	if err := setNijiiro(w.song); !nijiiroConflict(err) {
+		t.Fatal("shared Nijiiro ID", err)
+	}
+	taken := `{"nijiiroId":` + strconv.FormatInt(song.NumberID, 10) + `}`
+	if !s.source().Official {
+		// Only the official source's songs are given one: no request sets or clears it here.
+		for _, body := range []string{taken, `{"nijiiroId":7}`, `{"nijiiroId":null}`} {
+			if code := c.do("owner", "PATCH", w.chart(w.other), body, nil); code != 422 {
+				t.Fatal("PATCH", body, code)
+			}
+		}
+		if code := c.do("", "GET", number+"?by=nijiiro", "", &mapped); code != 200 || mapped.ID != w.other {
+			t.Fatal("Nijiiro ID after refused edits", code, mapped.ID)
+		}
+		return
+	}
+	// On the official source an edit sets it, and refuses one another chart has.
+	if code := c.do("owner", "PATCH", w.chart(w.song), taken, nil); code != 409 {
+		t.Fatal("taken Nijiiro ID", code)
+	}
+	// Its own chart keeps it, and a cleared one is free again.
+	if code := c.do("owner", "PATCH", w.chart(w.other), taken, nil); code != 200 {
+		t.Fatal("own Nijiiro ID", code)
+	}
+	if code := c.do("owner", "PATCH", w.chart(w.other), `{"nijiiroId":null}`, nil); code != 200 {
+		t.Fatal("clear Nijiiro ID", code)
+	}
+	if code := c.do("owner", "PATCH", w.chart(w.song), taken, &mapped); code != 200 || mapped.NijiiroID == nil || int64(*mapped.NijiiroID) != song.NumberID {
+		t.Fatal("freed Nijiiro ID", code)
 	}
 }

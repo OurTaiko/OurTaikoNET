@@ -357,78 +357,99 @@ func TestSubmitScore(t *testing.T) {
 	}
 }
 
-// adlib ([良, 可] of the Ad-Libs hit) and mines are optional: stored when sent, zero when not,
-// and a zero value digests as if it were left out, so retries of older requests still match.
-func TestScorePlayCounts(t *testing.T) {
-	pool := scoreTestDB(t)
+// adlib ([良, 可] of the Ad-Libs hit) and mines are optional: stored when sent, zero when
+// not, and a zero value digests as if it were left out, so retries of older requests still match.
+func TestScorePlayCounts(t *testing.T) { bothSources(t, testScorePlayCounts) }
+
+func testScorePlayCounts(t *testing.T, w interactionWorld) {
+	c, s := w.c, w.s
 	ctx := context.Background()
-	const song = "22222222222222222222222222222222"
-	token := strings.Repeat("d", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused');
- INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES('`+song+`',ARRAY['89b6ef3a5cb57b6e04f74711d15a8a5f'],'Test',120,10,test_file('tja','test.tja',repeat('a',64),1),test_file('ogg','test.ogg',repeat('b',64),1))`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+token)); err != nil {
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='published' WHERE id=$1`, w.song); err != nil {
 		t.Fatal(err)
 	}
 	var oni int64
-	if err := pool.QueryRow(ctx, `SELECT test_slot($1,'Oni')`, song).Scan(&oni); err != nil {
+	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,'Oni','single',5) RETURNING id`, w.song).Scan(&oni); err != nil {
 		t.Fatal(err)
 	}
-	handler := testServer(t, pool, Config{Origin: "http://127.0.0.1:5173"}).Handler()
-	post := func(key, extra string) *httptest.ResponseRecorder {
-		body := fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6%s}`, oni, extra)
-		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(body))
-		r.Header.Set("Authorization", "Bearer "+token)
+	// The game signs in with a game token; a local server without an account center has one for DEV_USER_ID.
+	game := New(s.DB, Config{Source: s.source(), Storage: t.TempDir(), Origin: "http://localhost", DevUserID: testUsers["alice"].ID})
+	handler, token := game.Handler(), game.devGameToken()
+	n := 0
+	send := func(method, path, key, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
-		r.Header.Set("Idempotency-Key", key)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, r)
-		return w
+		r.Header.Set("Authorization", "Bearer "+token)
+		if key != "" {
+			r.Header.Set("Idempotency-Key", key)
+		}
+		n++
+		r.RemoteAddr = fmt.Sprintf("10.9.0.%d:1234", n)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, r)
+		return rec
 	}
-	read := func(w *httptest.ResponseRecorder) Score {
+	post := func(key, extra string) *httptest.ResponseRecorder {
+		t.Helper()
+		return send("POST", "/api/v1/game/scores", key, fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6%s}`, oni, extra))
+	}
+	read := func(rec *httptest.ResponseRecorder) Score {
+		t.Helper()
 		var v Score
-		if err := json.Unmarshal(w.Body.Bytes(), &v); err != nil {
-			t.Fatal(err, w.Body.String())
+		if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
+			t.Fatal(err, rec.Body.String())
 		}
 		return v
 	}
 
-	if w := post("play-counts-plain-0001", ""); w.Code != 201 || read(w).AdLib != [2]int64{0, 0} || read(w).Mines != 0 || !strings.Contains(w.Body.String(), `"adlib":[0,0]`) {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-plain-0001", ""); rec.Code != 201 || read(rec).AdLib != [2]int64{0, 0} || read(rec).Mines != 0 || !strings.Contains(rec.Body.String(), `"adlib":[0,0]`) {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
-	if w := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":2`); w.Code != 201 || read(w).AdLib != [2]int64{3, 1} || read(w).Mines != 2 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":2`); rec.Code != 201 || read(rec).AdLib != [2]int64{3, 1} || read(rec).Mines != 2 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
 	// The same request again is the stored score; another count under that key conflicts.
-	if w := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":2`); w.Code != 200 || read(w).Mines != 2 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":2`); rec.Code != 200 || read(rec).Mines != 2 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
-	if w := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":1`); w.Code != 409 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-sent-00001", `,"adlib":[3,1],"mines":1`); rec.Code != 409 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
 	// Zeros are the same request as none.
-	if w := post("play-counts-plain-0001", `,"adlib":[0,0],"mines":0`); w.Code != 200 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-plain-0001", `,"adlib":[0,0],"mines":0`); rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
 	// A receipt stored without them is matched by a retry without them (the column defaults).
-	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='play-counts-plain-0001'`, web.Hash("an older request")); err != nil {
+	if _, err := s.DB.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='play-counts-plain-0001'`, web.Hash("an older request")); err != nil {
 		t.Fatal(err)
 	}
-	if w := post("play-counts-plain-0001", ""); w.Code != 200 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-plain-0001", ""); rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
 	for _, extra := range []string{`,"adlib":[1]`, `,"adlib":[1,2,3]`, `,"adlib":[-1,0]`, `,"mines":-1`, `,"adlib":[1,2147483648]`} {
-		if w := post("play-counts-bad-000001", extra); w.Code != 422 {
-			t.Fatal(extra, w.Code, w.Body.String())
+		if rec := post("play-counts-bad-000001", extra); rec.Code != 422 {
+			t.Fatal(extra, rec.Code, rec.Body.String())
 		}
 	}
-	if w := post("play-counts-bad-000001", `,"adlib":"3,1"`); w.Code != 400 {
-		t.Fatal(w.Code, w.Body.String())
+	if rec := post("play-counts-bad-000001", `,"adlib":"3,1"`); rec.Code != 400 {
+		t.Fatal(rec.Code, rec.Body.String())
 	}
 	var adlib []int64
 	var mines int64
-	if err := pool.QueryRow(ctx, `SELECT adlib,mines FROM scores WHERE idempotency_key='play-counts-sent-00001'`).Scan(&adlib, &mines); err != nil || len(adlib) != 2 || adlib[0] != 3 || adlib[1] != 1 || mines != 2 {
+	if err := s.DB.QueryRow(ctx, `SELECT adlib,mines FROM scores WHERE idempotency_key='play-counts-sent-00001'`).Scan(&adlib, &mines); err != nil || len(adlib) != 2 || adlib[0] != 3 || adlib[1] != 1 || mines != 2 {
 		t.Fatal(err, adlib, mines)
+	}
+	// The player's list and the leaderboard carry them too.
+	var list struct{ Scores []Score }
+	rec := send("GET", "/api/v1/game/scores", "", "")
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err, rec.Body.String())
+	}
+	if code := rec.Code; code != 200 || len(list.Scores) != 2 || list.Scores[1].AdLib != [2]int64{3, 1} || list.Scores[1].Mines != 2 {
+		t.Fatal(code, list)
+	}
+	var board leaderboardResponse
+	if code := c.do("", "GET", w.chart(w.song)+"/leaderboard", "", &board); code != 200 || len(board.Items) != 1 || !strings.Contains(fmt.Sprint(board.Items[0].Score), "[0 0]") {
+		t.Fatal(code, board)
 	}
 }
