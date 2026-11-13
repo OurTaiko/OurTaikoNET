@@ -13,16 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
-	"ourtaiko.dev/net/internal/kit/objectstore"
 )
-
-func (s *Server) readChart(row pgx.Row) (Chart, error) {
-	c, err := readChart(row)
-	if remote, ok := s.Config.Objects.(*objectstore.S3); ok && c.PreviewPath != "" {
-		c.PreviewPath = remote.Prefix + c.PreviewPath
-	}
-	return c, err
-}
 
 // The caller holds the chart row lock. Upload first, atomically switch the
 // file reference, then let retirement cleanup delete the previous object.

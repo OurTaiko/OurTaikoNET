@@ -18,6 +18,14 @@ func isGameRequest(r *http.Request) bool {
 // song-select folder: Fanmade's is the deep blue 10.
 const catalogGenreFrame = 10
 
+// withoutCoverHashes makes charts what this source's lists for the game have always carried:
+// no cover hash. The game reads a cover from the chart's resource links.
+func withoutCoverHashes(charts []Chart) {
+	for i := range charts {
+		charts[i].CoverHash = ""
+	}
+}
+
 // gameCatalog is the complete song list for a game client: categories, charts
 // and the public playlists. It is the same for everyone and ignores any
 // session; an account's scores are GET /api/v1/game/scores and its own
@@ -40,6 +48,7 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
+	withoutCoverHashes(charts)
 	categories := categoryCatalog
 	// Read each chart once, newest uploads first as in the category list. Counts
 	// come from this same snapshot; multi-category charts travel only once.

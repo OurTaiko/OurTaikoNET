@@ -354,10 +354,5 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chart.setOwners(s.publicProfiles(r.Context(), chart.OwnerIDs))
-	items := []Chart{chart}
-	if err = s.coverHashes(r.Context(), items); err != nil {
-		internal(w, err)
-		return
-	}
-	respond(w, 200, items[0])
+	respond(w, 200, chart)
 }

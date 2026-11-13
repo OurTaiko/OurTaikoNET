@@ -110,7 +110,7 @@ func (s *Server) downloadPackage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c, e := readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, id))
+	c, e := s.readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, id))
 	if errors.Is(e, pgx.ErrNoRows) {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return

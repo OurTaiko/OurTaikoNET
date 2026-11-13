@@ -67,7 +67,7 @@ func (s *Server) gameSearch(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	items, e := readCharts(rows)
+	items, e := s.readCharts(rows)
 	if e != nil {
 		internal(w, e)
 		return

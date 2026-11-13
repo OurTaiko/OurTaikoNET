@@ -88,13 +88,14 @@ func (s *Server) gameSearch(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
+	withoutCoverHashes(items)
 	respond(w, 200, map[string]any{"items": items, "total": len(items)})
 }
 
-// webSearch pages the website's song list: keyword, an optional uploader, a category, a
+// search pages the website's song list: keyword, an optional uploader, a category, a
 // course and star level that must hold for the same block (any side), and newest, hot,
 // top-voted, most-discussed or recently updated order. The filters are OurTaiko Database's.
-func (s *Server) webSearch(w http.ResponseWriter, r *http.Request, owner string) {
+func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	q, ok := searchKeyword(w, r)
 	if !ok {
 		return
@@ -164,26 +165,10 @@ func (s *Server) webSearch(w http.ResponseWriter, r *http.Request, owner string)
 		return
 	}
 	items, e := s.readCharts(rows)
-	if e == nil {
-		e = s.coverHashes(r.Context(), items)
-	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
 	s.chartNames(r.Context(), items)
 	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": 12})
-}
-
-func (s *Server) readCharts(rows pgx.Rows) ([]Chart, error) {
-	defer rows.Close()
-	items := []Chart{}
-	for rows.Next() {
-		c, e := s.readChart(rows)
-		if e != nil {
-			return nil, e
-		}
-		items = append(items, c)
-	}
-	return items, rows.Err()
 }

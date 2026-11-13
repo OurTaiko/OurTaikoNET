@@ -90,7 +90,7 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	charts, err := readCharts(rows)
+	charts, err := s.readCharts(rows)
 	if err != nil {
 		internal(w, err)
 		return

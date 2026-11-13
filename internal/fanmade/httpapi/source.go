@@ -13,6 +13,10 @@ const (
 	oidcCookie = "ourtaiko_oidc"
 	// Where signing in returns to when it was asked for nowhere, or nowhere allowed.
 	defaultReturn = "/upload"
+	// Whether this is the official source. A chart's JSON has the fields of its source.
+	officialSource = false
+	// A song's ID in the official source, as chartSelect reads it: this source has none.
+	officialIDColumn = `NULL::text`
 )
 
 // devGameToken stands for the SSO game token of DEV_USER_ID on a local server without an

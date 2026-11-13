@@ -114,9 +114,11 @@ expected="--ignore firstLoginAt --ignore lastActiveAt --skip /users"
 # The system playlists are described in the same words on both sources now ("songs"); the old
 # official site said "charts".
 official_wording="--ignore-in /playlists/system:description"
+# A chart that does not exist is called 谱面 on both sources (it was 作品 on Fanmade).
+fanmade_wording="--ignore-in /charts/00000000000000000000000000000000:message"
 [ -z "${STRICT:-}" ] || expected=""
 # shellcheck disable=SC2086
-python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18080 --new http://127.0.0.1:18090 --legacy-host fanmade.ourtaiko.org --source fanmade --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $users_fanmade || status=1
+python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18080 --new http://127.0.0.1:18090 --legacy-host fanmade.ourtaiko.org --source fanmade --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $fanmade_wording $users_fanmade || status=1
 # shellcheck disable=SC2086
 python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18081 --new http://127.0.0.1:18090 --legacy-host database.ourtaiko.org --source official --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $official_wording $users_official || status=1
 # shellcheck disable=SC2086

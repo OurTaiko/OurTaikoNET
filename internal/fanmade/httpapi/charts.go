@@ -8,58 +8,74 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/constants"
+	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
 )
 
+// Chart is one song, the same on both song sources. Its JSON has the fields of the chart's
+// own source: see MarshalJSON.
 type Chart struct {
-	DemoEnd      float64       `json:"demoEnd"`
-	PreviewPath  string        `json:"previewPath,omitempty"`
-	AudioPreview *AudioPreview `json:"audioPreview,omitempty"`
-	CoverHash    string        `json:"coverHash,omitempty"`
-	CategoryIDs  []string      `json:"categoryIds"`
-	ID           string        `json:"id"`
+	ID string `json:"id"`
 	// NumberID is the chart's short number, also accepted by GET /charts/{id}.
 	NumberID int64 `json:"numberId"`
-	// NijiiroID is the official song's Nijiiro ID, unique among charts and found by
-	// GET /charts/{id}?by=nijiiro. The field is disabled here: no request sets it, so it is null.
-	NijiiroID *int32              `json:"nijiiroId"`
-	OwnerIDs  []string            `json:"ownerIds"`
-	Owners    []NotificationActor `json:"owners"`
+	// NijiiroID is the song's Nijiiro ID, unique among charts and found by
+	// GET /charts/{id}?by=nijiiro; null when unknown.
+	NijiiroID *int32 `json:"nijiiroId"`
+	// OfficialID is null when unknown. Official source only.
+	OfficialID *string             `json:"officialId"`
+	OwnerIDs   []string            `json:"ownerIds"`
+	Owners     []NotificationActor `json:"owners"`
 	// Deprecated: original uploader only; authorization uses OwnerIDs.
 	OwnerID  string `json:"ownerId"`
 	Uploader string `json:"uploader"`
 	// UploaderAvatarURL is empty when the uploader has no avatar or SSO is unavailable.
-	UploaderAvatarURL string    `json:"uploaderAvatarUrl"`
-	Description       string    `json:"description"`
-	CreatedAt         time.Time `json:"createdAt"`
-	// UpdateAt is when the chart or anything about it last changed (R010, as on OurTaiko Database).
-	UpdateAt  time.Time `json:"updateAt"`
-	Duration  float64   `json:"duration"`
-	TJAName   string    `json:"tjaName"`
-	AudioName string    `json:"audioName"`
+	UploaderAvatarURL string `json:"uploaderAvatarUrl"`
+	Description       string `json:"description"`
+	// Votes and comments; MyVote is only filled for the signed-in detail view.
+	Score        int       `json:"score"`
+	Upvotes      int       `json:"upvotes"`
+	Downvotes    int       `json:"downvotes"`
+	CommentCount int       `json:"commentCount"`
+	MyVote       int       `json:"myVote"`
+	CreatedAt    time.Time `json:"createdAt"`
+	// UpdateAt is when the chart or anything about it last changed.
+	UpdateAt    time.Time `json:"updateAt"`
+	Duration    float64   `json:"duration"`
+	DemoEnd     float64   `json:"demoEnd"`
+	CategoryIDs []string  `json:"categoryIds"`
+	TJAName     string    `json:"tjaName"`
+	AudioName   string    `json:"audioName"`
 	// The stored file's hash: object key and download check, not the chart's identity (that is
 	// each block's chartHash). Not in the JSON; the resource manifest carries it as sha256.
-	TJAHash   string `json:"-"`
+	TJAHash string `json:"-"`
+	// TJASize is the stored TJA's size in bytes. Official source only.
+	TJASize   int64  `json:"tjaSize"`
 	AudioHash string `json:"audioHash"`
 	AudioSize int64  `json:"audioSize"`
-	// Votes and comments; MyVote is only filled for the signed-in detail view.
-	Score        int    `json:"score"`
-	Upvotes      int    `json:"upvotes"`
-	Downvotes    int    `json:"downvotes"`
-	CommentCount int    `json:"commentCount"`
-	MyVote       int    `json:"myVote"`
-	TJAKey       string `json:"-"`
-	AudioKey     string `json:"-"`
+	CoverHash string `json:"coverHash,omitempty"`
+	// HasFiles is false for a song registered without a TJA and audio, which only the
+	// official source accepts: it has no blocks, no duration, and the file fields are empty.
+	// Official source only.
+	HasFiles bool `json:"hasFiles"`
+	// PreviewPath is where the song-select clip is stored, AudioPreview the range of the
+	// whole audio that stands for it. Fanmade source only.
+	PreviewPath  string        `json:"previewPath,omitempty"`
+	AudioPreview *AudioPreview `json:"audioPreview,omitempty"`
+	TJAKey       string        `json:"-"`
+	AudioKey     string        `json:"-"`
 	// Background movie (BGMOVIE), transcoded; empty when the chart has none.
 	MovieHash string `json:"movieHash,omitempty"`
 	MovieSize int64  `json:"movieSize,omitempty"`
@@ -71,49 +87,127 @@ type Chart struct {
 	// Only in an upload's own response: optional files that were left out.
 	FailedFiles []fileFailure `json:"failedFiles,omitempty"`
 	tja.Metadata
+	// official is whether the chart was read from the official source.
+	official bool
+}
+
+// MarshalJSON writes the fields of the chart's own source. A Fanmade chart goes without
+// officialId, hasFiles and tjaSize; an official one without previewPath and audioPreview.
+// A field declared here hides the chart's field of the same JSON name, and is itself left
+// out because it is empty.
+func (c Chart) MarshalJSON() ([]byte, error) {
+	type fields Chart // the same fields without this method
+	type absent *struct{}
+	if c.official {
+		return json.Marshal(struct {
+			fields
+			PreviewPath  absent `json:"previewPath,omitempty"`
+			AudioPreview absent `json:"audioPreview,omitempty"`
+		}{fields: fields(c)})
+	}
+	return json.Marshal(struct {
+		fields
+		OfficialID absent `json:"officialId,omitempty"`
+		HasFiles   absent `json:"hasFiles,omitempty"`
+		TJASize    absent `json:"tjaSize,omitempty"`
+	}{fields: fields(c)})
+}
+
+// AudioPreview describes the original audio stream, not a transcoded excerpt.
+// Times are in seconds; SHA-256 and byte size remain Chart.AudioHash/AudioSize.
+type AudioPreview struct {
+	URL             string  `json:"url"`
+	ContentType     string  `json:"contentType"`
+	StartSeconds    float64 `json:"startSeconds"`
+	DurationSeconds float64 `json:"durationSeconds"`
+}
+
+func audioPreview(c Chart) *AudioPreview {
+	if c.Duration <= 0 || math.IsNaN(c.Duration) || math.IsInf(c.Duration, 0) {
+		return nil
+	}
+	start := c.DemoStart
+	if start < 0 || start >= c.Duration || math.IsNaN(start) || math.IsInf(start, 0) {
+		start = 0
+	}
+	return &AudioPreview{
+		URL:             "/api/v1/charts/" + url.PathEscape(c.ID) + "/audio",
+		ContentType:     audio.MediaType(c.AudioName),
+		StartSeconds:    start,
+		DurationSeconds: math.Min(15, c.Duration-start),
+	}
 }
 
 const publishedChart = `c.status='published'`
 
+// playableChart is a published chart with files: what the game can play.
+const playableChart = publishedChart + ` AND c.tja_file IS NOT NULL`
+
 // Blocks are listed Easy to Edit, each as single, p1, p2.
 const slotOrder = `array_position(ARRAY['Easy','Normal','Hard','Oni','Edit'],d.course),array_position(ARRAY['single','p1','p2'],d.side)`
 
-const chartSelect = `SELECT c.id,c.number_id,c.owner_ids,''::text,c.description,c.created_at,c.update_at,c.duration,tf.original_filename,af.original_filename,tf.sha256,af.sha256,af.byte_size,tf.storage_key,af.storage_key,c.title,c.subtitle,c.bpm,c.offset_seconds,c.demo_start,af.sha256||'.'||af.extension,c.title_translations,c.subtitle_translations,
+// chartSelect reads charts for readChart. A song without files (official source) has empty
+// file fields.
+const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,` + officialIDColumn + `,c.owner_ids,c.description,c.created_at,c.update_at,c.duration,c.demo_end,c.category_flags,
+ COALESCE(tf.original_filename,''),COALESCE(af.original_filename,''),COALESCE(tf.sha256,''),COALESCE(tf.byte_size,0),COALESCE(af.sha256,''),COALESCE(af.byte_size,0),COALESCE(tf.storage_key,''),COALESCE(af.storage_key,''),
+ COALESCE(cf.sha256,''),COALESCE(pf.storage_key,''),
+ c.title,c.subtitle,c.bpm,c.offset_seconds,c.demo_start,COALESCE(af.sha256||'.'||af.extension,''),c.title_translations,c.subtitle_translations,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',d.id,'course',d.course,'side',d.side,'level',d.level,'maker',d.maker,'branching',d.branching,'chartHash',d.content_hash) ORDER BY ` + slotOrder + `) FROM chart_difficulties d WHERE d.chart_id=c.id),'[]'),
- c.category_flags,c.demo_end,COALESCE((SELECT storage_key FROM chart_resources WHERE id=c.preview_file),''),
+ COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),
  c.movie_offset,COALESCE(mf.sha256,''),COALESCE(mf.byte_size,0),COALESCE(mf.storage_key,''),
- COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),
- COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),c.nijiiro_id
- FROM charts c JOIN chart_resources tf ON tf.id=c.tja_file JOIN chart_resources af ON af.id=c.audio_file LEFT JOIN chart_resources mf ON mf.id=c.movie_file LEFT JOIN chart_resources bf ON bf.id=c.bgimage_file `
+ COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,'')
+ FROM charts c LEFT JOIN chart_resources tf ON tf.id=c.tja_file LEFT JOIN chart_resources af ON af.id=c.audio_file
+ LEFT JOIN chart_resources cf ON cf.id=c.cover_file LEFT JOIN chart_resources pf ON pf.id=c.preview_file
+ LEFT JOIN chart_resources mf ON mf.id=c.movie_file LEFT JOIN chart_resources bf ON bf.id=c.bgimage_file `
 
-func readChart(row pgx.Row) (Chart, error) {
-	c := Chart{}
+// readChart reads a row of chartSelect.
+func (s *Server) readChart(row pgx.Row) (Chart, error) {
+	c := Chart{official: officialSource}
 	var difficulties []byte
 	var flags CategoryFlags
-	e := row.Scan(&c.ID, &c.NumberID, &c.OwnerIDs, &c.Uploader, &c.Description, &c.CreatedAt, &c.UpdateAt, &c.Duration, &c.TJAName, &c.AudioName, &c.TJAHash, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties, &flags, &c.DemoEnd, &c.PreviewPath, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey, &c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &c.Upvotes, &c.Downvotes, &c.CommentCount, &c.NijiiroID)
+	e := row.Scan(&c.ID, &c.NumberID, &c.NijiiroID, &c.OfficialID, &c.OwnerIDs, &c.Description, &c.CreatedAt, &c.UpdateAt, &c.Duration, &c.DemoEnd, &flags,
+		&c.TJAName, &c.AudioName, &c.TJAHash, &c.TJASize, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.CoverHash, &c.PreviewPath,
+		&c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties,
+		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
+		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey)
 	if e == nil {
 		c.OwnerID = c.OwnerIDs[0]
 		c.Score = c.Upvotes - c.Downvotes
+		c.HasFiles = c.TJAKey != ""
 		c.CategoryIDs = flags.IDs()
 		e = json.Unmarshal(difficulties, &c.Difficulties)
 		c.Maker = difficultyMakers(c.Difficulties)
 		c.AudioPreview = audioPreview(c)
+		// A bucket's files are reached under its public address.
+		if remote, ok := s.Config.Objects.(*objectstore.S3); ok && c.PreviewPath != "" {
+			c.PreviewPath = remote.Prefix + c.PreviewPath
+		}
 	}
 	return c, e
+}
+
+func (s *Server) readCharts(rows pgx.Rows) ([]Chart, error) {
+	defer rows.Close()
+	items := []Chart{}
+	for rows.Next() {
+		c, e := s.readChart(rows)
+		if e != nil {
+			return nil, e
+		}
+		items = append(items, c)
+	}
+	return items, rows.Err()
 }
 func (s *Server) chart(ctx context.Context, id string) (Chart, error) {
 	return s.chartWhere(ctx, "c.id", id)
 }
 
-// chartWhere reads the published chart whose column (c.id or c.number_id) is value.
+// chartWhere reads the published chart whose column (c.id, c.number_id or c.nijiiro_id) is value.
 func (s *Server) chartWhere(ctx context.Context, column string, value any) (Chart, error) {
 	c, e := s.readChart(s.DB.QueryRow(ctx, chartSelect+` WHERE `+column+`=$1 AND `+publishedChart, value))
 	if e == nil {
-		c.setOwners(s.publicProfiles(ctx, c.OwnerIDs))
-	}
-	if e == nil {
 		items := []Chart{c}
-		e = s.coverHashes(ctx, items)
+		s.chartNames(ctx, items)
 		c = items[0]
 	}
 	return c, e
@@ -124,17 +218,14 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "QUERY_INVALID", "用户标识无效")
 		return
 	}
-	s.listFor(w, r, owner)
+	s.search(w, r, owner)
 }
 func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, false)
 	if !ok {
 		return
 	}
-	s.listFor(w, r, u.User.ID)
-}
-func (s *Server) listFor(w http.ResponseWriter, r *http.Request, owner string) {
-	s.webSearch(w, r, owner)
+	s.search(w, r, u.User.ID)
 }
 
 // validID reports whether id has the form of every random ID here (charts, courses,
@@ -191,7 +282,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		c, e = s.chartWhere(r.Context(), column, value)
 	}
 	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return
 	}
 	if e != nil {
@@ -392,8 +483,6 @@ func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
-const playableChart = publishedChart + ` AND c.tja_file IS NOT NULL`
-
 // canManage: an owner or an administrator, as on Fanmade.
 func canManage(u User, c Chart) bool {
 	return u.IsAdmin || c.hasOwner(u.ID)
@@ -401,16 +490,13 @@ func canManage(u User, c Chart) bool {
 
 const pageSize = 24
 
-// playlistCharts reads public songs in the order of ids.
+// playlistCharts reads published charts in the order of ids.
 func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
 	rows, e := s.DB.Query(ctx, chartSelect+` JOIN unnest($1::text[]) WITH ORDINALITY listed(id,ord) ON listed.id=c.id WHERE `+publishedChart+` ORDER BY listed.ord`, ids)
 	if e != nil {
 		return nil, e
 	}
 	charts, e := s.readCharts(rows)
-	if e == nil {
-		e = s.coverHashes(ctx, charts)
-	}
 	if e != nil {
 		return nil, e
 	}

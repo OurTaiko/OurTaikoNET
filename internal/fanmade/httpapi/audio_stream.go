@@ -2,39 +2,12 @@ package httpapi
 
 import (
 	"errors"
-	"math"
 	"mime"
 	"net/http"
-	"net/url"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
 )
-
-// AudioPreview describes the original audio stream, not a transcoded excerpt.
-// Times are in seconds; SHA-256 and byte size remain Chart.AudioHash/AudioSize.
-type AudioPreview struct {
-	URL             string  `json:"url"`
-	ContentType     string  `json:"contentType"`
-	StartSeconds    float64 `json:"startSeconds"`
-	DurationSeconds float64 `json:"durationSeconds"`
-}
-
-func audioPreview(c Chart) *AudioPreview {
-	if c.Duration <= 0 || math.IsNaN(c.Duration) || math.IsInf(c.Duration, 0) {
-		return nil
-	}
-	start := c.DemoStart
-	if start < 0 || start >= c.Duration || math.IsNaN(start) || math.IsInf(start, 0) {
-		start = 0
-	}
-	return &AudioPreview{
-		URL:             "/api/v1/charts/" + url.PathEscape(c.ID) + "/audio",
-		ContentType:     audio.MediaType(c.AudioName),
-		StartSeconds:    start,
-		DurationSeconds: math.Min(15, c.Duration-start),
-	}
-}
 
 // Each decoder probe/range needs only the current published audio object. Do
 // not call chart(): SSO nickname lookups and cover/difficulty payloads would

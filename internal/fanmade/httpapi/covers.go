@@ -15,33 +15,6 @@ import (
 	"ourtaiko.dev/net/internal/kit/tja"
 )
 
-// Website responses carry only a content hash, never the image bytes. Native
-// category/catalog responses continue to use the original readChart contract.
-func (s *Server) coverHashes(ctx context.Context, charts []Chart) error {
-	if len(charts) == 0 {
-		return nil
-	}
-	ids := make([]string, len(charts))
-	positions := make(map[string]int, len(charts))
-	for i, c := range charts {
-		ids[i] = c.ID
-		positions[c.ID] = i
-	}
-	rows, err := s.DB.Query(ctx, `SELECT c.id,r.sha256 FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=ANY($1)`, ids)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id, digest string
-		if err = rows.Scan(&id, &digest); err != nil {
-			return err
-		}
-		charts[positions[id]].CoverHash = digest
-	}
-	return rows.Err()
-}
-
 // storeCover stores normalized WebP bytes and returns the file ID for the
 // caller to reference in tx.
 func (s *Server) storeCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {

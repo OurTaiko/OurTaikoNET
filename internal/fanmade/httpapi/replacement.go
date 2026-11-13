@@ -62,12 +62,6 @@ func (s *Server) beginUpload(w http.ResponseWriter, r *http.Request, user, key, 
 		problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开歌曲页面")
 		return nil, false
 	}
-	items := []Chart{c}
-	if err = s.coverHashes(r.Context(), items); err != nil {
-		internal(w, err)
-		return nil, false
-	}
-	c = items[0]
 	c.setOwners(s.publicProfiles(r.Context(), c.OwnerIDs))
 	respond(w, 200, c)
 	return nil, false
