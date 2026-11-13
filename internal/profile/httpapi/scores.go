@@ -4,59 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
-// Source is a service whose public score list (GET /api/v1/users/{id}/scores) is shown.
-// API is where this server reaches it; Site is its public website, for links.
+// Source is a song source whose plays are shown. ID is its name in ourtaiko_net (the schema
+// its charts are in, and the source of its rows in net.scores); Site is where its chart pages
+// are, for links.
 type Source struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	API  string `json:"-"`
 	Site string `json:"site"`
 }
 
-// DefaultSources are the two OurTaiko services.
-var DefaultSources = []Source{
-	{ID: "fanmade", Name: "OurTaiko Fanmade", API: "https://fanmade.ourtaiko.org", Site: "https://fanmade.ourtaiko.org"},
-	{ID: "database", Name: "OurTaiko Database", API: "https://database.ourtaiko.org", Site: "https://database.ourtaiko.org"},
-}
-
-// ParseSources reads SCORE_SOURCES: a JSON array of {id, name, api, site}; empty is the default.
-func ParseSources(raw string) ([]Source, error) {
-	if strings.TrimSpace(raw) == "" {
-		return DefaultSources, nil
-	}
-	var list []struct{ ID, Name, API, Site string }
-	if err := json.Unmarshal([]byte(raw), &list); err != nil || len(list) == 0 {
-		return nil, errors.New("SCORE_SOURCES must be a JSON array of {id, name, api, site}")
-	}
-	sources := []Source{}
-	seen := map[string]bool{}
-	for _, s := range list {
-		for _, base := range []string{s.API, s.Site} {
-			u, err := url.Parse(base)
-			if err != nil || u.Host == "" || u.RawQuery != "" || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
-				return nil, fmt.Errorf("source %q needs http(s) api and site URLs", s.ID)
-			}
-		}
-		if s.ID == "" || s.ID == "all" || seen[s.ID] || s.Name == "" || strings.Trim(s.ID, "abcdefghijklmnopqrstuvwxyz0123456789-") != "" {
-			return nil, fmt.Errorf("source id %q must be unique lowercase letters, digits or -", s.ID)
-		}
-		seen[s.ID] = true
-		sources = append(sources, Source{ID: s.ID, Name: s.Name, API: strings.TrimRight(s.API, "/"), Site: strings.TrimRight(s.Site, "/")})
-	}
-	return sources, nil
-}
-
-// SourceScore is a row of a service's list as it gave it, with where it came from.
+// SourceScore is one row of a player's list: a play (or, in the best view, the best play of a
+// chart block), the song's title, the block's level, and the source it was played on.
 type SourceScore struct {
 	ID                string          `json:"id"`
 	SongID            json.RawMessage `json:"songId"`
@@ -85,114 +54,73 @@ type SourceScore struct {
 	ReplayURL string `json:"replayUrl,omitempty"`
 }
 
-const (
-	scorePageSize = 50
-	// A service's rows read for one list; a player with more sees the newest ones.
-	sourceRowLimit = 2000
-	scoreCacheTTL  = time.Minute
-)
+const scorePageSize = 50
 
 type sourceList struct {
-	rows      []SourceScore
-	truncated bool
-	err       error
-	at        time.Time
+	rows []SourceScore
+	err  error
 }
 
-// scoreCache keeps each service's rows of a list for a minute.
-type scoreCache struct {
-	mu      sync.Mutex
-	entries map[string]*sourceList
-}
-
-func newScoreCache() *scoreCache { return &scoreCache{entries: map[string]*sourceList{}} }
-
-func (c *scoreCache) get(key string) *sourceList {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if v, ok := c.entries[key]; ok && time.Since(v.at) < scoreCacheTTL {
-		return v
+// plays reads a player's whole list on one source. view=all is every play on a published
+// chart; view=best is one row per chart block: the highest score among the plays of the
+// song's current files, or of replaced files while the block has none of the current ones,
+// with the best clear status of those plays and their count. These are the rules of each
+// source's own list (its GET /api/v1/users/{id}/scores).
+func (s *Server) plays(ctx context.Context, source Source, user, view, course string) *sourceList {
+	list := &sourceList{rows: []SourceScore{}}
+	schema := pgx.Identifier{source.ID}.Sanitize()
+	args := []any{user, source.ID}
+	plays := `SELECT sc.id,d.chart_id,sc.difficulty_id,d.course,d.side,sc.good,sc.ok,sc.bad,sc.score,sc.drumroll,sc.max_combo,sc.clear_status,sc.is_latest,sc.submitted_at,sc.replay_data IS NOT NULL AS has_replay,
+ c.title,c.title_translations,d.level
+ FROM net.scores sc JOIN ` + schema + `.chart_difficulties d ON d.id=sc.difficulty_id JOIN ` + schema + `.charts c ON c.id=d.chart_id
+ WHERE sc.source=$2 AND sc.user_id=$1 AND c.status='published'`
+	if course != "" {
+		args = append(args, course)
+		plays += ` AND d.course=$3`
 	}
-	return nil
-}
-
-func (c *scoreCache) put(key string, v *sourceList) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if len(c.entries) > 2000 {
-		for k, e := range c.entries {
-			if time.Since(e.at) >= scoreCacheTTL {
-				delete(c.entries, k)
-			}
-		}
-		if len(c.entries) > 2000 {
-			c.entries = map[string]*sourceList{}
-		}
+	columns := `id,chart_id,difficulty_id,course,side,good,ok,bad,score,drumroll,max_combo,clear_status,is_latest,submitted_at,has_replay,title,title_translations,level`
+	var sql string
+	if view == "all" {
+		sql = `SELECT ` + columns + `,NULL::int,NULL::int FROM (` + plays + `) p`
+	} else {
+		sql = `WITH plays AS (SELECT p.*,bool_or(p.is_latest) OVER (PARTITION BY p.difficulty_id) AS has_latest FROM (` + plays + `) p),
+ considered AS (SELECT * FROM plays WHERE is_latest OR NOT has_latest),
+ best AS (SELECT DISTINCT ON (difficulty_id) *,max(clear_status) OVER (PARTITION BY difficulty_id) AS best_clear,count(*) OVER (PARTITION BY difficulty_id) AS play_count
+  FROM considered ORDER BY difficulty_id,score DESC,submitted_at,id)
+ SELECT ` + columns + `,best_clear::int,play_count::int FROM best`
 	}
-	c.entries[key] = v
-}
-
-// fetch reads a user's whole list from one service, page by page, up to sourceRowLimit.
-func (s *Server) fetch(ctx context.Context, source Source, user, view, course string) *sourceList {
-	key := strings.Join([]string{source.ID, user, view, course}, "|")
-	if cached := s.scores.get(key); cached != nil {
-		return cached
+	rows, err := s.DB.Query(ctx, sql, args...)
+	if err != nil {
+		list.err = errors.New("unreadable")
+		log.Printf("scores of %s on %s: %v", user, source.ID, err)
+		return list
 	}
-	list := &sourceList{rows: []SourceScore{}, at: time.Now()}
-	for page := 1; ; page++ {
-		query := url.Values{"view": {view}, "sort": {"recent"}, "page": {strconv.Itoa(page)}}
-		if course != "" {
-			query.Set("course", course)
-		}
-		var reply struct {
-			Items []SourceScore `json:"items"`
-			Total int           `json:"total"`
-		}
-		if err := s.getJSON(ctx, source.API+"/api/v1/users/"+user+"/scores?"+query.Encode(), &reply); err != nil {
-			list.err = err
-			return list
-		}
-		for _, row := range reply.Items {
-			row.Source = source.ID
-			id := strings.Trim(string(row.SongID), `"`)
-			if id != "" && strings.Trim(id, "0123456789abcdef") == "" {
-				row.ChartURL = source.Site + "/charts/" + id
-				if row.HasReplay && row.IsLatest && row.ID != "" {
-					row.ReplayURL = row.ChartURL + "?replay=" + url.QueryEscape(row.ID)
-				}
-			}
-			list.rows = append(list.rows, row)
-		}
-		if len(reply.Items) == 0 || len(list.rows) >= reply.Total {
+	defer rows.Close()
+	for rows.Next() {
+		var row SourceScore
+		var chart string
+		var translations []byte
+		if err = rows.Scan(&row.ID, &chart, &row.DifficultyID, &row.Course, &row.Side, &row.Good, &row.OK, &row.Bad, &row.Score, &row.Drumroll, &row.MaxCombo, &row.ClearStatus, &row.IsLatest, &row.SubmittedAt, &row.HasReplay,
+			&row.Title, &translations, &row.Level, &row.BestClearStatus, &row.PlayCount); err != nil {
 			break
 		}
-		if len(list.rows) >= sourceRowLimit {
-			list.truncated = true
-			break
+		row.SongID = json.RawMessage(strconv.Quote(chart))
+		row.TitleTranslations = translations
+		row.Source = source.ID
+		row.ChartURL = source.Site + "/charts/" + chart
+		if row.HasReplay && row.IsLatest {
+			row.ReplayURL = row.ChartURL + "?replay=" + url.QueryEscape(row.ID)
 		}
+		list.rows = append(list.rows, row)
 	}
-	s.scores.put(key, list)
+	if err == nil {
+		err = rows.Err()
+	}
+	if err != nil {
+		log.Printf("scores of %s on %s: %v", user, source.ID, err)
+		return &sourceList{rows: []SourceScore{}, err: errors.New("unreadable")}
+	}
 	return list
-}
-
-func (s *Server) getJSON(ctx context.Context, address string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", address, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
-	if err != nil {
-		return errors.New("unreachable")
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return fmt.Errorf("HTTP %d", res.StatusCode)
-	}
-	if err = json.NewDecoder(http.MaxBytesReader(nil, res.Body, 8<<20)).Decode(out); err != nil {
-		return errors.New("invalid response")
-	}
-	return nil
 }
 
 var scoreOrders = map[string]func(a, b *SourceScore) bool{
@@ -213,10 +141,10 @@ var scoreOrders = map[string]func(a, b *SourceScore) bool{
 
 var scoreCourses = map[string]bool{"Easy": true, "Normal": true, "Hard": true, "Oni": true, "Edit": true}
 
-// userScores is GET /api/v1/users/{id}/scores: the player's rows of every service (or one,
-// source=<id>) in one list, public like the services' own. view=best (default) or all, sort
+// userScores is GET /api/v1/users/{id}/scores: the player's rows of every source (or one,
+// source=<id>) in one list, public like the sources' own. view=best (default) or all, sort
 // level/score/recent (default level for best, recent for all), course, 50 rows a page. A
-// service that does not answer is reported in sources[].error while the others still show.
+// source that cannot be read is reported in sources[].error while the others still show.
 func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validSubject(id) {
@@ -263,7 +191,7 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			lists[i] = s.fetch(r.Context(), src, id, view, course)
+			lists[i] = s.plays(r.Context(), src, id, view, course)
 		}()
 	}
 	wait.Wait()
@@ -276,7 +204,8 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	}
 	statuses := []status{}
 	for i, list := range lists {
-		st := status{Source: selected[i], Count: len(list.rows), Truncated: list.truncated}
+		// Truncated is from when a source's list was fetched and capped; it is always false now.
+		st := status{Source: selected[i], Count: len(list.rows)}
 		if list.err != nil {
 			st.Error = list.err.Error()
 		}

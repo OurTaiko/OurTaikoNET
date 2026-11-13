@@ -109,10 +109,9 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.pools = append(a.pools, shared)
 
-	// The three parts still talk to each other as the three old services did, over their HTTP
-	// APIs, but inside this program (package inproc): the sources ask the players' part for
-	// what a dan attempt earns, and it reads each source's scores.
-	players, fanmadeAPI, officialAPI := &later{}, &later{}, &later{}
+	// The sources still ask the players' part for what a dan attempt earns as the old sites
+	// asked OurTaikoProfile, over its HTTP API, but inside this program (package inproc).
+	players := &later{}
 	awards := func(id, name string) (config struct{ URL, ServiceID, ServiceKey string }, err error) {
 		// A fresh key each start: nothing outside this program needs to know it.
 		key, err := profile.RegisterService(ctx, shared, id, name)
@@ -160,12 +159,11 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.ProfileSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Sources: []profile.Source{
-			{ID: "fanmade", Name: "OurTaiko Fanmade", API: "http://fanmade.inproc", Site: fanmadeSite},
-			{ID: "official", Name: "OurTaiko Database", API: "http://official.inproc", Site: officialSite},
+			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
+			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
 		},
-		Client: &http.Client{Transport: inproc.Hosts{"fanmade.inproc": fanmadeAPI, "official.inproc": officialAPI}},
 	})
-	players.Handler, fanmadeAPI.Handler, officialAPI.Handler = a.Players.Handler(), a.Fanmade.Handler(), a.Official.Handler()
+	players.Handler = a.Players.Handler()
 	if err = errors.Join(a.Fanmade.EnsureStorage(), a.Official.EnsureStorage()); err != nil {
 		a.Close()
 		return nil, err

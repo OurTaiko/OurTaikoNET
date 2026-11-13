@@ -1,9 +1,9 @@
 // Package inproc lets one part of the program call another through its HTTP API without a
 // network.
 //
-// The three services OurTaikoNet is made from talked to each other over HTTP: Profile read
-// the song sites' scores, the song sites asked Profile for awards. They now run in one
-// program and still make those calls; this transport delivers them to the handler directly.
+// The services OurTaikoNet is made from talked to each other over HTTP. They now run in one
+// program, and the calls that are still made that way (the song sources asking the players'
+// part about titles and awards) are delivered to the handler directly by this transport.
 // It is a stage, not the destination: each such call is to become an ordinary function call
 // or a query, and when the last one has, this package goes.
 package inproc
@@ -33,15 +33,4 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	body, _ := io.ReadAll(res.Body)
 	res.Body = io.NopCloser(bytes.NewReader(body))
 	return res, nil
-}
-
-// Hosts answers a request with the handler registered for its host name.
-type Hosts map[string]http.Handler
-
-func (h Hosts) RoundTrip(r *http.Request) (*http.Response, error) {
-	handler, ok := h[r.URL.Hostname()]
-	if !ok {
-		handler = http.NotFoundHandler()
-	}
-	return Transport{handler}.RoundTrip(r)
 }

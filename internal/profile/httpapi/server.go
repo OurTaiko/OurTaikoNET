@@ -27,21 +27,16 @@ type Config struct {
 	SSO            *SSOClient
 	DevUserID      string
 	TrustedProxies []netip.Prefix
-	// The services whose scores are shown, in display order.
+	// The song sources whose plays are shown, in display order.
 	Sources []Source
 	// The built website; nil serves only the API.
 	Site fs.FS
-	// Client fetches the sources' scores; nil uses an ordinary HTTP client. OurTaikoNet sets
-	// one that reaches the sources inside the same program.
-	Client *http.Client
 }
 type Server struct {
 	DB     *pgxpool.Pool
 	Config Config
 	mu     sync.Mutex
 	limits map[string]window
-	scores *scoreCache
-	client *http.Client
 }
 type window struct {
 	since time.Time
@@ -49,11 +44,7 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
-	client := cfg.Client
-	if client == nil {
-		client = &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	}
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, scores: newScoreCache(), client: client}
+	return &Server{DB: pool, Config: cfg, limits: map[string]window{}}
 }
 
 func ID() string {

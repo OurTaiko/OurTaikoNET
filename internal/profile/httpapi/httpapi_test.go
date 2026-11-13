@@ -332,42 +332,42 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 
 func TestScoresOfEveryServiceInOneList(t *testing.T) {
 	pool := testDB(t)
-	row := func(id string, song any, score int64, level int, at string) map[string]any {
-		return map[string]any{"id": id, "songId": song, "difficultyId": 1, "course": "Oni", "side": "single", "score": score, "level": level,
-			"submittedAt": at, "title": "Song " + id, "titleTranslations": map[string]string{}, "isLatest": true, "ClearStatus": 1}
+	ctx := context.Background()
+	// Each play on a chart block of its own, in the source's tables.
+	play := func(source, id, chart string, score int64, level int, at string, recording, latest bool) {
+		t.Helper()
+		var replay any
+		if recording {
+			replay = `{"version":1}`
+		}
+		_, err := pool.Exec(ctx, fmt.Sprintf(`
+WITH player AS (INSERT INTO net.users(id) VALUES ($1) ON CONFLICT DO NOTHING),
+ tja AS (INSERT INTO %[1]s.chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES ($3||$3||'.tja','a.tja',$3||$3,1,'tja') RETURNING id),
+ audio AS (INSERT INTO %[1]s.chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES (repeat('a',32)||$3||'.ogg','a.ogg',repeat('a',32)||$3,1,'ogg') RETURNING id),
+ chart AS (INSERT INTO %[1]s.charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,audio_file) SELECT $3,ARRAY[$1],'Song '||$2,120,60,10,tja.id,audio.id FROM tja,audio RETURNING id),
+ block AS (INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SELECT id,'Oni','single',$5,'v2:'||repeat('0',64) FROM chart RETURNING id)
+INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,payload_digest,difficulty_id,clear_status,submitted_at,replay_data,is_latest)
+ SELECT $8,$2,$1,1,0,0,$4,0,1,repeat('d',64),block.id,1,$6::timestamptz,$7::jsonb,$9 FROM block`, source),
+			player, id, chart, score, level, at, replay, source, latest)
+		if err != nil {
+			t.Fatal(source, id, err)
+		}
 	}
-	serve := func(rows []map[string]any, fail bool) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if fail || r.URL.Path != "/api/v1/users/"+player+"/scores" || r.URL.Query().Get("sort") != "recent" {
-				w.WriteHeader(500)
-				return
-			}
-			var page int
-			fmt.Sscan(r.URL.Query().Get("page"), &page)
-			start, end := min((page-1)*2, len(rows)), min(page*2, len(rows))
-			json.NewEncoder(w).Encode(map[string]any{"items": rows[start:end], "total": len(rows)})
-		}))
+	// The player must exist before a chart can name them as its owner.
+	if _, err := pool.Exec(ctx, `INSERT INTO net.users(id) VALUES ($1)`, player); err != nil {
+		t.Fatal(err)
 	}
 	// f2 and d1 kept their recordings; f3's is of files replaced since.
-	kept := func(r map[string]any, latest bool) map[string]any {
-		r["hasReplay"], r["isLatest"] = true, latest
-		return r
-	}
-	fanmadeRows := []map[string]any{
-		row("f1", "11111111111111111111111111111111", 900000, 8, "2026-01-03T00:00:00Z"),
-		kept(row("f2", "22222222222222222222222222222222", 700000, 10, "2026-01-01T00:00:00Z"), true),
-		kept(row("f3", "33333333333333333333333333333333", 990000, 3, "2025-12-01T00:00:00Z"), false),
-	}
-	fanmade := serve(fanmadeRows, false)
-	defer fanmade.Close()
-	database := serve([]map[string]any{kept(row("d1", 101, 950000, 9, "2026-01-02T00:00:00Z"), true)}, false)
-	defer database.Close()
-	down := serve(nil, true)
-	defer down.Close()
+	f1, f2, f3, d1 := strings.Repeat("1", 32), strings.Repeat("2", 32), strings.Repeat("3", 32), strings.Repeat("d", 32)
+	play("fanmade", "f1", f1, 900000, 8, "2026-01-03T00:00:00Z", false, true)
+	play("fanmade", "f2", f2, 700000, 10, "2026-01-01T00:00:00Z", true, true)
+	play("fanmade", "f3", f3, 990000, 3, "2025-12-01T00:00:00Z", true, false)
+	play("official", "d1", d1, 950000, 9, "2026-01-02T00:00:00Z", true, true)
 	sources := []Source{
-		{ID: "fanmade", Name: "Fanmade", API: fanmade.URL, Site: "https://fanmade.test"},
-		{ID: "database", Name: "Database", API: database.URL, Site: "https://database.test"},
-		{ID: "down", Name: "Down", API: down.URL, Site: "https://down.test"},
+		{ID: "fanmade", Name: "Fanmade", Site: "https://fanmade.test"},
+		{ID: "official", Name: "Database", Site: "https://database.test"},
+		// A source this database does not have: reported, and the others still show.
+		{ID: "down", Name: "Down", Site: "https://down.test"},
 	}
 	c := &client{t: t, handler: New(pool, Config{Origin: origin, Sources: sources}).Handler()}
 	type page struct {
@@ -389,27 +389,41 @@ func TestScoresOfEveryServiceInOneList(t *testing.T) {
 	}
 	var merged page
 	c.json("GET", "/api/v1/users/"+player+"/scores", "", 200, &merged)
-	if merged.Sort != "level" || merged.Total != 4 || ids(merged) != "fanmade:f2,database:d1,fanmade:f1,fanmade:f3" {
+	if merged.Sort != "level" || merged.Total != 4 || ids(merged) != "fanmade:f2,official:d1,fanmade:f1,fanmade:f3" {
 		t.Fatalf("merged by level: %s %+v", ids(merged), merged)
 	}
-	if merged.Items[1].ChartURL != "https://database.test/charts/101" || merged.Items[0].ChartURL != "https://fanmade.test/charts/22222222222222222222222222222222" {
+	if merged.Items[1].ChartURL != "https://database.test/charts/"+d1 || merged.Items[0].ChartURL != "https://fanmade.test/charts/"+f2 {
 		t.Fatal("chart links", merged.Items[0].ChartURL, merged.Items[1].ChartURL)
 	}
 	// A play with a recording links to it on its chart's page; one of replaced files does not.
-	if merged.Items[0].ReplayURL != "https://fanmade.test/charts/22222222222222222222222222222222?replay=f2" || merged.Items[1].ReplayURL != "https://database.test/charts/101?replay=d1" ||
+	if merged.Items[0].ReplayURL != "https://fanmade.test/charts/"+f2+"?replay=f2" || merged.Items[1].ReplayURL != "https://database.test/charts/"+d1+"?replay=d1" ||
 		merged.Items[2].ReplayURL != "" || merged.Items[3].ReplayURL != "" || !merged.Items[3].HasReplay {
 		t.Fatal("replay links", merged.Items[0].ReplayURL, merged.Items[1].ReplayURL, merged.Items[2].ReplayURL, merged.Items[3].ReplayURL)
 	}
 	if merged.Sources[2].Error == "" || merged.Sources[0].Count != 3 || merged.Sources[1].Count != 1 {
-		t.Fatalf("a service that fails is reported %+v", merged.Sources)
+		t.Fatalf("a source that cannot be read is reported %+v", merged.Sources)
 	}
 	c.json("GET", "/api/v1/users/"+player+"/scores?sort=recent", "", 200, &merged)
-	if ids(merged) != "fanmade:f1,database:d1,fanmade:f2,fanmade:f3" {
+	if ids(merged) != "fanmade:f1,official:d1,fanmade:f2,fanmade:f3" {
 		t.Fatal("merged by date", ids(merged))
 	}
-	c.json("GET", "/api/v1/users/"+player+"/scores?source=database&sort=score", "", 200, &merged)
-	if ids(merged) != "database:d1" || len(merged.Sources) != 1 {
+	c.json("GET", "/api/v1/users/"+player+"/scores?source=official&sort=score", "", 200, &merged)
+	if ids(merged) != "official:d1" || len(merged.Sources) != 1 {
 		t.Fatal("one service", ids(merged))
+	}
+	// Every play, with a second one on a block: the best view shows one row for it, with the
+	// better clear and the count.
+	if _, err := pool.Exec(ctx, `INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,payload_digest,difficulty_id,clear_status,submitted_at)
+ SELECT 'official','d2',user_id,1,0,0,100,0,1,repeat('d',64),difficulty_id,3,'2026-01-05' FROM net.scores WHERE id='d1'`); err != nil {
+		t.Fatal(err)
+	}
+	c.json("GET", "/api/v1/users/"+player+"/scores?source=official&view=all", "", 200, &merged)
+	if ids(merged) != "official:d2,official:d1" {
+		t.Fatal("every play, newest first", ids(merged))
+	}
+	c.json("GET", "/api/v1/users/"+player+"/scores?source=official", "", 200, &merged)
+	if ids(merged) != "official:d1" || merged.Items[0].BestClearStatus == nil || *merged.Items[0].BestClearStatus != 3 || *merged.Items[0].PlayCount != 2 {
+		t.Fatalf("best of a block: %s %+v", ids(merged), merged.Items)
 	}
 	for _, query := range []string{"?view=x", "?sort=x", "?course=Ura", "?source=nope", "?page=0"} {
 		c.json("GET", "/api/v1/users/"+player+"/scores"+query, "", 400, nil)
