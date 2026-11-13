@@ -551,7 +551,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.avatarURL(u.User)
+	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
 	respond(w, 201, items[0])
 }
 
@@ -601,7 +601,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.avatarURL(u.User)
+	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
 	respond(w, 200, items[0])
 }
 

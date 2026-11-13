@@ -111,7 +111,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT upstream_refresh_token,expires_at,upstream_expires_at FROM sessions WHERE user_id=$1`, id).Scan(&encryptedRefresh, &deadline, &accessExpiry); err != nil {
 		t.Fatal(err)
 	}
-	plain, err := client.unseal(encryptedRefresh, "refresh:"+hash(cookie.Value))
+	plain, err := client.Unseal(encryptedRefresh, "refresh:"+hash(cookie.Value))
 	if err != nil || plain != "refresh:"+id || time.Until(deadline) < 167*time.Hour || time.Until(accessExpiry) > time.Hour {
 		t.Fatal("invalid persisted renewal credentials", err)
 	}

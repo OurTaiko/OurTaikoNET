@@ -11,25 +11,21 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/groups"
 )
 
 const defaultSessionCookie, flowCookie = "ourtaiko_profile_session", "ourtaiko_profile_oidc"
 
-// User is the signed-in website user as the account center describes them. IsAdmin is the
-// Profile application's role there: administrators manage titles and grants.
+// User is someone signed in: what the account center says about them (account.User), and
+// what the site itself knows.
+//
+// SiteAdmin is the account center's administrator of this site: they manage it, which includes
+// every player's groups, and are in no group for it. Groups are the user groups the player is
+// in (package groups). With Config.Groups, IsAdmin, which guards the title catalog and grants,
+// is membership of TITLE_MANAGER; without, it is SiteAdmin.
 type User struct {
-	PreferredLanguage string `json:"preferredLanguage"`
-	ID                string `json:"id"`
-	Username          string `json:"username"`
-	Nickname          string `json:"nickname"`
-	AvatarURL         string `json:"avatarUrl"`
-	EmailVerified     bool   `json:"emailVerified"`
-	IsAdmin           bool   `json:"isAdmin"`
-	// SiteAdmin is the account center's administrator of this site: they manage it, which
-	// includes every player's groups, and are in no group for it. Groups are the user groups
-	// the player is in (package groups). With Config.Groups, IsAdmin, which guards the title
-	// catalog and grants, is membership of TITLE_MANAGER; without, it is SiteAdmin.
+	account.User
 	SiteAdmin bool     `json:"siteAdmin"`
 	Groups    []string `json:"groups"`
 }
@@ -37,11 +33,11 @@ type User struct {
 // identity asks the account center who a token belongs to and adds what the site itself
 // knows about them.
 func (s *Server) identity(ctx context.Context, kind, token string) (User, error) {
-	u, e := s.Config.SSO.identity(ctx, kind, token)
+	who, e := s.Config.SSO.Identity(ctx, kind, token)
 	if e != nil {
-		return u, e
+		return User{}, e
 	}
-	u.SiteAdmin, u.Groups = u.IsAdmin, []string{}
+	u := User{User: who, SiteAdmin: who.IsAdmin, Groups: []string{}}
 	if s.Config.Groups {
 		set, e := groups.Of(ctx, s.DB, u.ID)
 		if e != nil {
@@ -76,9 +72,9 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 		// Development sessions carry no account-center credential.
 		return v, nil
 	}
-	v.Token, e = s.Config.SSO.unseal(encrypted, hash(c.Value))
+	v.Token, e = s.Config.SSO.Unseal(encrypted, hash(c.Value))
 	if e == nil && len(refresh) > 0 {
-		v.RefreshToken, e = s.Config.SSO.unseal(refresh, "refresh:"+hash(c.Value))
+		v.RefreshToken, e = s.Config.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
 	}
 	if accessExpires != nil {
 		v.AccessExpires = *accessExpires
@@ -88,7 +84,7 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 
 // devUser is the only account of a server running without an account center.
 func devUser(id string) User {
-	return User{ID: id, Username: "dev", Nickname: "本地开发用户", EmailVerified: true, IsAdmin: true, SiteAdmin: true, Groups: groups.Known().Names()}
+	return User{User: account.User{ID: id, Username: "dev", Nickname: "本地开发用户", EmailVerified: true, IsAdmin: true}, SiteAdmin: true, Groups: groups.Known().Names()}
 }
 
 func (s *Server) current(r *http.Request) (session, error) {
@@ -182,7 +178,7 @@ func (s *Server) accountRedirect(w http.ResponseWriter, r *http.Request) {
 	case "profile":
 		path = "/profile/"
 	}
-	http.Redirect(w, r, s.Config.SSO.config.Issuer+path, http.StatusSeeOther)
+	http.Redirect(w, r, s.Config.SSO.Config.Issuer+path, http.StatusSeeOther)
 }
 
 func safeReturn(raw string) string {
@@ -223,7 +219,7 @@ func (s *Server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.Config.Origin+"/?error=sso", http.StatusSeeOther)
 		return
 	}
-	_, cfg, e := s.Config.SSO.oidc(r.Context())
+	_, cfg, e := s.Config.SSO.OIDC(r.Context())
 	if e != nil {
 		internal(w, e)
 		return
@@ -261,19 +257,19 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	provider, cfg, e := s.Config.SSO.oidc(r.Context())
+	provider, cfg, e := s.Config.SSO.OIDC(r.Context())
 	if e != nil {
 		fail()
 		return
 	}
-	ctx := oidc.ClientContext(r.Context(), s.Config.SSO.http)
+	ctx := oidc.ClientContext(r.Context(), s.Config.SSO.HTTP)
 	token, e := cfg.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(verifier))
 	if e != nil {
 		fail()
 		return
 	}
 	revoke := func() {
-		_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": token.AccessToken, "refreshToken": token.RefreshToken}, nil)
+		_ = s.Config.SSO.Call(ctx, "web/revoke", map[string]string{"accessToken": token.AccessToken, "refreshToken": token.RefreshToken}, nil)
 	}
 	raw, _ := token.Extra("id_token").(string)
 	idToken, e := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}).Verify(ctx, raw)
@@ -333,7 +329,7 @@ func (s *Server) OpenSession(ctx context.Context, user, access, refresh string, 
 		return "", expires, e
 	}
 	if _, e = tx.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`,
-		digest, user, csrf, expires, s.Config.SSO.seal(access, digest), s.Config.SSO.seal(refresh, "refresh:"+digest), accessExpires); e != nil {
+		digest, user, csrf, expires, s.Config.SSO.Seal(access, digest), s.Config.SSO.Seal(refresh, "refresh:"+digest), accessExpires); e != nil {
 		return "", expires, e
 	}
 	return rawSession, expires, tx.Commit(ctx)
@@ -359,14 +355,14 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if e == nil && s.Config.SSO != nil {
-			v.Token, _ = s.Config.SSO.unseal(access, hash(c.Value))
+			v.Token, _ = s.Config.SSO.Unseal(access, hash(c.Value))
 			v.RefreshToken = ""
 			if len(refresh) > 0 {
-				v.RefreshToken, _ = s.Config.SSO.unseal(refresh, "refresh:"+hash(c.Value))
+				v.RefreshToken, _ = s.Config.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
 			}
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 			defer cancel()
-			_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
+			_ = s.Config.SSO.Call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
 		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})

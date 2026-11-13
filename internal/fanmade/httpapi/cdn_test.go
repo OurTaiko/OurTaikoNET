@@ -14,15 +14,15 @@ import (
 )
 
 func TestCDNAvatarAllowlist(t *testing.T) {
-	c := &SSOClient{config: SSOConfig{Issuer: "https://sso.example", AvatarBaseURL: "https://cdn.example/sso/avatars"}}
+	c := &SSOClient{Config: SSOConfig{Issuer: "https://sso.example", AvatarBaseURL: "https://cdn.example/sso/avatars"}}
 	id, digest := strings.Repeat("a", 32), strings.Repeat("b", 32)
 	for _, base := range []string{"https://sso.example/avatars", "https://cdn.example/sso/avatars"} {
 		valid := base + "/" + id + "/" + digest + ".webp"
-		if got := c.avatarURL(User{ID: id, AvatarURL: valid}); got != valid {
+		if got := c.AvatarURL(User{ID: id, AvatarURL: valid}); got != valid {
 			t.Fatal(got)
 		}
 		for _, bad := range []string{valid + "?x=1", valid + "#x", strings.Replace(valid, id, strings.Repeat("c", 32), 1), strings.Replace(valid, ".example", ".example.evil", 1), base + "/" + id + "/../" + digest + ".webp"} {
-			if got := c.avatarURL(User{ID: id, AvatarURL: bad}); got != "" {
+			if got := c.AvatarURL(User{ID: id, AvatarURL: bad}); got != "" {
 				t.Fatalf("accepted %s", bad)
 			}
 		}

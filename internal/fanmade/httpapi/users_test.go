@@ -111,7 +111,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	}
 	_, last = read()
 	old = *last
-	app.Config.SSO.http = &http.Client{Transport: failingTransport{}}
+	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
 	if w = call("GET", "/api/v1/me", "", cookie, ""); w.Code != 503 {
 		t.Fatal(w.Code)
 	}
@@ -275,7 +275,7 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 			t.Fatal(response.Code)
 		}
 	}
-	app.Config.SSO.http = &http.Client{Transport: failingTransport{}}
+	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
 	w = spaceRequest(ids[0])
 	if err = json.Unmarshal(w.Body.Bytes(), &space); err != nil || w.Code != 200 || space.ProfilesAvailable || space.User.Nickname != nil {
 		t.Fatal("space outage fallback", w.Body.String(), err)

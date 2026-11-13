@@ -13,11 +13,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
 	"ourtaiko.dev/net/internal/netdb"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	official "ourtaiko.dev/net/internal/official/httpapi"
-	profile "ourtaiko.dev/net/internal/profile/httpapi"
 )
 
 // One program, one database: each source answers under its name at the new address and as
@@ -296,19 +296,11 @@ func TestOneSignInForTheWholeSite(t *testing.T) {
 	ctx := context.Background()
 	issuer, _ := accountCenter(t)
 	key, secret := strings.Repeat("k", 64), strings.Repeat("b", 64)
-	fanmadeSSO, err := fanmade.NewSSO(fanmade.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
+	sso, err := account.New(account.Config{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
 	if err != nil {
 		t.Fatal(err)
 	}
-	officialSSO, err := official.NewSSO(official.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
-	if err != nil {
-		t.Fatal(err)
-	}
-	profileSSO, err := profile.NewSSO(profile.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), FanmadeSSO: fanmadeSSO, OfficialSSO: officialSSO, ProfileSSO: profileSSO})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), SSO: sso})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,19 +399,11 @@ func wholeSite(t *testing.T) (*App, http.Handler, *pgxpool.Pool) {
 	issuer, _ := accountCenter(t)
 	key, secret := strings.Repeat("k", 64), strings.Repeat("b", 64)
 	const callback = "http://localhost/api/v1/auth/sso/callback"
-	fanmadeSSO, err := fanmade.NewSSO(fanmade.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
+	sso, err := account.New(account.Config{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
 	if err != nil {
 		t.Fatal(err)
 	}
-	officialSSO, err := official.NewSSO(official.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
-	if err != nil {
-		t.Fatal(err)
-	}
-	profileSSO, err := profile.NewSSO(profile.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: callback, EncryptionKey: secret})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a, err := New(context.Background(), Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), FanmadeSSO: fanmadeSSO, OfficialSSO: officialSSO, ProfileSSO: profileSSO})
+	a, err := New(context.Background(), Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), SSO: sso})
 	if err != nil {
 		t.Fatal(err)
 	}

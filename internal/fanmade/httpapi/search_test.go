@@ -218,7 +218,7 @@ func TestPublicGameSearch(t *testing.T) {
 	}
 
 	// Metadata search must keep working without SSO nickname search.
-	s.Config.SSO.http = &http.Client{Transport: failingTransport{}}
+	s.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
 	for _, endpoint := range []string{"/api/v1/charts", "/api/v1/game/search"} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", endpoint+"?q=Artist", nil))

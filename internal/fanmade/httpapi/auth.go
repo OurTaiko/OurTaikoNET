@@ -12,17 +12,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/oauth2"
+	"ourtaiko.dev/net/internal/account"
 )
 
-type User struct {
-	PreferredLanguage string `json:"preferredLanguage"`
-	ID                string `json:"id"`
-	Username          string `json:"username"`
-	Nickname          string `json:"nickname"`
-	AvatarURL         string `json:"avatarUrl"`
-	EmailVerified     bool   `json:"emailVerified"`
-	IsAdmin           bool   `json:"isAdmin"`
-}
+// User is someone signed in, as the account center describes them; what IsAdmin means here
+// is decided by Config.Manager where one is set.
+type User = account.User
 type session struct {
 	User          User
 	CSRF          string
@@ -49,9 +44,9 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 	if e != nil {
 		return v, e
 	}
-	v.Token, e = s.Config.SSO.unseal(encrypted, hash(c.Value))
+	v.Token, e = s.Config.SSO.Unseal(encrypted, hash(c.Value))
 	if e == nil && len(refresh) > 0 {
-		v.RefreshToken, e = s.Config.SSO.unseal(refresh, "refresh:"+hash(c.Value))
+		v.RefreshToken, e = s.Config.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
 	}
 	if accessExpires != nil {
 		v.AccessExpires = *accessExpires
@@ -62,7 +57,7 @@ func (s *Server) localSession(r *http.Request) (session, error) {
 // identity asks the account center who a token belongs to. Whether they administer this
 // site's content is the account center's answer, unless Config.Manager decides it.
 func (s *Server) identity(ctx context.Context, kind, token string) (User, error) {
-	u, e := s.Config.SSO.identity(ctx, kind, token)
+	u, e := s.Config.SSO.Identity(ctx, kind, token)
 	if e != nil || s.Config.Manager == nil {
 		return u, e
 	}
@@ -158,7 +153,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		Token   string `json:"accessToken"`
 		Expires int    `json:"expiresIn"`
 	}
-	e := s.Config.SSO.call(r.Context(), "game/login", c, &result)
+	e := s.Config.SSO.Call(r.Context(), "game/login", c, &result)
 	var remote *ssoError
 	if errors.As(e, &remote) {
 		switch remote.Status {
@@ -186,7 +181,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	result.User.AvatarURL = s.Config.SSO.avatarURL(result.User)
+	result.User.AvatarURL = s.Config.SSO.AvatarURL(result.User)
 	respond(w, 200, result)
 }
 func (s *Server) accountRedirect(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +189,7 @@ func (s *Server) accountRedirect(w http.ResponseWriter, r *http.Request) {
 	if r.PathValue("page") == "register" {
 		path = "/register/"
 	}
-	http.Redirect(w, r, s.Config.SSO.config.Issuer+path, http.StatusSeeOther)
+	http.Redirect(w, r, s.Config.SSO.Config.Issuer+path, http.StatusSeeOther)
 }
 func (s *Server) retiredAccountAPI(w http.ResponseWriter, r *http.Request) {
 	problem(w, 410, "SSO_REQUIRED", "账号管理已迁至 OurTaiko 账号中心，请使用 SSO 登录或管理账号")
@@ -211,7 +206,7 @@ func (s *Server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "RETURN_PATH_INVALID", "返回地址必须是网站页面")
 		return
 	}
-	_, cfg, e := s.Config.SSO.oidc(r.Context())
+	_, cfg, e := s.Config.SSO.OIDC(r.Context())
 	if e != nil {
 		internal(w, e)
 		return
@@ -245,19 +240,19 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	provider, cfg, e := s.Config.SSO.oidc(r.Context())
+	provider, cfg, e := s.Config.SSO.OIDC(r.Context())
 	if e != nil {
 		fail()
 		return
 	}
-	ctx := oidc.ClientContext(r.Context(), s.Config.SSO.http)
+	ctx := oidc.ClientContext(r.Context(), s.Config.SSO.HTTP)
 	token, e := cfg.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(verifier))
 	if e != nil {
 		fail()
 		return
 	}
 	revoke := func() {
-		_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": token.AccessToken, "refreshToken": token.RefreshToken}, nil)
+		_ = s.Config.SSO.Call(ctx, "web/revoke", map[string]string{"accessToken": token.AccessToken, "refreshToken": token.RefreshToken}, nil)
 	}
 	raw, _ := token.Extra("id_token").(string)
 	idToken, e := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}).Verify(ctx, raw)
@@ -297,7 +292,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, digest, u.ID, csrf, expires, s.Config.SSO.seal(token.AccessToken, digest), s.Config.SSO.seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
+	_, e = tx.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, digest, u.ID, csrf, expires, s.Config.SSO.Seal(token.AccessToken, digest), s.Config.SSO.Seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
 	if e != nil {
 		revoke()
 		fail()
@@ -334,14 +329,14 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if e == nil {
-			v.Token, _ = s.Config.SSO.unseal(access, hash(c.Value))
+			v.Token, _ = s.Config.SSO.Unseal(access, hash(c.Value))
 			v.RefreshToken = ""
 			if len(refresh) > 0 {
-				v.RefreshToken, _ = s.Config.SSO.unseal(refresh, "refresh:"+hash(c.Value))
+				v.RefreshToken, _ = s.Config.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
 			}
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 			defer cancel()
-			_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
+			_ = s.Config.SSO.Call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
 		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})

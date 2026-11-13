@@ -107,7 +107,7 @@ func newTestClient(t *testing.T, s *Server) testClient {
 		_, err := s.DB.Exec(ctx, `INSERT INTO users(id) VALUES($1) ON CONFLICT DO NOTHING`, u.ID)
 		if err == nil {
 			_, err = s.DB.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,'csrf',now()+interval '1 day',$3)`,
-				hash(token), u.ID, s.Config.SSO.seal("tok:"+u.ID, hash(token)))
+				hash(token), u.ID, s.Config.SSO.Seal("tok:"+u.ID, hash(token)))
 		}
 		if err != nil {
 			t.Fatal(err)

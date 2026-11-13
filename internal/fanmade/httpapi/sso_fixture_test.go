@@ -130,7 +130,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 	}
 	rows.Close()
 	for _, v := range items {
-		_, e = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,$3,$4,$5)`, v.hash, v.id, v.csrf, v.expires, cfg.SSO.seal("web:"+v.id, v.hash))
+		_, e = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,$3,$4,$5)`, v.hash, v.id, v.csrf, v.expires, cfg.SSO.Seal("web:"+v.id, v.hash))
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -141,7 +141,7 @@ func seedWebSession(t *testing.T, s *Server, id string) string {
 	t.Helper()
 	token := ID() + ID()
 	digest := hash(token)
-	_, e := s.DB.Exec(context.Background(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,'csrf',now()+interval '1 day',$3)`, digest, id, s.Config.SSO.seal("web:"+id, digest))
+	_, e := s.DB.Exec(context.Background(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,'csrf',now()+interval '1 day',$3)`, digest, id, s.Config.SSO.Seal("web:"+id, digest))
 	if e != nil {
 		t.Fatal(e)
 	}

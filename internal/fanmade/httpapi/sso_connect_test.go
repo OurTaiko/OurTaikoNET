@@ -30,7 +30,7 @@ func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, oauth, err := c.oidc(context.Background())
+	_, oauth, err := c.OIDC(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
 	// Unrelated origins must not be routed to the account center.
 	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
 	defer other.Close()
-	res, err := c.http.Get(other.URL)
+	res, err := c.HTTP.Get(other.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestSSOConnectAddressDoesNotBypassTLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = c.http.Get("https://sso.example.test"); err == nil {
+	if _, err = c.HTTP.Get("https://sso.example.test"); err == nil {
 		t.Fatal("TLS verification bypassed")
 	}
 }

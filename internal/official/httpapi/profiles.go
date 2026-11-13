@@ -35,5 +35,5 @@ func (s *Server) avatarOf(u User) string {
 	if s.Config.SSO == nil {
 		return ""
 	}
-	return s.Config.SSO.avatarURL(u)
+	return s.Config.SSO.AvatarURL(u)
 }

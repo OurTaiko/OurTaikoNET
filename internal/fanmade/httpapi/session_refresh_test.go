@@ -68,14 +68,14 @@ func TestWebSessionRenewal(t *testing.T) {
 	}))
 	defer remote.Close()
 	issuer = remote.URL
-	app.Config.SSO.config.Issuer = issuer
-	app.Config.SSO.http = remote.Client()
+	app.Config.SSO.Config.Issuer = issuer
+	app.Config.SSO.HTTP = remote.Client()
 	h := app.Handler()
 	seed := func() string {
 		t.Helper()
 		cookie := ID() + ID()
 		digest := hash(cookie)
-		_, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,'csrf',now()+interval '7 days',$3,$4,now()-interval '2 days')`, digest, id, app.Config.SSO.seal("access-old", digest), app.Config.SSO.seal("refresh-old", "refresh:"+digest))
+		_, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,'csrf',now()+interval '7 days',$3,$4,now()-interval '2 days')`, digest, id, app.Config.SSO.Seal("access-old", digest), app.Config.SSO.Seal("refresh-old", "refresh:"+digest))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,7 +112,7 @@ func TestWebSessionRenewal(t *testing.T) {
 		if err := pool.QueryRow(ctx, `SELECT expires_at,upstream_refresh_token FROM sessions WHERE token_hash=$1`, hash(cookie)).Scan(&after, &encrypted); err != nil {
 			t.Fatal(err)
 		}
-		plain, err := app.Config.SSO.unseal(encrypted, "refresh:"+hash(cookie))
+		plain, err := app.Config.SSO.Unseal(encrypted, "refresh:"+hash(cookie))
 		if err != nil || plain != "refresh-new" || !before.Equal(after) {
 			t.Fatal("lost rotation or extended absolute deadline")
 		}

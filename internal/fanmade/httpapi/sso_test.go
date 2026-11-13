@@ -62,7 +62,7 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 		t.Fatal("CSRF accepted", w.Code)
 	}
 	// A remote outage cannot authorize a local cached user, but local logout still succeeds.
-	app.Config.SSO.http = &http.Client{Transport: failingTransport{}, Timeout: time.Second}
+	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}, Timeout: time.Second}
 	if w := call("GET", "/api/v1/me", ""); w.Code != 503 {
 		t.Fatal("SSO outage bypass", w.Code)
 	}
@@ -114,15 +114,15 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 	c := app.Config.SSO
-	encrypted := c.seal("secret", "sessionA")
+	encrypted := c.Seal("secret", "sessionA")
 	if string(encrypted) == "secret" {
 		t.Fatal("token not encrypted")
 	}
-	if _, e := c.unseal(encrypted, "sessionB"); e == nil {
+	if _, e := c.Unseal(encrypted, "sessionB"); e == nil {
 		t.Fatal("ciphertext can be swapped")
 	}
 	encrypted[len(encrypted)-1] ^= 1
-	if _, e := c.unseal(encrypted, "sessionA"); e == nil {
+	if _, e := c.Unseal(encrypted, "sessionA"); e == nil {
 		t.Fatal("tampered ciphertext accepted")
 	}
 	for _, input := range []string{"https://evil.example", "//evil.example", "/\\evil.example", "/x\r\ny"} {
@@ -147,11 +147,11 @@ func TestPublicNamesDoNotExposeLogin(t *testing.T) {
 	if strings.Contains(string(data), "PrivateLogin") || names[id].Nickname != "公开名" {
 		t.Fatal(string(data))
 	}
-	matches, e := app.Config.SSO.search(context.Background(), "PrivateLogin")
+	matches, e := app.Config.SSO.Search(context.Background(), "PrivateLogin")
 	if e != nil || len(matches) != 0 {
 		t.Fatal("login name searchable", e)
 	}
-	app.Config.SSO.http = &http.Client{Transport: failingTransport{}}
+	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
 	if app.publicProfiles(context.Background(), []string{id})[id] != (PublicProfile{Nickname: "未知用户"}) {
 		t.Fatal("no outage fallback")
 	}
@@ -167,10 +167,10 @@ func TestSSOPreferredLanguageIsLive(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"user": User{ID: strings.Repeat("a", 32), PreferredLanguage: language}})
 	}))
 	defer upstream.Close()
-	client := &SSOClient{config: SSOConfig{Issuer: upstream.URL, ServiceID: "fanmade"}, http: upstream.Client()}
+	client := &SSOClient{Config: SSOConfig{Issuer: upstream.URL, ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	for _, preference := range []string{"ja", "ko", "en", "zh-hans", ""} {
 		language = preference
-		user, err := client.identity(context.Background(), "web", "test-token")
+		user, err := client.Identity(context.Background(), "web", "test-token")
 		if err != nil || user.PreferredLanguage != preference {
 			t.Fatalf("stale preferred language: %#v, %v", user, err)
 		}
@@ -189,7 +189,7 @@ func TestSSOAvatarURLIsPassedThroughOnlyFromIssuer(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"user": User{ID: id, AvatarURL: avatar}})
 	}))
 	defer upstream.Close()
-	client := &SSOClient{config: SSOConfig{Issuer: upstream.URL + "/", ServiceID: "fanmade"}, http: upstream.Client()}
+	client := &SSOClient{Config: SSOConfig{Issuer: upstream.URL + "/", ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	valid := upstream.URL + "/avatars/" + id + "/" + digest + ".webp"
 	for given, want := range map[string]string{
 		valid: valid,
@@ -202,13 +202,13 @@ func TestSSOAvatarURLIsPassedThroughOnlyFromIssuer(t *testing.T) {
 		"javascript:alert(1)": "",
 	} {
 		avatar = given
-		user, err := client.identity(context.Background(), "web", "test-token")
+		user, err := client.Identity(context.Background(), "web", "test-token")
 		if err != nil || user.AvatarURL != want {
 			t.Fatalf("avatar %q: got %q, %v", given, user.AvatarURL, err)
 		}
 	}
 	avatar = valid
-	user, _ := client.identity(context.Background(), "web", "test-token")
+	user, _ := client.Identity(context.Background(), "web", "test-token")
 	body, err := json.Marshal(user)
 	if err != nil || !strings.Contains(string(body), `"avatarUrl":"`+valid+`"`) {
 		t.Fatalf("avatarUrl missing from API response: %s, %v", body, err)
@@ -231,7 +231,7 @@ func TestSSOProfilesCarryOnlyValidAvatars(t *testing.T) {
 	}))
 	defer upstream.Close()
 	issuer = upstream.URL
-	client := &SSOClient{config: SSOConfig{Issuer: issuer, ServiceID: "fanmade"}, http: upstream.Client()}
+	client := &SSOClient{Config: SSOConfig{Issuer: issuer, ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	profiles, err := client.Profiles(context.Background(), []string{a, b})
 	if err != nil {
 		t.Fatal(err)

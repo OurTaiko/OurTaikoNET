@@ -109,7 +109,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	matching := []string{}
 	if q != "" {
 		var err error
-		matching, err = s.Config.SSO.search(r.Context(), q)
+		matching, err = s.Config.SSO.Search(r.Context(), q)
 		if err != nil {
 			internal(w, err)
 			return

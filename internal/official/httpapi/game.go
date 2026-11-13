@@ -50,7 +50,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		result.User, result.Token, result.Expires = devUser(s.Config.DevUserID), s.devGameToken(), 86400
 	} else {
-		e := s.Config.SSO.call(r.Context(), "game/login", c, &result)
+		e := s.Config.SSO.Call(r.Context(), "game/login", c, &result)
 		var remote *ssoError
 		if errors.As(e, &remote) {
 			switch remote.Status {
@@ -74,7 +74,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 			internal(w, errors.New("invalid SSO login response"))
 			return
 		}
-		result.User.AvatarURL = s.Config.SSO.avatarURL(result.User)
+		result.User.AvatarURL = s.Config.SSO.AvatarURL(result.User)
 	}
 	if e := recordUserActivity(r.Context(), s.DB, result.User.ID, true); e != nil {
 		internal(w, e)

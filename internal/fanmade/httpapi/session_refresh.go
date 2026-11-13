@@ -37,14 +37,14 @@ func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 	if !deadline.After(time.Now()) {
 		return v, pgx.ErrNoRows
 	}
-	v.Token, err = s.Config.SSO.unseal(access, digest)
+	v.Token, err = s.Config.SSO.Unseal(access, digest)
 	if err != nil {
 		return v, err
 	}
 	if len(refresh) == 0 {
 		return v, pgx.ErrNoRows
 	}
-	v.RefreshToken, err = s.Config.SSO.unseal(refresh, "refresh:"+digest)
+	v.RefreshToken, err = s.Config.SSO.Unseal(refresh, "refresh:"+digest)
 	if err != nil {
 		return v, err
 	}
@@ -52,12 +52,12 @@ func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 		v.AccessExpires = *accessExpiry
 		return v, nil
 	}
-	_, cfg, err := s.Config.SSO.oidc(ctx)
+	_, cfg, err := s.Config.SSO.OIDC(ctx)
 	if err != nil {
 		return v, err
 	}
 	// Force renewal inside our own expiry window, not oauth2's implicit window.
-	token, err := cfg.TokenSource(oidc.ClientContext(ctx, s.Config.SSO.http), &oauth2.Token{RefreshToken: v.RefreshToken}).Token()
+	token, err := cfg.TokenSource(oidc.ClientContext(ctx, s.Config.SSO.HTTP), &oauth2.Token{RefreshToken: v.RefreshToken}).Token()
 	if err != nil {
 		var remote *oauth2.RetrieveError
 		if errors.As(err, &remote) && remote.ErrorCode == "invalid_grant" {
@@ -76,7 +76,7 @@ func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 		return session{}, errors.New("invalid SSO renewal response")
 	}
 	// The normal current() path performs live introspection before authorization.
-	_, err = tx.Exec(ctx, `UPDATE sessions SET upstream_token=$2,upstream_refresh_token=$3,upstream_expires_at=$4 WHERE token_hash=$1`, digest, s.Config.SSO.seal(token.AccessToken, digest), s.Config.SSO.seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
+	_, err = tx.Exec(ctx, `UPDATE sessions SET upstream_token=$2,upstream_refresh_token=$3,upstream_expires_at=$4 WHERE token_hash=$1`, digest, s.Config.SSO.Seal(token.AccessToken, digest), s.Config.SSO.Seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
 	if err != nil {
 		return session{}, err
 	}
