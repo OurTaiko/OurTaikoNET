@@ -202,8 +202,9 @@ func cleanDanRewards(raw json.RawMessage) (json.RawMessage, bool) {
 }
 
 type danSongRow struct {
-	chartID, course, side string
-	hidden                bool
+	chartID      string
+	course, side string
+	hidden       bool
 }
 
 var danSides = map[string]bool{"single": true, "p1": true, "p2": true}
@@ -242,8 +243,9 @@ func (s *Server) checkDan(ctx context.Context, w http.ResponseWriter, in danInpu
 	}
 	songs := []danSongRow{}
 	for _, song := range in.Songs {
-		if !danCourses[song.Course] {
-			problem(w, 422, "DAN_INVALID", "难度无效")
+		chart := song.ChartID
+		if !danCourses[song.Course] || !validID(chart) {
+			problem(w, 422, "DAN_INVALID", "歌曲或难度无效")
 			return nil, nil, nil, nil, false
 		}
 		if !danSides[song.Side] {
@@ -252,7 +254,7 @@ func (s *Server) checkDan(ctx context.Context, w http.ResponseWriter, in danInpu
 		}
 		var hashed bool
 		err := s.DB.QueryRow(ctx, `SELECT d.content_hash IS NOT NULL FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
- WHERE c.id=$1 AND `+publishedChart+` AND d.course=$2 AND d.side=$3`, song.ChartID, song.Course, song.Side).Scan(&hashed)
+ WHERE c.id=$1 AND `+publishedChart+` AND d.course=$2 AND d.side=$3`, chart, song.Course, song.Side).Scan(&hashed)
 		if errors.Is(err, pgx.ErrNoRows) {
 			problem(w, 422, "DAN_SONG_NOT_FOUND", "找不到歌曲或该难度的这个谱面块："+song.ChartID)
 			return nil, nil, nil, nil, false
@@ -265,7 +267,7 @@ func (s *Server) checkDan(ctx context.Context, w http.ResponseWriter, in danInpu
 			problem(w, 422, "DAN_SONG_NOT_FOUND", "这个谱面块还没有内容哈希，请稍后再试："+song.ChartID)
 			return nil, nil, nil, nil, false
 		}
-		songs = append(songs, danSongRow{chartID: song.ChartID, course: song.Course, side: song.Side, hidden: song.Hidden})
+		songs = append(songs, danSongRow{chartID: chart, course: song.Course, side: song.Side, hidden: song.Hidden})
 	}
 	return title, songs, exams, rewards, true
 }
@@ -408,7 +410,11 @@ func (s *Server) danDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if viewer := s.viewer(r); viewer != "" {
-		s.DB.QueryRow(r.Context(), `SELECT value FROM dan_votes WHERE dan_id=$1 AND user_id=$2`, id, viewer).Scan(&courses[0].MyVote)
+		err = s.DB.QueryRow(r.Context(), `SELECT value FROM dan_votes WHERE dan_id=$1 AND user_id=$2`, id, viewer).Scan(&courses[0].MyVote)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			internal(w, err)
+			return
+		}
 	}
 	respond(w, 200, courses[0])
 }

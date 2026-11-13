@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +45,10 @@ const publicUserColumns = `u.id,u.first_login_at,u.last_active_at,
  (SELECT COALESCE(sum(v.value),0) FROM dan_votes v JOIN dan_courses d ON d.id=v.dan_id WHERE d.owner_id=u.id AND v.user_id<>u.id),
  (SELECT count(*) FROM playlists p WHERE p.owner_id=u.id AND p.is_public)`
 
+func scanPublicUser(row pgx.Row, u *PublicUser) error {
+	return row.Scan(&u.ID, &u.FirstLoginAt, &u.LastActiveAt, &u.ChartCount, &u.ScoreCount, &u.CommentCount, &u.Karma, &u.PlaylistCount)
+}
+
 type UserSpace struct {
 	User              PublicUser `json:"user"`
 	ProfilesAvailable bool       `json:"profilesAvailable"`
@@ -57,10 +60,9 @@ func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
-	result := UserSpace{ProfilesAvailable: true}
+	result := UserSpace{ProfilesAvailable: s.Config.SSO != nil}
 	u := &result.User
-	err := s.DB.QueryRow(r.Context(), `SELECT `+publicUserColumns+` FROM users u WHERE u.id=$1`, id).
-		Scan(&u.ID, &u.FirstLoginAt, &u.LastActiveAt, &u.ChartCount, &u.ScoreCount, &u.CommentCount, &u.Karma, &u.PlaylistCount)
+	err := scanPublicUser(s.DB.QueryRow(r.Context(), `SELECT `+publicUserColumns+` FROM users u WHERE u.id=$1`, id), u)
 	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
@@ -69,14 +71,16 @@ func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	names, err := s.Config.SSO.Profiles(ctx, []string{id})
-	if err != nil {
-		result.ProfilesAvailable = false
-	}
-	if p, ok := names[id]; ok {
-		u.Nickname, u.AvatarURL = &p.Nickname, p.AvatarURL
+	if s.Config.SSO != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		names, err := s.Config.SSO.Profiles(ctx, []string{id})
+		if err != nil {
+			result.ProfilesAvailable = false
+		}
+		if p, ok := names[id]; ok {
+			u.Nickname, u.AvatarURL = &p.Nickname, p.AvatarURL
+		}
 	}
 	respond(w, http.StatusOK, result)
 }
@@ -84,14 +88,9 @@ func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))
-	page := 1
-	if raw := query.Get("page"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 || n > 10000 {
-			problem(w, 400, "QUERY_INVALID", "页码无效")
-			return
-		}
-		page = n
+	page, ok := queryPage(w, r)
+	if !ok {
+		return
 	}
 	if len(q) > 200 {
 		problem(w, 400, "QUERY_INVALID", "搜索内容过长")
@@ -108,6 +107,10 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	matching := []string{}
 	if q != "" {
+		if s.Config.SSO == nil {
+			problem(w, 503, "SSO_NOT_CONFIGURED", "此服务器未接入账号中心，无法搜索用户")
+			return
+		}
 		var err error
 		matching, err = s.Config.SSO.Search(r.Context(), q)
 		if err != nil {
@@ -122,7 +125,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	result := UserDirectory{Items: []PublicUser{}, Page: page, PageSize: 12, ProfilesAvailable: true}
+	result := UserDirectory{Items: []PublicUser{}, Page: page, PageSize: 12, ProfilesAvailable: s.Config.SSO != nil}
 	const filter = ` WHERE ($1='' OR u.id=ANY($2::text[]))`
 	if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM users u`+filter, q, matching).Scan(&result.Total); err != nil {
 		internal(w, err)
@@ -139,7 +142,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	ids := []string{}
 	for rows.Next() {
 		var user PublicUser
-		if err = rows.Scan(&user.ID, &user.FirstLoginAt, &user.LastActiveAt, &user.ChartCount, &user.ScoreCount, &user.CommentCount, &user.Karma, &user.PlaylistCount); err != nil {
+		if err = scanPublicUser(rows, &user); err != nil {
 			rows.Close()
 			internal(w, err)
 			return
@@ -159,15 +162,17 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	// Release the DB transaction before contacting SSO. An outage still allows
 	// browsing local public statistics, but never masquerades as an empty search.
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	names, err := s.Config.SSO.Profiles(ctx, ids)
-	if err != nil {
-		result.ProfilesAvailable = false
-	}
-	for i := range result.Items {
-		if p, ok := names[result.Items[i].ID]; ok {
-			result.Items[i].Nickname, result.Items[i].AvatarURL = &p.Nickname, p.AvatarURL
+	if s.Config.SSO != nil && len(ids) > 0 {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		names, err := s.Config.SSO.Profiles(ctx, ids)
+		if err != nil {
+			result.ProfilesAvailable = false
+		}
+		for i := range result.Items {
+			if p, ok := names[result.Items[i].ID]; ok {
+				result.Items[i].Nickname, result.Items[i].AvatarURL = &p.Nickname, p.AvatarURL
+			}
 		}
 	}
 	respond(w, http.StatusOK, result)

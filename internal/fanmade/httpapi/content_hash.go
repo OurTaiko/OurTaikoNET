@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,12 +17,13 @@ import (
 )
 
 // RunContentHashBackfill fills chart_difficulties.content_hash for charts stored before
-// migration 046, or hashed by an older algorithm than the tool now reports, and the raw
+// migration 010, or hashed by an older algorithm than the tool now reports, and the raw
 // difficulty constants (difficulty_constants, every route) for blocks without them in the
 // current constants.Version; a chart that has no titles from its file yet gets the ones
 // TJAParser reads (origin and every locale), never removing a key. It runs after start-up, resumes on the next
 // start, and leaves a block the tool cannot play NULL with a log line; the retire trigger
-// ignores a hash set for the first time, and the constants touch no score.
+// ignores a hash set for the first time, and the constants touch neither scores nor the
+// chart's update_at.
 func (s *Server) RunContentHashBackfill(ctx context.Context) {
 	cli, ok := tja.Inspector.(charthash.CLI)
 	if !ok {
@@ -39,7 +41,7 @@ func (s *Server) RunContentHashBackfill(ctx context.Context) {
 
 func (s *Server) backfillContentHashes(ctx context.Context, prefix string, constantsVersion int) error {
 	rows, err := s.DB.Query(ctx, `SELECT DISTINCT c.id FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
- WHERE c.status<>'deleted' AND (d.content_hash IS NULL OR left(d.content_hash,length($1))<>$1
+ WHERE c.status<>'deleted' AND c.tja_file IS NOT NULL AND (d.content_hash IS NULL OR left(d.content_hash,length($1))<>$1
   OR NOT EXISTS (SELECT 1 FROM difficulty_constants k WHERE k.content_hash=d.content_hash AND k.constants_version=$2)) ORDER BY c.id`, prefix, constantsVersion)
 	if err != nil {
 		return err
@@ -77,9 +79,9 @@ func (s *Server) backfillChartHashes(parent context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var f storedFile
-	err = tx.QueryRow(ctx, `SELECT r.id,r.storage_key,r.original_filename,r.sha256,r.extension,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1 FOR UPDATE OF c SKIP LOCKED`, id).
-		Scan(&f.id, &f.key, &f.name, &f.sha, &f.extension, &f.size)
+	var key string
+	var size int64
+	err = tx.QueryRow(ctx, `SELECT r.storage_key,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1 FOR UPDATE OF c SKIP LOCKED`, id).Scan(&key, &size)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -92,7 +94,16 @@ func (s *Server) backfillChartHashes(parent context.Context, id string) error {
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "stored.tja")
-	if err = s.fetch(ctx, f, path); err != nil {
+	in, err := s.Config.Objects.Open(ctx, key)
+	if err != nil {
+		return err
+	}
+	data, err := io.ReadAll(io.LimitReader(in, size+1))
+	in.Close()
+	if err != nil {
+		return err
+	}
+	if err = os.WriteFile(path, data, 0600); err != nil {
 		return err
 	}
 	result, err := tja.Inspector.Inspect(ctx, path)
@@ -101,7 +112,7 @@ func (s *Server) backfillChartHashes(parent context.Context, id string) error {
 	}
 	for _, b := range result.Blocks {
 		if b.Error != "" {
-			log.Printf("content hash backfill: %s %s/%s cannot be played: %s", id, b.Name, b.Side, b.Error)
+			log.Printf("content hash backfill: chart %s %s/%s cannot be played: %s", id, b.Name, b.Side, b.Error)
 			continue
 		}
 		if b.Hash == "" {

@@ -14,7 +14,7 @@ import (
 )
 
 // Notification kinds the server emits, in the order the settings page lists
-// them. A new event registers its kind here and calls notify.
+// them. A new event registers its kind here and calls notify. As on Fanmade.
 var notificationKinds = []string{
 	"comment_reply",   // someone replied to the recipient's comment
 	"chart_comment",   // someone commented on the recipient's song
@@ -25,7 +25,7 @@ var notificationKinds = []string{
 	"comment_removed", // an administrator removed the recipient's comment
 }
 
-// Kinds about the recipient's own requests. They are not listed in the
+// Kinds about the recipient's own content. They are not listed in the
 // settings and cannot be muted: the notice is the only report of the outcome.
 var systemNotificationKinds = []string{
 	"upload_result",    // an upload the recipient did not wait for was published or failed
@@ -35,7 +35,7 @@ var systemNotificationKinds = []string{
 // Upvote counts that notify the author, as Reddit does, instead of every vote.
 var upvoteMilestones = []int{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000}
 
-// Notice is one event for one recipient. Empty IDs mean "not linked".
+// Notice is one event for one recipient. Empty or zero IDs mean "not linked".
 type Notice struct {
 	// DanID links a 段位 course instead of a song.
 	Recipient, Kind, Actor, ChartID, CommentID, DanID string
@@ -76,7 +76,7 @@ func notify(ctx context.Context, db activityWriter, n Notice) error {
 }
 
 // notifyUpvoteMilestone notifies an author when an upvote count lands exactly
-// on a milestone. link names the song, course and comment; the dedupe key
+// on a milestone. link names the chart, course and comment; the dedupe key
 // keeps a withdrawn and recast vote quiet.
 func notifyUpvoteMilestone(ctx context.Context, db activityWriter, kind, recipient string, link Notice, upvotes int) error {
 	if !slices.Contains(upvoteMilestones, upvotes) {
@@ -87,7 +87,7 @@ func notifyUpvoteMilestone(ctx context.Context, db activityWriter, kind, recipie
 		target = link.ChartID
 	}
 	if target == "" {
-		target = link.DanID
+		target = "dan" + link.DanID
 	}
 	link.Recipient, link.Kind = recipient, kind
 	link.DedupeKey, link.Data = kind+":"+target+":"+strconv.Itoa(upvotes), map[string]any{"upvotes": upvotes}
@@ -133,7 +133,7 @@ type NotificationPage struct {
 
 const notificationPageSize = 20
 
-// Notices about songs that are no longer public or comments that were deleted
+// Notices about charts that are no longer public or comments that were deleted
 // stay stored but are not shown; n is the notice, $1 the recipient.
 const visibleNotification = `n.recipient_id=$1
  AND (n.chart_id IS NULL OR EXISTS(SELECT 1 FROM charts c WHERE c.id=n.chart_id AND ` + publishedChart + `))
