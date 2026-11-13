@@ -12,6 +12,8 @@ func TestEmbeddedSite(t *testing.T) {
 		"index.html":                   {Data: []byte("<html>Fanmade</html>")},
 		"assets/app.js":                {Data: []byte("console.log('app')")},
 		"edit/builds/v/Build/Web.wasm": {Data: []byte("wasm")},
+		"site.webmanifest":             {Data: []byte("{}")},
+		"icons/icon-192.png":           {Data: []byte("png")},
 	}
 	for _, tc := range []struct {
 		method, path, cache string
@@ -26,6 +28,8 @@ func TestEmbeddedSite(t *testing.T) {
 		{"HEAD", "/dans/1", "no-cache", 200, true},
 		{"GET", "/assets/app.js", "public, max-age=31536000, immutable", 200, false},
 		{"GET", "/edit/builds/v/Build/Web.wasm", "public, max-age=31536000, immutable", 200, false},
+		{"GET", "/site.webmanifest", "public, max-age=3600", 200, false},
+		{"GET", "/icons/icon-192.png", "public, max-age=3600", 200, false},
 		{"GET", "/assets/missing.js", "no-store", 404, false},
 		{"GET", "/edit/missing", "no-store", 404, false},
 		{"GET", "/api/v1/missing", "no-store", 404, false},

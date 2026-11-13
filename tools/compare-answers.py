@@ -36,6 +36,8 @@ def get(base, path, host=None):
 IGNORED = set()
 # Fields left out of the answers to one question only: {path: {field}}.
 IGNORED_IN = {}
+# Fields left out of the answers to every question whose path ends so: [(ending, field)].
+IGNORED_ENDING = []
 
 
 def without_ignored(value, fields):
@@ -55,7 +57,8 @@ def parsed(body, path=""):
     if isinstance(value, dict) and "code" in value:
         value.pop("requestId", None)
     # A field left out of a question is left out of it whatever is asked after its "?".
-    return without_ignored(value, IGNORED | IGNORED_IN.get(path, set()) | IGNORED_IN.get(path.split("?")[0], set()))
+    ending = {field for end, field in IGNORED_ENDING if path.endswith(end)}
+    return without_ignored(value, IGNORED | IGNORED_IN.get(path, set()) | IGNORED_IN.get(path.split("?")[0], set()) | ending)
 
 
 def where(a, b, path=""):
@@ -95,6 +98,8 @@ def main():
                    help="a question not asked, because its answer differs on purpose")
     p.add_argument("--skip-ending", action="append", default=[], metavar="END",
                    help="leave out every question whose path ends so")
+    p.add_argument("--ignore-ending", action="append", default=[], metavar="END:FIELD",
+                   help="leave a field out of every question whose path ends so")
     p.add_argument("--ignore", action="append", default=[], metavar="FIELD",
                    help="a field left out of the comparison wherever it appears, because it differs on purpose")
     p.add_argument("--ignore-in", action="append", default=[], metavar="PATH:FIELD",
@@ -104,10 +109,13 @@ def main():
     if bool(args.source) == args.players:
         p.error("give either --source or --players")
     IGNORED.update(args.ignore)
+    for item in args.ignore_ending:
+        end, _, field = item.rpartition(":")
+        IGNORED_ENDING.append((end, field))
     for item in args.ignore_in:
         path, _, field = item.rpartition(":")
         IGNORED_IN.setdefault(path, set()).add(field)
-    on_purpose = ", ".join(sorted(IGNORED) + args.skip + ["…" + end for end in args.skip_ending] + [f"{f} of {q}" for q in sorted(IGNORED_IN) for f in sorted(IGNORED_IN[q])])
+    on_purpose = ", ".join(sorted(IGNORED) + args.skip + ["…" + end for end in args.skip_ending] + [f"{f} of {q}" for q in sorted(IGNORED_IN) for f in sorted(IGNORED_IN[q])] + [f"{f} of …{end}" for end, f in IGNORED_ENDING])
     # A source's routes are under its name at the new address; players' routes are not under any.
     new_prefix = "/api/v1" if args.players else f"/api/v1/sources/{args.source}"
     asked = 0

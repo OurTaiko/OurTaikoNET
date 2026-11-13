@@ -97,13 +97,15 @@ type testClient struct {
 	handler http.Handler
 	tokens  map[string]string
 	n       *atomic.Int64
+	// cookie names the server's session cookie.
+	cookie string
 }
 
 // newTestClient signs every test user in with a website session.
 func newTestClient(t *testing.T, s *Server) testClient {
 	t.Helper()
 	ctx := context.Background()
-	c := testClient{t, s.Handler(), map[string]string{}, &atomic.Int64{}}
+	c := testClient{t, s.Handler(), map[string]string{}, &atomic.Int64{}, s.sessionCookie()}
 	for name, u := range testUsers {
 		token := web.NewID() + web.NewID()
 		_, err := s.DB.Exec(ctx, `INSERT INTO users(id) VALUES($1) ON CONFLICT DO NOTHING`, u.ID)
@@ -136,7 +138,7 @@ func (c testClient) do(user, method, path, body string, out any) int {
 		r.Header.Set("X-CSRF-Token", "csrf")
 	}
 	if user != "" {
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: c.tokens[user]})
+		r.AddCookie(&http.Cookie{Name: c.cookie, Value: c.tokens[user]})
 	}
 	w := httptest.NewRecorder()
 	c.handler.ServeHTTP(w, r)
@@ -153,7 +155,7 @@ func (c testClient) raw(user, path string) (int, []byte) {
 	c.t.Helper()
 	r := httptest.NewRequest("GET", path, nil)
 	if user != "" {
-		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: c.tokens[user]})
+		r.AddCookie(&http.Cookie{Name: c.cookie, Value: c.tokens[user]})
 	}
 	w := httptest.NewRecorder()
 	c.handler.ServeHTTP(w, r)

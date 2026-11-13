@@ -114,6 +114,9 @@ expected="--ignore firstLoginAt --ignore lastActiveAt --skip /users"
 # The system playlists are described in the same words on both sources now ("songs"); the old
 # official site said "charts".
 official_wording="--ignore-in /playlists/system:description"
+# A server that keeps files on its own disk, as these local ones do, lists its own file routes
+# as download links. They are under the source's new address now, whichever address asked.
+official_links="--ignore-ending /resources:url --ignore-ending /resources:headUrl"
 # A chart that does not exist is called 谱面 on both sources (it was 作品 on Fanmade).
 fanmade_wording="--ignore-in /charts/00000000000000000000000000000000:message"
 # The game's lists carry what the website's do on both sources now: Fanmade's did not name a
@@ -125,7 +128,7 @@ fanmade_game="--ignore-in /game/catalog:coverHash --ignore-in /game/catalog:reso
 # shellcheck disable=SC2086
 python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18080 --new http://127.0.0.1:18090 --legacy-host fanmade.ourtaiko.org --source fanmade --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $fanmade_wording $fanmade_game $users_fanmade || status=1
 # shellcheck disable=SC2086
-python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18081 --new http://127.0.0.1:18090 --legacy-host database.ourtaiko.org --source official --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $official_wording $users_official || status=1
+python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18081 --new http://127.0.0.1:18090 --legacy-host database.ourtaiko.org --source official --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $official_wording $official_links $users_official || status=1
 # shellcheck disable=SC2086
 python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18083 --new http://127.0.0.1:18090 --legacy-host profile.ourtaiko.org --players --show "${SHOW:-40}" $expected $users_all || status=1
 exit "$status"

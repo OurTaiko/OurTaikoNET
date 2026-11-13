@@ -164,45 +164,49 @@ func TestChartDetailBy(t *testing.T) {
 	}
 }
 
-func TestChartVotes(t *testing.T) {
-	c, _ := interactionFixture(t)
+func TestChartVotes(t *testing.T) { bothSources(t, testChartVotes) }
+
+func testChartVotes(t *testing.T, w interactionWorld) {
+	c, song := w.c, w.chart(w.song)
 	var v VoteResult
-	if code := c.do("", "PUT", "/api/v1/charts/song/vote", `{"value":1}`, nil); code != 401 {
+	if code := c.do("", "PUT", song+"/vote", `{"value":1}`, nil); code != 401 {
 		t.Fatal("guest vote", code)
 	}
 	for _, body := range []string{`{"value":2}`, `{}`, `{"value":"1"}`} {
-		if code := c.do("alice", "PUT", "/api/v1/charts/song/vote", body, nil); code != 400 {
+		if code := c.do("alice", "PUT", song+"/vote", body, nil); code != 400 {
 			t.Fatal("invalid vote accepted", body, code)
 		}
 	}
-	if code := c.do("alice", "PUT", "/api/v1/charts/missing/vote", `{"value":1}`, nil); code != 404 {
-		t.Fatal("missing chart", code)
+	for _, path := range []string{"/api/v1/charts/999999/vote", "/api/v1/charts/song/vote"} {
+		if code := c.do("alice", "PUT", path, `{"value":1}`, nil); code != 404 {
+			t.Fatal("missing chart", path, code)
+		}
 	}
-	c.do("alice", "PUT", "/api/v1/charts/song/vote", `{"value":1}`, &v)
-	c.do("alice", "PUT", "/api/v1/charts/song/vote", `{"value":1}`, &v)
-	c.do("bob", "PUT", "/api/v1/charts/song/vote", `{"value":1}`, &v)
+	c.do("alice", "PUT", song+"/vote", `{"value":1}`, &v)
+	c.do("alice", "PUT", song+"/vote", `{"value":1}`, &v)
+	c.do("bob", "PUT", song+"/vote", `{"value":1}`, &v)
 	if v.Score != 2 || *v.Upvotes != 2 || v.MyVote != 1 {
 		t.Fatalf("repeated vote counted twice: %+v", v)
 	}
-	c.do("bob", "PUT", "/api/v1/charts/song/vote", `{"value":-1}`, &v)
+	c.do("bob", "PUT", song+"/vote", `{"value":-1}`, &v)
 	if v.Score != 0 || *v.Upvotes != 1 || *v.Downvotes != 1 || v.MyVote != -1 {
 		t.Fatalf("changed vote: %+v", v)
 	}
-	c.do("bob", "PUT", "/api/v1/charts/song/vote", `{"value":0}`, &v)
+	c.do("bob", "PUT", song+"/vote", `{"value":0}`, &v)
 	if v.Score != 1 || *v.Downvotes != 0 || v.MyVote != 0 {
 		t.Fatalf("withdrawn vote: %+v", v)
 	}
 	var chart Chart
-	c.do("alice", "GET", "/api/v1/charts/song?by=id", "", &chart)
+	c.do("alice", "GET", song+"?by=id", "", &chart)
 	if chart.Score != 1 || chart.MyVote != 1 || chart.Upvotes != 1 {
 		t.Fatalf("detail: %+v %+v", chart.Score, chart.MyVote)
 	}
-	c.do("", "GET", "/api/v1/charts/song?by=id", "", &chart)
+	c.do("", "GET", song+"?by=id", "", &chart)
 	if chart.MyVote != 0 || chart.Score != 1 {
 		t.Fatal("guest detail", chart.MyVote)
 	}
-	// "top" puts the voted older song first; the default order is newest first.
-	for order, first := range map[string]string{"": "other", "top": "song", "hot": "other", "comments": "other"} {
+	// "top" puts the voted older chart first; the default order is newest first.
+	for order, first := range map[string]string{"": w.other, "top": w.song, "hot": w.other, "comments": w.other} {
 		var list struct{ Items []Chart }
 		if code := c.do("", "GET", "/api/v1/charts?order="+order, "", &list); code != 200 || len(list.Items) != 2 || list.Items[0].ID != first {
 			t.Fatal("order", order, code, list.Items)
@@ -210,8 +214,10 @@ func TestChartVotes(t *testing.T) {
 	}
 }
 
-func TestCommentThreads(t *testing.T) {
-	c, s := interactionFixture(t)
+func TestCommentThreads(t *testing.T) { bothSources(t, testCommentThreads) }
+
+func testCommentThreads(t *testing.T, w interactionWorld) {
+	c, s, song := w.c, w.s, w.chart(w.song)
 	ctx := context.Background()
 	post := func(user, chart, body string, parent string) Comment {
 		t.Helper()
@@ -221,34 +227,34 @@ func TestCommentThreads(t *testing.T) {
 		}
 		raw, _ := json.Marshal(payload)
 		var out Comment
-		if code := c.do(user, "POST", "/api/v1/charts/"+chart+"/comments", string(raw), &out); code != 201 {
+		if code := c.do(user, "POST", chart+"/comments", string(raw), &out); code != 201 {
 			t.Fatal("post", body, code)
 		}
 		return out
 	}
-	if code := c.do("", "POST", "/api/v1/charts/song/comments", `{"body":"hi"}`, nil); code != 401 {
+	if code := c.do("", "POST", song+"/comments", `{"body":"hi"}`, nil); code != 401 {
 		t.Fatal("guest comment", code)
 	}
 	for _, body := range []string{`{"body":"   "}`, `{"body":"a\u0000b"}`, `{"body":"` + strings.Repeat("长", 10001) + `"}`} {
-		if code := c.do("alice", "POST", "/api/v1/charts/song/comments", body, nil); code != 400 {
+		if code := c.do("alice", "POST", song+"/comments", body, nil); code != 400 {
 			t.Fatal("invalid body accepted", len(body), code)
 		}
 	}
-	long := post("alice", "song", strings.Repeat("长", 10000), "")
-	if long.Score != 1 || long.MyVote != 1 || long.Author != "alice" {
+	long := post("alice", song, strings.Repeat("长", 10000), "")
+	if long.Score != 1 || long.MyVote != 1 || long.Author != "alice" || long.ChartID != w.song {
 		t.Fatalf("own comment not self-upvoted: %+v", long)
 	}
-	top := post("alice", "song", " First\r\nline ", "")
+	top := post("alice", song, " First\r\nline ", "")
 	if top.Body != "First\nline" || top.Depth != 0 {
 		t.Fatalf("body not normalized: %q", top.Body)
 	}
-	reply := post("bob", "song", "reply", top.ID)
-	deep := post("owner", "song", "deeper", reply.ID)
+	reply := post("bob", song, "reply", top.ID)
+	deep := post("owner", song, "deeper", reply.ID)
 	if deep.Depth != 2 || *deep.ParentID != reply.ID {
 		t.Fatalf("nested reply: %+v", deep)
 	}
-	if code := c.do("bob", "POST", "/api/v1/charts/other/comments", `{"body":"x","parentId":"`+top.ID+`"}`, nil); code != 404 {
-		t.Fatal("reply across songs", code)
+	if code := c.do("bob", "POST", w.chart(w.other)+"/comments", `{"body":"x","parentId":"`+top.ID+`"}`, nil); code != 404 {
+		t.Fatal("reply across charts", code)
 	}
 	// Bob downvotes the long comment so "best" ranks the first comment ahead.
 	var v VoteResult
@@ -261,7 +267,7 @@ func TestCommentThreads(t *testing.T) {
 		t.Fatalf("comment vote: %+v", v)
 	}
 	var page CommentPage
-	c.do("bob", "GET", "/api/v1/charts/song/comments", "", &page)
+	c.do("bob", "GET", song+"/comments", "", &page)
 	if page.Total != 2 || page.CommentCount != 4 || len(page.Items) != 2 || page.Items[0].ID != top.ID {
 		t.Fatalf("best page: %+v", page)
 	}
@@ -272,16 +278,16 @@ func TestCommentThreads(t *testing.T) {
 		t.Fatal("viewer's downvote not reported")
 	}
 	for sort, first := range map[string]string{"new": top.ID, "old": long.ID, "top": top.ID, "controversial": long.ID} {
-		c.do("", "GET", "/api/v1/charts/song/comments?sort="+sort, "", &page)
+		c.do("", "GET", song+"/comments?sort="+sort, "", &page)
 		if page.Items[0].ID != first {
 			t.Fatal("sort", sort)
 		}
 	}
-	if code := c.do("", "GET", "/api/v1/charts/song/comments?sort=hot", "", nil); code != 400 {
+	if code := c.do("", "GET", song+"/comments?sort=hot", "", nil); code != 400 {
 		t.Fatal("unknown sort", code)
 	}
 	var chart Chart
-	c.do("", "GET", "/api/v1/charts/song?by=id", "", &chart)
+	c.do("", "GET", song+"?by=id", "", &chart)
 	if chart.CommentCount != 4 {
 		t.Fatal("chart comment count", chart.CommentCount)
 	}
@@ -328,18 +334,17 @@ func TestCommentThreads(t *testing.T) {
 		t.Fatal("delete by another user", code)
 	}
 	c.do("bob", "DELETE", "/api/v1/comments/"+reply.ID, "", nil)
-	c.do("", "GET", "/api/v1/charts/song/comments?sort=new", "", &page)
+	c.do("", "GET", song+"/comments?sort=new", "", &page)
 	placeholder := page.Items[0].Replies[0]
 	if !placeholder.Deleted || placeholder.Body != "" || placeholder.AuthorID != "" || placeholder.Author != "" || len(placeholder.Replies) != 1 {
 		t.Fatalf("placeholder: %+v", placeholder)
 	}
-	if code := c.do("alice", "POST", "/api/v1/charts/song/comments", `{"body":"x","parentId":"`+reply.ID+`"}`, nil); code != 409 {
+	if code := c.do("alice", "POST", song+"/comments", `{"body":"x","parentId":"`+reply.ID+`"}`, nil); code != 409 {
 		t.Fatal("reply to deleted comment", code)
 	}
 	if code := c.do("alice", "PUT", "/api/v1/comments/"+reply.ID+"/vote", `{"value":1}`, nil); code != 409 {
 		t.Fatal("vote on deleted comment", code)
 	}
-	// The deleted reply no longer notifies alice.
 	c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread)
 	if unread["count"] != 0 {
 		t.Fatal("notice of a deleted reply", unread)
@@ -354,71 +359,73 @@ func TestCommentThreads(t *testing.T) {
 	if err := s.DB.QueryRow(ctx, `SELECT count(*) FROM comments WHERE id=ANY($1)`, []string{reply.ID, deep.ID}).Scan(&n); err != nil || n != 0 {
 		t.Fatal("placeholder chain kept", n, err)
 	}
-	c.do("", "GET", "/api/v1/charts/song/comments", "", &page)
+	c.do("", "GET", song+"/comments", "", &page)
 	if page.CommentCount != 2 || page.Items[0].ReplyCount != 0 {
 		t.Fatalf("counters after purge: %+v", page)
 	}
 	// Removal by an administrator keeps replies under a "removed" placeholder.
-	post("bob", "song", "under", long.ID)
+	post("bob", song, "under", long.ID)
 	c.do("admin", "DELETE", "/api/v1/comments/"+long.ID, "", nil)
 	c.do("alice", "GET", "/api/v1/me/notifications?filter=unread", "", &notes)
-	// Newest first: the removal, then bob's reply that preceded it.
-	if notes.Total != 2 || notes.Items[0].Kind != "comment_removed" || notes.Items[0].Actor != nil || notes.Items[0].Chart.ID != "song" || notes.Items[1].Kind != "comment_reply" {
+	if notes.Total != 2 || notes.Items[0].Kind != "comment_removed" || notes.Items[0].Actor != nil || notes.Items[0].Chart.ID != w.song || notes.Items[1].Kind != "comment_reply" {
 		t.Fatalf("removal notice: %+v", notes)
 	}
-	c.do("", "GET", "/api/v1/charts/song/comments?sort=old", "", &page)
+	c.do("", "GET", song+"/comments?sort=old", "", &page)
 	if !page.Items[0].Removed || page.Items[0].Body != "" {
 		t.Fatalf("removed placeholder: %+v", page.Items[0])
 	}
 
 	// History lists live comments only. Karma keeps every vote from others: the
 	// owner's upvote on the live comment and bob's downvote on the removed one.
+	alice := testUsers["alice"].ID
 	var history CommentList
-	c.do("", "GET", "/api/v1/users/9b893bc6d9422c93536ff0df503b81e9/comments", "", &history)
-	if history.Total != 1 || history.Items[0].ID != top.ID {
+	c.do("", "GET", "/api/v1/users/"+alice+"/comments", "", &history)
+	if history.Total != 1 || history.Items[0].ID != top.ID || history.Items[0].ChartTitle != "Song" {
 		t.Fatalf("history: %+v", history)
 	}
 	var space UserSpace
-	c.do("", "GET", "/api/v1/users/9b893bc6d9422c93536ff0df503b81e9", "", &space)
-	if space.User.CommentCount != 1 || space.User.Karma != 0 {
+	c.do("", "GET", "/api/v1/users/"+alice, "", &space)
+	if space.User.CommentCount != 1 || space.User.Karma != 0 || space.User.Nickname == nil || *space.User.Nickname != "alice" {
 		t.Fatalf("profile: %+v", space.User)
 	}
 
-	// Deleting the song cascades through comments and votes.
-	if code := c.do("owner", "DELETE", "/api/v1/charts/song", "", nil); code != 200 {
-		t.Fatal("delete song", code)
+	// Deleting the chart cascades through comments and votes.
+	if code := c.do("owner", "DELETE", song, "", nil); code != 200 {
+		t.Fatal("delete chart", code)
 	}
 	for _, table := range []string{"comments", "comment_votes", "chart_votes", "chart_stats"} {
 		if err := s.DB.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&n); err != nil || n != 0 {
-			t.Fatal(table, "left after song deletion", n, err)
+			t.Fatal(table, "left after chart deletion", n, err)
 		}
 	}
 }
 
-func TestCommentBurstLimit(t *testing.T) {
-	c, _ := interactionFixture(t)
+func TestCommentBurstLimit(t *testing.T) { bothSources(t, testCommentBurstLimit) }
+
+func testCommentBurstLimit(t *testing.T, w interactionWorld) {
 	for i := 0; i < commentBurst; i++ {
-		if code := c.do("alice", "POST", "/api/v1/charts/song/comments", `{"body":"spam"}`, nil); code != 201 {
+		if code := w.c.do("alice", "POST", w.chart(w.song)+"/comments", `{"body":"spam"}`, nil); code != 201 {
 			t.Fatal("comment", i, code)
 		}
 	}
-	if code := c.do("alice", "POST", "/api/v1/charts/song/comments", `{"body":"spam"}`, nil); code != 429 {
+	if code := w.c.do("alice", "POST", w.chart(w.song)+"/comments", `{"body":"spam"}`, nil); code != 429 {
 		t.Fatal("burst not limited", code)
 	}
 }
 
-// Concurrent votes on the same song and comment neither deadlock nor drift.
-func TestConcurrentVotes(t *testing.T) {
-	c, s := interactionFixture(t)
+// Concurrent votes on the same chart and comment neither deadlock nor drift.
+func TestConcurrentVotes(t *testing.T) { bothSources(t, testConcurrentVotes) }
+
+func testConcurrentVotes(t *testing.T, w interactionWorld) {
+	c := w.c
 	var comment Comment
-	if code := c.do("owner", "POST", "/api/v1/charts/song/comments", `{"body":"vote here"}`, &comment); code != 201 {
+	if code := c.do("owner", "POST", w.chart(w.song)+"/comments", `{"body":"vote here"}`, &comment); code != 201 {
 		t.Fatal("comment", code)
 	}
-	users := []string{"owner", "alice", "bob", "admin"}
 	var wg sync.WaitGroup
 	codes := make(chan int, 64)
-	for _, user := range users {
-		for _, path := range []string{"/api/v1/charts/song/vote", "/api/v1/comments/" + comment.ID + "/vote"} {
+	for _, user := range []string{"owner", "alice", "bob", "admin"} {
+		for _, path := range []string{w.chart(w.song) + "/vote", "/api/v1/comments/" + comment.ID + "/vote"} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -437,26 +444,27 @@ func TestConcurrentVotes(t *testing.T) {
 	}
 	var up, down, cup, cdown int
 	ctx := context.Background()
-	if err := s.DB.QueryRow(ctx, `SELECT upvotes,downvotes FROM chart_stats WHERE chart_id='song'`).Scan(&up, &down); err != nil || up != 0 || down != 4 {
-		t.Fatal("song tally", up, down, err)
+	if err := w.s.DB.QueryRow(ctx, `SELECT upvotes,downvotes FROM chart_stats WHERE chart_id=$1`, w.song).Scan(&up, &down); err != nil || up != 0 || down != 4 {
+		t.Fatal("chart tally", up, down, err)
 	}
-	if err := s.DB.QueryRow(ctx, `SELECT upvotes,downvotes FROM comments WHERE id=$1`, comment.ID).Scan(&cup, &cdown); err != nil || cup != 0 || cdown != 4 {
+	if err := w.s.DB.QueryRow(ctx, `SELECT upvotes,downvotes FROM comments WHERE id=$1`, comment.ID).Scan(&cup, &cdown); err != nil || cup != 0 || cdown != 4 {
 		t.Fatal("comment tally", cup, cdown, err)
 	}
 }
 
-func TestNotificationCenter(t *testing.T) {
-	c, s := interactionFixture(t)
+func TestNotificationCenter(t *testing.T) { bothSources(t, testNotificationCenter) }
+
+func testNotificationCenter(t *testing.T, w interactionWorld) {
+	c, s, song := w.c, w.s, w.chart(w.song)
 	ctx := context.Background()
 	var comment Comment
-	c.do("alice", "POST", "/api/v1/charts/song/comments", `{"body":"hello"}`, &comment)
+	c.do("alice", "POST", song+"/comments", `{"body":"hello"}`, &comment)
 	var notes NotificationPage
 	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
 	if len(notes.Items) != 1 {
 		t.Fatal("no notice", notes)
 	}
-	id := notes.Items[0].ID
-	path := "/api/v1/me/notifications/" + id
+	path := "/api/v1/me/notifications/" + notes.Items[0].ID
 	// Only the recipient can see or change a notice.
 	if code := c.do("bob", "PATCH", path, `{"read":true}`, nil); code != 404 {
 		t.Fatal("foreign mark", code)
@@ -491,7 +499,7 @@ func TestNotificationCenter(t *testing.T) {
 	if len(settings.Items) != len(notificationKinds) || settings.Items[1].Kind != "chart_comment" || settings.Items[1].Enabled || !settings.Items[0].Enabled {
 		t.Fatalf("settings: %+v", settings)
 	}
-	c.do("bob", "POST", "/api/v1/charts/song/comments", `{"body":"muted"}`, nil)
+	c.do("bob", "POST", song+"/comments", `{"body":"muted"}`, nil)
 	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
 	if notes.Total != 0 {
 		t.Fatal("muted kind delivered", notes)
@@ -502,59 +510,59 @@ func TestNotificationCenter(t *testing.T) {
 	}
 
 	// The fifth upvote (the author's own counts as on Reddit) notifies once,
-	// even when a vote is withdrawn and cast again.
+	// even when a vote is withdrawn and cast again; it names no voter.
 	if _, err := s.DB.Exec(ctx, `INSERT INTO users(id) VALUES('77777777777777777777777777777777')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(ctx, `INSERT INTO comment_votes(comment_id,user_id,value) VALUES($1,'77777777777777777777777777777777',1)`, comment.ID); err != nil {
 		t.Fatal(err)
 	}
-	// alice (self) and the extra user give 2; owner, bob and admin reach 5;
-	// bob then withdraws and recasts, touching 5 again.
 	for _, vote := range []struct{ user, value string }{{"owner", "1"}, {"bob", "1"}, {"admin", "1"}, {"bob", "0"}, {"bob", "1"}} {
 		if code := c.do(vote.user, "PUT", "/api/v1/comments/"+comment.ID+"/vote", `{"value":`+vote.value+`}`, nil); code != 200 {
 			t.Fatal("vote", code)
 		}
 	}
 	c.do("alice", "GET", "/api/v1/me/notifications", "", &notes)
-	if notes.Total != 1 || notes.Items[0].Kind != "comment_upvotes" || notes.Items[0].Data["upvotes"] != float64(5) || notes.Items[0].Comment.Excerpt != "hello" {
+	if notes.Total != 1 || notes.Items[0].Kind != "comment_upvotes" || notes.Items[0].Data["upvotes"] != float64(5) || notes.Items[0].Comment.Excerpt != "hello" || notes.Items[0].Actor != nil {
 		t.Fatalf("milestone: %+v", notes)
 	}
 
-	// Hiding the song hides its notices; deleting the song removes them.
-	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='hidden' WHERE id='song'`); err != nil {
+	// Hiding the chart hides its notices; deleting the chart removes them.
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='hidden' WHERE id=$1`, w.song); err != nil {
 		t.Fatal(err)
 	}
 	var unread map[string]int
 	c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread)
 	if unread["count"] != 0 {
-		t.Fatal("notice of a hidden song", unread)
+		t.Fatal("notice of a hidden chart", unread)
 	}
-	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='published' WHERE id='song'`); err != nil {
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='published' WHERE id=$1`, w.song); err != nil {
 		t.Fatal(err)
 	}
-	c.do("owner", "DELETE", "/api/v1/charts/song", "", nil)
+	c.do("owner", "DELETE", song, "", nil)
 	var n int
 	if err := s.DB.QueryRow(ctx, `SELECT count(*) FROM notifications`).Scan(&n); err != nil || n != 0 {
-		t.Fatal("notices left after song deletion", n, err)
+		t.Fatal("notices left after chart deletion", n, err)
 	}
 }
 
-func TestNotificationPrune(t *testing.T) {
-	_, s := interactionFixture(t)
+func TestNotificationPrune(t *testing.T) { bothSources(t, testNotificationPrune) }
+
+func testNotificationPrune(t *testing.T, w interactionWorld) {
 	ctx := context.Background()
-	_, err := s.DB.Exec(ctx, `INSERT INTO notifications(id,recipient_id,kind,created_at,read_at) VALUES
-	 ('old-read','9b893bc6d9422c93536ff0df503b81e9','chart_upvotes',now()-interval '100 days',now()-interval '91 days'),
-	 ('recent-read','9b893bc6d9422c93536ff0df503b81e9','chart_upvotes',now()-interval '100 days',now()-interval '10 days'),
-	 ('old-unread','9b893bc6d9422c93536ff0df503b81e9','chart_upvotes',now()-interval '400 days',NULL),
-	 ('unread','9b893bc6d9422c93536ff0df503b81e9','chart_upvotes',now()-interval '200 days',NULL)`)
+	alice := testUsers["alice"].ID
+	_, err := w.s.DB.Exec(ctx, `INSERT INTO notifications(id,recipient_id,kind,created_at,read_at) VALUES
+	 ('old-read',$1,'chart_upvotes',now()-interval '100 days',now()-interval '91 days'),
+	 ('recent-read',$1,'chart_upvotes',now()-interval '100 days',now()-interval '10 days'),
+	 ('old-unread',$1,'chart_upvotes',now()-interval '400 days',NULL),
+	 ('unread',$1,'chart_upvotes',now()-interval '200 days',NULL)`, alice)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = s.PruneNotifications(ctx); err != nil {
+	if err = w.s.PruneNotifications(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rows, _ := s.DB.Query(ctx, `SELECT id FROM notifications ORDER BY id`)
+	rows, _ := w.s.DB.Query(ctx, `SELECT id FROM notifications ORDER BY id`)
 	kept, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil || strings.Join(kept, ",") != "recent-read,unread" {
 		t.Fatal("pruned", kept, err)
