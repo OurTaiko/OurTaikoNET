@@ -63,8 +63,24 @@
     "tabs": {
       "scores": "점수",
       "titles": "칭호",
-      "dans": "단위"
-    }
+      "dans": "단위",
+      "charts": "채보",
+      "playlists": "플레이리스트",
+      "comments": "댓글"
+    },
+    "stats": {
+      "plays": "플레이 기록",
+      "charts": "업로드한 채보",
+      "playlists": "공개 플레이리스트",
+      "comments": "댓글",
+      "site": "두 소스 합계"
+    },
+    "since": "{{first}} 가입 · 최근 활동 {{last}}",
+    "more": "더 보기",
+    "noCharts": "아직 업로드한 채보가 없습니다.",
+    "noPlaylists": "공개 플레이리스트가 아직 없습니다.",
+    "noComments": "아직 댓글이 없습니다.",
+    "favorites": "즐겨찾기 {{n}}"
   },
   "scores": {
     "view": "보기",

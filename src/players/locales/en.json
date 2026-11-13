@@ -63,8 +63,24 @@
     "tabs": {
       "scores": "Scores",
       "titles": "Titles",
-      "dans": "Dan"
-    }
+      "dans": "Dan",
+      "charts": "Charts",
+      "playlists": "Playlists",
+      "comments": "Comments"
+    },
+    "stats": {
+      "plays": "plays",
+      "charts": "charts uploaded",
+      "playlists": "public playlists",
+      "comments": "comments",
+      "site": "Both sources"
+    },
+    "since": "Playing since {{first}} · last seen {{last}}",
+    "more": "Show more",
+    "noCharts": "No charts uploaded yet.",
+    "noPlaylists": "No public playlists yet.",
+    "noComments": "No comments yet.",
+    "favorites": "{{n}} favorites"
   },
   "scores": {
     "view": "View",

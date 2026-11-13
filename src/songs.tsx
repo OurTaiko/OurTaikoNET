@@ -3,7 +3,7 @@
 import { StrictMode, useEffect } from 'react'
 import { IconContext } from '@phosphor-icons/react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
-import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { CategoryProvider } from '@sitekit/categories'
 import { ChartEditorPage } from '@sitekit/chart-editor'
 import { Layout } from '@sitekit/components/layout'
@@ -20,7 +20,6 @@ import { SessionProvider } from '@sitekit/session'
 import { SiteProvider, type Site } from '@sitekit/site'
 import { BASE, SOURCE, type SourceId } from '@sitekit/source'
 import { ThemeProvider } from '@sitekit/theme'
-import { UserSpacePage } from '@sitekit/user-space'
 import type { ComponentType } from 'react'
 import './styles.css'
 
@@ -42,6 +41,11 @@ function LeaveTo({ address }: { address: string }) {
   useEffect(() => location.replace(address), [address])
   return null
 }
+/** A source's old page about one player: their page, at the charts they made. */
+function LeaveToPlayer() {
+  const { id = '' } = useParams()
+  return <LeaveTo address={`/players/${encodeURIComponent(id)}?tab=charts`} />
+}
 
 function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
   const { t } = useTranslation()
@@ -61,7 +65,7 @@ function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
                         <Route element={<Layout />}>
                           <Route index element={<Library />} />
                           <Route path="users" element={<LeaveTo address="/players" />} />
-                          <Route path="users/:id" element={<UserSpacePage />} />
+                          <Route path="users/:id" element={<LeaveToPlayer />} />
                           <Route path="me/profile" element={<ProfilePage />} />
                           <Route path="me/charts" element={<ChartManagerPage />} />
                           {/* Publishing and replacing files need a signed-in user. */}

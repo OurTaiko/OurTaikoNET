@@ -23,12 +23,7 @@ import type { PublicProfile } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
-
-const sources: SourceId[] = ['fanmade', 'official']
-const sourceApi = (source: SourceId) => `/api/v1/sources/${source}`
-const songPage = (source: SourceId, id: string) => `/${source}/charts/${id}`
-const coverOf = (source: SourceId, chart: ChartBase) =>
-  chart.coverHash ? `${sourceApi(source)}/charts/${chart.id}/cover?v=${chart.coverHash}` : undefined
+import { SongTile, coverOf, songPage, sourceApi, sources } from '@players/components/song-tile'
 
 type Library = { total: number; items: ChartBase[] }
 
@@ -53,19 +48,6 @@ function useLibraries() {
     return () => controller.abort()
   }, [])
   return libraries
-}
-
-/** The tag that says which source a song is from; only where both sources' songs are mixed. */
-function SourceTag({ source }: { source: SourceId }) {
-  const { t } = useTranslation()
-  return (
-    <span
-      data-accent={source}
-      className="inline-flex items-center bg-secondary px-2 rounded-[7px] h-[1.375rem] font-semibold text-[0.6875rem] text-secondary-foreground"
-    >
-      {t(`shell.${source}`)}
-    </span>
-  )
 }
 
 function SourceCard({ source, library }: { source: SourceId; library?: Library | 'failed' }) {
@@ -143,40 +125,6 @@ function SourceCard({ source, library }: { source: SourceId; library?: Library |
         </a>
       </div>
     </section>
-  )
-}
-
-/** A song among both sources' songs: the tile of the song lists, with its source said. */
-function MixedSong({ source, chart }: { source: SourceId; chart: ChartBase }) {
-  const { i18n } = useTranslation()
-  const text = chartText(chart, i18n.resolvedLanguage)
-  return (
-    <a
-      href={songPage(source, chart.id)}
-      data-testid="home-song"
-      className="group flex flex-col bg-card shadow-elev-1 hover:shadow-elev-2 rounded-[20px] outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2 min-w-0 overflow-hidden hover:-translate-y-0.5 motion-reduce:transform-none transition-[translate,box-shadow] motion-reduce:transition-none duration-200 ease-emphasized"
-    >
-      <SongCover
-        image={coverOf(source, chart)}
-        categoryIds={chart.categoryIds}
-        bpm={chart.bpm}
-        duration={chart.duration}
-      />
-      <div className="flex flex-col flex-1 gap-2 p-3 min-w-0">
-        <div className="space-y-0.5 min-w-0">
-          <h3 className="font-bold text-sm line-clamp-2 leading-snug" title={text.title}>
-            {text.title}
-          </h3>
-          <p className="min-h-4 text-muted-foreground text-xs truncate" title={text.subtitle}>
-            {text.subtitle}
-          </p>
-        </div>
-        <LevelChips difficulties={chart.difficulties} />
-        <div className="mt-auto">
-          <SourceTag source={source} />
-        </div>
-      </div>
-    </a>
   )
 }
 
@@ -304,7 +252,7 @@ export function HomePage() {
         </div>
         <div className={cn('song-grid', loading && 'opacity-80')}>
           {newest.map(({ source, chart }) => (
-            <MixedSong key={`${source}/${chart.id}`} source={source} chart={chart} />
+            <SongTile key={`${source}/${chart.id}`} source={source} chart={chart} tag />
           ))}
           {loading &&
             [0, 1, 2, 3, 4, 5].map((tile) => (

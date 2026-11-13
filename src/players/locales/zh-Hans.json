@@ -63,8 +63,24 @@
     "tabs": {
       "scores": "成绩",
       "titles": "称号",
-      "dans": "段位"
-    }
+      "dans": "段位",
+      "charts": "谱面",
+      "playlists": "歌单",
+      "comments": "评论"
+    },
+    "stats": {
+      "plays": "游玩记录",
+      "charts": "上传的谱面",
+      "playlists": "公开歌单",
+      "comments": "评论",
+      "site": "两个曲源合计"
+    },
+    "since": "{{first}} 加入 · 最近活跃 {{last}}",
+    "more": "显示更多",
+    "noCharts": "还没有上传谱面。",
+    "noPlaylists": "还没有公开歌单。",
+    "noComments": "还没有评论。",
+    "favorites": "{{n}} 次收藏"
   },
   "scores": {
     "view": "显示方式",

@@ -48,18 +48,27 @@ import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { danName, danRings, danText, offeredDans, titleName, verdictKey } from '@players/dan'
 import { formatLocale } from '@players/i18n'
+import {
+  ChartsTab,
+  CommentsTab,
+  PlaylistsTab,
+  Seen,
+  SourceStats,
+  useSourceProfiles,
+} from '@players/pages/user-works'
 import { cn } from '@sitekit/lib/utils'
 
-type Tab = 'scores' | 'titles' | 'dans'
+const tabs = ['scores', 'charts', 'playlists', 'dans', 'titles', 'comments'] as const
 
 export function UserPage() {
   const { t } = useTranslation()
   const { id = '' } = useParams()
   const session = useSession()
   const [params, setParams] = useSearchParams()
-  const tab = (
-    ['scores', 'titles', 'dans'].includes(params.get('tab') ?? '') ? params.get('tab') : 'scores'
-  ) as Tab
+  const tab = tabs.find((name) => name === params.get('tab')) ?? 'scores'
+  const works = useSourceProfiles(id)
+  const count = (field: 'chartCount' | 'playlistCount' | 'commentCount') =>
+    (works.fanmade?.[field] ?? 0) + (works.official?.[field] ?? 0)
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [error, setError] = useState('')
   const mine = session.user?.id === id
@@ -91,6 +100,7 @@ export function UserPage() {
           />
           <div className="min-w-0 flex-1 space-y-3">
             <Nameplate plate={plate} />
+            <Seen profiles={works} />
             <p className="truncate font-mono text-xs text-muted-foreground">{id}</p>
             {!profile.profilesAvailable && (
               <Notice kind="info">{t('profile.accountCenterDown')}</Notice>
@@ -98,6 +108,7 @@ export function UserPage() {
           </div>
         </CardContent>
       </Card>
+      <SourceStats profiles={works} />
       <Tabs
         value={tab}
         onValueChange={(value) =>
@@ -105,11 +116,26 @@ export function UserPage() {
         }
         className="gap-5"
       >
-        <TabsList aria-label={t('profile.sections')}>
-          <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
-          <TabsTrigger value="titles">{t('profile.tabs.titles')}</TabsTrigger>
-          <TabsTrigger value="dans">{t('profile.tabs.dans')}</TabsTrigger>
-        </TabsList>
+        {/* Six tabs are wider than a phone: the row scrolls sideways there. */}
+        <div className="-m-1 p-1 max-w-full overflow-x-auto">
+          <TabsList aria-label={t('profile.sections')}>
+            <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
+            <TabsTrigger value="charts">
+              {t('profile.tabs.charts')}
+              <TabCount value={count('chartCount')} />
+            </TabsTrigger>
+            <TabsTrigger value="playlists">
+              {t('profile.tabs.playlists')}
+              <TabCount value={count('playlistCount')} />
+            </TabsTrigger>
+            <TabsTrigger value="dans">{t('profile.tabs.dans')}</TabsTrigger>
+            <TabsTrigger value="titles">{t('profile.tabs.titles')}</TabsTrigger>
+            <TabsTrigger value="comments">
+              {t('profile.tabs.comments')}
+              <TabCount value={count('commentCount')} />
+            </TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="scores">
           <ScoresTab id={id} profile={profile} />
         </TabsContent>
@@ -124,9 +150,23 @@ export function UserPage() {
         <TabsContent value="dans">
           <DansTab id={id} />
         </TabsContent>
+        <TabsContent value="charts">
+          <ChartsTab id={id} />
+        </TabsContent>
+        <TabsContent value="playlists">
+          <PlaylistsTab id={id} />
+        </TabsContent>
+        <TabsContent value="comments">
+          <CommentsTab id={id} />
+        </TabsContent>
       </Tabs>
     </div>
   )
+}
+
+/** How many of something a tab holds, over both sources; nothing while it is none. */
+function TabCount({ value }: { value: number }) {
+  return value > 0 ? <span className="tabular-nums opacity-70">{value}</span> : null
 }
 
 const courses: Course[] = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit']

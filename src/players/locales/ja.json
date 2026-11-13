@@ -63,8 +63,24 @@
     "tabs": {
       "scores": "スコア",
       "titles": "称号",
-      "dans": "段位"
-    }
+      "dans": "段位",
+      "charts": "譜面",
+      "playlists": "プレイリスト",
+      "comments": "コメント"
+    },
+    "stats": {
+      "plays": "プレイ記録",
+      "charts": "アップロードした譜面",
+      "playlists": "公開プレイリスト",
+      "comments": "コメント",
+      "site": "両ソース合計"
+    },
+    "since": "{{first}} から · 最終アクティブ {{last}}",
+    "more": "もっと見る",
+    "noCharts": "まだ譜面をアップロードしていません。",
+    "noPlaylists": "公開プレイリストはまだありません。",
+    "noComments": "コメントはまだありません。",
+    "favorites": "お気に入り {{n}}"
   },
   "scores": {
     "view": "表示",
