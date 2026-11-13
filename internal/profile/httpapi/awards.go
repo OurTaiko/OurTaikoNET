@@ -92,23 +92,8 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var body struct {
-		Key         string   `json:"key"`
-		UserID      string   `json:"userId"`
-		CourseID    string   `json:"courseId"`
-		CourseTitle string   `json:"courseTitle"`
-		CourseOwner string   `json:"courseOwnerId"`
-		Official    bool     `json:"official"`
-		Verdict     int      `json:"verdict"`
-		Dan         *int     `json:"dan"`
-		Titles      []string `json:"titles"`
-	}
+	var body AwardRequest
 	if !decode(w, r, &body) {
-		return
-	}
-	if len(body.Key) < 1 || len(body.Key) > 100 || !validSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !validSubject(body.CourseOwner)) ||
-		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
-		problem(w, 422, "AWARD_INVALID", "奖励请求无效")
 		return
 	}
 	ctx := r.Context()
@@ -118,31 +103,89 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	// The player's awards one at a time, so two attempts cannot both "upgrade" a badge.
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('award:'||$1,0))`, body.UserID); err != nil {
+	granted, err := s.grant(ctx, tx, service, body)
+	var rejected *AwardRejection
+	if errors.As(err, &rejected) {
+		problem(w, rejected.Status, rejected.Code, rejected.Message)
+		return
+	}
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
+	if err != nil {
 		internal(w, err)
 		return
 	}
+	s.respondAward(w, ctx, body.UserID, granted)
+}
+
+// AwardRequest is one 段位 attempt of a song source: see award.
+type AwardRequest struct {
+	Key         string   `json:"key"`
+	UserID      string   `json:"userId"`
+	CourseID    string   `json:"courseId"`
+	CourseTitle string   `json:"courseTitle"`
+	CourseOwner string   `json:"courseOwnerId"`
+	Official    bool     `json:"official"`
+	Verdict     int      `json:"verdict"`
+	Dan         *int     `json:"dan"`
+	Titles      []string `json:"titles"`
+}
+
+// AwardRejection is an award turned down for good because the request itself is wrong.
+// Asking again cannot help.
+type AwardRejection struct {
+	Status        int
+	Code, Message string
+}
+
+func (e *AwardRejection) Error() string { return "award rejected: " + e.Code }
+
+// Grant records what an attempt earns inside the caller's transaction, so that a song
+// source saves an attempt and its award together or not at all, and returns what award
+// answers: {"granted": …, "nameplate": …}. service is the source's name. An
+// *AwardRejection leaves the transaction usable.
+func (s *Server) Grant(ctx context.Context, tx pgx.Tx, service string, request AwardRequest) (json.RawMessage, error) {
+	if !serviceID.MatchString(service) || service == "admin" {
+		return nil, errors.New("award: unknown service")
+	}
+	granted, err := s.grant(ctx, tx, service, request)
+	if err != nil {
+		return nil, err
+	}
+	plate, err := s.nameplate(ctx, tx, request.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(map[string]any{"granted": json.RawMessage(granted), "nameplate": plate})
+}
+
+// grant does the work of award in tx and returns what was granted, as awards.granted keeps it.
+func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body AwardRequest) ([]byte, error) {
+	if len(body.Key) < 1 || len(body.Key) > 100 || !validSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !validSubject(body.CourseOwner)) ||
+		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
+		return nil, &AwardRejection{422, "AWARD_INVALID", "奖励请求无效"}
+	}
+	// The player's awards one at a time, so two attempts cannot both "upgrade" a badge.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('award:'||$1,0))`, body.UserID); err != nil {
+		return nil, err
+	}
 	var award int64
-	err = tx.QueryRow(ctx, `INSERT INTO awards(service,request_key,user_id,course_id,course_title,official,verdict,dan) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+	err := tx.QueryRow(ctx, `INSERT INTO awards(service,request_key,user_id,course_id,course_title,official,verdict,dan) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
  ON CONFLICT(service,request_key) DO NOTHING RETURNING id`, service, body.Key, body.UserID, body.CourseID, body.CourseTitle, body.Official, body.Verdict, body.Dan).Scan(&award)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var user string
 		var granted []byte
 		if err = tx.QueryRow(ctx, `SELECT user_id,granted FROM awards WHERE service=$1 AND request_key=$2`, service, body.Key).Scan(&user, &granted); err != nil {
-			internal(w, err)
-			return
+			return nil, err
 		}
 		if user != body.UserID {
-			problem(w, 409, "AWARD_CONFLICT", "该挑战已用于其他玩家")
-			return
+			return nil, &AwardRejection{409, "AWARD_CONFLICT", "该挑战已用于其他玩家"}
 		}
-		s.respondAward(w, ctx, body.UserID, granted)
-		return
+		return granted, nil
 	}
 	if err != nil {
-		internal(w, err)
-		return
+		return nil, err
 	}
 	granted := Granted{Titles: []GrantedTitle{}, Skipped: []SkippedTitle{}}
 	if body.Verdict >= 1 {
@@ -153,8 +196,7 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 			case errors.Is(err, pgx.ErrNoRows):
 				reason = "not_found"
 			case err != nil:
-				internal(w, err)
-				return
+				return nil, err
 			case t.Official && !body.Official:
 				reason = "official_only"
 			case !t.Official && t.OwnerID != nil && *t.OwnerID != body.CourseOwner:
@@ -166,8 +208,7 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 			}
 			tag, err := tx.Exec(ctx, `INSERT INTO user_titles(user_id,title_id,award_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, body.UserID, id, award)
 			if err != nil {
-				internal(w, err)
-				return
+				return nil, err
 			}
 			granted.Titles = append(granted.Titles, GrantedTitle{Title: t, New: tag.RowsAffected() == 1})
 		}
@@ -179,8 +220,7 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 			case errors.Is(err, pgx.ErrNoRows):
 				d.Upgraded = true
 			case err != nil:
-				internal(w, err)
-				return
+				return nil, err
 			default:
 				d.Previous = &previous
 				d.Upgraded = body.Verdict > previous
@@ -192,8 +232,7 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 				_, err = tx.Exec(ctx, `INSERT INTO user_dans(user_id,dan,verdict,award_id,achieved_at) VALUES($1,$2,$3,$4,now())
  ON CONFLICT(user_id,dan) DO UPDATE SET verdict=EXCLUDED.verdict,award_id=EXCLUDED.award_id,achieved_at=now()`, body.UserID, *body.Dan, body.Verdict, award)
 				if err != nil {
-					internal(w, err)
-					return
+					return nil, err
 				}
 			}
 			granted.Dan = &d
@@ -201,14 +240,9 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 	}
 	data, _ := json.Marshal(granted)
 	if _, err = tx.Exec(ctx, `UPDATE awards SET granted=$2 WHERE id=$1`, award, data); err != nil {
-		internal(w, err)
-		return
+		return nil, err
 	}
-	if err = tx.Commit(ctx); err != nil {
-		internal(w, err)
-		return
-	}
-	s.respondAward(w, ctx, body.UserID, data)
+	return data, nil
 }
 
 func (s *Server) respondAward(w http.ResponseWriter, ctx context.Context, user string, granted []byte) {

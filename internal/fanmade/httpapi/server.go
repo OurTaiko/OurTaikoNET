@@ -33,6 +33,9 @@ type Config struct {
 	TrustedProxies  []netip.Prefix
 	// Profile is nil when 段位 attempts earn nothing (no OurTaikoProfile configured).
 	Profile *ProfileClient
+	// Awards, when set, records what 段位 attempts earn in the attempt's own transaction;
+	// Profile is then used for its title catalog only.
+	Awards Awarder
 }
 type Server struct {
 	DB      *pgxpool.Pool

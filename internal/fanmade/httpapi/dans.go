@@ -854,6 +854,23 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 		}
 		saved = append(saved, &score)
 	}
+	// With an Awarder, what the attempt earns is recorded in this same transaction: the
+	// attempt, its scores and its award are saved together or not at all, and a failure is
+	// this request's failure, which the game retries with the same key.
+	var refused *ProfileRejection
+	if granted == nil && s.Config.Awards != nil {
+		answer, err := s.Config.Awards.Grant(ctx, tx, danAward(c, a, u.User.ID))
+		if errors.As(err, &refused) {
+			err = nil
+		} else if err == nil {
+			granted = answer
+			_, err = tx.Exec(ctx, `UPDATE dan_attempts SET granted=$2 WHERE id=$1`, a.ID, granted)
+		}
+		if err != nil {
+			internal(w, err)
+			return
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		internal(w, err)
 		return
@@ -864,7 +881,10 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 	}
 	if granted != nil {
 		reply["profile"] = json.RawMessage(granted)
-	} else if s.Config.Profile != nil {
+	} else if refused != nil {
+		// This attempt will never be taken; without profileError the game stops sending it.
+		reply["profileRejected"] = refused.Code
+	} else if s.Config.Awards == nil && s.Config.Profile != nil {
 		answer, err := s.Config.Profile.Award(ctx, danAward(c, a, u.User.ID))
 		var rejected *ProfileRejection
 		if errors.As(err, &rejected) {

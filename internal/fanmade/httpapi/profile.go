@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // ProfileConfig is how this service asks OurTaikoProfile (profile.ourtaiko.org) for the
@@ -46,6 +48,17 @@ func NewProfile(cfg ProfileConfig) (*ProfileClient, error) {
 // UseTransport makes the client reach Profile through rt instead of the network. OurTaikoNet
 // uses it: Profile's features run in the same program.
 func (c *ProfileClient) UseTransport(rt http.RoundTripper) { c.http.Transport = rt }
+
+// Awarder records what a 段位 attempt earns inside the attempt's own transaction and returns
+// what Award returns. A *ProfileRejection means the attempt will never be taken and leaves
+// the transaction usable; any other error fails the request.
+//
+// It replaces ProfileClient.Award where the titles and badges are kept in the same database
+// (OurTaikoNet). ProfileClient.Award, with its separate call after the attempt is saved and
+// the profileError retries that go with it, remains for a Profile that is another service.
+type Awarder interface {
+	Grant(ctx context.Context, tx pgx.Tx, request AwardRequest) (json.RawMessage, error)
+}
 
 // AwardRequest is one 段位 attempt as Profile records it.
 type AwardRequest struct {

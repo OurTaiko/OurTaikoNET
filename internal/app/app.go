@@ -4,11 +4,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/netip"
 	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,11 +69,29 @@ type App struct {
 	legacy  legacy.Hosts
 }
 
-// later is a handler that is set after the things that call it are built: the three parts
-// call one another.
-type later struct{ http.Handler }
+// fanmadeAwards and officialAwards record a source's awards with the players' part, under the
+// source's name. The two sources' code is still separate, so each has its own request type.
+type fanmadeAwards struct{ players *profile.Server }
 
-func (l *later) ServeHTTP(w http.ResponseWriter, r *http.Request) { l.Handler.ServeHTTP(w, r) }
+func (a fanmadeAwards) Grant(ctx context.Context, tx pgx.Tx, r fanmade.AwardRequest) (json.RawMessage, error) {
+	answer, err := a.players.Grant(ctx, tx, "fanmade", profile.AwardRequest(r))
+	var rejected *profile.AwardRejection
+	if errors.As(err, &rejected) {
+		return nil, &fanmade.ProfileRejection{Status: rejected.Status, Code: rejected.Code}
+	}
+	return answer, err
+}
+
+type officialAwards struct{ players *profile.Server }
+
+func (a officialAwards) Grant(ctx context.Context, tx pgx.Tx, r official.AwardRequest) (json.RawMessage, error) {
+	answer, err := a.players.Grant(ctx, tx, "official", profile.AwardRequest(r))
+	var rejected *profile.AwardRejection
+	if errors.As(err, &rejected) {
+		return nil, &official.ProfileRejection{Status: rejected.Status, Code: rejected.Code}
+	}
+	return answer, err
+}
 
 // New connects to the database and builds both sources. The database must already hold the
 // schema this program was built for; see Init.
@@ -109,46 +129,6 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.pools = append(a.pools, shared)
 
-	// The sources still ask the players' part for what a dan attempt earns as the old sites
-	// asked OurTaikoProfile, over its HTTP API, but inside this program (package inproc).
-	players := &later{}
-	awards := func(id, name string) (config struct{ URL, ServiceID, ServiceKey string }, err error) {
-		// A fresh key each start: nothing outside this program needs to know it.
-		key, err := profile.RegisterService(ctx, shared, id, name)
-		config.URL, config.ServiceID, config.ServiceKey = "http://127.0.0.1", id, key
-		return config, err
-	}
-	fanmadeAwards, err := awards("fanmade", "OurTaiko Fanmade")
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
-	officialAwards, err := awards("official", "OurTaiko Database")
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
-	fanmadeProfile, err := fanmade.NewProfile(fanmade.ProfileConfig(fanmadeAwards))
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
-	officialProfile, err := official.NewProfile(official.ProfileConfig(officialAwards))
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
-	fanmadeProfile.UseTransport(inproc.Transport{Handler: players})
-	officialProfile.UseTransport(inproc.Transport{Handler: players})
-
-	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
-		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
-		CookieSecure: cfg.CookieSecure, SSO: cfg.FanmadeSSO, TrustedProxies: cfg.TrustedProxies, Profile: fanmadeProfile,
-	})
-	a.Official = official.New(officialPool, official.Config{
-		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
-		CookieSecure: cfg.CookieSecure, SSO: cfg.OfficialSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies, Profile: officialProfile,
-	})
 	fanmadeSite, officialSite := cfg.FanmadeSite, cfg.OfficialSite
 	if fanmadeSite == "" {
 		fanmadeSite = cfg.Origin + "/fanmade"
@@ -163,7 +143,36 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
 		},
 	})
-	players.Handler = a.Players.Handler()
+
+	// What a dan attempt earns is recorded by the players' part in the attempt's own
+	// transaction (Awards). The sources still read the title catalog as the old sites read
+	// OurTaikoProfile's, over its HTTP API, but inside this program (package inproc); the
+	// key that API once wanted for awards is never sent, so any will do.
+	catalog := inproc.Transport{Handler: a.Players.Handler()}
+	unused := strings.Repeat("0", 64)
+	fanmadeProfile, err := fanmade.NewProfile(fanmade.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "fanmade", ServiceKey: unused})
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	officialProfile, err := official.NewProfile(official.ProfileConfig{URL: "http://127.0.0.1", ServiceID: "official", ServiceKey: unused})
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	fanmadeProfile.UseTransport(catalog)
+	officialProfile.UseTransport(catalog)
+
+	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
+		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
+		CookieSecure: cfg.CookieSecure, SSO: cfg.FanmadeSSO, TrustedProxies: cfg.TrustedProxies,
+		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players},
+	})
+	a.Official = official.New(officialPool, official.Config{
+		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
+		CookieSecure: cfg.CookieSecure, SSO: cfg.OfficialSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
+		Profile: officialProfile, Awards: officialAwards{a.Players},
+	})
 	if err = errors.Join(a.Fanmade.EnsureStorage(), a.Official.EnsureStorage()); err != nil {
 		a.Close()
 		return nil, err

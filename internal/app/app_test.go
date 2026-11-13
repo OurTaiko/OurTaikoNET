@@ -3,12 +3,16 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
+	"ourtaiko.dev/net/internal/netdb"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	official "ourtaiko.dev/net/internal/official/httpapi"
 )
@@ -172,21 +176,66 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		}
 	}
 
-	// A dan attempt's award, asked for by each source and recorded under its name.
-	if _, err = a.Fanmade.Config.Profile.Award(ctx, fanmade.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}}); err != nil {
-		t.Fatal("fanmade award:", err)
+	// What a dan attempt earns is recorded in the transaction the source saves the attempt in,
+	// under the source's name: kept when that transaction commits, gone when it does not.
+	official1, err := netdb.Open(ctx, url, "official")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err = a.Official.Config.Profile.Award(ctx, official.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}}); err != nil {
-		t.Fatal("official award:", err)
+	defer official1.Close()
+	grant := func(pool *pgxpool.Pool, commit bool, give func(tx pgx.Tx) (json.RawMessage, error)) {
+		t.Helper()
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		answer, err := give(tx)
+		if err != nil || !strings.Contains(string(answer), `"granted"`) || !strings.Contains(string(answer), `"nameplate"`) {
+			t.Fatalf("award: %s %v", answer, err)
+		}
+		if commit {
+			if err = tx.Commit(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
+	grant(pool, true, func(tx pgx.Tx) (json.RawMessage, error) {
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+	})
+	grant(official1, true, func(tx pgx.Tx) (json.RawMessage, error) {
+		return a.Official.Config.Awards.Grant(ctx, tx, official.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+	})
+	grant(pool, false, func(tx pgx.Tx) (json.RawMessage, error) {
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-undone", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+	})
 	var recorded string
 	if err = pool.QueryRow(ctx, `SELECT string_agg(service||':'||request_key, ',' ORDER BY service) FROM net.awards`).Scan(&recorded); err != nil || recorded != "fanmade:attempt-f,official:attempt-o" {
 		t.Fatalf("awards recorded: %q %v", recorded, err)
 	}
+	// An attempt already used for another player is refused for good, as the source's own kind
+	// of refusal, and the transaction goes on.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = a.Fanmade.Config.Awards.Grant(ctx, tx, fanmade.AwardRequest{Key: "attempt-f", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), Verdict: 4, Titles: []string{}})
+	var refused *fanmade.ProfileRejection
+	if !errors.As(err, &refused) || refused.Code != "AWARD_CONFLICT" {
+		t.Fatal("an attempt of another player:", err)
+	}
+	if _, err = tx.Exec(ctx, `SELECT 1`); err != nil {
+		t.Fatal("the transaction is not usable after a refusal:", err)
+	}
+	tx.Rollback(ctx)
 	// The second award was for someone no source had seen: they are a player now.
 	var known bool
 	if err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM net.users WHERE id=repeat('b',32))`).Scan(&known); err != nil || !known {
 		t.Fatal("the awarded player is not in net.users", err)
+	}
+	// The sources still read the title catalog from the players' part.
+	if titles, err := a.Fanmade.Config.Profile.Titles(ctx, true); err != nil || titles == nil {
+		t.Fatal("title catalog:", titles, err)
 	}
 
 	// Nameplates are public; asking for awards is not possible from outside.
