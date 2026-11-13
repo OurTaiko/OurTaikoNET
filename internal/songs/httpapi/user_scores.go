@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"ourtaiko.dev/net/internal/account"
 )
 
 // UserScore is one row of a player's public score list: a play, the song's title and the
@@ -43,7 +45,7 @@ var userScoreOrders = map[string]string{
 // course; 50 rows a page.
 func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}

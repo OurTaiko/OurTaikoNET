@@ -4,18 +4,20 @@ import (
 	"context"
 	"slices"
 	"time"
+
+	"ourtaiko.dev/net/internal/account"
 )
 
 // publicProfiles names users for public pages. Catalogs stay available during an
 // identity-provider outage (or without SSO in development): unknown users then
 // show a placeholder. Account checks never use this fallback.
-func (s *Server) publicProfiles(ctx context.Context, ids []string) map[string]PublicProfile {
-	result := map[string]PublicProfile{}
+func (s *Server) publicProfiles(ctx context.Context, ids []string) map[string]account.PublicProfile {
+	result := map[string]account.PublicProfile{}
 	unique := []string{}
 	for _, id := range ids {
 		if _, ok := result[id]; !ok {
 			unique = append(unique, id)
-			result[id] = PublicProfile{Nickname: "未知用户"}
+			result[id] = account.PublicProfile{Nickname: "未知用户"}
 		}
 	}
 	if s.Config.SSO == nil || len(unique) == 0 {
@@ -58,7 +60,7 @@ func (s *Server) chartNames(ctx context.Context, charts []Chart) {
 
 func (c *Chart) hasOwner(id string) bool { return slices.Contains(c.OwnerIDs, id) }
 
-func (c *Chart) setOwners(profiles map[string]PublicProfile) {
+func (c *Chart) setOwners(profiles map[string]account.PublicProfile) {
 	c.Owners = []NotificationActor{}
 	for _, id := range c.OwnerIDs {
 		p, ok := profiles[id]
@@ -74,7 +76,7 @@ func (c *Chart) setOwners(profiles map[string]PublicProfile) {
 	c.setUploader(p)
 }
 
-func (c *Chart) setUploader(p PublicProfile) {
+func (c *Chart) setUploader(p account.PublicProfile) {
 	c.Uploader = p.Nickname
 	c.UploaderAvatarURL = p.AvatarURL
 }

@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 type Config struct {
@@ -24,7 +26,7 @@ type Config struct {
 	CookieSecure bool
 	// SSO is nil when no account center is configured; sign-in is then unavailable unless
 	// DevUserID is set (local development only).
-	SSO            *SSOClient
+	SSO            *account.Client
 	DevUserID      string
 	TrustedProxies []netip.Prefix
 	// The song sources whose plays are shown, in display order.
@@ -157,7 +159,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		if api {
 			var finish func()
-			w, finish = gzipJSON(w, r)
+			w, finish = web.GzipJSON(w, r)
 			defer finish()
 		}
 		defer func() {
@@ -172,7 +174,7 @@ func (s *Server) Handler() http.Handler {
 
 // allow counts a write against its client's 40 a minute.
 func (s *Server) allow(r *http.Request) bool {
-	host := s.clientIP(r)
+	host := web.ClientIP(r, s.Config.TrustedProxies)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()

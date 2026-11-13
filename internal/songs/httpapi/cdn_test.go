@@ -9,12 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/songs/teststore"
 )
 
 func TestCDNAvatarAllowlist(t *testing.T) {
-	c := &SSOClient{Config: SSOConfig{Issuer: "https://sso.example", AvatarBaseURL: "https://cdn.example/sso/avatars"}}
+	c := &account.Client{Config: account.Config{Issuer: "https://sso.example", AvatarBaseURL: "https://cdn.example/sso/avatars"}}
 	id, digest := strings.Repeat("a", 32), strings.Repeat("b", 32)
 	for _, base := range []string{"https://sso.example/avatars", "https://cdn.example/sso/avatars"} {
 		valid := base + "/" + id + "/" + digest + ".webp"

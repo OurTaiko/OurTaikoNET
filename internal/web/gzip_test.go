@@ -1,7 +1,8 @@
-package httpapi
+package web
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,14 +13,15 @@ import (
 func TestGzipJSON(t *testing.T) {
 	big := strings.Repeat(`{"title":"Material Girl"},`, 2000)
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		w, finish := gzipJSON(w, r)
+		w, finish := GzipJSON(w, r)
 		defer finish()
 		if r.URL.Path == "/file" {
 			w.Header().Set("Content-Type", "audio/ogg")
 			w.Write([]byte("OggS"))
 			return
 		}
-		respond(w, 200, big)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(big)
 	}
 	for _, tc := range []struct {
 		path, accept string

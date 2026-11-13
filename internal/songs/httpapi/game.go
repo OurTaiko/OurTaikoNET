@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/signin"
 )
 
@@ -42,7 +43,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		result.User, result.Token, result.Expires = devUser(s.Config.DevUserID), s.devGameToken(), 86400
 	} else {
 		e := s.Config.SSO.Call(r.Context(), "game/login", c, &result)
-		var remote *ssoError
+		var remote *account.Error
 		if errors.As(e, &remote) {
 			switch remote.Status {
 			case 401:
@@ -61,7 +62,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 			internal(w, e)
 			return
 		}
-		if !validSubject(result.User.ID) || len(result.Token) != 64 {
+		if !account.ValidSubject(result.User.ID) || len(result.Token) != 64 {
 			internal(w, errors.New("invalid SSO login response"))
 			return
 		}

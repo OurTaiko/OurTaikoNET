@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/account"
 )
 
 func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
@@ -25,8 +27,8 @@ func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	cfg := SSOConfig{Issuer: issuer, ConnectAddress: strings.TrimPrefix(server.URL, "http://"), ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)}
-	c, err := NewSSO(cfg)
+	cfg := account.Config{Issuer: issuer, ConnectAddress: strings.TrimPrefix(server.URL, "http://"), ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)}
+	c, err := account.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +55,7 @@ func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
 		t.Fatal("unrelated origin was rerouted")
 	}
 	cfg.ConnectAddress = "missing-port"
-	if _, err := NewSSO(cfg); err == nil {
+	if _, err := account.New(cfg); err == nil {
 		t.Fatal("invalid TCP address accepted")
 	}
 }
@@ -61,7 +63,7 @@ func TestSSOConnectAddressPreservesPublicIssuer(t *testing.T) {
 func TestSSOConnectAddressDoesNotBypassTLS(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { t.Error("untrusted TLS accepted") }))
 	defer server.Close()
-	c, err := NewSSO(SSOConfig{Issuer: "https://sso.example.test", ConnectAddress: strings.TrimPrefix(server.URL, "https://"), ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "https://fanmade.example.test/callback", EncryptionKey: strings.Repeat("b", 64)})
+	c, err := account.New(account.Config{Issuer: "https://sso.example.test", ConnectAddress: strings.TrimPrefix(server.URL, "https://"), ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "https://fanmade.example.test/callback", EncryptionKey: strings.Repeat("b", 64)})
 	if err != nil {
 		t.Fatal(err)
 	}

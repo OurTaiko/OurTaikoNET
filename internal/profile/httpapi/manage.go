@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/groups"
 )
 
@@ -30,7 +31,7 @@ func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
 		if id == "" {
 			continue
 		}
-		if !validSubject(id) || len(ids) == 100 {
+		if !account.ValidSubject(id) || len(ids) == 100 {
 			problem(w, 400, "QUERY_INVALID", "需要至多 100 个用户 ID")
 			return
 		}
@@ -52,7 +53,7 @@ func (s *Server) giveGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}

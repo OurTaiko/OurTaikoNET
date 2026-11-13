@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // Title is one title of the catalog. Style names the game's title band. OwnerID is the player
@@ -84,18 +85,18 @@ type queryer interface {
 
 // profile looks a player up at the account center: nickname and avatar, and whether the
 // account center answered. Without one, only the development user has a name.
-func (s *Server) profile(ctx context.Context, id string) (PublicProfile, bool, bool) {
+func (s *Server) profile(ctx context.Context, id string) (account.PublicProfile, bool, bool) {
 	if s.Config.SSO == nil {
 		if id == s.Config.DevUserID && id != "" {
-			return PublicProfile{Nickname: devUser(id).Nickname}, true, true
+			return account.PublicProfile{Nickname: devUser(id).Nickname}, true, true
 		}
-		return PublicProfile{}, false, true
+		return account.PublicProfile{}, false, true
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	found, err := s.Config.SSO.Profiles(ctx, []string{id})
 	if err != nil {
-		return PublicProfile{}, false, false
+		return account.PublicProfile{}, false, false
 	}
 	p, ok := found[id]
 	return p, ok, true
@@ -136,7 +137,7 @@ func (s *Server) nameplate(ctx context.Context, db queryer, id string) (Nameplat
 func (s *Server) userNameplate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -163,7 +164,7 @@ func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		seen[id] = true
-		if !validSubject(id) || len(seen) > 100 {
+		if !account.ValidSubject(id) || len(seen) > 100 {
 			problem(w, 400, "QUERY_INVALID", "需要至多 100 个用户 ID")
 			return
 		}
@@ -181,7 +182,7 @@ func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
 // shown. 404 when the account center knows no such active user.
 func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -240,7 +241,7 @@ type HeldTitle struct {
 
 func (s *Server) userTitles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -281,7 +282,7 @@ type AwardRecord struct {
 
 func (s *Server) userDans(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -587,7 +588,7 @@ func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	if !validSubject(body.UserID) {
+	if !account.ValidSubject(body.UserID) {
 		problem(w, 422, "USER_INVALID", "用户 ID 无效")
 		return
 	}

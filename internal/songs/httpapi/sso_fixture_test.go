@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // Regression tests run the production ID-only schema and real HTTP SSO bridge.
@@ -108,7 +109,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 		}
 	}))
 	t.Cleanup(remote.Close)
-	cfg.SSO, e = NewSSO(SSOConfig{Issuer: remote.URL, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)})
+	cfg.SSO, e = account.New(account.Config{Issuer: remote.URL, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)})
 	if e != nil {
 		t.Fatal(e)
 	}

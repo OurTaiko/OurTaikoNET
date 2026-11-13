@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // PublicUser is intentionally separate from authenticated User: never add login
@@ -56,7 +57,7 @@ type UserSpace struct {
 
 func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}

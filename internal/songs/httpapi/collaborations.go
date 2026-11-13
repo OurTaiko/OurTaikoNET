@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // Collaboration is an invitation as its chart's owners see it. An accepted
@@ -135,7 +136,7 @@ func (s *Server) uploadCollaborators(w http.ResponseWriter, r *http.Request, raw
 	if len(ids) == 0 {
 		return nil, true
 	}
-	if slices.ContainsFunc(ids, func(id string) bool { return !validSubject(id) }) {
+	if slices.ContainsFunc(ids, func(id string) bool { return !account.ValidSubject(id) }) {
 		problem(w, 400, "USER_INVALID", "请选择有效的用户")
 		return nil, false
 	}
@@ -209,7 +210,7 @@ func (s *Server) inviteCollaborator(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if !validSubject(req.UserID) {
+	if !account.ValidSubject(req.UserID) {
 		problem(w, 400, "USER_INVALID", "请选择有效的用户")
 		return
 	}

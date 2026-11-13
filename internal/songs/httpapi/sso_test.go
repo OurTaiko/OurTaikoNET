@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ourtaiko.dev/net/internal/account"
 )
 
 func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
@@ -152,7 +154,7 @@ func TestPublicNamesDoNotExposeLogin(t *testing.T) {
 		t.Fatal("login name searchable", e)
 	}
 	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
-	if app.publicProfiles(context.Background(), []string{id})[id] != (PublicProfile{Nickname: "未知用户"}) {
+	if app.publicProfiles(context.Background(), []string{id})[id] != (account.PublicProfile{Nickname: "未知用户"}) {
 		t.Fatal("no outage fallback")
 	}
 }
@@ -167,7 +169,7 @@ func TestSSOPreferredLanguageIsLive(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"user": User{ID: strings.Repeat("a", 32), PreferredLanguage: language}})
 	}))
 	defer upstream.Close()
-	client := &SSOClient{Config: SSOConfig{Issuer: upstream.URL, ServiceID: "fanmade"}, HTTP: upstream.Client()}
+	client := &account.Client{Config: account.Config{Issuer: upstream.URL, ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	for _, preference := range []string{"ja", "ko", "en", "zh-hans", ""} {
 		language = preference
 		user, err := client.Identity(context.Background(), "web", "test-token")
@@ -189,7 +191,7 @@ func TestSSOAvatarURLIsPassedThroughOnlyFromIssuer(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"user": User{ID: id, AvatarURL: avatar}})
 	}))
 	defer upstream.Close()
-	client := &SSOClient{Config: SSOConfig{Issuer: upstream.URL + "/", ServiceID: "fanmade"}, HTTP: upstream.Client()}
+	client := &account.Client{Config: account.Config{Issuer: upstream.URL + "/", ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	valid := upstream.URL + "/avatars/" + id + "/" + digest + ".webp"
 	for given, want := range map[string]string{
 		valid: valid,
@@ -231,13 +233,13 @@ func TestSSOProfilesCarryOnlyValidAvatars(t *testing.T) {
 	}))
 	defer upstream.Close()
 	issuer = upstream.URL
-	client := &SSOClient{Config: SSOConfig{Issuer: issuer, ServiceID: "fanmade"}, HTTP: upstream.Client()}
+	client := &account.Client{Config: account.Config{Issuer: issuer, ServiceID: "fanmade"}, HTTP: upstream.Client()}
 	profiles, err := client.Profiles(context.Background(), []string{a, b})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profiles[a] != (PublicProfile{Nickname: "A", AvatarURL: issuer + "/avatars/" + a + "/" + digest + ".webp"}) ||
-		profiles[b] != (PublicProfile{Nickname: "B"}) {
+	if profiles[a] != (account.PublicProfile{Nickname: "A", AvatarURL: issuer + "/avatars/" + a + "/" + digest + ".webp"}) ||
+		profiles[b] != (account.PublicProfile{Nickname: "B"}) {
 		t.Fatalf("%#v", profiles)
 	}
 	chart := Chart{OwnerID: a}

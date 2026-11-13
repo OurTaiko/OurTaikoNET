@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/objectstore"
@@ -254,7 +255,7 @@ func keywordNumber(q string) int64 {
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	owner := r.URL.Query().Get("owner")
-	if owner != "" && !validSubject(owner) {
+	if owner != "" && !account.ValidSubject(owner) {
 		problem(w, 400, "QUERY_INVALID", "用户标识无效")
 		return
 	}

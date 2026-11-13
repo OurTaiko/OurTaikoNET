@@ -11,6 +11,7 @@ import (
 	"testing/fstest"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 )
 
@@ -253,7 +254,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	for _, style := range []string{"wood", "teal", "wood2", "gold", "wood"} {
 		var title Title
 		c.json("POST", "/api/v1/me/titles", `{"name":"称号 `+style+`","nameTranslations":{"en":"Title"},"style":"`+style+`"}`, 201, &title)
-		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !validSubject(title.ID) {
+		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) {
 			t.Fatal("made", title)
 		}
 		made = append(made, title)

@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 type Config struct {
@@ -33,7 +35,7 @@ type Config struct {
 	CookieSecure bool
 	// SSO is nil when no account center is configured; sign-in is then
 	// unavailable unless DevUserID is set.
-	SSO *SSOClient
+	SSO *account.Client
 	// DevUserID signs every "login" in as this user without a password. Local
 	// development only: main refuses it with SSO or a non-loopback listener.
 	DevUserID      string
@@ -243,7 +245,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		if (r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login" {
-			host := s.clientIP(r)
+			host := web.ClientIP(r, s.Config.TrustedProxies)
 			s.mu.Lock()
 			now := time.Now()
 			for k, v := range s.limits {
@@ -263,7 +265,7 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		}
-		w, finish := gzipJSON(w, r)
+		w, finish := web.GzipJSON(w, r)
 		defer finish()
 		defer func() {
 			if e := recover(); e != nil {

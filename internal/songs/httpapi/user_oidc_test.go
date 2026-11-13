@@ -12,6 +12,7 @@ import (
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
+	"ourtaiko.dev/net/internal/account"
 )
 
 func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
@@ -75,7 +76,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	}))
 	defer remote.Close()
 	issuer = remote.URL
-	client, err := NewSSO(SSOConfig{Issuer: issuer, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "test-secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)})
+	client, err := account.New(account.Config{Issuer: issuer, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "test-secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)})
 	if err != nil {
 		t.Fatal(err)
 	}

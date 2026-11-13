@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 )
 
@@ -40,7 +41,7 @@ func remoteUser(u testUser) map[string]any {
 
 // fakeSSO answers the internal account-center calls the server makes: a web
 // access token "tok:<user id>" introspects to that user.
-func fakeSSO(t *testing.T) *SSOClient {
+func fakeSSO(t *testing.T) *account.Client {
 	t.Helper()
 	byID := map[string]testUser{}
 	for _, u := range testUsers {
@@ -82,7 +83,7 @@ func fakeSSO(t *testing.T) *SSOClient {
 		}
 	}))
 	t.Cleanup(remote.Close)
-	sso, err := NewSSO(SSOConfig{Issuer: remote.URL, RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: strings.Repeat("ab", 32),
+	sso, err := account.New(account.Config{Issuer: remote.URL, RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: strings.Repeat("ab", 32),
 		ServiceID: "database", ServiceKey: strings.Repeat("k", 40), ClientID: "database", ClientSecret: "secret"})
 	if err != nil {
 		t.Fatal(err)

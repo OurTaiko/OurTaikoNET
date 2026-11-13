@@ -22,7 +22,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/charthash"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
-	songs "ourtaiko.dev/net/internal/songs/httpapi"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func env(key, fallback string) string {
@@ -90,7 +90,7 @@ func main() {
 		FanmadeSite: strings.TrimRight(os.Getenv("FANMADE_SITE"), "/"), OfficialSite: strings.TrimRight(os.Getenv("OFFICIAL_SITE"), "/"),
 	}
 	var err error
-	if cfg.TrustedProxies, err = songs.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
+	if cfg.TrustedProxies, err = web.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		log.Fatal(err)
 	}
 	devUser := os.Getenv("DEV_USER_ID")

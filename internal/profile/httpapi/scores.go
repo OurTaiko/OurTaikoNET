@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // Source is a song source whose plays are shown. ID is its name in ourtaiko_net (the schema
@@ -147,7 +148,7 @@ var scoreCourses = map[string]bool{"Easy": true, "Normal": true, "Hard": true, "
 // source that cannot be read is reported in sources[].error while the others still show.
 func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validSubject(id) {
+	if !account.ValidSubject(id) {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}

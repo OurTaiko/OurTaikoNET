@@ -1,4 +1,4 @@
-package httpapi
+package web
 
 import (
 	"compress/gzip"
@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// gzipJSON compresses JSON responses for clients that accept gzip; the game
+// GzipJSON compresses JSON responses for clients that accept gzip; the game
 // catalog is several megabytes and crosses a slow link between the servers.
 // Files, redirects and other responses pass through untouched, so ranges and
 // content hashes of stored objects are unaffected.
-func gzipJSON(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, func()) {
+func GzipJSON(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, func()) {
 	if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
 		return w, func() {}
 	}

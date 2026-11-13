@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/awards"
 )
 
@@ -149,7 +150,7 @@ func (s *Server) Grant(ctx context.Context, tx pgx.Tx, service string, request A
 
 // grant does the work of award in tx and returns what was granted, as awards.granted keeps it.
 func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body AwardRequest) ([]byte, error) {
-	if len(body.Key) < 1 || len(body.Key) > 100 || !validSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !validSubject(body.CourseOwner)) ||
+	if len(body.Key) < 1 || len(body.Key) > 100 || !account.ValidSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !account.ValidSubject(body.CourseOwner)) ||
 		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
 		return nil, &AwardRejection{Status: 422, Code: "AWARD_INVALID", Message: "奖励请求无效"}
 	}

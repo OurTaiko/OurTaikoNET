@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // Playlists are the same on both song sources: a player's own, private or public,
@@ -122,12 +123,12 @@ func (src *Source) readPlaylists(ctx context.Context, db playlistQuerier, sql st
 
 // profiles looks up public profiles; the account center being down leaves
 // them unknown rather than failing the request.
-func (s *Server) profiles(ctx context.Context, ids []string) map[string]PublicProfile {
-	found := map[string]PublicProfile{}
+func (s *Server) profiles(ctx context.Context, ids []string) map[string]account.PublicProfile {
+	found := map[string]account.PublicProfile{}
 	if s.Config.SSO == nil {
 		for _, id := range ids {
 			if id == s.Config.DevUserID {
-				found[id] = PublicProfile{Nickname: devUser(id).Nickname}
+				found[id] = account.PublicProfile{Nickname: devUser(id).Nickname}
 			}
 		}
 		return found
@@ -174,7 +175,7 @@ func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
 func (s *Server) listPlaylists(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	q, owner := strings.TrimSpace(query.Get("q")), query.Get("owner")
-	if utf8.RuneCountInString(q) > 100 || (owner != "" && !validSubject(owner)) {
+	if utf8.RuneCountInString(q) > 100 || (owner != "" && !account.ValidSubject(owner)) {
 		problem(w, 400, "QUERY_INVALID", "搜索条件无效")
 		return
 	}
