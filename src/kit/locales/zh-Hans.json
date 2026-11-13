@@ -586,7 +586,8 @@
       "dan_upvotes": "段位获赞里程碑",
       "comment_upvotes": "评论获赞里程碑",
       "comment_removed": "我的评论被管理员移除"
-    }
+    },
+    "more": "显示更早的通知"
   },
   "collaboration": {
     "add": "添加共同创作",

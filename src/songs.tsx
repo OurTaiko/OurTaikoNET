@@ -10,7 +10,6 @@ import { Layout } from '@sitekit/components/layout'
 import { DanEditorPage, DanPage, DansPage } from '@sitekit/dans'
 import { addSourceCatalogues, i18n } from '@sitekit/i18n'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
-import { NotificationsPage } from '@sitekit/notification-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { Auth, ChartManagerPage, Detail, Library } from '@sitekit/pages'
 import { MyPlaylistsPage, PlaylistPage, PlaylistsPage } from '@sitekit/playlists'
@@ -88,7 +87,10 @@ function App({ site, UpdatePage }: { site: Site; UpdatePage: ComponentType }) {
                           <Route path="charts/:id/edit" element={<ChartEditorPage />} />
                           <Route path="charts/:id" element={<Detail />} />
                           <Route path="charts/:id/comments/:commentId" element={<Detail />} />
-                          <Route path="notifications" element={<NotificationsPage />} />
+                          <Route
+                            path="notifications"
+                            element={<LeaveTo address="/notifications" />}
+                          />
                           <Route path="login" element={<Auth key="login" />} />
                           <Route path="register" element={<Auth key="register" register />} />
                           <Route

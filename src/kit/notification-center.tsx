@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowBendUpLeftIcon,
   ArrowFatUpIcon,
@@ -15,7 +15,8 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
-import { endpoints } from './api/endpoints'
+import { SITE_API_ROOT } from './api/config'
+import { withQuery } from './api/endpoints'
 import { errorCodeMessage } from './api/error-message'
 import type { AppNotification, NotificationPage, NotificationSetting } from './api/types'
 import { Button } from './components/ui/button'
@@ -28,18 +29,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
+import { SourceTag } from './components/source-tag'
 import { UserAvatar } from './components/user-avatar'
-import { loginPath } from './components/vote-control'
 import { RelativeTime, commentPath, danCommentPath } from './comments'
 import { danTitle } from './dan-title'
 import { cn } from './lib/utils'
 import { Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session-context'
+import { AREA, sources } from './source'
+import type { SourceId } from './source'
+
+// One inbox for the whole site. Each source keeps its own notices, so the bell and the inbox
+// ask both and put the answers together; a notice remembers which source it came from, and
+// everything done to it goes back to that source.
+type Sourced = AppNotification & { source: SourceId }
+const ids = sources.map((source) => source.id)
+const mine = (source: SourceId) => `${SITE_API_ROOT}/sources/${source}/me`
+const one = (n: Sourced) => `${mine(n.source)}/notifications/${encodeURIComponent(n.id)}`
+const addresses = {
+  list: (source: SourceId, query: { filter: 'all' | 'unread'; page: number }) =>
+    withQuery(`${mine(source)}/notifications`, query),
+  unread: (source: SourceId) => `${mine(source)}/notifications/unread`,
+  read: (source: SourceId) => `${mine(source)}/notifications/read`,
+  one,
+  respond: (n: Sourced) => `${one(n)}/respond`,
+  settings: (source: SourceId) => `${mine(source)}/notification-settings`,
+}
+/** The inbox's page; it belongs to no source. */
+export const inboxPage = '/notifications'
+const when = (n: AppNotification) => Date.parse(n.createdAt)
+const newestFirst = (a: AppNotification, b: AppNotification) => when(b) - when(a)
 
 // Any change to read state anywhere refreshes the bell's count.
 const changedEvent = 'ourtaiko:notifications-changed'
 const announceChange = () => window.dispatchEvent(new Event(changedEvent))
+
+/** Goes to a page of a source, or of none (''): within this area without loading anew. */
+function useGo() {
+  const navigate = useNavigate()
+  return (area: SourceId | '', path: string) =>
+    area === AREA ? navigate(path) : location.assign(`${area && `/${area}`}${path}`)
+}
 
 function useNotificationText() {
   const { t, i18n } = useTranslation()
@@ -101,8 +132,9 @@ function useNotificationText() {
   }
 }
 
+/** The page a notice is about, inside its source; null when it has none. */
 function target(n: AppNotification) {
-  if (n.kind === 'chart_collaboration' && n.data.status === 'pending') return '/notifications'
+  if (n.kind === 'chart_collaboration' && n.data.status === 'pending') return null
   if (n.chart && n.comment) return commentPath(n.chart.id, n.comment.id)
   if (n.chart) return `/charts/${encodeURIComponent(n.chart.id)}`
   if (n.dan && n.comment) return danCommentPath(n.dan.id, n.comment.id)
@@ -143,7 +175,7 @@ function NotificationIcon({ n }: { n: AppNotification }) {
   )
 }
 
-function NotificationContent({ n }: { n: AppNotification }) {
+function NotificationContent({ n }: { n: Sourced }) {
   const text = useNotificationText()
   return (
     <span className="min-w-0 flex-1 space-y-1">
@@ -153,7 +185,8 @@ function NotificationContent({ n }: { n: AppNotification }) {
           {n.comment.excerpt}
         </span>
       )}
-      <span className="block text-xs text-muted-foreground">
+      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <SourceTag source={n.source} />
         <RelativeTime value={n.createdAt} />
       </span>
     </span>
@@ -171,26 +204,68 @@ function UnreadDot({ read }: { read: boolean }) {
   )
 }
 
-const markRead = (n: AppNotification, csrf: string) =>
+const markRead = (n: Sourced, csrf: string) =>
   n.read
     ? Promise.resolve()
-    : api(endpoints.notification(n.id), jsonRequest('PATCH', { read: true }, csrf)).then(
-        announceChange,
-      )
+    : api(addresses.one(n), jsonRequest('PATCH', { read: true }, csrf)).then(announceChange)
 
-// Header bell: unread badge plus a menu with the latest notifications.
+/** Marks everything read, in each source. */
+const markAllRead = (csrf: string) =>
+  Promise.all(ids.map((source) => api(addresses.read(source), jsonRequest('POST', {}, csrf))))
+
+type Loaded = { items: Sourced[]; total: number; unread: number; more: boolean }
+/** A source's notices, its first `depth` pages. */
+async function loadSource(
+  source: SourceId,
+  filter: 'all' | 'unread',
+  depth: number,
+  signal?: AbortSignal,
+): Promise<Loaded> {
+  const page = (number: number) =>
+    api<NotificationPage>(addresses.list(source, { filter, page: number }), { signal })
+  const first = await page(1)
+  const pages = Math.min(depth, Math.max(1, Math.ceil(first.total / first.pageSize)))
+  const rest = await Promise.all(Array.from({ length: pages - 1 }, (_, i) => page(i + 2)))
+  return {
+    items: [first, ...rest].flatMap((p) => p.items).map((n) => ({ ...n, source })),
+    total: first.total,
+    unread: first.unread,
+    more: pages * first.pageSize < first.total,
+  }
+}
+
+/**
+ * Both sources' notices as one list, newest first. A source with more to load has shown
+ * everything down to its oldest loaded notice, so the other's older ones wait until it has
+ * loaded further: the list never gets a notice inserted above ones already read.
+ */
+function merge(loaded: Loaded[]) {
+  const limits = loaded.filter((l) => l.more && l.items.length).map((l) => when(l.items.at(-1)!))
+  const limit = limits.length ? Math.max(...limits) : -Infinity
+  return loaded
+    .flatMap((l) => l.items)
+    .filter((n) => when(n) >= limit)
+    .sort(newestFirst)
+}
+
+// The bell in the top bar: how many are unread, and a menu of the latest.
 export function NotificationBell() {
   const { t } = useTranslation()
   const { user, csrfToken } = useSession()
   const location = useLocation()
-  const navigate = useNavigate()
+  const go = useGo()
   const [count, setCount] = useState(0)
-  const [recent, setRecent] = useState<AppNotification[] | null>(null)
+  const [recent, setRecent] = useState<Sourced[] | null>(null)
   const refresh = useCallback(() => {
     if (!user) return
-    api<{ count: number }>(endpoints.notificationsUnread)
-      .then((r) => setCount(r.count))
-      .catch(() => {})
+    // A source that does not answer counts for nothing; the other's count still shows.
+    void Promise.all(
+      ids.map((source) =>
+        api<{ count: number }>(addresses.unread(source))
+          .then((r) => r.count)
+          .catch(() => 0),
+      ),
+    ).then((counts) => setCount(counts.reduce((a, b) => a + b, 0)))
   }, [user])
   useEffect(() => {
     if (!user) {
@@ -208,22 +283,29 @@ export function NotificationBell() {
     }
   }, [user, refresh, location.pathname])
   if (!user) return null
-  const open = (n: AppNotification) => {
+  const open = (n: Sourced) => {
     void markRead(n, csrfToken).catch(() => {})
     const to = target(n)
-    navigate(to ?? '/notifications')
+    if (to) go(n.source, to)
+    else go('', inboxPage)
   }
   return (
     <DropdownMenu
       onOpenChange={(isOpen) => {
         if (!isOpen) return
         setRecent(null)
-        api<NotificationPage>(endpoints.notifications({ filter: 'all', page: 1 }))
-          .then((r) => {
-            setRecent(r.items.slice(0, 6))
-            setCount(r.unread)
-          })
-          .catch(() => setRecent([]))
+        void Promise.all(ids.map((source) => loadSource(source, 'all', 1).catch(() => null))).then(
+          (answers) => {
+            const loaded = answers.flatMap((answer) => answer ?? [])
+            setRecent(
+              loaded
+                .flatMap((l) => l.items)
+                .sort(newestFirst)
+                .slice(0, 6),
+            )
+            if (loaded.length === ids.length) setCount(loaded.reduce((a, l) => a + l.unread, 0))
+          },
+        )
       }}
     >
       <DropdownMenuTrigger
@@ -232,6 +314,7 @@ export function NotificationBell() {
             variant="ghost"
             size="icon"
             className="relative"
+            data-testid="notification-bell"
             aria-label={
               count ? t('notificationCenter.bellUnread', { count }) : t('notificationCenter.title')
             }
@@ -240,7 +323,7 @@ export function NotificationBell() {
       >
         <BellIcon className="size-4" aria-hidden="true" />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold text-white tabular-nums">
+          <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums">
             {count > 99 ? '99+' : count}
           </span>
         )}
@@ -267,7 +350,7 @@ export function NotificationBell() {
         ) : (
           recent.map((n) => (
             <DropdownMenuItem
-              key={n.id}
+              key={`${n.source}/${n.id}`}
               className="items-start gap-3 rounded-xl p-2"
               onClick={() => open(n)}
             >
@@ -281,7 +364,7 @@ export function NotificationBell() {
         {count > 0 && (
           <DropdownMenuItem
             onClick={() => {
-              void api(endpoints.notificationsRead, jsonRequest('POST', {}, csrfToken))
+              void markAllRead(csrfToken)
                 .then(announceChange)
                 .catch(() => {})
             }}
@@ -290,7 +373,7 @@ export function NotificationBell() {
             {t('notificationCenter.markAllRead')}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem render={<Link to="/notifications" />}>
+        <DropdownMenuItem onClick={() => go('', inboxPage)}>
           <BellSimpleIcon />
           {t('notificationCenter.viewAll')}
         </DropdownMenuItem>
@@ -309,18 +392,31 @@ const settingLabels = {
   comment_removed: 'notificationCenter.settings.comment_removed',
 } as const
 
+// What to be told about. The choice is one for the whole site: it is written to both sources,
+// and a kind counts as on only while both have it on.
 function NotificationSettings() {
   const { t } = useTranslation()
   const { csrfToken } = useSession()
   const { notify } = useNotification()
   const [items, setItems] = useState<NotificationSetting[] | null>(null)
   const [error, setError] = useState('')
+  const together = (answers: { items: NotificationSetting[] }[]) =>
+    answers[0].items.map((setting) => ({
+      kind: setting.kind,
+      enabled: answers.every(
+        (answer) => answer.items.find((other) => other.kind === setting.kind)?.enabled ?? true,
+      ),
+    }))
   useEffect(() => {
     const controller = new AbortController()
-    api<{ items: NotificationSetting[] }>(endpoints.notificationSettings, {
-      signal: controller.signal,
-    })
-      .then((r) => setItems(r.items))
+    Promise.all(
+      ids.map((source) =>
+        api<{ items: NotificationSetting[] }>(addresses.settings(source), {
+          signal: controller.signal,
+        }),
+      ),
+    )
+      .then((answers) => setItems(together(answers)))
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message)
       })
@@ -330,11 +426,15 @@ function NotificationSettings() {
     const previous = items
     setItems((current) => current?.map((s) => (s.kind === kind ? { ...s, enabled } : s)) ?? null)
     try {
-      const r = await api<{ items: NotificationSetting[] }>(
-        endpoints.notificationSettings,
-        jsonRequest('PUT', { [kind]: enabled }, csrfToken),
+      const answers = await Promise.all(
+        ids.map((source) =>
+          api<{ items: NotificationSetting[] }>(
+            addresses.settings(source),
+            jsonRequest('PUT', { [kind]: enabled }, csrfToken),
+          ),
+        ),
       )
-      setItems(r.items)
+      setItems(together(answers))
     } catch (e) {
       setItems(previous)
       notify((e as Error).message, 'error')
@@ -343,7 +443,7 @@ function NotificationSettings() {
   return (
     <section
       aria-labelledby="notification-settings-heading"
-      className="space-y-4 rounded-[20px] border border-border bg-card p-6 shadow-drop"
+      className="space-y-4 rounded-[20px] bg-card p-6 shadow-elev-1"
     >
       <div className="space-y-1">
         <h2 id="notification-settings-heading" className="text-lg font-extrabold">
@@ -379,29 +479,31 @@ export function NotificationsPage() {
   const { t } = useTranslation()
   const { user, csrfToken, loading } = useSession()
   const { notify } = useNotification()
-  const location = useLocation()
-  const navigate = useNavigate()
+  const go = useGo()
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
-  const [page, setPage] = useState(1)
-  const [data, setData] = useState<NotificationPage | null>(null)
+  // How many pages of each source are loaded.
+  const [depth, setDepth] = useState(1)
+  const [data, setData] = useState<Loaded[] | null>(null)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [responding, setResponding] = useState<string | null>(null)
   useEffect(() => {
     if (!user) return
     const controller = new AbortController()
     setError('')
-    api<NotificationPage>(endpoints.notifications({ filter, page }), { signal: controller.signal })
-      .then(setData)
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
+    setBusy(true)
+    // What one source gives is shown even when the other does not answer.
+    Promise.allSettled(ids.map((source) => loadSource(source, filter, depth, controller.signal)))
+      .then((answers) => {
+        if (controller.signal.aborted) return
+        const failed = answers.find((answer) => answer.status === 'rejected')
+        setError(failed ? (failed.reason as Error).message : '')
+        setData(answers.flatMap((answer) => (answer.status === 'fulfilled' ? answer.value : [])))
       })
+      .finally(() => !controller.signal.aborted && setBusy(false))
     return () => controller.abort()
-  }, [user, filter, page, attempt])
-  // Step back when the last notice of a later page was dismissed.
-  useEffect(() => {
-    if (data && data.items.length === 0 && page > 1) setPage(page - 1)
-  }, [data, page])
+  }, [user, filter, depth, attempt])
   // Refresh when another view (such as the bell menu) changes read state.
   useEffect(() => {
     const reload = () => setAttempt((n) => n + 1)
@@ -412,9 +514,12 @@ export function NotificationsPage() {
   if (!user)
     return (
       <Notice kind="info" title={t('notificationCenter.title')}>
-        <Link to={loginPath(location)} className="text-link hover:underline">
+        <a
+          href={`${SITE_API_ROOT}/auth/sso/login?returnTo=${encodeURIComponent(inboxPage)}`}
+          className="text-link hover:underline"
+        >
           {t('notificationCenter.signIn')}
-        </Link>
+        </a>
       </Notice>
     )
   const run = async (request: Promise<unknown>) => {
@@ -425,35 +530,35 @@ export function NotificationsPage() {
       notify((e as Error).message, 'error')
     }
   }
-  const respond = async (n: AppNotification, accept: boolean) => {
+  const respond = async (n: Sourced, accept: boolean) => {
     setResponding(n.id)
     try {
-      await run(
-        api(endpoints.respondCollaboration(n.id), jsonRequest('POST', { accept }, csrfToken)),
-      )
+      await run(api(addresses.respond(n), jsonRequest('POST', { accept }, csrfToken)))
     } finally {
       setResponding(null)
     }
   }
-  const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
+  const items = data ? merge(data) : []
+  const unread = data?.reduce((total, l) => total + l.unread, 0) ?? 0
+  const more = !!data?.some((l) => l.more)
   return (
     <section className="mx-auto grid max-w-5xl items-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-extrabold">{t('notificationCenter.title')}</h1>
+            <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+              <span className="mark">{t('notificationCenter.title')}</span>
+            </h1>
             {data && (
               <p className="text-sm text-muted-foreground">
-                {t('notificationCenter.unreadCount', { count: data.unread })}
+                {t('notificationCenter.unreadCount', { count: unread })}
               </p>
             )}
           </div>
           <Button
             variant="outline"
-            disabled={!data?.unread}
-            onClick={() =>
-              void run(api(endpoints.notificationsRead, jsonRequest('POST', {}, csrfToken)))
-            }
+            disabled={!unread}
+            onClick={() => void run(markAllRead(csrfToken))}
           >
             <CheckIcon />
             {t('notificationCenter.markAllRead')}
@@ -473,12 +578,12 @@ export function NotificationsPage() {
               className={cn(
                 'rounded-full px-4 py-1.5 text-sm transition-all duration-200 active:scale-[0.96] motion-reduce:transition-none',
                 filter === value
-                  ? 'border border-border bg-card font-bold shadow-elev-1'
+                  ? 'bg-card font-bold text-secondary-foreground shadow-elev-1'
                   : 'text-muted-foreground hover:text-foreground',
               )}
               onClick={() => {
                 setFilter(value)
-                setPage(1)
+                setDepth(1)
                 setData(null)
               }}
             >
@@ -486,29 +591,40 @@ export function NotificationsPage() {
             </button>
           ))}
         </div>
-        {error ? (
+        {error && (
           <div className="flex flex-col items-start gap-3">
             <Notice>{error}</Notice>
             <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
               {t('messages.retry')}
             </Button>
           </div>
-        ) : !data ? (
-          <div className="space-y-3" role="status" aria-label={t('notificationCenter.loading')}>
-            <Skeleton className="h-20 rounded-[20px]" />
-            <Skeleton className="h-20 rounded-[20px]" />
-          </div>
-        ) : data.items.length === 0 ? (
-          <p className="rounded-[20px] bg-muted py-12 text-center text-sm text-muted-foreground">
-            {filter === 'unread' ? t('notificationCenter.noUnread') : t('notificationCenter.empty')}
-          </p>
+        )}
+        {!data ? (
+          !error && (
+            <div className="space-y-3" role="status" aria-label={t('notificationCenter.loading')}>
+              <Skeleton className="h-20 rounded-[20px]" />
+              <Skeleton className="h-20 rounded-[20px]" />
+            </div>
+          )
+        ) : items.length === 0 ? (
+          !error && (
+            <p className="rounded-[20px] bg-muted py-12 text-center text-sm text-muted-foreground">
+              {filter === 'unread'
+                ? t('notificationCenter.noUnread')
+                : t('notificationCenter.empty')}
+            </p>
+          )
         ) : (
-          <ul className="divide-y overflow-hidden rounded-[20px] border border-border bg-card shadow-drop">
-            {data.items.map((n) => {
+          <ul
+            className="divide-y overflow-hidden rounded-[20px] bg-card shadow-elev-1"
+            data-testid="inbox"
+          >
+            {items.map((n) => {
               const to = target(n)
               return (
                 <li
-                  key={n.id}
+                  key={`${n.source}/${n.id}`}
+                  data-source={n.source}
                   className={cn('flex flex-wrap items-start gap-3 p-4', !n.read && 'bg-link/5')}
                 >
                   <UnreadDot read={n.read} />
@@ -519,7 +635,7 @@ export function NotificationsPage() {
                     onClick={() => {
                       if (!to) return
                       void markRead(n, csrfToken).catch(() => {})
-                      navigate(to)
+                      go(n.source, to)
                     }}
                   >
                     <NotificationIcon n={n} />
@@ -578,10 +694,7 @@ export function NotificationsPage() {
                       }
                       onClick={() =>
                         void run(
-                          api(
-                            endpoints.notification(n.id),
-                            jsonRequest('PATCH', { read: !n.read }, csrfToken),
-                          ),
+                          api(addresses.one(n), jsonRequest('PATCH', { read: !n.read }, csrfToken)),
                         )
                       }
                     >
@@ -594,9 +707,7 @@ export function NotificationsPage() {
                       aria-label={t('notificationCenter.dismiss')}
                       title={t('notificationCenter.dismiss')}
                       onClick={() =>
-                        void run(
-                          api(endpoints.notification(n.id), jsonRequest('DELETE', {}, csrfToken)),
-                        )
+                        void run(api(addresses.one(n), jsonRequest('DELETE', {}, csrfToken)))
                       }
                     >
                       <XIcon />
@@ -607,18 +718,10 @@ export function NotificationsPage() {
             })}
           </ul>
         )}
-        {data && pages > 1 && (
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-            <Button variant="outline" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-              {t('messages.previous')}
-            </Button>
-            <span>{t('messages.pagination', { page, pages })}</span>
-            <Button
-              variant="outline"
-              disabled={page >= pages}
-              onClick={() => setPage((n) => n + 1)}
-            >
-              {t('messages.next')}
+        {more && (
+          <div className="flex justify-center">
+            <Button variant="outline" disabled={busy} onClick={() => setDepth((n) => n + 1)}>
+              {t('notificationCenter.more')}
             </Button>
           </div>
         )}

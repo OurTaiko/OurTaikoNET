@@ -6,6 +6,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-r
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { IconContext } from '@phosphor-icons/react'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
+import { NotificationsPage } from '@sitekit/notification-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { SessionProvider } from '@sitekit/session'
 import { ThemeProvider } from '@sitekit/theme'
@@ -53,6 +54,7 @@ function App() {
                       <Route path="players/users/:id" element={<OldUserAddress />} />
                       <Route path="players/:id" element={<UserPage />} />
                       <Route path="titles" element={<TitlesPage />} />
+                      <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="admin" element={<AdminPage />} />
                       <Route path="manage" element={<ManagePage />} />
                       <Route path="*" element={<NotFound />} />

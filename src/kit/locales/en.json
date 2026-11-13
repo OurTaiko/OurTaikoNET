@@ -595,7 +595,8 @@
       "dan_upvotes": "Dan course upvote milestones",
       "comment_upvotes": "Upvote milestones on my comments",
       "comment_removed": "My comments removed by administrators"
-    }
+    },
+    "more": "Show older"
   },
   "collaboration": {
     "add": "Add co-creator",

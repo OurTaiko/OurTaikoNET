@@ -26,4 +26,4 @@ export const AREA: SourceId | '' =
 /** Where the pages about players are: their scores on every source, titles, nameplate. */
 export const PLAYERS_BASE = '/players'
 /** The first part of the addresses that belong to no source. */
-export const sitePages = ['', 'players', 'titles', 'admin', 'manage']
+export const sitePages = ['', 'players', 'titles', 'notifications', 'admin', 'manage']

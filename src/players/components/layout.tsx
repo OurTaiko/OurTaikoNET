@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Shell } from '@sitekit/shell/shell'
+import { NotificationBell } from '@sitekit/notification-center'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
 
@@ -14,6 +15,7 @@ export function Layout() {
       area=""
       user={session.user}
       loading={session.loading}
+      bell={session.user ? <NotificationBell /> : null}
       // Anyone uploads to Fanmade; the official source's songs are its managers'.
       canUpload={(source) => source === 'fanmade' || groups.includes('OFFICIAL_MANAGER')}
       onSignOut={() => {

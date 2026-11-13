@@ -62,8 +62,6 @@ export const endpoints = {
   collaboration: (id: string, invitation: string) =>
     `${chartPath(id)}/collaborations/${encodeURIComponent(invitation)}`,
   chartOwnership: (id: string) => `${chartPath(id)}/owners/me`,
-  respondCollaboration: (id: string) =>
-    `${API_ROOT}/me/notifications/${encodeURIComponent(id)}/respond`,
   chartFiles: (id: string) => `${chartPath(id)}/files`,
   /** PUT: the background movie on its own, with an optional movieOffset. */
   chartMovie: (id: string) => `${chartPath(id)}/movie`,
@@ -85,12 +83,6 @@ export const endpoints = {
   commentVote: (id: string) => `${API_ROOT}/comments/${encodeURIComponent(id)}/vote`,
   userComments: (id: string, query: { sort: string; page: number }) =>
     withQuery(`${API_ROOT}/users/${encodeURIComponent(id)}/comments`, query),
-  notifications: (query: { filter: 'all' | 'unread'; page: number }) =>
-    withQuery(`${API_ROOT}/me/notifications`, query),
-  notificationsUnread: `${API_ROOT}/me/notifications/unread`,
-  notificationsRead: `${API_ROOT}/me/notifications/read`,
-  notification: (id: string) => `${API_ROOT}/me/notifications/${encodeURIComponent(id)}`,
-  notificationSettings: `${API_ROOT}/me/notification-settings`,
   playlists: `${API_ROOT}/playlists`,
   playlistList: (query: { q: string; sort: string; page: number; owner?: string }) =>
     withQuery(`${API_ROOT}/playlists`, query),

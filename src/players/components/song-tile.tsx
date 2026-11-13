@@ -3,7 +3,10 @@ import type { ChartBase } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { SongCover } from '@sitekit/components/song-cover'
+import { SourceTag } from '@sitekit/components/source-tag'
 import type { SourceId } from '@sitekit/source'
+
+export { SourceTag }
 
 // These pages belong to no source, so they say which source's API and pages they mean.
 export const sources: SourceId[] = ['fanmade', 'official']
@@ -11,19 +14,6 @@ export const sourceApi = (source: SourceId) => `/api/v1/sources/${source}`
 export const songPage = (source: SourceId, id: string) => `/${source}/charts/${id}`
 export const coverOf = (source: SourceId, chart: ChartBase) =>
   chart.coverHash ? `${sourceApi(source)}/charts/${chart.id}/cover?v=${chart.coverHash}` : undefined
-
-/** The tag that says which source something is from; only where both sources are mixed. */
-export function SourceTag({ source }: { source: SourceId }) {
-  const { t } = useTranslation()
-  return (
-    <span
-      data-accent={source}
-      className="inline-flex items-center bg-secondary px-2 rounded-[7px] h-[1.375rem] font-semibold text-[0.6875rem] text-secondary-foreground whitespace-nowrap"
-    >
-      {t(`shell.${source}`)}
-    </span>
-  )
-}
 
 /** A song of a named source: the tile of the song lists, linking to the song's page there. */
 export function SongTile({

@@ -14,6 +14,7 @@ import {
   FolderIcon,
   GameControllerIcon,
   HouseIcon,
+  BellIcon,
   IdentificationCardIcon,
   ListIcon,
   MagnifyingGlassIcon,
@@ -145,6 +146,12 @@ export function Shell({
           href: `/players/${user.id}`,
           label: t('shell.myPage'),
           icon: IdentificationCardIcon,
+        },
+        {
+          key: 'notifications',
+          href: '/notifications',
+          label: t('shell.notifications'),
+          icon: BellIcon,
         },
         {
           key: 'myPlaylists',

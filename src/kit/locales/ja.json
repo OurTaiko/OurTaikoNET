@@ -586,7 +586,8 @@
       "dan_upvotes": "段位の高評価マイルストーン",
       "comment_upvotes": "コメントの高評価の節目",
       "comment_removed": "管理者による自分のコメントの非表示"
-    }
+    },
+    "more": "以前のお知らせを表示"
   },
   "collaboration": {
     "add": "共同制作者を追加",
