@@ -210,6 +210,7 @@ func (a *App) Start(ctx context.Context) error {
 	go a.Fanmade.RunFileRekey(ctx)
 	go a.Fanmade.RunDifficultyConstants(ctx)
 	go a.Fanmade.RunNotificationPrune(ctx)
+	go a.Official.RunFileCleanup(ctx)
 	go a.Official.RunNotificationPrune(ctx)
 	go a.Official.RunDifficultyConstants(ctx)
 	go a.Official.RunPreviewBackfill(ctx)

@@ -6,11 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -105,111 +103,4 @@ func retireChart(ctx context.Context, tx pgx.Tx, chartID, description string, au
 	}
 	_, err := tx.Exec(ctx, `UPDATE charts SET description=$2 WHERE id=$1`, chartID, description)
 	return err
-}
-
-// RunFileCleanup retries committed file deletions on startup and every 30 seconds.
-func (s *Server) RunFileCleanup(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		s.cleanupReplacedFiles()
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func (s *Server) cleanupReplacedFiles() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := s.reconcilePending(ctx); err != nil {
-		log.Printf("pending object cleanup failed: %v", err)
-		return
-	}
-	if err := s.deleteRetiredFiles(ctx); err != nil {
-		log.Printf("retired file cleanup pending: %v", err)
-	}
-}
-
-func (s *Server) deleteRetiredFiles(ctx context.Context) error {
-	rows, err := s.DB.Query(ctx, `SELECT storage_key FROM retired_files ORDER BY created_at,storage_key LIMIT 100`)
-	if err != nil {
-		return err
-	}
-	var keys []string
-	for rows.Next() {
-		var key string
-		if err = rows.Scan(&key); err != nil {
-			rows.Close()
-			return err
-		}
-		keys = append(keys, key)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	var failures []error
-	for _, key := range keys {
-		if err = s.deleteRetiredFile(ctx, key); err != nil {
-			failures = append(failures, err)
-		}
-	}
-	return errors.Join(failures...)
-}
-
-// releaseFiles deletes the given files and their objects unless a chart still refers to
-// them. The database queued them (retired_files) when the row that referred to them went,
-// so one that fails now is deleted by the periodic cleanup.
-func (s *Server) releaseFiles(ctx context.Context, ids []int64) error {
-	rows, err := s.DB.Query(ctx, `SELECT storage_key FROM chart_resources WHERE id=ANY($1)`, ids)
-	if err != nil {
-		return err
-	}
-	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return err
-	}
-	var failures []error
-	for _, key := range keys {
-		failures = append(failures, s.deleteRetiredFile(ctx, key))
-	}
-	return errors.Join(failures...)
-}
-
-// deleteRetiredFile deletes one queued file and its object unless a chart still
-// refers to it, then removes it from the queue. A failure leaves it queued for
-// retry. The key lock excludes an upload that is about to reuse the object.
-func (s *Server) deleteRetiredFile(ctx context.Context, key string) error {
-	if !filepath.IsLocal(key) {
-		return errors.New("invalid retired storage key")
-	}
-	tx, err := s.DB.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if err = lockObject(ctx, tx, key); err != nil {
-		return err
-	}
-	var live bool
-	err = tx.QueryRow(ctx, `SELECT `+referencedFile+` FROM chart_resources r WHERE r.storage_key=$1`, key).Scan(&live)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
-	}
-	if !live {
-		if _, err = tx.Exec(ctx, `DELETE FROM chart_resources WHERE storage_key=$1`, key); err != nil {
-			return err
-		}
-		if err = s.Config.Objects.Delete(ctx, key); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM retired_files WHERE storage_key=$1`, key); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
 }

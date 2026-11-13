@@ -60,6 +60,13 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- 7. Each source queues the files its charts and playlists stop referring to.
+  FOR r IN SELECT s.nspname, t.rel, t.tgname FROM (VALUES ('fanmade'), ('official')) s(nspname),
+                  (VALUES ('charts', 'charts_retire_files'), ('playlists', 'playlists_retire_cover')) t(rel, tgname)
+            WHERE NOT EXISTS (SELECT 1 FROM pg_trigger g WHERE g.tgrelid = format('%I.%I', s.nspname, t.rel)::regclass AND g.tgname = t.tgname AND g.tgenabled <> 'D') LOOP
+    bad := bad || format(E'\n  %s.%s has no trigger %s', r.nspname, r.rel, r.tgname);
+  END LOOP;
+
   IF bad <> '' THEN
     RAISE EXCEPTION 'ourtaiko_net check failed:%', bad;
   END IF;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -228,13 +229,16 @@ func (s *Server) storeGameCover(ctx context.Context, tx pgx.Tx, data []byte) (in
 	return s.storeImage(ctx, tx, data, cover.GameExtension, cover.GameMediaType)
 }
 
-// releaseCovers deletes a playlist's former cover files unless something still
-// refers to them. This source sweeps for every file nothing refers to.
-func (s *Server) releaseCovers(_ context.Context, covers []*int64) {
+// releaseCovers deletes a playlist's former cover files unless something
+// still refers to them; a failure leaves them for the next release.
+func (s *Server) releaseCovers(ctx context.Context, covers []*int64) {
+	ids := []int64{}
 	for _, id := range covers {
 		if id != nil {
-			s.cleanupReplacedFiles()
-			return
+			ids = append(ids, *id)
 		}
+	}
+	if e := s.releaseFiles(context.WithoutCancel(ctx), ids); e != nil {
+		log.Printf("playlist cover cleanup pending: %v", e)
 	}
 }

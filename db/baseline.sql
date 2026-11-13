@@ -701,6 +701,42 @@ $$;
 
 
 --
+-- Name: retire_chart_files(); Type: FUNCTION; Schema: official; Owner: -
+--
+
+CREATE FUNCTION official.retire_chart_files() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'official', 'net'
+    AS $$
+BEGIN
+ INSERT INTO retired_files(storage_key) SELECT storage_key FROM chart_resources
+  WHERE id IN (OLD.tja_file,OLD.audio_file,OLD.cover_file,OLD.preview_file,OLD.movie_file,OLD.bgimage_file)
+   AND (TG_OP='DELETE' OR NOT id=ANY(array_remove(ARRAY[NEW.tja_file,NEW.audio_file,NEW.cover_file,NEW.preview_file,NEW.movie_file,NEW.bgimage_file],NULL)))
+  ON CONFLICT DO NOTHING;
+ RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: retire_playlist_cover(); Type: FUNCTION; Schema: official; Owner: -
+--
+
+CREATE FUNCTION official.retire_playlist_cover() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'official', 'net'
+    AS $$
+BEGIN
+ INSERT INTO retired_files(storage_key) SELECT storage_key FROM chart_resources
+  WHERE id IN (OLD.cover_file,OLD.game_cover_file)
+   AND (TG_OP='DELETE' OR NOT id=ANY(array_remove(ARRAY[NEW.cover_file,NEW.game_cover_file],NULL)))
+  ON CONFLICT DO NOTHING;
+ RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: touch_related_chart(); Type: FUNCTION; Schema: official; Owner: -
 --
 
@@ -3601,6 +3637,13 @@ CREATE TRIGGER charts_check_owners BEFORE INSERT OR UPDATE OF owner_ids ON offic
 
 
 --
+-- Name: charts charts_retire_files; Type: TRIGGER; Schema: official; Owner: -
+--
+
+CREATE TRIGGER charts_retire_files AFTER DELETE OR UPDATE OF tja_file, audio_file, cover_file, preview_file, movie_file, bgimage_file ON official.charts FOR EACH ROW EXECUTE FUNCTION official.retire_chart_files();
+
+
+--
 -- Name: charts charts_retire_scores; Type: TRIGGER; Schema: official; Owner: -
 --
 
@@ -3640,6 +3683,13 @@ CREATE TRIGGER comments_touch_chart AFTER INSERT OR DELETE OR UPDATE ON official
 --
 
 CREATE TRIGGER dan_votes_count AFTER INSERT OR DELETE OR UPDATE OF value ON official.dan_votes FOR EACH ROW EXECUTE FUNCTION official.count_dan_vote();
+
+
+--
+-- Name: playlists playlists_retire_cover; Type: TRIGGER; Schema: official; Owner: -
+--
+
+CREATE TRIGGER playlists_retire_cover AFTER DELETE OR UPDATE OF cover_file, game_cover_file ON official.playlists FOR EACH ROW EXECUTE FUNCTION official.retire_playlist_cover();
 
 
 --

@@ -13,6 +13,7 @@ One PostgreSQL database, `ourtaiko_net` (PostgreSQL 18), made from the databases
 Rules, all checked by `check.sql`:
 
 - The two sources have the same set of tables. Only five columns differ between them (`charts.audio_file` and `tja_file` may be empty in `official`; `category_flags` and `playlists.category_flag` are narrower there; `official.charts` has `official_id`).
+- Each source queues the files its charts and playlists stop referring to (`retired_files`), by trigger, in the transaction that replaces or deletes the row. Fanmade's old database did this; the official source was given the same two triggers here (`build/alike.sql`).
 - A connection that works on one source sets `search_path` to `<source>, net`. SQL written without schema names then finds the source's tables and the shared ones.
 - Every function of a source is pinned to that same `search_path`, so it works whoever fires it.
 - `fanmade.scores` and `official.scores` are partitions of `net.scores`, split by `source`; the same for `dan_attempts`. Each keeps its primary key on `id` and its foreign key to its own `chart_difficulties`. Across sources a score is named by `(source, id)`.
@@ -22,7 +23,7 @@ Rules, all checked by `check.sql`:
 
 | File | What it does |
 |---|---|
-| `build.sh`, `build/` | Builds the empty schema in an empty database from the two song databases' schemas, and writes `baseline.sql` |
+| `build.sh`, `build/` | Builds the empty schema in an empty database from the two song databases' schemas (`adopt.sql`), gives both sources what only one did by itself (`alike.sql`), adds what the site holds once (`net.sql`), and writes `baseline.sql` |
 | `baseline.sql` | The result, generated. Do not edit by hand |
 | `import.sh`, `import/` | Replaces all song and player data with the three old databases' current contents, in one transaction, and compares every table with its origin |
 | `check.sql` | The structural rules above, and every foreign key by query |

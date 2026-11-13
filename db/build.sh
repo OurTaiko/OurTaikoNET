@@ -29,6 +29,7 @@ for pair in "fanmade|$fanmade" "official|$official"; do
     | run -f - >/dev/null
   run -c "CALL net_build.adopt('$src')"
 done
+run -f "$here/build/alike.sql"
 run -f "$here/build/net.sql" >/dev/null
 run -c "DROP SCHEMA net_build CASCADE" -c "DROP SCHEMA public CASCADE" -c "CREATE SCHEMA public"
 run -f "$here/check.sql"
