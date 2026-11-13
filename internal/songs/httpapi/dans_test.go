@@ -21,7 +21,7 @@ func TestDanCourses(t *testing.T) {
 	const origin = "http://127.0.0.1:5173"
 	const alice, boss, carol = "0000000000000000000000000000a11c", "0000000000000000000000000000b055", "0000000000000000000000000000ca01"
 	const songA, songB = "11111111111111111111111111111111", "22222222222222222222222222222222"
-	_, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,nickname,is_admin) VALUES
+	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,nickname,is_admin) VALUES
  ('0000000000000000000000000000a11c','alice','unused','Alice',false),('0000000000000000000000000000b055','boss','unused','Boss',true),('0000000000000000000000000000ca01','carol','unused','Carol',false);
  INSERT INTO charts(id,owner_ids,title,subtitle,bpm,duration,tja_file,audio_file) VALUES
  ('11111111111111111111111111111111',ARRAY['0000000000000000000000000000a11c'],'Alpha','--a',120,10,test_file('tja-a','a.tja',repeat('a',64),1),test_file('ogg-a','a.ogg',repeat('b',64),1)),
@@ -81,7 +81,7 @@ func TestDanCourses(t *testing.T) {
 	game := map[string]string{}
 	for _, user := range []string{carol} {
 		token := web.NewID() + web.NewID()
-		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user); err != nil {
+		if _, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user); err != nil {
 			t.Fatal(err)
 		}
 		game[user] = token

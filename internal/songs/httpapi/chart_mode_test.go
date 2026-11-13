@@ -19,10 +19,10 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
 	token := strings.Repeat("c", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','doubletest','unused');`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','doubletest','unused');`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','csrf',now()+interval '1 day'),($2,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','csrf',now()+interval '1 day'),($2,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()}).Handler()

@@ -25,7 +25,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'ActivityUser',$2)`, id, string(password)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'ActivityUser',$2)`, id, string(password)); err != nil {
 		t.Fatal(err)
 	}
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
@@ -146,13 +146,17 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 	for i := 0; i < 15; i++ {
 		id := fmt.Sprintf("%032x", i+100)
 		ids = append(ids, id)
-		if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,nickname,password_hash) VALUES($1,$2,$3,'private-hash')`, id, fmt.Sprintf("PrivateLogin%d", i), fmt.Sprintf("鼓手 %02d", i)); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,$2,$3,'private-hash')`, id, fmt.Sprintf("PrivateLogin%d", i), fmt.Sprintf("鼓手 %02d", i)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	app := testServer(t, pool, Config{})
-	// An SSO-only identity must never appear in the Fanmade directory.
-	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'SsoOnly','SSO独有','private-hash')`, web.NewID()); err != nil {
+	// An account the account center knows but the site has never seen is in no directory here.
+	ssoOnly := web.NewID()
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'SsoOnly','SSO独有','private-hash')`, ssoOnly); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM users WHERE id=$1`, ssoOnly); err != nil {
 		t.Fatal(err)
 	}
 	for i, id := range ids[:14] {

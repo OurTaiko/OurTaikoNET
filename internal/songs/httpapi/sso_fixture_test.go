@@ -14,22 +14,13 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Regression tests run the production ID-only schema and real HTTP SSO bridge.
-// Legacy fixtures become the fake identity provider's private data, never runtime fallback.
+// testServer makes a server whose account center is a fake one over real HTTP. The fake
+// knows the accounts and tokens the fixtures put in test_sso_users and test_sessions
+// (scoreTestDB); every website session among the latter becomes a real session of the site.
 func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 	t.Helper()
 	ctx := context.Background()
-	_, e := pool.Exec(ctx, `CREATE TABLE test_sso_users AS TABLE users; CREATE TABLE test_old_sessions AS TABLE sessions`)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e = dropLegacyIdentity(ctx, pool); e != nil {
-		t.Fatal(e)
-	}
-	_, e = pool.Exec(ctx, `ALTER TABLE sessions ALTER COLUMN upstream_token SET DEFAULT ''::bytea`)
-	if e != nil {
-		t.Fatal(e)
-	}
+	var e error
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Service-ID") != "fanmade" || r.Header.Get("X-Service-Key") != strings.Repeat("a", 64) || r.Header.Get("Origin") != "" {
 			w.WriteHeader(401)
@@ -56,7 +47,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 				return
 			}
 			token := web.NewID() + web.NewID()
-			_, e = pool.Exec(r.Context(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), u.ID)
+			_, e = pool.Exec(r.Context(), `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), u.ID)
 			if e != nil {
 				w.WriteHeader(503)
 				return
@@ -65,7 +56,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 		case "/internal/v1/game/introspect", "/internal/v1/web/introspect":
 			var id string
 			if strings.Contains(r.URL.Path, "/game/") {
-				_ = pool.QueryRow(r.Context(), `SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at>now()`, web.Hash("game:"+str("accessToken"))).Scan(&id)
+				_ = pool.QueryRow(r.Context(), `SELECT user_id FROM test_sessions WHERE token_hash=$1 AND expires_at>now()`, web.Hash("game:"+str("accessToken"))).Scan(&id)
 			} else {
 				v, ok := strings.CutPrefix(str("accessToken"), "web:")
 				if ok {
@@ -114,7 +105,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 	if e != nil {
 		t.Fatal(e)
 	}
-	rows, e := pool.Query(ctx, `SELECT token_hash,user_id,csrf_token,expires_at FROM test_old_sessions`)
+	rows, e := pool.Query(ctx, `SELECT token_hash,user_id,csrf_token,expires_at FROM test_sessions`)
 	if e != nil {
 		t.Fatal(e)
 	}

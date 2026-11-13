@@ -21,10 +21,10 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	ctx := context.Background()
 	const owner = "89b6ef3a5cb57b6e04f74711d15a8a5f"
 	cookie := strings.Repeat("a", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 		t.Fatal(err)
 	}
 	app := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()})

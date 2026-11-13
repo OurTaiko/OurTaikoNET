@@ -23,10 +23,10 @@ func TestPreviewLifecycle(t *testing.T) {
 			pool := scoreTestDB(t)
 			const owner = "d46774d30dd13b92d9e536808da468a4"
 			cookie := strings.Repeat("1", 64)
-			if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
+			if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
+			if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 				t.Fatal(err)
 			}
 			cfg := Config{Storage: t.TempDir(), Origin: "http://localhost"}

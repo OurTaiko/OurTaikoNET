@@ -13,7 +13,7 @@ func TestUserScores(t *testing.T) {
 	const player = "0000000000000000000000000000abcd"
 	const other = "0000000000000000000000000000beef"
 	_, err := pool.Exec(ctx, `BEGIN;
- INSERT INTO users(id,username,password_hash) VALUES('0000000000000000000000000000abcd','player','unused'),('0000000000000000000000000000beef','other','unused');
+ INSERT INTO test_sso_users(id,username,password_hash) VALUES('0000000000000000000000000000abcd','player','unused'),('0000000000000000000000000000beef','other','unused');
  INSERT INTO charts(id,owner_ids,title,title_translations,bpm,duration,tja_file,audio_file,status) VALUES
   ('11111111111111111111111111111111',ARRAY['0000000000000000000000000000abcd'],'Alpha','{"ja":"アルファ"}',120,10,test_file('tja','tja',repeat('a',64),1),test_file('audio','audio',repeat('a',64),1),'published'),
   ('22222222222222222222222222222222',ARRAY['0000000000000000000000000000abcd'],'Beta','{}',120,10,test_file('tja','tja',repeat('a',64),1),test_file('audio','audio',repeat('a',64),1),'published'),

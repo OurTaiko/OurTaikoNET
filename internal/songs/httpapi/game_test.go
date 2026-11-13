@@ -15,7 +15,7 @@ import (
 func TestGameSessionIsolation(t *testing.T) {
 	pool := scoreTestDB(t)
 	h, _ := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
-	_, err := pool.Exec(context.Background(), `INSERT INTO users(id,username,password_hash) VALUES('abd722b06b5255372acb7511472ff700','gameuser',$1)`, string(h))
+	_, err := pool.Exec(context.Background(), `INSERT INTO test_sso_users(id,username,password_hash) VALUES('abd722b06b5255372acb7511472ff700','gameuser',$1)`, string(h))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestGameSessionIsolation(t *testing.T) {
 	if w := call("GET", "/api/v1/game/scores", "", webToken, "", ""); w.Code != 401 {
 		t.Fatal("browser token accepted as native token")
 	}
-	if _, err = pool.Exec(context.Background(), `UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, web.Hash("game:"+result.AccessToken)); err != nil {
+	if _, err = pool.Exec(context.Background(), `UPDATE test_sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, web.Hash("game:"+result.AccessToken)); err != nil {
 		t.Fatal(err)
 	}
 	if w := call("GET", "/api/v1/game/scores", "", result.AccessToken, "", ""); w.Code != 401 {

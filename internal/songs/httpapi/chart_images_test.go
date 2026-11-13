@@ -30,10 +30,10 @@ func TestChartImagesFollowTheirHeaders(t *testing.T) {
 	ctx := context.Background()
 	const owner = "5d0f1c3a9b2e4f6a8c7d0e1f2a3b4c5d"
 	cookie := strings.Repeat("c", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 		t.Fatal(err)
 	}
 	// Remote storage, as in production: the resource list needs public links.

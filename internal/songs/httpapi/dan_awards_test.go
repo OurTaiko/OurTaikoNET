@@ -43,7 +43,7 @@ func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
 	const origin = "http://127.0.0.1:5173"
 	const alice, carol = "0000000000000000000000000000a11c", "0000000000000000000000000000ca01"
 	const song, course = "11111111111111111111111111111111", "dddddddddddddddddddddddddddddddd"
-	_, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,nickname) VALUES ('0000000000000000000000000000a11c','alice','unused','Alice'),('0000000000000000000000000000ca01','carol','unused','Carol');
+	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,nickname) VALUES ('0000000000000000000000000000a11c','alice','unused','Alice'),('0000000000000000000000000000ca01','carol','unused','Carol');
  INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES
  ('11111111111111111111111111111111',ARRAY['0000000000000000000000000000a11c'],'Alpha',120,10,test_file('tja-a','a.tja',repeat('a',64),1),test_file('ogg-a','a.ogg',repeat('b',64),1));
  SELECT test_slot('11111111111111111111111111111111','Oni',9);
@@ -56,7 +56,7 @@ func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
 	s := testServer(t, pool, Config{Origin: origin, Awards: awards})
 	handler := s.Handler()
 	token := web.NewID() + web.NewID()
-	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), carol); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), carol); err != nil {
 		t.Fatal(err)
 	}
 	var slot int64

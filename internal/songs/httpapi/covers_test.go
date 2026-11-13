@@ -35,14 +35,14 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	if err := pool.QueryRow(ctx, `SELECT current_database()`).Scan(&name); err != nil || !strings.HasPrefix(name, "otn_test_") {
 		t.Fatalf("refuse non-isolated test database: %q %v", name, err)
 	}
-	_, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,is_admin) VALUES(repeat('1',32),'owner','unused',false),(repeat('2',32),'other','unused',false),(repeat('3',32),'admin','unused',true)`)
+	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES(repeat('1',32),'owner','unused',false),(repeat('2',32),'other','unused',false),(repeat('3',32),'admin','unused',true)`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cookies := map[string]string{}
 	for index, id := range []string{"owner", "other", "admin"} {
 		cookies[id] = web.NewID() + web.NewID()
-		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookies[id]), strings.Repeat(string(rune('1'+index)), 32)); err != nil {
+		if _, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookies[id]), strings.Repeat(string(rune('1'+index)), 32)); err != nil {
 			t.Fatal(err)
 		}
 	}

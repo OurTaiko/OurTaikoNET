@@ -24,10 +24,10 @@ func TestCategoriesFlow(t *testing.T) {
 	token := strings.Repeat("a", 64)
 	gameToken := strings.Repeat("b", 64)
 	otherToken := strings.Repeat("c", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','testd46774d30dd1','unused'),('9b893bc6d9422c93536ff0df503b81e9','test9b893bc6d942','unused');`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','testd46774d30dd1','unused'),('9b893bc6d9422c93536ff0df503b81e9','test9b893bc6d942','unused');`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($3,'9b893bc6d9422c93536ff0df503b81e9','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+gameToken), web.Hash(otherToken)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($3,'9b893bc6d9422c93536ff0df503b81e9','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+gameToken), web.Hash(otherToken)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: origin, Storage: t.TempDir()}).Handler()

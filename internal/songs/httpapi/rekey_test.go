@@ -22,7 +22,7 @@ func TestRekeyFiles(t *testing.T) {
 			ctx := context.Background()
 			pool := scoreTestDB(t)
 			const owner = "d46774d30dd13b92d9e536808da468a4"
-			if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
+			if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
 				t.Fatal(err)
 			}
 			cfg := Config{Storage: t.TempDir(), Origin: "http://localhost"}

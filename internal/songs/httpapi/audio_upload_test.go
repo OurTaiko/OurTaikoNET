@@ -29,10 +29,10 @@ func testAudioUploadAndDownload(t *testing.T, remote bool) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
 	cookie := strings.Repeat("a", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie)); err != nil {
 		t.Fatal(err)
 	}
 	cfg := Config{Origin: "http://localhost", Storage: t.TempDir()}

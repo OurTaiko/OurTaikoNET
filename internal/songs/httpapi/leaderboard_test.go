@@ -15,7 +15,7 @@ func TestLeaderboard(t *testing.T) {
 	const song = "11111111111111111111111111111111"
 	const old = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	for i := 0; i < 23; i++ {
-		if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,$2,'unused')`, fmt.Sprintf("%032x", i+1000), fmt.Sprintf("player%d", i)); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,$2,'unused')`, fmt.Sprintf("%032x", i+1000), fmt.Sprintf("player%d", i)); err != nil {
 			t.Fatal(err)
 		}
 	}

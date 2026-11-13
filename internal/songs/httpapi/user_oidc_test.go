@@ -19,9 +19,6 @@ import (
 func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	if err := dropLegacyIdentity(ctx, pool); err != nil {
-		t.Fatal(err)
-	}
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)

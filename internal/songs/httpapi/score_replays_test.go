@@ -94,7 +94,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	_, err = tx.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'replaytest','unused');`, user)
+	_, err = tx.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'replaytest','unused');`, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	}
 	base := fmt.Sprintf(`{"difficultyId":%d,"good":10,"ok":0,"bad":0,"score":10000,"drumroll":0,"max_combo":10}`, slot)
 	app := testServer(t, pool, Config{Origin: origin})
-	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user)
+	_, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user)
 	if err != nil {
 		t.Fatal(err)
 	}

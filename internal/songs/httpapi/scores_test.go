@@ -16,14 +16,27 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// scoreTestDB gives a test its own ourtaiko_net, opened for the fanmade source, with the
-// account columns these fixtures were written against (see legacy_identity_test.go).
+// scoreTestDB gives a test its own ourtaiko_net, opened for the fanmade source, and beside it
+// what the fake account center of testServer knows: its accounts (test_sso_users; adding one
+// also makes the player known to the site) and the tokens it has given out (test_sessions: a
+// website session by the hash of its cookie, a game token by the hash of "game:" and the
+// token). testServer opens a real website session for each of the former.
 func scoreTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	pool := netdbtest.New(t, "fanmade")
 	ctx := context.Background()
 	var err error
-	if err = addLegacyIdentity(ctx, pool); err != nil {
+	if _, err = pool.Exec(ctx, `
+CREATE TABLE test_sso_users (id text PRIMARY KEY, username text NOT NULL UNIQUE, password_hash text NOT NULL, nickname text,
+ email_verified_at timestamptz, is_admin boolean NOT NULL DEFAULT false);
+CREATE FUNCTION test_sso_user() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.nickname IS NULL THEN NEW.nickname := NEW.username; END IF;
+ INSERT INTO users(id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER test_sso_user BEFORE INSERT ON test_sso_users FOR EACH ROW EXECUTE FUNCTION test_sso_user();
+CREATE TABLE test_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL, csrf_token text NOT NULL, expires_at timestamptz NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
 	// Fixtures register a file under an arbitrary key and reference its ID.
@@ -51,11 +64,11 @@ func TestSubmitScore(t *testing.T) {
 	const csrf = "test-csrf"
 	const cookie = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const cookie2 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	_, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused'),('d1ee9badde8bb6f733b2315472711632','tester2','unused');`)
+	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused'),('d1ee9badde8bb6f733b2315472711632','tester2','unused');`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f',$3,now()+interval '1 day'),($2,'d1ee9badde8bb6f733b2315472711632',$3,now()+interval '1 day')`, web.Hash(cookie), web.Hash(cookie2), csrf)
+	_, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f',$3,now()+interval '1 day'),($2,'d1ee9badde8bb6f733b2315472711632',$3,now()+interval '1 day')`, web.Hash(cookie), web.Hash(cookie2), csrf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +92,7 @@ func TestSubmitScore(t *testing.T) {
 	slot := fmt.Sprintf(`"difficultyId":%d`, oni)
 	handler := testServer(t, pool, Config{Origin: origin}).Handler()
 	nativeToken := strings.Repeat("c", 64)
-	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+nativeToken)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+nativeToken)); err != nil {
 		t.Fatal(err)
 	}
 	native := func(method, path, body string) *httptest.ResponseRecorder {
@@ -351,11 +364,11 @@ func TestScorePlayCounts(t *testing.T) {
 	ctx := context.Background()
 	const song = "22222222222222222222222222222222"
 	token := strings.Repeat("d", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused');
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused');
  INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES('`+song+`',ARRAY['89b6ef3a5cb57b6e04f74711d15a8a5f'],'Test',120,10,test_file('tja','test.tja',repeat('a',64),1),test_file('ogg','test.ogg',repeat('b',64),1))`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	var oni int64

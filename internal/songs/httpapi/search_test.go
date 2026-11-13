@@ -15,7 +15,7 @@ import (
 func TestPublicGameSearch(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,nickname,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','searcher','公开昵称','unused');`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','searcher','公开昵称','unused');`); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 14; i++ {
@@ -106,7 +106,7 @@ func TestPublicGameSearch(t *testing.T) {
 	}
 	webToken := seedWebSession(t, s, "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 	gameToken := strings.Repeat("c", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash("game:"+gameToken)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash("game:"+gameToken)); err != nil {
 		t.Fatal(err)
 	}
 	for _, endpoint := range []string{"/api/v1/game/search"} {

@@ -61,7 +61,7 @@ func testAudioStreamHTTP(t *testing.T, remote bool) {
 			t.Fatal(err)
 		}
 	}
-	mustExec(`INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','audioowner','unused')`)
+	mustExec(`INSERT INTO test_sso_users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','audioowner','unused')`)
 	app := testServer(t, pool, cfg)
 	for _, filename := range []string{"cbr.mp3", "vorbis.ogg"} {
 		t.Run(filename, func(t *testing.T) {

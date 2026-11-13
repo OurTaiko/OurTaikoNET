@@ -16,11 +16,11 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 	ctx := context.Background()
 	const owner, other, manager = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9", "5f63f79d876d201a13f8710453636837"
 	tokens := map[string]string{owner: strings.Repeat("1", 64), other: strings.Repeat("2", 64), manager: strings.Repeat("3", 64)}
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,is_admin) VALUES($1,'owner','unused',false),($2,'other','unused',false),($3,'manager','unused',true)`, owner, other, manager); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES($1,'owner','unused',false),($2,'other','unused',false),($3,'manager','unused',true)`, owner, other, manager); err != nil {
 		t.Fatal(err)
 	}
 	for id, token := range tokens {
-		if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(token), id); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(token), id); err != nil {
 			t.Fatal(err)
 		}
 	}

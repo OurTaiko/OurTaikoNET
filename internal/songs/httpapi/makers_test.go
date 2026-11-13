@@ -18,10 +18,10 @@ func TestDifficultyMakersFlow(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
 	token := strings.Repeat("d", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('037c0ccac142bf8602cbbe373b9a6f16','makertest','unused')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES('037c0ccac142bf8602cbbe373b9a6f16','makertest','unused')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day'),($2,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day'),($2,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()}).Handler()

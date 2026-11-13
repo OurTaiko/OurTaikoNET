@@ -52,7 +52,7 @@ func interactionFixture(t *testing.T) (interactionClient, *Server) {
 	t.Helper()
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,is_admin) VALUES
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES
 	 ('d46774d30dd13b92d9e536808da468a4','owner','unused',false),
 	 ('9b893bc6d9422c93536ff0df503b81e9','alice','unused',false),
 	 ('5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69','bob','unused',false),

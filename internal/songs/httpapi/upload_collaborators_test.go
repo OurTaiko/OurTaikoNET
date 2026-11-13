@@ -25,11 +25,11 @@ func TestUploadInvitesCollaborators(t *testing.T) {
 	const alice = "9b893bc6d9422c93536ff0df503b81e9"
 	const bob = "5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69"
 	cookies := map[string]string{owner: strings.Repeat("a", 64), alice: strings.Repeat("b", 64)}
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused'),($2,'alice','unused'),($3,'bob','unused')`, owner, alice, bob); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash) VALUES($1,'tester','unused'),($2,'alice','unused'),($3,'bob','unused')`, owner, alice, bob); err != nil {
 		t.Fatal(err)
 	}
 	for user, cookie := range cookies {
-		if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), user); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), user); err != nil {
 			t.Fatal(err)
 		}
 	}

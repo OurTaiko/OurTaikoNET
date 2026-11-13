@@ -18,7 +18,7 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
 	id := web.NewID()
-	_, e := pool.Exec(ctx, `INSERT INTO users(id,username,nickname,password_hash) VALUES($1,'Private123','公开昵称','unused')`, id)
+	_, e := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'Private123','公开昵称','unused')`, id)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -140,7 +140,7 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 func TestPublicNamesDoNotExposeLogin(t *testing.T) {
 	pool := scoreTestDB(t)
 	id := web.NewID()
-	_, e := pool.Exec(context.Background(), `INSERT INTO users(id,username,nickname,password_hash) VALUES($1,'PrivateLogin','公开名','unused')`, id)
+	_, e := pool.Exec(context.Background(), `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'PrivateLogin','公开名','unused')`, id)
 	if e != nil {
 		t.Fatal(e)
 	}
