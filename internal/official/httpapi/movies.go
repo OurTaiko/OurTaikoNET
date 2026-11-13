@@ -21,10 +21,11 @@ import (
 )
 
 // replaceMovie sets a chart's background movie apart from its other files, as replaceCover
-// sets its cover (as on Fanmade). The multipart body holds one "movie" file and optionally
+// sets its cover. The multipart body holds one "movie" file and optionally
 // "movieOffset" (seconds; the current offset when left out). The movie is transcoded by the
 // upload worker; with Prefer: respond-async the answer is 202 and the result arrives as an
-// upload_result notification. A song registered without files has no TJA to name it.
+// upload_result notification. A song registered without files (official source) has no TJA
+// to name it.
 func (s *Server) replaceMovie(w http.ResponseWriter, r *http.Request) {
 	u, c, ok := s.managed(w, r)
 	if !ok {

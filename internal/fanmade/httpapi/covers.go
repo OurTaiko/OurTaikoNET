@@ -61,7 +61,7 @@ func (s *Server) changeCover(ctx context.Context, tx pgx.Tx, chartID string, dat
 		return err
 	}
 	name := hash(string(data)) + ".webp"
-	tjaFile, err := s.rewriteStoredTJA(ctx, tx, chartID, func(stored []byte) ([]byte, bool) {
+	tjaFile, _, err := s.rewriteStoredTJA(ctx, tx, chartID, func(stored []byte) ([]byte, bool) {
 		stored, ok := tja.SetSongHeader(stored, "PREIMAGE", name)
 		return stored, ok && tja.SongHeader(stored, "PREIMAGE") == name
 	})

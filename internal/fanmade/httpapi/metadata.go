@@ -246,7 +246,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if offset != current {
-			if err = s.rewriteMovie(r.Context(), tx, r.PathValue("id"), movieSHA, nil, offset); err != nil {
+			if _, err = s.rewriteMovie(r.Context(), tx, r.PathValue("id"), movieSHA, nil, offset); err != nil {
 				internal(w, err)
 				return
 			}

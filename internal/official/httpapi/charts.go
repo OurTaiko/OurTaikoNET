@@ -484,6 +484,29 @@ func canManage(u User, c Chart) bool {
 	return u.IsAdmin || c.hasOwner(u.ID)
 }
 
+// managed answers a request to change a chart: the signed-in user and the published chart
+// the path names, when the user may manage it.
+func (s *Server) managed(w http.ResponseWriter, r *http.Request) (session, Chart, bool) {
+	u, ok := s.required(w, r, true)
+	if !ok {
+		return u, Chart{}, false
+	}
+	c, e := s.chart(r.Context(), r.PathValue("id"))
+	if errors.Is(e, pgx.ErrNoRows) {
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return u, c, false
+	}
+	if e != nil {
+		internal(w, e)
+		return u, c, false
+	}
+	if !canManage(u.User, c) {
+		problem(w, 403, "FORBIDDEN", "只有所有者或管理员可以修改谱面")
+		return u, c, false
+	}
+	return u, c, true
+}
+
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {

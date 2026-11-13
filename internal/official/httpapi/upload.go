@@ -18,7 +18,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/text/unicode/norm"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/cover"
@@ -389,30 +388,4 @@ func validDescription(s string) bool {
 		}
 	}
 	return true
-}
-
-// managed loads a published chart the signed-in user may edit.
-func (s *Server) managed(w http.ResponseWriter, r *http.Request) (session, Chart, bool) {
-	u, ok := s.required(w, r, true)
-	if !ok {
-		return u, Chart{}, false
-	}
-	id, ok := chartID(w, r)
-	if !ok {
-		return u, Chart{}, false
-	}
-	c, e := s.chart(r.Context(), id)
-	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
-		return u, c, false
-	}
-	if e != nil {
-		internal(w, e)
-		return u, c, false
-	}
-	if !canManage(u.User, c) {
-		problem(w, 403, "FORBIDDEN", "只有所有者或管理员可以修改谱面")
-		return u, c, false
-	}
-	return u, c, true
 }
