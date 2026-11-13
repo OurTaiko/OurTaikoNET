@@ -1,17 +1,11 @@
 package httpapi
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"ourtaiko.dev/net/internal/kit/audio"
-	"ourtaiko.dev/net/internal/kit/objectstore"
-	"ourtaiko.dev/net/internal/kit/video"
 )
 
 // The game API follows the protocol OurTaikoPlay speaks to the Fanmade
@@ -21,13 +15,6 @@ import (
 // bearer tokens; browser cookies never authorize them.
 func isGameRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, "/api/v1/game/") || strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ")
-}
-
-// devGameToken stands for the SSO game token of DEV_USER_ID on a local server
-// without an account center.
-func (s *Server) devGameToken() string {
-	h := sha256.Sum256([]byte("ourtaiko-database-dev-game:" + s.Config.DevUserID))
-	return hex.EncodeToString(h[:])
 }
 
 func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
@@ -141,164 +128,25 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, body)
 }
 
-// gameSearch is the game's song picker: keyword, course and star level that
-// hold for the same block (a course covers all its sides), optionally putting
-// songs the player has not full-combo'd (unfc) or all-perfected (unperfect)
-// yet first. A block's scores of replaced files count only while it has no
-// current one. It returns every match, without pagination.
-func (s *Server) gameSearch(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	q := strings.TrimSpace(query.Get("q"))
-	if len(q) > 200 {
-		problem(w, 400, "QUERY_INVALID", "搜索内容过长")
-		return
-	}
-	course := query.Get("course")
-	switch course {
-	case "", "Easy", "Normal", "Hard", "Oni", "Edit":
-	default:
-		problem(w, 400, "DIFFICULTY_INVALID", "难度必须为 Easy / Normal / Hard / Oni / Edit")
-		return
-	}
-	level := -1
-	if raw := query.Get("level"); raw != "" {
-		var e error
-		if level, e = strconv.Atoi(raw); e != nil || level < 1 || level > 10 {
-			problem(w, 400, "QUERY_INVALID", "星数必须在 1 到 10 之间")
-			return
-		}
-	}
-	order := query.Get("order")
-	switch order {
-	case "", "default", "unfc", "unperfect":
-	default:
-		problem(w, 400, "QUERY_INVALID", "顺序必须为 default / unfc / unperfect")
-		return
-	}
-	// Only a game session personalizes the order; guests keep the default.
-	userID := ""
-	if order == "unfc" || order == "unperfect" {
-		if u, e := s.current(r); e == nil {
-			userID = u.User.ID
-		} else if !errors.Is(e, pgx.ErrNoRows) {
-			internal(w, e)
-			return
-		}
-	}
-	const matching = `SELECT 1 FROM chart_difficulties d WHERE d.chart_id=c.id AND ($3='' OR d.course=$3) AND ($4::int=-1 OR d.level=$4)`
-	rows, e := s.DB.Query(r.Context(), chartSelect+` WHERE `+playableChart+` AND c.category_flags<>0 AND `+keywordClause("$1", "$2")+` AND EXISTS(`+matching+`)
-	 ORDER BY ($5::text<>'' AND EXISTS(`+matching+`
-	 AND NOT EXISTS(SELECT 1 FROM scores sc WHERE sc.user_id=$5 AND sc.difficulty_id=d.id
-	 AND (sc.is_latest OR NOT EXISTS(SELECT 1 FROM scores cur WHERE cur.user_id=$5 AND cur.difficulty_id=d.id AND cur.is_latest))
-	 AND sc.bad=0 AND (sc.good>0 OR sc.ok>0) AND ($6::text='unfc' OR sc.ok=0)))) DESC, c.created_at DESC,c.id DESC`,
-		q, keywordNumber(q), course, level, userID, order)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	items, e := readCharts(rows)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	s.chartNames(r.Context(), items)
-	respond(w, 200, map[string]any{"items": items, "total": len(items)})
-}
-
-// resourceLink tells a client where to download one stored file and how to
-// verify it.
-type resourceLink struct {
-	URL         string `json:"url"`
-	HeadURL     string `json:"headUrl"`
-	SHA256      string `json:"sha256"`
-	Size        int64  `json:"size"`
-	ContentType string `json:"contentType"`
-}
-
-// resourceLinks lists where a client downloads a chart's current files: the
-// CDN address when S3 has one, else this API's own file routes under
-// APP_ORIGIN. API credentials are never needed for these links.
-func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
-	id, ok := chartID(w, r)
+// gameScoreList returns the signed-in account's scores on published charts,
+// those of replaced files included; the client prefers current ones.
+func (s *Server) gameScoreList(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.required(w, r, false)
 	if !ok {
 		return
 	}
-	c, e := readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, id))
-	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+	rows, err := s.DB.Query(r.Context(), scoreSelect+` JOIN charts c ON c.id=d.chart_id WHERE sc.user_id=$1 AND `+publishedChart+` ORDER BY sc.submitted_at,sc.id`, u.User.ID)
+	if err != nil {
+		internal(w, err)
 		return
 	}
-	if e != nil {
-		internal(w, e)
+	scores, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Score, error) { return readScore(row) })
+	if err != nil {
+		internal(w, err)
 		return
 	}
-	if !c.HasFiles {
-		problem(w, 404, "CHART_FILES_MISSING", "该乐曲尚未上传谱面文件")
-		return
+	if scores == nil {
+		scores = []Score{}
 	}
-	link := func(key, route, digest, media string, size int64) (resourceLink, error) {
-		target := ""
-		if remote, ok := s.Config.Objects.(*objectstore.S3); ok {
-			var e error
-			if target, e = remote.PublicURL(key); e != nil {
-				return resourceLink{}, e
-			}
-		}
-		if target == "" {
-			target = s.Config.Origin + "/api/v1/charts/" + c.ID + "/" + route
-		}
-		return resourceLink{target, target, digest, size, media}, nil
-	}
-	tjaLink, e := link(c.TJAKey, "tja", c.TJAHash, "application/octet-stream", c.TJASize)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	audioLink, e := link(c.AudioKey, "audio", c.AudioHash, audio.MediaType(c.AudioName), c.AudioSize)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	resources := map[string]resourceLink{"tja": tjaLink, "audio": audioLink}
-	// The song-select preview clip, as Fanmade lists it; a chart waiting for the backfill has none.
-	var previewKey, previewHash string
-	var previewSize int64
-	e = s.DB.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.preview_file WHERE c.id=$1`, c.ID).Scan(&previewKey, &previewHash, &previewSize)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
-	}
-	if e == nil {
-		if resources["preview"], e = link(previewKey, "preview", previewHash, "audio/ogg", previewSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	if c.MovieKey != "" {
-		if resources["movie"], e = link(c.MovieKey, "movie", c.MovieHash, video.MediaType, c.MovieSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	if c.BackgroundKey != "" {
-		if resources["bgimage"], e = link(c.BackgroundKey, "bgimage", c.BackgroundHash, "image/webp", c.BackgroundSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	// The cover too, as Fanmade lists it: the website's chart package carries it.
-	var coverKey, coverHash string
-	var coverSize int64
-	e = s.DB.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, c.ID).Scan(&coverKey, &coverHash, &coverSize)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
-	}
-	if e == nil {
-		if resources["cover"], e = link(coverKey, "cover", coverHash, "image/webp", coverSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	respond(w, 200, map[string]any{"chartId": c.ID, "urlsExpire": false, "resources": resources})
+	respond(w, 200, map[string]any{"scores": scores})
 }

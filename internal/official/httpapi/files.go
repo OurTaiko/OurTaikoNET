@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
@@ -81,13 +80,6 @@ func (s *Server) downloadTJA(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) streamAudio(w http.ResponseWriter, r *http.Request) {
-	if key, name, digest, ok := s.publishedFile(w, r, "audio_file"); ok {
-		w.Header().Set("X-Accel-Buffering", "no")
-		s.serveObject(w, r, key, name, digest, audio.MediaType(name), "inline")
-	}
-}
-
 // streamMovie sends the chart's background movie (BGMOVIE), as Fanmade's /movie.
 func (s *Server) streamMovie(w http.ResponseWriter, r *http.Request) {
 	if key, _, digest, ok := s.publishedFile(w, r, "movie_file"); ok {
@@ -107,18 +99,6 @@ func (s *Server) streamPreview(w http.ResponseWriter, r *http.Request) {
 	if key, _, digest, ok := s.publishedFile(w, r, "preview_file"); ok {
 		s.serveObject(w, r, key, "preview.ogg", digest, "audio/ogg", "inline")
 	}
-}
-
-func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
-	key, _, digest, ok := s.publishedFile(w, r, "cover_file")
-	if !ok {
-		return
-	}
-	if requested := r.URL.Query().Get("v"); requested != "" && requested != digest {
-		problem(w, 404, "COVER_NOT_FOUND", "该封面已被替换")
-		return
-	}
-	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
 }
 
 // downloadPackage builds a ZIP per request from the stored TJA, with the

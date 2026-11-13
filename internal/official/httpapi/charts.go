@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -73,9 +72,6 @@ type Chart struct {
 
 const publishedChart = `c.status='published'`
 
-// playableChart is a published chart with files: what the game can play.
-const chartScoreSQL = `COALESCE((SELECT upvotes-downvotes FROM chart_stats WHERE chart_id=c.id),0)`
-
 const playableChart = publishedChart + ` AND c.tja_file IS NOT NULL`
 
 const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_ids,c.description,c.created_at,c.update_at,c.duration,c.demo_end,c.category_flags,
@@ -108,20 +104,6 @@ func readChart(row pgx.Row) (Chart, error) {
 		c.Maker = difficultyMakers(c.Difficulties)
 	}
 	return c, e
-}
-
-// Keep the first occurrence in block order, so credits never shuffle between reads.
-func difficultyMakers(difficulties []tja.Difficulty) string {
-	seen := map[string]bool{}
-	names := []string{}
-	for _, d := range difficulties {
-		name := strings.TrimSpace(d.Maker)
-		if name != "" && !seen[name] {
-			seen[name] = true
-			names = append(names, name)
-		}
-	}
-	return strings.Join(names, " | ")
 }
 
 func readCharts(rows pgx.Rows) ([]Chart, error) {
@@ -207,45 +189,6 @@ func (s *Server) chartWhere(ctx context.Context, column string, value any) (Char
 		c = items[0]
 	}
 	return c, e
-}
-
-// Public catalogs stay available during an identity-provider outage.
-func (s *Server) chartNames(ctx context.Context, charts []Chart) {
-	ids, seen := []string{}, map[string]bool{}
-	for _, c := range charts {
-		for _, id := range c.OwnerIDs {
-			if !seen[id] {
-				seen[id] = true
-				ids = append(ids, id)
-			}
-		}
-	}
-	profiles := s.profiles(ctx, ids)
-	for i := range charts {
-		charts[i].setOwners(profiles)
-	}
-}
-
-func (c *Chart) setUploader(p PublicProfile) {
-	c.Uploader = p.Nickname
-	c.UploaderAvatarURL = p.AvatarURL
-}
-
-func (c *Chart) hasOwner(id string) bool { return slices.Contains(c.OwnerIDs, id) }
-func (c *Chart) setOwners(profiles map[string]PublicProfile) {
-	c.Owners = []NotificationActor{}
-	for _, id := range c.OwnerIDs {
-		p, ok := profiles[id]
-		if !ok {
-			p.Nickname = "未知用户"
-		}
-		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL})
-	}
-	p, ok := profiles[c.OwnerID]
-	if !ok {
-		p.Nickname = "未知用户"
-	}
-	c.setUploader(p)
 }
 
 const pageSize = 24

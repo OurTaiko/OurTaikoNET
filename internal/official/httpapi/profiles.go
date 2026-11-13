@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"slices"
 	"time"
 )
 
@@ -36,4 +37,44 @@ func (s *Server) avatarOf(u User) string {
 		return ""
 	}
 	return s.Config.SSO.AvatarURL(u)
+}
+
+// Public catalogs stay available during an identity-provider outage.
+func (s *Server) chartNames(ctx context.Context, charts []Chart) {
+	ids, seen := []string{}, map[string]bool{}
+	for _, c := range charts {
+		for _, id := range c.OwnerIDs {
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	profiles := s.profiles(ctx, ids)
+	for i := range charts {
+		charts[i].setOwners(profiles)
+	}
+}
+
+func (c *Chart) hasOwner(id string) bool { return slices.Contains(c.OwnerIDs, id) }
+
+func (c *Chart) setOwners(profiles map[string]PublicProfile) {
+	c.Owners = []NotificationActor{}
+	for _, id := range c.OwnerIDs {
+		p, ok := profiles[id]
+		if !ok {
+			p.Nickname = "未知用户"
+		}
+		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL})
+	}
+	p, ok := profiles[c.OwnerID]
+	if !ok {
+		p.Nickname = "未知用户"
+	}
+	c.setUploader(p)
+}
+
+func (c *Chart) setUploader(p PublicProfile) {
+	c.Uploader = p.Nickname
+	c.UploaderAvatarURL = p.AvatarURL
 }

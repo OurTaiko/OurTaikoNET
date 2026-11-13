@@ -83,25 +83,6 @@ func playlistID(raw string) (string, bool) {
 	return raw, validID(raw)
 }
 
-func categoryByFlag(flag CategoryFlags) Category {
-	for _, category := range categoryCatalog {
-		if category.Flag == flag {
-			return category.Category
-		}
-	}
-	return Category{}
-}
-
-// viewer is the signed-in user by the website cookie alone, without asking the
-// account center; empty for a guest.
-func (s *Server) viewer(r *http.Request) string {
-	v, e := s.localSession(r)
-	if e != nil {
-		return ""
-	}
-	return v.User.ID
-}
-
 // playlistChartCount counts the charts of playlist p that are still published.
 const playlistChartCount = `(SELECT count(*) FROM playlist_items i JOIN charts c ON c.id=i.chart_id WHERE i.playlist_id=p.id AND ` + publishedChart + `)`
 

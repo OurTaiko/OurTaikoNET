@@ -49,3 +49,17 @@ func applyDifficultyMakers(raw string, difficulties []tja.Difficulty) error {
 	}
 	return nil
 }
+
+// Keep the first occurrence in block order, so credits never shuffle between reads.
+func difficultyMakers(difficulties []tja.Difficulty) string {
+	seen := map[string]bool{}
+	names := []string{}
+	for _, d := range difficulties {
+		name := strings.TrimSpace(d.Maker)
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return strings.Join(names, " | ")
+}

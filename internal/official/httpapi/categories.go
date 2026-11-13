@@ -136,3 +136,12 @@ func categorySelection(raw json.RawMessage) ([]string, error) {
 	}
 	return unique, nil
 }
+
+func categoryByFlag(flag CategoryFlags) Category {
+	for _, category := range categoryCatalog {
+		if category.Flag == flag {
+			return category.Category
+		}
+	}
+	return Category{}
+}

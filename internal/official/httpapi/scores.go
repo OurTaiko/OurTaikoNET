@@ -98,29 +98,6 @@ func readScore(row pgx.Row) (Score, error) {
 	return v, err
 }
 
-// gameScoreList returns the signed-in account's scores on published charts,
-// those of replaced files included; the client prefers current ones.
-func (s *Server) gameScoreList(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, false)
-	if !ok {
-		return
-	}
-	rows, err := s.DB.Query(r.Context(), scoreSelect+` JOIN charts c ON c.id=d.chart_id WHERE sc.user_id=$1 AND `+publishedChart+` ORDER BY sc.submitted_at,sc.id`, u.User.ID)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	scores, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Score, error) { return readScore(row) })
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if scores == nil {
-		scores = []Score{}
-	}
-	respond(w, 200, map[string]any{"scores": scores})
-}
-
 // submitScore stores one play. Every play is its own row; the same
 // Idempotency-Key with the same body returns the stored score.
 func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
