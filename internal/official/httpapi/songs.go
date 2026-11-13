@@ -3,18 +3,11 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 )
-
-// validBPM accepts the BPM an uploader gives a song without files: positive
-// and finite, or 0 for unknown.
-func validBPM(n float64) bool {
-	return n >= 0 && n <= 10000 && !math.IsNaN(n)
-}
 
 // songBPM reads the optional BPM of a song without files; empty means
 // unknown, stored as 0.

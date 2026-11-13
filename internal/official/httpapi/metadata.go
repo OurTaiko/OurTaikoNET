@@ -2,20 +2,24 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"math"
 	"net/http"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
 )
 
-// editMetadata changes the database's own description of a chart; the stored
+// editMetadata changes the site's own description of a chart; the stored
 // TJA and audio are untouched. Omitted fields keep their value. The title and
 // subtitle can be changed at any time (R042): pages, packages and the game use
 // these, and put them into the TJA headers they hand out. The BPM is the TJA's
@@ -77,6 +81,11 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		flags, _ = encodeCategories(ids)
+	}
+	// Only the official source's songs carry the official game's identifiers.
+	if !officialSource && len(patch.NijiiroID)+len(patch.OfficialID) > 0 {
+		problem(w, 422, "IDENTIFIER_INVALID", "这个曲源的谱面没有 Nijiiro ID 和官方 ID")
+		return
 	}
 	nijiiroID, officialID := c.NijiiroID, c.OfficialID
 	if len(patch.NijiiroID) > 0 {
@@ -157,8 +166,8 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	// update_at is refreshed by the charts trigger only when something changed.
-	tag, e := tx.Exec(r.Context(), `UPDATE charts c SET description=$2,category_flags=$3,nijiiro_id=$4,official_id=$5,title_translations=$6,subtitle_translations=$7,title=$8,subtitle=$9,bpm=$10,demo_start=$11,demo_end=$12 WHERE c.id=$1 AND `+publishedChart,
-		c.ID, description, flags, nijiiroID, officialID, titles, subtitles, title, subtitle, bpm, demoStart, demoEnd)
+	tag, e := tx.Exec(r.Context(), `UPDATE charts c SET description=$2,category_flags=$3,nijiiro_id=$4,title_translations=$5,subtitle_translations=$6,title=$7,subtitle=$8,bpm=$9,demo_start=$10,demo_end=$11 WHERE c.id=$1 AND `+publishedChart,
+		c.ID, description, flags, nijiiroID, titles, subtitles, title, subtitle, bpm, demoStart, demoEnd)
 	if nijiiroConflict(e) {
 		problem(w, 409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
 		return
@@ -170,6 +179,13 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	if tag.RowsAffected() == 0 {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return
+	}
+	// The column is the official source's alone.
+	if officialSource {
+		if _, e = tx.Exec(r.Context(), `UPDATE charts SET official_id=$2 WHERE id=$1`, c.ID, officialID); e != nil {
+			internal(w, e)
+			return
+		}
 	}
 	// A changed block refreshes the chart's update_at by trigger.
 	for i, d := range makers {
@@ -235,7 +251,7 @@ type metadataPatch struct {
 	// MOVIEOFFSET in seconds, for a chart with a movie; it is rewritten in the stored TJA,
 	// where players read it.
 	MovieOffset json.RawMessage `json:"movieOffset"`
-	// Every block's maker, as [{course, side, maker}], as on Fanmade.
+	// Every block's maker, as [{course, side, maker}].
 	DifficultyMakers json.RawMessage `json:"difficultyMakers"`
 }
 
@@ -275,4 +291,57 @@ func validDisplayText(s string) bool {
 		}
 	}
 	return true
+}
+
+func validDescription(s string) bool {
+	if len(s) > 4000 || !utf8.ValidString(s) {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+			return false
+		}
+	}
+	return true
+}
+
+// validBPM accepts the BPM an uploader gives a song without files: positive
+// and finite, or 0 for unknown.
+func validBPM(n float64) bool {
+	return n >= 0 && n <= 10000 && !math.IsNaN(n)
+}
+
+var officialIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+
+// nijiiroTaken reports whether a chart other than except has the Nijiiro ID; each names one
+// chart (unique index charts_nijiiro_id, migration 027).
+func (s *Server) nijiiroTaken(ctx context.Context, id *int32, except string) (bool, error) {
+	if id == nil {
+		return false, nil
+	}
+	var taken bool
+	e := s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM charts WHERE nijiiro_id=$1 AND id<>$2)`, *id, except).Scan(&taken)
+	return taken, e
+}
+
+// nijiiroConflict tells the unique index's refusal: another writer took the Nijiiro ID after
+// nijiiroTaken looked.
+func nijiiroConflict(e error) bool {
+	var pg *pgconn.PgError
+	return errors.As(e, &pg) && pg.Code == "23505" && pg.ConstraintName == "charts_nijiiro_id"
+}
+
+const nijiiroTakenMessage = "这个 Nijiiro ID 已被其他谱面使用"
+
+// nijiiroFree answers 409 NIJIIRO_ID_TAKEN and reports false when another chart has the ID.
+func (s *Server) nijiiroFree(w http.ResponseWriter, r *http.Request, id *int32, except string) bool {
+	taken, e := s.nijiiroTaken(r.Context(), id, except)
+	if e != nil {
+		internal(w, e)
+		return false
+	}
+	if taken {
+		problem(w, 409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
+	}
+	return !taken
 }

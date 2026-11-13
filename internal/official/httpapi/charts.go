@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/objectstore"
@@ -220,39 +219,6 @@ func validID(id string) bool {
 
 func (s *Server) chart(ctx context.Context, id string) (Chart, error) {
 	return s.chartWhere(ctx, "c.id", id)
-}
-
-// nijiiroTaken reports whether a chart other than except has the Nijiiro ID; each names one
-// chart (unique index charts_nijiiro_id, migration 027).
-func (s *Server) nijiiroTaken(ctx context.Context, id *int32, except string) (bool, error) {
-	if id == nil {
-		return false, nil
-	}
-	var taken bool
-	e := s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM charts WHERE nijiiro_id=$1 AND id<>$2)`, *id, except).Scan(&taken)
-	return taken, e
-}
-
-// nijiiroConflict tells the unique index's refusal: another writer took the Nijiiro ID after
-// nijiiroTaken looked.
-func nijiiroConflict(e error) bool {
-	var pg *pgconn.PgError
-	return errors.As(e, &pg) && pg.Code == "23505" && pg.ConstraintName == "charts_nijiiro_id"
-}
-
-const nijiiroTakenMessage = "这个 Nijiiro ID 已被其他谱面使用"
-
-// nijiiroFree answers 409 NIJIIRO_ID_TAKEN and reports false when another chart has the ID.
-func (s *Server) nijiiroFree(w http.ResponseWriter, r *http.Request, id *int32, except string) bool {
-	taken, e := s.nijiiroTaken(r.Context(), id, except)
-	if e != nil {
-		internal(w, e)
-		return false
-	}
-	if taken {
-		problem(w, 409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
-	}
-	return !taken
 }
 
 // chartWhere reads the published chart whose column (c.id, c.number_id or c.nijiiro_id) is value.

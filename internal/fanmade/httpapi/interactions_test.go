@@ -155,7 +155,7 @@ func TestChartDetailBy(t *testing.T) {
 	}
 	// No request changes it.
 	for _, body := range []string{`{"nijiiroId":7}`, `{"nijiiroId":null}`} {
-		if code := c.do("owner", "PATCH", "/api/v1/charts/other", body, nil); code != 400 {
+		if code := c.do("owner", "PATCH", "/api/v1/charts/other", body, nil); code != 422 {
 			t.Fatal("PATCH", body, code)
 		}
 	}

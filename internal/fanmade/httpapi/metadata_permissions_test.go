@@ -58,7 +58,9 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		{"", "csrf", `{"title":"Anonymous"}`, 401},
 		{"9b893bc6d9422c93536ff0df503b81e9", "csrf", `{"title":"Denied"}`, 403},
 		{"5f63f79d876d201a13f8710453636837", "", `{"title":"Missing CSRF"}`, 403},
-		{"9b893bc6d9422c93536ff0df503b81e9", "csrf", `{"title":"Forged","isAdmin":true}`, 400},
+		// Who may edit is settled before what the edit says.
+		{"9b893bc6d9422c93536ff0df503b81e9", "csrf", `{"title":"Forged","isAdmin":true}`, 403},
+		{"d46774d30dd13b92d9e536808da468a4", "csrf", `{"title":"Forged","isAdmin":true}`, 400},
 		{"d46774d30dd13b92d9e536808da468a4", "csrf", `{"title":"Author edit"}`, 200},
 		{"5f63f79d876d201a13f8710453636837", "csrf", `{"title":"Admin edit"}`, 200},
 	} {
@@ -81,7 +83,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	if updated.Code != 200 || json.Unmarshal(updated.Body.Bytes(), &content) != nil || content.Description != "介绍\n第二行" || content.Maker != "New credit" {
 		t.Fatalf("content edit failed: %s", updated.Body.String())
 	}
-	for _, body := range []string{`{"description":null}`, `{"description":12}`, `{"description":"\u0000"}`, `{"description":"` + strings.Repeat("中", 1001) + `"}`, `{"description":"rolled back","difficultyMakers":[{"course":"Hard","side":"single","maker":"invalid"}]}`, `{"difficultyMakers":null}`} {
+	for _, body := range []string{`{"description":null}`, `{"description":12}`, `{"description":"\u0000"}`, `{"description":"` + strings.Repeat("中", 1334) + `"}`, `{"description":"rolled back","difficultyMakers":[{"course":"Hard","side":"single","maker":"invalid"}]}`, `{"difficultyMakers":null}`} {
 		if w := call("d46774d30dd13b92d9e536808da468a4", "csrf", body); w.Code != 422 {
 			t.Fatalf("invalid content accepted: %s", w.Body.String())
 		}

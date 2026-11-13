@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -138,4 +140,29 @@ func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respond(w, 200, map[string]any{"metadata": meta, "previous": previous, "blocks": blocks})
+}
+
+// sourceMetadata parses the chart's stored TJA.
+func (s *Server) sourceMetadata(ctx context.Context, tx pgx.Tx, id string) (tja.Metadata, error) {
+	var key string
+	if err := tx.QueryRow(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1`, id).Scan(&key); err != nil {
+		return tja.Metadata{}, err
+	}
+	f, err := s.Config.Objects.Open(ctx, key)
+	if err != nil {
+		return tja.Metadata{}, err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, tja.MaxTJA+1))
+	if err != nil {
+		return tja.Metadata{}, err
+	}
+	if len(data) > tja.MaxTJA {
+		return tja.Metadata{}, fmt.Errorf("source TJA exceeds limit")
+	}
+	parsed, issue := tja.Parse(data, tja.WaveName(data))
+	if issue != nil {
+		return tja.Metadata{}, issue
+	}
+	return parsed, nil
 }

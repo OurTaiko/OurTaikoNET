@@ -140,12 +140,12 @@ func categorySelection(raw json.RawMessage) ([]string, error) {
 	sort.Strings(ids)
 	unique := ids[:0]
 	for _, id := range ids {
-		if id == "" || len(id) > 64 {
-			return nil, errors.New("invalid category ID")
-		}
 		if len(unique) == 0 || unique[len(unique)-1] != id {
 			unique = append(unique, id)
 		}
+	}
+	if _, err := encodeCategories(unique); err != nil {
+		return nil, err
 	}
 	return unique, nil
 }

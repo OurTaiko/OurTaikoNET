@@ -101,7 +101,7 @@ func internal(w http.ResponseWriter, err error) {
 	problem(w, 503, "SERVICE_UNAVAILABLE", "服务暂时不可用，请稍后重试")
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	return decodeLimit(w, r, v, 8192)
+	return decodeLimit(w, r, v, 64*1024)
 }
 func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {

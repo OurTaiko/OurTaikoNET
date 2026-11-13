@@ -15,8 +15,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 	"ourtaiko.dev/net/internal/kit/audio"
@@ -31,7 +29,6 @@ type stagedFile struct {
 }
 
 var keyPattern = regexp.MustCompile(`^[a-zA-Z0-9-]{16,80}$`)
-var officialIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 func uploadReadError(w http.ResponseWriter, e error) {
 	var tooLarge *http.MaxBytesError
@@ -376,16 +373,4 @@ func reservePending(w http.ResponseWriter, s *Server) bool {
 		problem(w, 503, "UPLOAD_BUSY", "当前排队处理的上传较多，请稍后重试")
 		return false
 	}
-}
-
-func validDescription(s string) bool {
-	if len(s) > 4000 || !utf8.ValidString(s) {
-		return false
-	}
-	for _, r := range s {
-		if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
-			return false
-		}
-	}
-	return true
 }
