@@ -24,6 +24,30 @@ db/dev/pull-backups.sh                   # fill the local source databases from 
 tools/compare-local.sh <3 local dbs>     # run the old sites and this one side by side and compare their answers
 ```
 
+## Local development
+
+The backend and the website run side by side on this machine:
+
+```sh
+scripts/dev.sh        # this repository: the backend on http://127.0.0.1:8090
+pnpm dev              # in OurTaikoNetWeb: the website on http://127.0.0.1:5173, passing /api on
+```
+
+Open <http://127.0.0.1:5173> (that address, not `localhost`: the backend accepts changes only from the origin it is told, `APP_ORIGIN`).
+
+`scripts/dev.sh` reads `.env` in this directory, which git ignores. What it needs:
+
+| Variable | For local development |
+|---|---|
+| `DATABASE_URL` | The local database, for example `postgres:///ourtaiko_net_dev?host=/tmp&sslmode=disable` (made by `db/import.sh`, or empty after `-init`) |
+| `LISTEN_ADDR`, `APP_ORIGIN` | `127.0.0.1:8090` and `http://127.0.0.1:5173` |
+| `STORAGE_DIR` | Where uploaded files go, for example `.data` |
+| `TJAPARSER_BIN` | A build of TJAParser `v0.13.0`, for example kept under `.data/tools/` |
+| `DEV_USER_ID` | 32 lowercase hex digits. With no account center configured, signing in signs in as this player, who may manage everything. Only accepted on a loopback address |
+
+The script starts the local PostgreSQL if it is not running and puts ffmpeg on `PATH`. A database filled from production holds the songs but not their files, which are in the bucket: covers and audio of those songs do not load locally, while anything uploaded locally does.
+
+
 The plan, the decisions behind it and the work log are in the private notes repository, under `OurTaikoNet/`.
 
 ## The database in one paragraph
