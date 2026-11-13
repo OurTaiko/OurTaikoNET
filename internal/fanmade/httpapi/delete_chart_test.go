@@ -13,9 +13,9 @@ import (
 func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	const owner, other = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9"
-	tokens := map[string]string{owner: strings.Repeat("1", 64), other: strings.Repeat("2", 64)}
-	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,is_admin) VALUES($1,'owner','unused',false),($2,'other','unused',false)`, owner, other); err != nil {
+	const owner, other, manager = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9", "5f63f79d876d201a13f8710453636837"
+	tokens := map[string]string{owner: strings.Repeat("1", 64), other: strings.Repeat("2", 64), manager: strings.Repeat("3", 64)}
+	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash,is_admin) VALUES($1,'owner','unused',false),($2,'other','unused',false),($3,'manager','unused',true)`, owner, other, manager); err != nil {
 		t.Fatal(err)
 	}
 	for id, token := range tokens {
@@ -47,8 +47,8 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 		}
 	}
 	handler := testServer(t, pool, Config{Objects: store, Storage: t.TempDir(), Origin: "http://localhost"}).Handler()
-	remove := func(actor string) int {
-		r := httptest.NewRequest("DELETE", "/api/v1/charts/gone", nil)
+	removeChart := func(actor, chart string) int {
+		r := httptest.NewRequest("DELETE", "/api/v1/charts/"+chart, nil)
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: tokens[actor]})
@@ -56,6 +56,7 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w.Code
 	}
+	remove := func(actor string) int { return removeChart(actor, "gone") }
 	count := func(query string, args ...any) int {
 		t.Helper()
 		var n int
@@ -106,5 +107,15 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 	}
 	if code := remove(owner); code != 404 {
 		t.Fatal("repeated delete", code)
+	}
+	// Whoever manages the source may delete a song that is not theirs; nobody else may.
+	if code := removeChart(other, "kept"); code != 403 {
+		t.Fatal("non-owner delete of the kept song", code)
+	}
+	if code := removeChart(manager, "kept"); code != 200 {
+		t.Fatal("manager delete", code)
+	}
+	if count(`SELECT count(*) FROM charts`) != 0 || count(`SELECT count(*) FROM scores`) != 0 || count(`SELECT count(*) FROM chart_resources`) != 0 || exists("shared") || exists("kept/tja") {
+		t.Fatal("manager delete left something")
 	}
 }

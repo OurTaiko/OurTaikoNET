@@ -161,6 +161,25 @@ func (s *Server) deleteRetiredFiles(ctx context.Context) error {
 	return errors.Join(failures...)
 }
 
+// releaseFiles deletes the given files and their objects unless a chart still refers to
+// them. The database queued them (retired_files) when the row that referred to them went,
+// so one that fails now is deleted by the periodic cleanup.
+func (s *Server) releaseFiles(ctx context.Context, ids []int64) error {
+	rows, err := s.DB.Query(ctx, `SELECT storage_key FROM chart_resources WHERE id=ANY($1)`, ids)
+	if err != nil {
+		return err
+	}
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+	var failures []error
+	for _, key := range keys {
+		failures = append(failures, s.deleteRetiredFile(ctx, key))
+	}
+	return errors.Join(failures...)
+}
+
 // deleteRetiredFile deletes one queued file and its object unless a chart still
 // refers to it, then removes it from the queue. A failure leaves it queued for
 // retry. The key lock excludes an upload that is about to reuse the object.

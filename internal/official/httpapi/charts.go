@@ -480,7 +480,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, c)
 }
 
-// canManage: an owner or an administrator, as on Fanmade.
+// canManage: a song's owners and whoever manages this source may change or delete it.
 func canManage(u User, c Chart) bool {
 	return u.IsAdmin || c.hasOwner(u.ID)
 }
@@ -490,11 +490,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	id, ok := chartID(w, r)
-	if !ok {
-		return
-	}
-	c, e := s.chart(r.Context(), id)
+	c, e := s.chart(r.Context(), r.PathValue("id"))
 	if errors.Is(e, pgx.ErrNoRows) {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在")
 		return
@@ -507,7 +503,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "FORBIDDEN", "只有所有者或管理员可以删除谱面")
 		return
 	}
-	files, e := s.deleteChart(r.Context(), id)
+	files, e := s.deleteChart(r.Context(), c.ID)
 	if errors.Is(e, pgx.ErrNoRows) {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在")
 		return
@@ -516,21 +512,22 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	// Shared files stay while another chart refers to them.
+	// The song is gone either way. A file another chart shares stays; one that could not be
+	// deleted is retried later.
 	if e = s.releaseFiles(context.WithoutCancel(r.Context()), files); e != nil {
 		log.Printf("deleted chart file cleanup pending: %v", e)
 	}
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
-// deleteChart removes a chart's scores and row, returning the file records it
-// referenced.
+// deleteChart removes a chart's scores and row, and returns the files it referred to.
 func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		return nil, e
 	}
 	defer tx.Rollback(ctx)
+	// Serialize with score submissions, which hold the chart row FOR SHARE.
 	var files []*int64
 	if e = tx.QueryRow(ctx, `SELECT ARRAY[tja_file,audio_file,cover_file,preview_file,movie_file,bgimage_file] FROM charts WHERE id=$1 FOR UPDATE`, id).Scan(&files); e != nil {
 		return nil, e

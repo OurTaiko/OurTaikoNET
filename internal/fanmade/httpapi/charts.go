@@ -311,6 +311,12 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, 200, c)
 }
+
+// canManage: a song's owners and whoever manages this source may change or delete it.
+func canManage(u User, c Chart) bool {
+	return u.IsAdmin || c.hasOwner(u.ID)
+}
+
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -318,62 +324,59 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	}
 	c, e := s.chart(r.Context(), r.PathValue("id"))
 	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在")
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在")
 		return
 	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
-	if !c.hasOwner(u.User.ID) {
-		problem(w, 403, "FORBIDDEN", "只能删除自己的作品")
+	if !canManage(u.User, c) {
+		problem(w, 403, "FORBIDDEN", "只有所有者或管理员可以删除谱面")
 		return
 	}
-	keys, e := s.deleteChart(r.Context(), c.ID, u.User.ID)
+	files, e := s.deleteChart(r.Context(), c.ID)
 	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在")
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在")
 		return
 	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
-	// Files are queued by the deletion; the periodic cleanup retries any failure.
-	for _, key := range keys {
-		if e = s.deleteRetiredFile(r.Context(), key); e != nil {
-			log.Printf("deleted chart file cleanup pending: %v", e)
-		}
+	// The song is gone either way. A file another chart shares stays; one that could not be
+	// deleted is retried later.
+	if e = s.releaseFiles(context.WithoutCancel(r.Context()), files); e != nil {
+		log.Printf("deleted chart file cleanup pending: %v", e)
 	}
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
-// deleteChart removes a song's scores and row. The chart trigger queues each
-// of its files in retired_files; it returns their keys.
-func (s *Server) deleteChart(ctx context.Context, chartID, ownerID string) ([]string, error) {
+// deleteChart removes a chart's scores and row, and returns the files it referred to.
+func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		return nil, e
 	}
 	defer tx.Rollback(ctx)
-	// Serialize with score submissions, which hold the song row FOR SHARE.
-	if e = tx.QueryRow(ctx, `SELECT id FROM charts WHERE id=$1 AND owner_ids @> ARRAY[$2::text] AND status<>'deleted' FOR UPDATE`, chartID, ownerID).Scan(&chartID); e != nil {
+	// Serialize with score submissions, which hold the chart row FOR SHARE.
+	var files []*int64
+	if e = tx.QueryRow(ctx, `SELECT ARRAY[tja_file,audio_file,cover_file,preview_file,movie_file,bgimage_file] FROM charts WHERE id=$1 FOR UPDATE`, id).Scan(&files); e != nil {
 		return nil, e
 	}
-	if _, e = tx.Exec(ctx, `DELETE FROM scores WHERE difficulty_id IN (SELECT id FROM chart_difficulties WHERE chart_id=$1)`, chartID); e != nil {
+	if _, e = tx.Exec(ctx, `DELETE FROM scores WHERE difficulty_id IN (SELECT id FROM chart_difficulties WHERE chart_id=$1)`, id); e != nil {
 		return nil, e
 	}
-	rows, e := tx.Query(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id IN (c.tja_file,c.audio_file,c.cover_file,c.preview_file,c.movie_file,c.bgimage_file) WHERE c.id=$1`, chartID)
-	if e != nil {
+	if _, e = tx.Exec(ctx, `DELETE FROM charts WHERE id=$1`, id); e != nil {
 		return nil, e
 	}
-	keys, e := pgx.CollectRows(rows, pgx.RowTo[string])
-	if e != nil {
-		return nil, e
+	ids := []int64{}
+	for _, file := range files {
+		if file != nil {
+			ids = append(ids, *file)
+		}
 	}
-	if _, e = tx.Exec(ctx, `DELETE FROM charts WHERE id=$1`, chartID); e != nil {
-		return nil, e
-	}
-	return keys, tx.Commit(ctx)
+	return ids, tx.Commit(ctx)
 }
 func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	c, e := s.chart(r.Context(), r.PathValue("id"))
@@ -481,11 +484,6 @@ func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
 		return "", false
 	}
 	return id, true
-}
-
-// canManage: an owner or an administrator, as on Fanmade.
-func canManage(u User, c Chart) bool {
-	return u.IsAdmin || c.hasOwner(u.ID)
 }
 
 const pageSize = 24
