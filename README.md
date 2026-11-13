@@ -7,7 +7,7 @@ Status: the database layer and a first backend exist and pass their tests locall
 | Part | State |
 |---|---|
 | `db/` | One database, `ourtaiko_net`, built from the three old ones; importer; tests |
-| Backend (Go, this repository) | One program on the one database. `internal/songs` serves a song source, and the program runs it twice: once for Fanmade and once for the official source (`sources.go` holds what each has of its own). `internal/profile` serves the players' pages; its sign-in code is still its own copy |
+| Backend (Go, this repository) | One program on the one database. `internal/songs` serves a song source, and the program runs it twice: once for Fanmade and once for the official source (`sources.go` holds what each has of its own). `internal/profile` serves the players' pages. `internal/signin` is the website's sign-in and sessions, which all of them use |
 | `internal/site` | The new address: each source under `/api/v1/sources/<source>/`, players' routes (titles, nameplates, all their scores) under `/api/v1/` |
 | `internal/legacy` | The old host names, answered as the old sites answered. The only place that knows about them |
 | `internal/groups` | User groups, one bit each on a player's row: who may do the work each part reserves for its managers. The account center only says who the site's administrator is; the administrator assigns groups under `/api/v1/admin/` |
