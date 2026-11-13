@@ -54,7 +54,7 @@ type session struct {
 func (s *Server) sessions() *signin.Sessions {
 	return &signin.Sessions{DB: s.DB, SSO: s.Config.SSO, DevUserID: s.Config.DevUserID, Origin: s.Config.Origin, CookieSecure: s.Config.CookieSecure,
 		Cookie: s.sessionCookie(), FlowCookie: flowCookie, DefaultReturn: "/", ErrorPage: "/?error=sso",
-		Problem: problem, Internal: internal}
+		Problems: answers}
 }
 
 // OpenSession records that a player has signed in with the account center and returns the

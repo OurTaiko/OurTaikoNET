@@ -40,9 +40,8 @@ type Sessions struct {
 	// DefaultReturn is the page signing in returns to when it was asked for nowhere, or
 	// nowhere allowed. ErrorPage is where a sign-in that failed lands.
 	DefaultReturn, ErrorPage string
-	// Problem and Internal answer a request that cannot be served, in the part's own shape.
-	Problem  func(w http.ResponseWriter, status int, code, message string)
-	Internal func(w http.ResponseWriter, err error)
+	// Problems answers a request that cannot be served, in the part's own shape.
+	web.Problems
 }
 
 // Session is a signed-in browser. Token and RefreshToken are the account center's

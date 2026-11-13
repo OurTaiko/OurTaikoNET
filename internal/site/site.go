@@ -7,9 +7,10 @@
 package site
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Source is one song source and the handler of its API, which expects paths under /api/v1/.
@@ -33,20 +34,20 @@ func Handler(sources []Source, players http.Handler) http.Handler {
 		byID[s.ID] = s.API
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]bool{"ok": true}) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { web.Respond(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /api/v1/sources", func(w http.ResponseWriter, r *http.Request) {
-		respond(w, 200, map[string]any{"sources": list})
+		web.Respond(w, 200, map[string]any{"sources": list})
 	})
 	mux.HandleFunc("/api/v1/sources/{source}/{rest...}", func(w http.ResponseWriter, r *http.Request) {
 		api, ok := byID[r.PathValue("source")]
 		if !ok {
-			respond(w, 404, map[string]string{"code": "SOURCE_NOT_FOUND", "message": "No such song source"})
+			web.Respond(w, 404, map[string]string{"code": "SOURCE_NOT_FOUND", "message": "No such song source"})
 			return
 		}
 		// The site has one sign-in, /api/v1/auth/…, and a session opened there is a session in
 		// every source. The sign-in routes each source's old site had are not offered.
 		if rest := r.PathValue("rest"); rest == "auth" || strings.HasPrefix(rest, "auth/") {
-			respond(w, 404, map[string]string{"code": "NOT_FOUND", "message": "Sign in at /api/v1/auth/sso/login"})
+			web.Respond(w, 404, map[string]string{"code": "NOT_FOUND", "message": "Sign in at /api/v1/auth/sso/login"})
 			return
 		}
 		// The source's API sees the path it has always had.
@@ -57,17 +58,11 @@ func Handler(sources []Source, players http.Handler) http.Handler {
 		api.ServeHTTP(w, inner)
 	})
 	notFound := func(w http.ResponseWriter, r *http.Request) {
-		respond(w, 404, map[string]string{"code": "NOT_FOUND", "message": "Not found"})
+		web.Respond(w, 404, map[string]string{"code": "NOT_FOUND", "message": "Not found"})
 	}
 	if players != nil {
 		mux.Handle("/api/v1/", players)
 	}
 	mux.HandleFunc("/", notFound)
 	return mux
-}
-
-func respond(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(body)
 }

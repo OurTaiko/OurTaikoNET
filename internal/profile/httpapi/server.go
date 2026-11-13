@@ -3,7 +3,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"io/fs"
 	"log"
 	"net/http"
@@ -60,27 +59,11 @@ func (s *Server) sessionCookie() string {
 	return defaultSessionCookie
 }
 
-func problem(w http.ResponseWriter, status int, code, msg string) {
-	web.Respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID")})
-}
-func internal(w http.ResponseWriter, err error) {
-	log.Printf("request=%s error=%v", w.Header().Get("X-Request-ID"), err)
-	problem(w, 503, "SERVICE_UNAVAILABLE", "服务暂时不可用，请稍后重试")
-}
-func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		problem(w, 415, "CONTENT_TYPE_INVALID", "请使用 JSON 请求")
-		return false
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
-	if err := d.Decode(v); err != nil {
-		problem(w, 400, "REQUEST_INVALID", "请求格式不正确")
-		return false
-	}
-	return true
-}
+// answers is how the players' part answers a request it cannot serve (web.Problems).
+var answers = web.Problems{}
+
+// The names this package calls them by.
+var problem, internal, decode = answers.Problem, answers.Internal, answers.Decode
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()

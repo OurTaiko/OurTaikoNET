@@ -24,7 +24,7 @@ func (s *Server) sessions() *signin.Sessions {
 	src := s.source()
 	return &signin.Sessions{DB: s.DB, SSO: s.Config.SSO, DevUserID: s.Config.DevUserID, Origin: s.Config.Origin, CookieSecure: s.Config.CookieSecure,
 		Cookie: s.sessionCookie(), FlowCookie: src.OIDCCookie, DefaultReturn: src.DefaultReturn, ErrorPage: "/login?error=sso",
-		Problem: problem, Internal: internal}
+		Problems: answers}
 }
 
 // manages says whether u may do what this code calls an administrator's work: the account

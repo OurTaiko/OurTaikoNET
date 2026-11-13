@@ -2,14 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io/fs"
 	"log"
 	"net/http"
 	"net/netip"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -93,30 +91,14 @@ func New(pool *pgxpool.Pool, cfg Config) *Server {
 	}
 	return &Server{DB: pool, Config: cfg, uploads: make(chan struct{}, 2), pending: make(chan struct{}, maxPendingUploads), jobs: make(chan *uploadJob, maxPendingUploads), limits: map[string]window{}}
 }
-func problem(w http.ResponseWriter, status int, code, msg string) {
-	web.Respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
-}
-func internal(w http.ResponseWriter, err error) {
-	log.Printf("request=%s error=%v", w.Header().Get("X-Request-ID"), err)
-	problem(w, 503, "SERVICE_UNAVAILABLE", "服务暂时不可用，请稍后重试")
-}
-func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	return decodeLimit(w, r, v, 64*1024)
-}
-func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
-	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		problem(w, 415, "CONTENT_TYPE_INVALID", "请使用 JSON 请求")
-		return false
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
-	if err := d.Decode(v); err != nil {
-		problem(w, 400, "REQUEST_INVALID", "请求格式不正确")
-		return false
-	}
-	return true
-}
+
+// answers is how a song source answers a request it cannot serve (web.Problems): every such
+// answer also says which version of the TJA rules this server judges uploads by.
+var answers = web.Problems{Extra: map[string]any{"validationVersion": tja.Version}}
+
+// The names this package calls them by.
+var problem, internal, decode, decodeLimit = answers.Problem, answers.Internal, answers.Decode, answers.DecodeLimit
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { web.Respond(w, 200, map[string]bool{"ok": true}) })
