@@ -11,7 +11,7 @@ import (
 
 // site serves the embedded build, falling back to the SPA for page routes only.
 func (s *Server) site(w http.ResponseWriter, r *http.Request) {
-	if s.Config.Site == nil || s.Config.GameOnly || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+	if s.Config.Site == nil || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
 		http.NotFound(w, r)
 		return
 	}

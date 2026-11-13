@@ -15,35 +15,10 @@ type Category struct {
 	ChartCount int `json:"chartCount"`
 }
 
-// CategoryFlags are persisted in charts.category_flags as one byte. Never
-// renumber or reuse a bit.
-type CategoryFlags int16
-
-const (
-	CategoryNamco    CategoryFlags = 0x01
-	CategoryPop      CategoryFlags = 0x02
-	CategoryGame     CategoryFlags = 0x04
-	CategoryAnime    CategoryFlags = 0x08
-	CategoryVocaloid CategoryFlags = 0x10
-	CategoryVariety  CategoryFlags = 0x20
-	CategoryKids     CategoryFlags = 0x40
-	CategoryClassics CategoryFlags = 0x80
-)
-
-// Catalog order is the order of the bits. Genre is the game's box.def #GENRE.
-var categoryCatalog = [...]struct {
-	Flag CategoryFlags
-	Category
-}{
-	{CategoryNamco, Category{ID: "namco", Title: "Namco", Genre: "ナムコオリジナル"}},
-	{CategoryPop, Category{ID: "pop", Title: "Pop", Genre: "J-POP"}},
-	{CategoryGame, Category{ID: "game", Title: "Game", Genre: "ゲームミュージック"}},
-	{CategoryAnime, Category{ID: "anime", Title: "Anime", Genre: "アニメ"}},
-	{CategoryVocaloid, Category{ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"}},
-	{CategoryVariety, Category{ID: "variety", Title: "Variety", Genre: "バラエティー"}},
-	{CategoryKids, Category{ID: "kids", Title: "Kids", Genre: "どうよう"}},
-	{CategoryClassics, Category{ID: "classics", Title: "Classics", Genre: "クラシック"}},
-}
+// CategoryFlags are persisted in charts.category_flags. Never renumber or reuse a bit; a new
+// category also needs the database's CHECK on the column widened. Each source has its own
+// categories (source.go).
+type CategoryFlags int32
 
 func categoryFlag(id string) (CategoryFlags, bool) {
 	for _, category := range categoryCatalog {
@@ -66,7 +41,8 @@ func encodeCategories(ids []string) (CategoryFlags, error) {
 	return flags, nil
 }
 
-// IDs lists the set categories in catalog (bit) order.
+// IDs lists the set categories: in the catalog's order, or by ID where the source's answers
+// always had them so.
 func (flags CategoryFlags) IDs() []string {
 	ids := []string{}
 	for _, category := range categoryCatalog {
@@ -74,9 +50,14 @@ func (flags CategoryFlags) IDs() []string {
 			ids = append(ids, category.ID)
 		}
 	}
+	if categoryIDsSorted {
+		sort.Strings(ids)
+	}
 	return ids
 }
 
+// categories lists the catalog with each category's published charts (a chart may be in
+// several) and their total.
 func (s *Server) categories(w http.ResponseWriter, r *http.Request) {
 	counts := make([]int, len(categoryCatalog))
 	rows, err := s.DB.Query(r.Context(), `SELECT c.category_flags,count(*) FROM charts c WHERE `+publishedChart+` GROUP BY 1`)
@@ -112,8 +93,9 @@ func (s *Server) categories(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]any{"items": items, "chartCount": total})
 }
 
-// categorySelection reads a JSON array of category IDs. Omitted, null or empty
-// means Variety, as on Fanmade.
+// categorySelection reads a JSON array of category IDs. Omitted, null or empty means
+// Variety. The result is in one order whatever order the IDs came in, so a repeated upload
+// is recognised as the same.
 func categorySelection(raw json.RawMessage) ([]string, error) {
 	var ids []string
 	if len(raw) > 0 {

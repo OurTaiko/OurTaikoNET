@@ -35,15 +35,13 @@ func TestCDNRedirectFilename(t *testing.T) {
 	}
 	s := New(nil, Config{Objects: remote})
 	w := httptest.NewRecorder()
-	if !s.redirectResource(w, httptest.NewRequest("GET", "/download", nil), "archives/abc/download.zip", "日本語の曲.zip") {
-		t.Fatal("not redirected")
-	}
+	s.serveObject(w, httptest.NewRequest("GET", "/tja", nil), "objects/abc/song.tja", "日本語の曲.tja", "abc", "application/octet-stream", "attachment")
 	target, err := url.Parse(w.Header().Get("Location"))
-	if err != nil || w.Code != 302 || w.Header().Get("Cache-Control") != "no-store" {
+	if err != nil || w.Code != 302 {
 		t.Fatal(w.Result(), err)
 	}
 	disposition, params, err := mime.ParseMediaType(target.Query().Get("response-content-disposition"))
-	if err != nil || disposition != "attachment" || params["filename"] != "日本語の曲.zip" {
+	if err != nil || disposition != "attachment" || params["filename"] != "日本語の曲.tja" {
 		t.Fatal(params, err)
 	}
 }
@@ -87,7 +85,8 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 		for _, path := range []string{"audio", "tja", "cover"} {
 			w = httptest.NewRecorder()
 			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/charts/cdn-song/"+path, nil))
-			if w.Code != 302 || !strings.HasPrefix(w.Header().Get("Location"), "https://cdn.example/fanmade/") {
+			// A redirect by chart ID is never cached: a replaced or removed chart is asked about again.
+			if w.Code != 302 || !strings.HasPrefix(w.Header().Get("Location"), "https://cdn.example/fanmade/") || w.Header().Get("Cache-Control") != "no-store" {
 				t.Fatalf("%s %s: %d %s", method, path, w.Code, w.Body.String())
 			}
 		}

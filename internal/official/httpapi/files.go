@@ -19,23 +19,25 @@ import (
 	"ourtaiko.dev/net/internal/kit/video"
 )
 
-// publishedFile resolves one file role of a published chart without the
-// uploader lookup a full chart read makes.
+// publishedFile resolves one file role of a published chart. It does not read the whole
+// chart: a player asks here on every seek, and the uploader lookup a full read makes would
+// make playback wait for an unrelated service.
 func (s *Server) publishedFile(w http.ResponseWriter, r *http.Request, column string) (key, name, digest string, ok bool) {
-	id, ok := chartID(w, r)
-	if !ok {
-		return
-	}
-	err := s.DB.QueryRow(r.Context(), `SELECT f.storage_key,f.original_filename,f.sha256 FROM charts c JOIN chart_resources f ON f.id=c.`+column+` WHERE c.id=$1 AND `+publishedChart, id).Scan(&key, &name, &digest)
+	var stored struct{ key, name, digest *string }
+	err := s.DB.QueryRow(r.Context(), `SELECT f.storage_key,f.original_filename,f.sha256 FROM charts c LEFT JOIN chart_resources f ON f.id=c.`+column+` WHERE c.id=$1 AND `+publishedChart, r.PathValue("id")).Scan(&stored.key, &stored.name, &stored.digest)
 	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "RESOURCE_NOT_FOUND", "谱面或资源不存在")
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return "", "", "", false
 	}
 	if err != nil {
 		internal(w, err)
 		return "", "", "", false
 	}
-	return key, name, digest, true
+	if stored.key == nil {
+		problem(w, 404, "RESOURCE_NOT_FOUND", "该谱面没有这个文件")
+		return "", "", "", false
+	}
+	return *stored.key, *stored.name, *stored.digest, true
 }
 
 // serveObject sends a stored file, or redirects to its CDN address when S3
@@ -80,14 +82,14 @@ func (s *Server) downloadTJA(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// streamMovie sends the chart's background movie (BGMOVIE), as Fanmade's /movie.
+// streamMovie sends the chart's background movie (BGMOVIE).
 func (s *Server) streamMovie(w http.ResponseWriter, r *http.Request) {
 	if key, _, digest, ok := s.publishedFile(w, r, "movie_file"); ok {
 		s.serveObject(w, r, key, digest+"."+video.Extension, digest, video.MediaType, "inline")
 	}
 }
 
-// streamBackground sends the chart's background image (BGIMAGE), as Fanmade's /bgimage.
+// streamBackground sends the chart's background image (BGIMAGE).
 func (s *Server) streamBackground(w http.ResponseWriter, r *http.Request) {
 	if key, _, digest, ok := s.publishedFile(w, r, "bgimage_file"); ok {
 		s.serveObject(w, r, key, digest+".webp", digest, "image/webp", "inline")
@@ -101,16 +103,12 @@ func (s *Server) streamPreview(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// downloadPackage builds a ZIP per request from the stored TJA, with the
-// database's title and subtitle in its headers, and the stored audio. The
-// audio keeps its content-addressed name, which is what the stored TJA's WAVE
-// declares (R007).
+// downloadPackage builds a ZIP per request from the stored TJA, with the site's title and
+// subtitle in its headers, the stored audio and the movie if there is one. Audio and movie go
+// in under the names the stored TJA declares; a file awaiting rekeying still declares its
+// uploaded name.
 func (s *Server) downloadPackage(w http.ResponseWriter, r *http.Request) {
-	id, ok := chartID(w, r)
-	if !ok {
-		return
-	}
-	c, e := s.readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, id))
+	c, e := s.readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, r.PathValue("id")))
 	if errors.Is(e, pgx.ErrNoRows) {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return
@@ -134,7 +132,7 @@ func (s *Server) downloadPackage(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	// The package names the chart as the database does (R042).
+	// The package names the chart as the site does, whatever the uploaded file says.
 	chartText := tjatitles.WithTitles(stored, c.Title, c.Subtitle, c.TitleTranslations, c.SubtitleTranslations)
 	af, e := s.Config.Objects.Open(r.Context(), c.AudioKey)
 	if e != nil {
@@ -145,8 +143,7 @@ func (s *Server) downloadPackage(w http.ResponseWriter, r *http.Request) {
 	entries := []struct {
 		name string
 		file io.Reader
-	}{{c.TJAName, bytes.NewReader(chartText)}, {c.Wave, af}}
-	// The movie goes in under the name the stored TJA declares, as on Fanmade.
+	}{{c.TJAName, bytes.NewReader(chartText)}, {tja.WaveName(stored), af}}
 	if c.MovieKey != "" {
 		mf, e := s.Config.Objects.Open(r.Context(), c.MovieKey)
 		if e != nil {

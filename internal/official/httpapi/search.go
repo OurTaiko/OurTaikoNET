@@ -9,14 +9,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// playableChart is a published chart with files: what the game can play.
+// chartScoreSQL is a chart's votes: up less down.
 const chartScoreSQL = `COALESCE((SELECT upvotes-downvotes FROM chart_stats WHERE chart_id=c.id),0)`
 
 // gameSearch is the game's song picker: keyword, course and star level that
 // hold for the same block (a course covers all its sides), optionally putting
 // songs the player has not full-combo'd (unfc) or all-perfected (unperfect)
 // yet first. A block's scores of replaced files count only while it has no
-// current one. It returns every match, without pagination.
+// current one. It finds what the catalog lists (playable songs in a category) and returns
+// every match, without pagination.
 func (s *Server) gameSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))

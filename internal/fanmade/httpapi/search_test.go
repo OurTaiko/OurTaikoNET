@@ -202,8 +202,8 @@ func TestPublicGameSearch(t *testing.T) {
 				t.Fatal("bulk response was paginated")
 			}
 			for i, c := range result.Items {
-				if c.ID != paged[i] || c.Uploader != "" || c.CoverHash != "" {
-					t.Fatal("bulk order or enrichment mismatch", c.ID)
+				if c.ID != paged[i] {
+					t.Fatal("bulk order mismatch", c.ID)
 				}
 			}
 		}
@@ -227,4 +227,20 @@ func TestPublicGameSearch(t *testing.T) {
 		}
 	}
 
+	// The game's search finds what its catalog lists: a song in no category is in neither,
+	// while the website's list still has it.
+	if _, err := pool.Exec(ctx, `UPDATE charts SET category_flags=0 WHERE id=$1`, fmt.Sprintf("%032d", 13)); err != nil {
+		t.Fatal(err)
+	}
+	for endpoint, want := range map[string]int{"/api/v1/game/search": 13, "/api/v1/game/catalog": 13, "/api/v1/charts?page=2": 14} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest("GET", endpoint, nil))
+		var found struct {
+			Items, Charts []Chart
+			Total         int
+		}
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &found) != nil || (found.Total != want && len(found.Charts) != want) {
+			t.Fatal("songs outside every category", endpoint, w.Code, found.Total, len(found.Charts))
+		}
+	}
 }

@@ -39,9 +39,19 @@ func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
 	s.serveCover(w, r, digest, key)
 }
 
+// replaceCover sets a published chart's cover on its own and points the stored TJA's PREIMAGE
+// at it, as an upload does.
 func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 	_, c, ok := s.managed(w, r)
 	if !ok {
+		return
+	}
+	// Encoding a large image is as heavy as an upload: one at a time.
+	select {
+	case s.uploads <- struct{}{}:
+		defer func() { <-s.uploads }()
+	default:
+		problem(w, 503, "UPLOAD_BUSY", "当前正在处理其他上传，请稍后重试")
 		return
 	}
 	encoded, ok := receiveCover(w, r)
@@ -102,7 +112,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
 }
 
-// storeImage stores an encoded WebP cover and returns its file ID.
+// storeCover stores an encoded WebP cover and returns its file ID.
 func (s *Server) storeCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
 	return s.storeImageAs(ctx, tx, "cover", data, "webp", "image/webp")
 }
@@ -151,11 +161,15 @@ func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 		problem(w, 413, "FILE_TOO_LARGE", "封面不能超过 8 MiB")
 		return nil, false
 	}
-	encoded, ok := encodeCover(w, r, name, data)
-	if !ok {
+	if _, err = mr.NextPart(); err != io.EOF {
+		if err != nil {
+			uploadReadError(w, err)
+		} else {
+			problem(w, 400, "COVER_INVALID", "只能上传一个封面文件")
+		}
 		return nil, false
 	}
-	return encoded, true
+	return encodeCover(w, r, name, data)
 }
 
 // storeGameCover stores the copy of a playlist's cover that the game shows.

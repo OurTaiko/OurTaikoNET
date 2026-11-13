@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"ourtaiko.dev/net/internal/fanmade/teststore"
 	"testing"
+
+	"ourtaiko.dev/net/internal/fanmade/teststore"
 )
 
 func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []byte) {
@@ -63,11 +64,11 @@ func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []b
 		}
 	}
 }
-func TestS3PendingRecoveryAndGameIsolation(t *testing.T) {
+func TestS3PendingRecovery(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
 	store := teststore.New(t)
-	app := testServer(t, pool, Config{Objects: store, Storage: t.TempDir(), GameOnly: true})
+	app := testServer(t, pool, Config{Objects: store, Storage: t.TempDir()})
 	for _, key := range []string{"abandoned", "recent", "referenced"} {
 		teststore.Seed(t, store, key, []byte("test"))
 	}
@@ -92,13 +93,6 @@ func TestS3PendingRecoveryAndGameIsolation(t *testing.T) {
 			t.Fatal("live/pending deleted", e)
 		}
 		f.Close()
-	}
-	for _, target := range []struct{ method, path string }{{"GET", "/api/v1/auth/sso/login"}, {"GET", "/api/v1/auth/sso/callback"}, {"POST", "/api/v1/charts"}, {"POST", "/api/v1/scores"}, {"GET", "/api/v1/me"}} {
-		w := httptest.NewRecorder()
-		app.Handler().ServeHTTP(w, httptest.NewRequest(target.method, target.path, nil))
-		if w.Code != 404 {
-			t.Fatal("browser endpoint exposed", target, w.Code)
-		}
 	}
 	w := httptest.NewRecorder()
 	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/catalog", nil))

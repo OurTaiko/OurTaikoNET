@@ -1,46 +1,24 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
-
-	"github.com/jackc/pgx/v5"
 )
 
 type Category struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Genre string `json:"genre"`
+	// Published charts in the category; a chart may be in several.
+	ChartCount int `json:"chartCount"`
 }
 
-// CategoryFlags are persisted in charts.category_flags. Never renumber or reuse
-// a bit; adding a category also requires widening the database CHECK constraint.
+// CategoryFlags are persisted in charts.category_flags. Never renumber or reuse a bit; a new
+// category also needs the database's CHECK on the column widened. Each source has its own
+// categories (source.go).
 type CategoryFlags int32
-
-const (
-	CategoryGame          CategoryFlags = 1
-	CategoryVirtualSinger CategoryFlags = 2
-	CategoryPop           CategoryFlags = 4
-	CategoryClassics      CategoryFlags = 8
-	CategoryVariety       CategoryFlags = 16
-	CategoryAnime         CategoryFlags = 32
-)
-
-// Catalog order and metadata are part of the existing public API contract.
-var categoryCatalog = [...]struct {
-	Flag CategoryFlags
-	Category
-}{
-	{CategoryGame, Category{"game", "Game", "GAME"}},
-	{CategoryVirtualSinger, Category{"virtual-singer", "Virtual Singer", "VOCALOID"}},
-	{CategoryPop, Category{"pop", "Pop", "J-POP"}},
-	{CategoryClassics, Category{"classic", "Classic", "CLASSICAL"}},
-	{CategoryVariety, Category{"variety", "Variety", "VARIETY"}},
-	{CategoryAnime, Category{"anime", "Anime", "ANIME"}},
-}
 
 func categoryFlag(id string) (CategoryFlags, bool) {
 	for _, category := range categoryCatalog {
@@ -49,16 +27,6 @@ func categoryFlag(id string) (CategoryFlags, bool) {
 		}
 	}
 	return 0, false
-}
-
-// categoryByFlag finds the category of a single flag.
-func categoryByFlag(flag CategoryFlags) Category {
-	for _, category := range categoryCatalog {
-		if category.Flag == flag {
-			return category.Category
-		}
-	}
-	return Category{}
 }
 
 func encodeCategories(ids []string) (CategoryFlags, error) {
@@ -73,6 +41,8 @@ func encodeCategories(ids []string) (CategoryFlags, error) {
 	return flags, nil
 }
 
+// IDs lists the set categories: in the catalog's order, or by ID where the source's answers
+// always had them so.
 func (flags CategoryFlags) IDs() []string {
 	ids := []string{}
 	for _, category := range categoryCatalog {
@@ -80,13 +50,14 @@ func (flags CategoryFlags) IDs() []string {
 			ids = append(ids, category.ID)
 		}
 	}
-	// Chart responses and idempotency payloads use lexical ID order.
-	sort.Strings(ids)
+	if categoryIDsSorted {
+		sort.Strings(ids)
+	}
 	return ids
 }
 
 // categories lists the catalog with each category's published charts (a chart may be in
-// several) and their total, as on OurTaiko Database.
+// several) and their total.
 func (s *Server) categories(w http.ResponseWriter, r *http.Request) {
 	counts := make([]int, len(categoryCatalog))
 	rows, err := s.DB.Query(r.Context(), `SELECT c.category_flags,count(*) FROM charts c WHERE `+publishedChart+` GROUP BY 1`)
@@ -114,19 +85,17 @@ func (s *Server) categories(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	type countedCategory struct {
-		Category
-		ChartCount int `json:"chartCount"`
-	}
-	items := make([]countedCategory, 0, len(categoryCatalog))
+	items := make([]Category, 0, len(categoryCatalog))
 	for i, category := range categoryCatalog {
-		items = append(items, countedCategory{category.Category, counts[i]})
+		category.ChartCount = counts[i]
+		items = append(items, category.Category)
 	}
 	respond(w, 200, map[string]any{"items": items, "chartCount": total})
 }
 
-// Omitted, null or empty selection defaults to Variety. Canonical ordering also
-// makes upload retries independent of checkbox order and duplicate IDs.
+// categorySelection reads a JSON array of category IDs. Omitted, null or empty means
+// Variety. The result is in one order whatever order the IDs came in, so a repeated upload
+// is recognised as the same.
 func categorySelection(raw json.RawMessage) ([]string, error) {
 	var ids []string
 	if len(raw) > 0 {
@@ -150,16 +119,11 @@ func categorySelection(raw json.RawMessage) ([]string, error) {
 	return unique, nil
 }
 
-func validCategories(ids []string) bool {
-	_, err := encodeCategories(ids)
-	return err == nil
-}
-
-func setCategories(ctx context.Context, tx pgx.Tx, chart string, ids []string) error {
-	flags, err := encodeCategories(ids)
-	if err != nil {
-		return err
+func categoryByFlag(flag CategoryFlags) Category {
+	for _, category := range categoryCatalog {
+		if category.Flag == flag {
+			return category.Category
+		}
 	}
-	_, err = tx.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, chart, flags)
-	return err
+	return Category{}
 }

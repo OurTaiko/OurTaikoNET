@@ -25,15 +25,15 @@ import (
 
 type Config struct {
 	Origin, Storage string
-	Site            fs.FS
-	Objects         objectstore.Store
-	CookieSecure    bool
-	GameOnly        bool
-	// SSO is nil when no account center is configured; sign-in is then unavailable unless
-	// DevUserID is set.
+	// Site is the built website; nil serves the API alone.
+	Site         fs.FS
+	Objects      objectstore.Store
+	CookieSecure bool
+	// SSO is nil when no account center is configured; sign-in is then
+	// unavailable unless DevUserID is set.
 	SSO *SSOClient
-	// DevUserID signs every "login" in as this user without a password. Local development
-	// only: main refuses it with SSO or a non-loopback listener.
+	// DevUserID signs every "login" in as this user without a password. Local
+	// development only: main refuses it with SSO or a non-loopback listener.
 	DevUserID      string
 	TrustedProxies []netip.Prefix
 	// Profile is nil when 段位 attempts earn nothing (no OurTaikoProfile configured).
@@ -134,7 +134,7 @@ func (s *Server) Handler() http.Handler {
 			"maxMovieBytes": video.MaxBytes, "movieExtensions": []string{".mp4", ".webm", ".mov"},
 			"movieOutput": map[string]any{"codec": "h264", "extension": "." + video.Extension, "maxWidth": video.MaxWidth, "maxHeight": video.MaxHeight, "maxFps": video.MaxFPS, "maxKbps": video.MaxKbps, "audio": false}})
 	})
-	mux.HandleFunc("POST /api/v1/game/login", s.login)
+	mux.HandleFunc("POST /api/v1/game/login", s.gameLogin)
 	mux.HandleFunc("GET /api/v1/game/catalog", s.gameCatalog)
 	mux.HandleFunc("GET /api/v1/categories", s.categories)
 	mux.HandleFunc("GET /api/v1/users", s.listUsers)
@@ -217,8 +217,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/playlists/{id}/order", s.orderPlaylist)
 	mux.HandleFunc("PUT /api/v1/playlists/{id}/favorite", s.favoritePlaylist)
 	mux.HandleFunc("DELETE /api/v1/playlists/{id}/favorite", s.unfavoritePlaylist)
-	mux.HandleFunc("GET /api/v1/charts/{id}/{kind}", s.download)
+	mux.HandleFunc("GET /api/v1/charts/{id}/tja", s.downloadTJA)
 	mux.HandleFunc("GET /api/v1/charts/{id}/audio", s.streamAudio)
+	mux.HandleFunc("GET /api/v1/charts/{id}/preview", s.streamPreview)
+	mux.HandleFunc("GET /api/v1/charts/{id}/movie", s.streamMovie)
+	mux.HandleFunc("GET /api/v1/charts/{id}/bgimage", s.streamBackground)
+	mux.HandleFunc("GET /api/v1/charts/{id}/download", s.downloadPackage)
 	mux.HandleFunc("GET /api/v1/charts/{id}/resources", s.resourceLinks)
 	mux.HandleFunc("/", s.site)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -226,15 +230,10 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		if s.Config.GameOnly && (strings.HasPrefix(r.URL.Path, "/api/v1/auth/") || strings.HasPrefix(r.URL.Path, "/api/v1/me") || ((r.Method != "GET" && r.Method != "HEAD") && !isGameRequest(r))) {
-			problem(w, 404, "GAME_ONLY", "此测试入口仅提供游戏 API")
+		// Native game requests come without an Origin; a browser always sends one.
+		if game := isGameRequest(r); r.Method != "GET" && r.Method != "HEAD" && ((game && r.Header.Get("Origin") != "") || (!game && r.Header.Get("Origin") != s.Config.Origin)) {
+			problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
 			return
-		}
-		if r.Method != "GET" && r.Method != "HEAD" {
-			if (isGameRequest(r) && r.Header.Get("Origin") != "") || (!isGameRequest(r) && r.Header.Get("Origin") != s.Config.Origin) {
-				problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
-				return
-			}
 		}
 		if (r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login" {
 			host := s.clientIP(r)
@@ -257,6 +256,8 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		}
+		w, finish := gzipJSON(w, r)
+		defer finish()
 		defer func() {
 			if e := recover(); e != nil {
 				log.Printf("panic: %v", e)

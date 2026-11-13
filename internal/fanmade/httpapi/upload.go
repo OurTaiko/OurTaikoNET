@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -417,4 +418,18 @@ func uploadReadError(w http.ResponseWriter, e error) {
 	} else {
 		problem(w, 400, "UPLOAD_INTERRUPTED", "上传中断或请求格式错误，请重试")
 	}
+}
+
+func validCategories(ids []string) bool {
+	_, err := encodeCategories(ids)
+	return err == nil
+}
+
+func setCategories(ctx context.Context, tx pgx.Tx, chart string, ids []string) error {
+	flags, err := encodeCategories(ids)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, chart, flags)
+	return err
 }

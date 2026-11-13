@@ -1,18 +1,13 @@
 package httpapi
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"math"
-	"mime"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +17,6 @@ import (
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
-	"ourtaiko.dev/net/internal/kit/tjatitles"
-	"ourtaiko.dev/net/internal/kit/video"
 )
 
 // Chart is one song, the same on both song sources. Its JSON has the fields of the chart's
@@ -528,105 +521,6 @@ func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 		}
 	}
 	return ids, tx.Commit(ctx)
-}
-func (s *Server) download(w http.ResponseWriter, r *http.Request) {
-	c, e := s.chart(r.Context(), r.PathValue("id"))
-	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
-		return
-	}
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	kind := r.PathValue("kind")
-	if kind == "download" {
-		// The ZIP is built per request from the stored TJA and audio.
-		tf, e := s.Config.Objects.Open(r.Context(), c.TJAKey)
-		if e != nil {
-			internal(w, e)
-			return
-		}
-		defer tf.Close()
-		af, e := s.Config.Objects.Open(r.Context(), c.AudioKey)
-		if e != nil {
-			internal(w, e)
-			return
-		}
-		defer af.Close()
-		// Name the audio as this TJA does; a file awaiting rekeying still
-		// declares its uploaded name.
-		data, e := io.ReadAll(io.LimitReader(tf, tja.MaxTJA+1))
-		if e != nil {
-			internal(w, e)
-			return
-		}
-		// The package names the chart as the site does, whatever the uploaded file says.
-		chartText := tjatitles.WithTitles(data, c.Title, c.Subtitle, c.TitleTranslations, c.SubtitleTranslations)
-		entries := []struct {
-			name string
-			file io.Reader
-		}{{c.TJAName, bytes.NewReader(chartText)}, {tja.WaveName(data), af}}
-		if c.MovieKey != "" {
-			mf, e := s.Config.Objects.Open(r.Context(), c.MovieKey)
-			if e != nil {
-				internal(w, e)
-				return
-			}
-			defer mf.Close()
-			entries = append(entries, struct {
-				name string
-				file io.Reader
-			}{tja.MovieName(data), mf})
-		}
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": strings.TrimSuffix(c.TJAName, filepath.Ext(c.TJAName)) + ".zip"}))
-		z := zip.NewWriter(w)
-		for _, f := range entries {
-			dst, e := z.CreateHeader(&zip.FileHeader{Name: f.name, Method: zip.Store})
-			if e != nil {
-				return
-			}
-			if _, e = io.Copy(dst, f.file); e != nil {
-				return
-			}
-		}
-		z.Close()
-		return
-	}
-	var key, name, contentType, etag string
-	switch kind {
-	case "tja":
-		key, name, contentType, etag = c.TJAKey, c.TJAName, "application/octet-stream", c.TJAHash
-	case "movie":
-		if c.MovieKey == "" {
-			problem(w, 404, "RESOURCE_NOT_FOUND", "该谱面没有背景视频")
-			return
-		}
-		key, name, contentType, etag = c.MovieKey, c.MovieHash+"."+video.Extension, video.MediaType, c.MovieHash
-	case "bgimage":
-		if c.BackgroundKey == "" {
-			problem(w, 404, "RESOURCE_NOT_FOUND", "该谱面没有背景图片")
-			return
-		}
-		key, name, contentType, etag = c.BackgroundKey, c.BackgroundHash+".webp", "image/webp", c.BackgroundHash
-	default:
-		problem(w, 404, "RESOURCE_NOT_FOUND", "资源不存在")
-		return
-	}
-	if s.redirectResource(w, r, key, name) {
-		return
-	}
-	f, e := s.Config.Objects.Open(r.Context(), key)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	defer f.Close()
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("ETag", `"`+etag+`"`)
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
-	http.ServeContent(w, r, name, f.ModTime(), f)
 }
 
 // chartID checks the {id} path value; chart IDs are 32 lowercase hex digits, as Fanmade's.

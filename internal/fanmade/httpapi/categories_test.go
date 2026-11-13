@@ -84,10 +84,11 @@ func TestCategoriesFlow(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	wantCatalog := []Category{
-		{"game", "Game", "GAME"}, {"virtual-singer", "Virtual Singer", "VOCALOID"},
-		{"pop", "Pop", "J-POP"}, {"classic", "Classic", "CLASSICAL"},
-		{"variety", "Variety", "VARIETY"}, {"anime", "Anime", "ANIME"},
+		{ID: "game", Title: "Game", Genre: "GAME"}, {ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"},
+		{ID: "pop", Title: "Pop", Genre: "J-POP"}, {ID: "classic", Title: "Classic", Genre: "CLASSICAL"},
+		{ID: "variety", Title: "Variety", Genre: "VARIETY"}, {ID: "anime", Title: "Anime", Genre: "ANIME"},
 	}
+	// No chart is published yet: every count is 0.
 	if !reflect.DeepEqual(catalog.Items, wantCatalog) {
 		t.Fatal("catalog metadata/order changed", catalog)
 	}
@@ -142,10 +143,7 @@ func TestCategoriesFlow(t *testing.T) {
 	var summary struct {
 		ChartCount int
 		Charts     []Chart
-		Categories []struct {
-			Category
-			ChartCount int
-		}
+		Categories []Category
 	}
 	if err = json.Unmarshal(w.Body.Bytes(), &summary); err != nil || summary.ChartCount != 4 || len(summary.Charts) != 4 || len(summary.Categories) != 6 {
 		t.Fatal("server total must count unique charts", w.Body.String(), err)
@@ -164,10 +162,7 @@ func TestCategoriesFlow(t *testing.T) {
 	w = call("GET", "/api/v1/categories", "", "")
 	var site struct {
 		ChartCount int
-		Items      []struct {
-			Category
-			ChartCount int
-		}
+		Items      []Category
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &site) != nil || site.ChartCount != 4 || len(site.Items) != 6 {
 		t.Fatal("website catalog counts", w.Body.String())

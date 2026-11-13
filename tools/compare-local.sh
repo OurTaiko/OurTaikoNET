@@ -116,9 +116,14 @@ expected="--ignore firstLoginAt --ignore lastActiveAt --skip /users"
 official_wording="--ignore-in /playlists/system:description"
 # A chart that does not exist is called 谱面 on both sources (it was 作品 on Fanmade).
 fanmade_wording="--ignore-in /charts/00000000000000000000000000000000:message"
+# The game's lists carry what the website's do on both sources now: Fanmade's did not name a
+# chart's cover or, in a search, its owners. And a server that keeps files on its own disk, as
+# these local ones do, lists its own file routes as download links, where Fanmade listed none
+# (and said so in the catalogue: resourceDownloadVersion 0).
+fanmade_game="--ignore-in /game/catalog:coverHash --ignore-in /game/catalog:resourceDownloadVersion --ignore-in /game/search:coverHash --ignore-in /game/search:owners --ignore-in /game/search:uploader --skip-ending /resources"
 [ -z "${STRICT:-}" ] || expected=""
 # shellcheck disable=SC2086
-python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18080 --new http://127.0.0.1:18090 --legacy-host fanmade.ourtaiko.org --source fanmade --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $fanmade_wording $users_fanmade || status=1
+python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18080 --new http://127.0.0.1:18090 --legacy-host fanmade.ourtaiko.org --source fanmade --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $fanmade_wording $fanmade_game $users_fanmade || status=1
 # shellcheck disable=SC2086
 python3 "$here/tools/compare-answers.py" --old http://127.0.0.1:18081 --new http://127.0.0.1:18090 --legacy-host database.ourtaiko.org --source official --charts "${CHARTS:-0}" --show "${SHOW:-40}" $expected $official_wording $users_official || status=1
 # shellcheck disable=SC2086

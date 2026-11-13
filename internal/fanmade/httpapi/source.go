@@ -1,10 +1,5 @@
 package httpapi
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-)
-
 // What is this source's own in code it otherwise shares with the official source.
 const (
 	// The cookie of a website session when the site gives no name of its own.
@@ -21,9 +16,32 @@ const (
 	officialIDColumn = `NULL::text`
 )
 
-// devGameToken stands for the SSO game token of DEV_USER_ID on a local server without an
-// account center.
-func (s *Server) devGameToken() string {
-	h := sha256.Sum256([]byte("ourtaiko-fanmade-dev-game:" + s.Config.DevUserID))
-	return hex.EncodeToString(h[:])
+// The categories of this source. Catalog order and names are what clients have always been
+// given. Genre is the game's box.def #GENRE.
+const (
+	CategoryGame          CategoryFlags = 1
+	CategoryVirtualSinger CategoryFlags = 2
+	CategoryPop           CategoryFlags = 4
+	CategoryClassics      CategoryFlags = 8
+	CategoryVariety       CategoryFlags = 16
+	CategoryAnime         CategoryFlags = 32
+)
+
+var categoryCatalog = [...]struct {
+	Flag CategoryFlags
+	Category
+}{
+	{CategoryGame, Category{ID: "game", Title: "Game", Genre: "GAME"}},
+	{CategoryVirtualSinger, Category{ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"}},
+	{CategoryPop, Category{ID: "pop", Title: "Pop", Genre: "J-POP"}},
+	{CategoryClassics, Category{ID: "classic", Title: "Classic", Genre: "CLASSICAL"}},
+	{CategoryVariety, Category{ID: "variety", Title: "Variety", Genre: "VARIETY"}},
+	{CategoryAnime, Category{ID: "anime", Title: "Anime", Genre: "ANIME"}},
 }
+
+const (
+	// Whether a chart lists its categories by ID rather than in the catalog's order.
+	categoryIDsSorted = true
+	// The game's bar_genre frame (0-12) for this source's own song-select folder: deep blue.
+	catalogGenreFrame = 10
+)

@@ -12,9 +12,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"ourtaiko.dev/net/internal/fanmade/teststore"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/fanmade/teststore"
 
 	"ourtaiko.dev/net/internal/kit/cover"
 )
@@ -245,10 +246,11 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	if !strings.Contains(w.Body.String(), result.CoverHash) {
 		t.Fatal("list missing cover")
 	}
+	// The game's list names the cover as the website's does.
 	w = get("/api/v1/game/catalog", "")
 	status(w, 200)
-	if strings.Contains(w.Body.String(), "coverHash") {
-		t.Fatal("changed game response")
+	if !strings.Contains(w.Body.String(), result.CoverHash) {
+		t.Fatal("game list missing cover")
 	}
 	replacement := []part{parts[0], {"confirmReset", "", []byte("true")}}
 	w = send("PUT", "/api/v1/charts/"+original.ID+"/files", "owner", "csrf", ID(), replacement...)

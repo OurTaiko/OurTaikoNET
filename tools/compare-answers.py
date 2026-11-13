@@ -54,7 +54,8 @@ def parsed(body, path=""):
     # An error names the request it answers with a random id: never the same twice.
     if isinstance(value, dict) and "code" in value:
         value.pop("requestId", None)
-    return without_ignored(value, IGNORED | IGNORED_IN.get(path, set()))
+    # A field left out of a question is left out of it whatever is asked after its "?".
+    return without_ignored(value, IGNORED | IGNORED_IN.get(path, set()) | IGNORED_IN.get(path.split("?")[0], set()))
 
 
 def where(a, b, path=""):
@@ -92,6 +93,8 @@ def main():
     p.add_argument("--show", type=int, default=40, help="how many differences to list")
     p.add_argument("--skip", action="append", default=[], metavar="PATH",
                    help="a question not asked, because its answer differs on purpose")
+    p.add_argument("--skip-ending", action="append", default=[], metavar="END",
+                   help="leave out every question whose path ends so")
     p.add_argument("--ignore", action="append", default=[], metavar="FIELD",
                    help="a field left out of the comparison wherever it appears, because it differs on purpose")
     p.add_argument("--ignore-in", action="append", default=[], metavar="PATH:FIELD",
@@ -104,7 +107,7 @@ def main():
     for item in args.ignore_in:
         path, _, field = item.rpartition(":")
         IGNORED_IN.setdefault(path, set()).add(field)
-    on_purpose = ", ".join(sorted(IGNORED) + args.skip + [f"{f} of {q}" for q in sorted(IGNORED_IN) for f in sorted(IGNORED_IN[q])])
+    on_purpose = ", ".join(sorted(IGNORED) + args.skip + ["…" + end for end in args.skip_ending] + [f"{f} of {q}" for q in sorted(IGNORED_IN) for f in sorted(IGNORED_IN[q])])
     # A source's routes are under its name at the new address; players' routes are not under any.
     new_prefix = "/api/v1" if args.players else f"/api/v1/sources/{args.source}"
     asked = 0
@@ -112,7 +115,7 @@ def main():
 
     def ask(path):
         nonlocal asked
-        if path in args.skip:
+        if path in args.skip or any(path.endswith(end) for end in args.skip_ending):
             return 0, None
         asked += 1
         old_status, old_body = get(args.old, "/api/v1" + path)

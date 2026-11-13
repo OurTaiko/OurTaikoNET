@@ -42,11 +42,9 @@ func TestEmbeddedSite(t *testing.T) {
 			}
 		})
 	}
-	for _, cfg := range []Config{{}, {Site: site, GameOnly: true}} {
-		w := httptest.NewRecorder()
-		New(nil, cfg).Handler().ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
-		if w.Code != 404 {
-			t.Fatalf("API-only/game-only site status=%d", w.Code)
-		}
+	w := httptest.NewRecorder()
+	New(nil, Config{}).Handler().ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	if w.Code != 404 {
+		t.Fatalf("API-only site status=%d", w.Code)
 	}
 }

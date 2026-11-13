@@ -12,94 +12,6 @@ import (
 	"ourtaiko.dev/net/internal/kit/video"
 )
 
-// resourceLinks lists where a client downloads a chart's current files: the
-// CDN address when S3 has one, else this API's own file routes under
-// APP_ORIGIN. API credentials are never needed for these links.
-func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
-	id, ok := chartID(w, r)
-	if !ok {
-		return
-	}
-	c, e := s.readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, id))
-	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
-		return
-	}
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	if !c.HasFiles {
-		problem(w, 404, "CHART_FILES_MISSING", "该乐曲尚未上传谱面文件")
-		return
-	}
-	link := func(key, route, digest, media string, size int64) (resourceLink, error) {
-		target := ""
-		if remote, ok := s.Config.Objects.(*objectstore.S3); ok {
-			var e error
-			if target, e = remote.PublicURL(key); e != nil {
-				return resourceLink{}, e
-			}
-		}
-		if target == "" {
-			target = s.Config.Origin + "/api/v1/charts/" + c.ID + "/" + route
-		}
-		return resourceLink{target, target, digest, size, media}, nil
-	}
-	tjaLink, e := link(c.TJAKey, "tja", c.TJAHash, "application/octet-stream", c.TJASize)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	audioLink, e := link(c.AudioKey, "audio", c.AudioHash, audio.MediaType(c.AudioName), c.AudioSize)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	resources := map[string]resourceLink{"tja": tjaLink, "audio": audioLink}
-	// The song-select preview clip, as Fanmade lists it; a chart waiting for the backfill has none.
-	var previewKey, previewHash string
-	var previewSize int64
-	e = s.DB.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.preview_file WHERE c.id=$1`, c.ID).Scan(&previewKey, &previewHash, &previewSize)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
-	}
-	if e == nil {
-		if resources["preview"], e = link(previewKey, "preview", previewHash, "audio/ogg", previewSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	if c.MovieKey != "" {
-		if resources["movie"], e = link(c.MovieKey, "movie", c.MovieHash, video.MediaType, c.MovieSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	if c.BackgroundKey != "" {
-		if resources["bgimage"], e = link(c.BackgroundKey, "bgimage", c.BackgroundHash, "image/webp", c.BackgroundSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	// The cover too, as Fanmade lists it: the website's chart package carries it.
-	var coverKey, coverHash string
-	var coverSize int64
-	e = s.DB.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, c.ID).Scan(&coverKey, &coverHash, &coverSize)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
-	}
-	if e == nil {
-		if resources["cover"], e = link(coverKey, "cover", coverHash, "image/webp", coverSize); e != nil {
-			internal(w, e)
-			return
-		}
-	}
-	respond(w, 200, map[string]any{"chartId": c.ID, "urlsExpire": false, "resources": resources})
-}
-
 // resourceLink tells a client where to download one stored file and how to
 // verify it.
 type resourceLink struct {
@@ -123,4 +35,85 @@ func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, d
 	}
 	head, e := remote.Sign(ctx, key, "HEAD", name, media, 15*time.Minute)
 	return resourceLink{get, head, digest, size, media}, e
+}
+
+// resourceLinks lists where a client downloads a chart's current files and how to verify
+// them: the bucket's public address, a link signed for 15 minutes when the bucket has none
+// (urlsExpire), or this API's own file routes when files are kept on this server's disk. A
+// client never sends its API credentials to these links.
+func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
+	// One snapshot: every key, hash and size is of one committed upload, even if a
+	// replacement commits while the list is being put together.
+	tx, e := s.DB.BeginTx(r.Context(), pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	c, e := s.readChart(tx.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, r.PathValue("id")))
+	if errors.Is(e, pgx.ErrNoRows) {
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return
+	}
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	if !c.HasFiles {
+		problem(w, 404, "CHART_FILES_MISSING", "该乐曲尚未上传谱面文件")
+		return
+	}
+	remote, _ := s.Config.Objects.(*objectstore.S3)
+	expire := false
+	resources := map[string]resourceLink{}
+	// kind is also the last part of this API's route for the file.
+	add := func(kind, key, name, media, digest string, size int64) error {
+		if remote == nil {
+			route := s.Config.Origin + "/api/v1/charts/" + c.ID + "/" + kind
+			resources[kind] = resourceLink{route, route, digest, size, media}
+			return nil
+		}
+		link, e := directLink(r.Context(), remote, key, name, media, digest, size)
+		resources[kind] = link
+		expire = expire || link.URL != link.HeadURL
+		return e
+	}
+	// stored reads the files a chart read does not carry: its cover and preview clip.
+	stored := func(kind, column, name, media string) error {
+		var key, digest string
+		var size int64
+		e := tx.QueryRow(r.Context(), `SELECT f.storage_key,f.sha256,f.byte_size FROM charts c JOIN chart_resources f ON f.id=c.`+column+` WHERE c.id=$1`, c.ID).Scan(&key, &digest, &size)
+		if errors.Is(e, pgx.ErrNoRows) {
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		return add(kind, key, name, media, digest, size)
+	}
+	e = add("tja", c.TJAKey, c.TJAName, "application/octet-stream", c.TJAHash, c.TJASize)
+	if e == nil {
+		e = add("audio", c.AudioKey, c.AudioName, audio.MediaType(c.AudioName), c.AudioHash, c.AudioSize)
+	}
+	if e == nil {
+		e = stored("cover", "cover_file", "cover.webp", "image/webp")
+	}
+	// A chart waiting for its preview clip to be cut has none yet.
+	if e == nil {
+		e = stored("preview", "preview_file", "preview.ogg", "audio/ogg")
+	}
+	if e == nil && c.BackgroundKey != "" {
+		e = add("bgimage", c.BackgroundKey, c.BackgroundHash+".webp", "image/webp", c.BackgroundHash, c.BackgroundSize)
+	}
+	if e == nil && c.MovieKey != "" {
+		e = add("movie", c.MovieKey, c.MovieHash+"."+video.Extension, video.MediaType, c.MovieHash, c.MovieSize)
+	}
+	if e == nil {
+		e = tx.Commit(r.Context())
+	}
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }

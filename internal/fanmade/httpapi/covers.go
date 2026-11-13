@@ -8,105 +8,11 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"slices"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
 )
-
-// storeCover stores normalized WebP bytes and returns the file ID for the
-// caller to reference in tx.
-func (s *Server) storeCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
-	return s.storeImage(ctx, tx, data, "webp", "image/webp")
-}
-
-// storeImageAs stores WebP bytes produced by the cover package under a name for the kind of
-// image (cover, bgimage).
-func (s *Server) storeImageAs(ctx context.Context, tx pgx.Tx, kind string, data []byte) (int64, error) {
-	return s.storeNamedImage(ctx, tx, data, kind, "webp", "image/webp")
-}
-
-func (s *Server) storeImage(ctx context.Context, tx pgx.Tx, data []byte, extension, media string) (int64, error) {
-	return s.storeNamedImage(ctx, tx, data, "cover", extension, media)
-}
-
-func (s *Server) storeNamedImage(ctx context.Context, tx pgx.Tx, data []byte, kind, extension, media string) (int64, error) {
-	f, err := os.CreateTemp(s.Config.Storage, "staging-cover-")
-	if err != nil {
-		return 0, err
-	}
-	defer os.Remove(f.Name())
-	_, err = f.Write(data)
-	if err = errors.Join(err, f.Close()); err != nil {
-		return 0, err
-	}
-	return s.storeFile(ctx, tx, f.Name(), kind+"."+extension, extension, media, hash(string(data)), int64(len(data)))
-}
-
-func (s *Server) saveCover(ctx context.Context, tx pgx.Tx, chartID string, data []byte) error {
-	id, err := s.storeCover(ctx, tx, data)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `UPDATE charts SET cover_file=$2 WHERE id=$1`, chartID, id)
-	return err
-}
-
-// changeCover sets a published chart's cover on its own and points the stored TJA's PREIMAGE
-// at it, as an upload does. tx must hold the chart's row lock.
-func (s *Server) changeCover(ctx context.Context, tx pgx.Tx, chartID string, data []byte) error {
-	if err := s.saveCover(ctx, tx, chartID, data); err != nil {
-		return err
-	}
-	name := hash(string(data)) + ".webp"
-	tjaFile, _, err := s.rewriteStoredTJA(ctx, tx, chartID, func(stored []byte) ([]byte, bool) {
-		stored, ok := tja.SetSongHeader(stored, "PREIMAGE", name)
-		return stored, ok && tja.SongHeader(stored, "PREIMAGE") == name
-	})
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2 WHERE id=$1`, chartID, tjaFile)
-	return err
-}
-
-func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
-	var digest, key string
-	err := s.DB.QueryRow(r.Context(), `SELECT cv.sha256,cv.storage_key FROM chart_resources cv JOIN charts c ON c.cover_file=cv.id WHERE c.id=$1 AND `+publishedChart, r.PathValue("id")).Scan(&digest, &key)
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "COVER_NOT_FOUND", "封面不存在")
-		return
-	}
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if requestedHash := r.URL.Query().Get("v"); requestedHash != "" && requestedHash != digest {
-		problem(w, 404, "COVER_NOT_FOUND", "该封面已被替换")
-		return
-	}
-	s.serveCover(w, r, digest, key)
-}
-
-// serveCover sends a stored WebP cover, or redirects to its public address.
-func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, digest, key string) {
-	if s.redirectResource(w, r, key, "") {
-		return
-	}
-	w.Header().Set("Content-Type", "image/webp")
-	w.Header().Set("Content-Disposition", `inline; filename="cover.webp"`)
-	w.Header().Set("Cache-Control", "public, no-cache")
-	w.Header().Set("ETag", `"`+digest+`"`)
-	f, err := s.Config.Objects.Open(r.Context(), key)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	defer f.Close()
-	http.ServeContent(w, r, "cover.webp", time.Time{}, f)
-}
 
 func encodeCover(w http.ResponseWriter, r *http.Request, name string, data []byte) ([]byte, bool) {
 	encoded, err := cover.Encode(r.Context(), name, data)
@@ -121,8 +27,113 @@ func encodeCover(w http.ResponseWriter, r *http.Request, name string, data []byt
 	return encoded, true
 }
 
-// receiveCover reads the single "cover" file of a multipart request and
-// returns it normalized to WebP.
+func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
+	key, _, digest, ok := s.publishedFile(w, r, "cover_file")
+	if !ok {
+		return
+	}
+	if requested := r.URL.Query().Get("v"); requested != "" && requested != digest {
+		problem(w, 404, "COVER_NOT_FOUND", "该封面已被替换")
+		return
+	}
+	s.serveCover(w, r, digest, key)
+}
+
+// replaceCover sets a published chart's cover on its own and points the stored TJA's PREIMAGE
+// at it, as an upload does.
+func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
+	_, c, ok := s.managed(w, r)
+	if !ok {
+		return
+	}
+	// Encoding a large image is as heavy as an upload: one at a time.
+	select {
+	case s.uploads <- struct{}{}:
+		defer func() { <-s.uploads }()
+	default:
+		problem(w, 503, "UPLOAD_BUSY", "当前正在处理其他上传，请稍后重试")
+		return
+	}
+	encoded, ok := receiveCover(w, r)
+	if !ok {
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	var previous *int64
+	var hasFiles bool
+	err = tx.QueryRow(ctx, `SELECT cover_file,tja_file IS NOT NULL FROM charts c WHERE c.id=$1 AND `+publishedChart+` FOR UPDATE`, c.ID).Scan(&previous, &hasFiles)
+	if errors.Is(err, pgx.ErrNoRows) {
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return
+	}
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	file, err := s.storeCover(ctx, tx, encoded)
+	if err == nil {
+		_, err = tx.Exec(ctx, `UPDATE charts SET cover_file=$2 WHERE id=$1`, c.ID, file)
+	}
+	// The stored TJA's PREIMAGE names the cover, as an upload writes it; a song registered
+	// without files has none.
+	var released []int64
+	if err == nil && hasFiles {
+		name := hash(string(encoded)) + ".webp"
+		var tjaFile int64
+		tjaFile, released, err = s.rewriteStoredTJA(ctx, tx, c.ID, func(data []byte) ([]byte, bool) {
+			stored, ok := tja.SetSongHeader(data, "PREIMAGE", name)
+			return stored, ok && tja.SongHeader(stored, "PREIMAGE") == name
+		})
+		if err == nil {
+			_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2 WHERE id=$1`, c.ID, tjaFile)
+		}
+	}
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	if previous != nil && *previous != file {
+		released = append(released, *previous)
+	}
+	if len(released) > 0 {
+		if err = s.releaseFiles(ctx, released); err != nil {
+			log.Printf("replaced cover cleanup pending: %v", err)
+		}
+	}
+	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
+}
+
+// storeCover stores an encoded WebP cover and returns its file ID.
+func (s *Server) storeCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
+	return s.storeImageAs(ctx, tx, "cover", data, "webp", "image/webp")
+}
+
+// storeImageAs stores image bytes as {kind}.{extension} (kind: cover, bgimage) and returns the
+// file ID.
+func (s *Server) storeImageAs(ctx context.Context, tx pgx.Tx, kind string, data []byte, extension, media string) (int64, error) {
+	tmp, e := os.CreateTemp(s.Config.Storage, "cover-*."+extension)
+	if e != nil {
+		return 0, e
+	}
+	defer os.Remove(tmp.Name())
+	_, e = tmp.Write(data)
+	if e = errors.Join(e, tmp.Close()); e != nil {
+		return 0, e
+	}
+	return s.storeFile(ctx, tx, tmp.Name(), kind+"."+extension, extension, media, hash(string(data)), int64(len(data)))
+}
+
+// receiveCover reads the single multipart file field "cover" and encodes it
+// as the stored WebP. It reports false after writing the error response.
 func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, cover.MaxBytes+64*1024)
 	mr, err := r.MultipartReader()
@@ -161,72 +172,14 @@ func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	return encodeCover(w, r, name, data)
 }
 
-func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, true)
-	if !ok {
-		return
-	}
-	id := r.PathValue("id")
-	var owner []string
-	err := s.DB.QueryRow(r.Context(), `SELECT owner_ids FROM charts c WHERE c.id=$1 AND `+publishedChart, id).Scan(&owner)
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
-		return
-	}
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if !slices.Contains(owner, u.User.ID) && !u.User.IsAdmin {
-		problem(w, 403, "FORBIDDEN", "只有上传者或管理员可以修改封面")
-		return
-	}
-	select {
-	case s.uploads <- struct{}{}:
-		defer func() { <-s.uploads }()
-	default:
-		problem(w, 503, "UPLOAD_BUSY", "当前正在处理其他上传，请稍后重试")
-		return
-	}
-	encoded, ok := receiveCover(w, r)
-	if !ok {
-		return
-	}
-	tx, err := s.DB.Begin(r.Context())
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	// Serialize with deletion/file replacement and recheck ownership after encoding.
-	err = tx.QueryRow(r.Context(), `SELECT owner_ids FROM charts c WHERE c.id=$1 AND `+publishedChart+` FOR UPDATE`, id).Scan(&owner)
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
-		return
-	}
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if !slices.Contains(owner, u.User.ID) && !u.User.IsAdmin {
-		problem(w, 403, "FORBIDDEN", "只有上传者或管理员可以修改封面")
-		return
-	}
-	if err = s.changeCover(r.Context(), tx, id, encoded); err != nil {
-		internal(w, err)
-		return
-	}
-	if err = tx.Commit(r.Context()); err != nil {
-		internal(w, err)
-		return
-	}
-	s.cleanupReplacedFiles()
-	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
-}
-
 // storeGameCover stores the copy of a playlist's cover that the game shows.
 func (s *Server) storeGameCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
-	return s.storeImage(ctx, tx, data, cover.GameExtension, cover.GameMediaType)
+	return s.storeImageAs(ctx, tx, "cover", data, cover.GameExtension, cover.GameMediaType)
+}
+
+// serveCover sends a cover image, or redirects to its CDN address.
+func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, digest, key string) {
+	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
 }
 
 // releaseCovers deletes a playlist's former cover files unless something

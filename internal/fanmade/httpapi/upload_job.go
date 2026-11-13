@@ -309,14 +309,18 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 		return failed(err)
 	}
 	if coverData != nil {
-		if err = s.saveCover(ctx, tx, chartID, coverData); err != nil {
+		id, err := s.storeCover(ctx, tx, coverData)
+		if err == nil {
+			_, err = tx.Exec(ctx, `UPDATE charts SET cover_file=$2 WHERE id=$1`, chartID, id)
+		}
+		if err != nil {
 			return failed(err)
 		}
 	}
 	if !j.keepBackground {
 		var file *int64
 		if backgroundData != nil {
-			id, err := s.storeImageAs(ctx, tx, "bgimage", backgroundData)
+			id, err := s.storeImageAs(ctx, tx, "bgimage", backgroundData, "webp", "image/webp")
 			if err != nil {
 				return failed(err)
 			}

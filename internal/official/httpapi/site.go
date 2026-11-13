@@ -22,15 +22,31 @@ func (s *Server) site(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 	if name != "" && name != "index.html" && name != "." {
+		if info, err := fs.Stat(s.Config.Site, name); err == nil && info.IsDir() {
+			name = path.Join(name, "index.html")
+		}
 		if info, err := fs.Stat(s.Config.Site, name); err == nil && !info.IsDir() && !strings.HasPrefix(name, ".") {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
-			if strings.HasPrefix(name, "assets/") {
+			if strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, "edit/builds/") {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			// ServeFileFS redirects index.html to its directory; keep embedded
+			// editor entry pages working at either URL without a SPA fallback.
+			if path.Base(name) == "index.html" {
+				page, err := fs.ReadFile(s.Config.Site, name)
+				if err != nil {
+					http.NotFound(w, r)
+					return
+				}
+				w.Header().Set("Cache-Control", "no-cache")
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(page))
+				return
 			}
 			http.ServeFileFS(w, r, s.Config.Site, name)
 			return
 		}
-		if path.Ext(name) != "" || strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, ".") {
+		if path.Ext(name) != "" || strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, "edit/") || strings.HasPrefix(name, ".") {
 			http.NotFound(w, r)
 			return
 		}

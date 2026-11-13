@@ -226,8 +226,7 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		// Native game requests come without an Origin; a browser always sends one.
-		game := strings.HasPrefix(r.URL.Path, "/api/v1/game/")
-		if r.Method != "GET" && r.Method != "HEAD" && ((game && r.Header.Get("Origin") != "") || (!game && r.Header.Get("Origin") != s.Config.Origin)) {
+		if game := isGameRequest(r); r.Method != "GET" && r.Method != "HEAD" && ((game && r.Header.Get("Origin") != "") || (!game && r.Header.Get("Origin") != s.Config.Origin)) {
 			problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
 			return
 		}

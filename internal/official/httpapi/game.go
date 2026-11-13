@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,13 +10,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// The game API follows the protocol OurTaikoPlay speaks to the Fanmade
-// backend: chart blocks as slots of course × side (chartSlotVersion 1),
-// resource manifests (resourceDownloadVersion 1) and scores with an input
-// recording (scoreReplayVersion 1). Native routes use SSO game sessions as
-// bearer tokens; browser cookies never authorize them.
+// The game API, as OurTaikoPlay speaks it: chart blocks as slots of course × side
+// (chartSlotVersion 1), resource manifests (resourceDownloadVersion 1) and scores with an
+// input recording (scoreReplayVersion 1). The game sends its account-center session as a
+// bearer token to the game routes, where a browser cookie authorizes nothing; on every other
+// route only the website's session counts, so a token kept in a game cannot do what the
+// website can.
 func isGameRequest(r *http.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/api/v1/game/") || strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return strings.HasPrefix(r.URL.Path, "/api/v1/game/")
 }
 
 func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
@@ -70,14 +73,10 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, result)
 }
 
-// catalogGenreFrame is the game's bar_genre frame (0-12) for this site's own
-// song-select folder: Database's is the orange 4.
-const catalogGenreFrame = 4
-
-// gameCatalog is the complete song list for a game client: the categories,
-// every published chart with files in at least one, and the system playlists, read in
-// one snapshot. It is the same for everyone and ignores any session; an
-// account's own playlists are GET /game/playlists.
+// gameCatalog is the complete song list for a game client: the categories, every published
+// chart with files that is in at least one, and the playlists everyone gets, read in one
+// snapshot so the counts match the charts. It is the same for everyone and ignores any
+// session; an account's scores are GET /game/scores and its own playlists GET /game/playlists.
 func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 	tx, err := s.DB.BeginTx(r.Context(), pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
@@ -117,10 +116,18 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		categories = append(categories, category)
 	}
 	s.chartNames(r.Context(), charts)
+	if err = s.gamePlaylistDetails(r.Context(), playlists); err != nil {
+		internal(w, err)
+		return
+	}
 	body := map[string]any{
 		"categories": categories, "charts": charts, "chartCount": len(charts), "playlists": playlists, "playlistVersion": 1,
 		"chartSlotVersion": 1, "resourceDownloadVersion": 1, "scoreReplayVersion": 1, "danVersion": 1, "danResultsVersion": 1,
 		"genreFrame": catalogGenreFrame,
+	}
+	// Where charts carry their preview clip (audioPreview).
+	if !officialSource {
+		body["audioPreviewVersion"] = 1
 	}
 	if s.Config.SSO != nil {
 		body["sso"] = s.Config.SSO.GameAccounts()
@@ -149,4 +156,11 @@ func (s *Server) gameScoreList(w http.ResponseWriter, r *http.Request) {
 		scores = []Score{}
 	}
 	respond(w, 200, map[string]any{"scores": scores})
+}
+
+// devGameToken stands for the account center's game session of DEV_USER_ID on a local server
+// without an account center.
+func (s *Server) devGameToken() string {
+	h := sha256.Sum256([]byte("ourtaiko-dev-game:" + s.Config.DevUserID))
+	return hex.EncodeToString(h[:])
 }

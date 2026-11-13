@@ -3,12 +3,13 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"github.com/jackc/pgx/v5"
 	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/video"
-	"time"
 )
 
 // resourceLink tells a client where to download one stored file and how to
@@ -36,15 +37,13 @@ func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, d
 	return resourceLink{get, head, digest, size, media}, e
 }
 
-// Resolve current resources before download. Never forward API credentials to the object host.
+// resourceLinks lists where a client downloads a chart's current files and how to verify
+// them: the bucket's public address, a link signed for 15 minutes when the bucket has none
+// (urlsExpire), or this API's own file routes when files are kept on this server's disk. A
+// client never sends its API credentials to these links.
 func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
-	remote, ok := s.Config.Objects.(*objectstore.S3)
-	if !ok {
-		problem(w, 404, "DIRECT_DOWNLOAD_UNAVAILABLE", "此服务器尚未启用直连下载")
-		return
-	}
-	// Keep every key/hash/size from one committed upload, even if a replacement
-	// commits while the manifest is being assembled.
+	// One snapshot: every key, hash and size is of one committed upload, even if a
+	// replacement commits while the list is being put together.
 	tx, e := s.DB.BeginTx(r.Context(), pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if e != nil {
 		internal(w, e)
@@ -53,77 +52,68 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	c, e := s.readChart(tx.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1 AND `+publishedChart, r.PathValue("id")))
 	if errors.Is(e, pgx.ErrNoRows) {
-		problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已下架")
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return
 	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
+	if !c.HasFiles {
+		problem(w, 404, "CHART_FILES_MISSING", "该乐曲尚未上传谱面文件")
+		return
+	}
+	remote, _ := s.Config.Objects.(*objectstore.S3)
+	expire := false
 	resources := map[string]resourceLink{}
+	// kind is also the last part of this API's route for the file.
 	add := func(kind, key, name, media, digest string, size int64) error {
+		if remote == nil {
+			route := s.Config.Origin + "/api/v1/charts/" + c.ID + "/" + kind
+			resources[kind] = resourceLink{route, route, digest, size, media}
+			return nil
+		}
 		link, e := directLink(r.Context(), remote, key, name, media, digest, size)
 		resources[kind] = link
+		expire = expire || link.URL != link.HeadURL
 		return e
 	}
-	var tjaSize int64
-	if e = tx.QueryRow(r.Context(), `SELECT r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1`, c.ID).Scan(&tjaSize); e != nil {
-		internal(w, e)
-		return
-	}
-	if e = add("tja", c.TJAKey, c.TJAName, "application/octet-stream", c.TJAHash, tjaSize); e != nil {
-		internal(w, e)
-		return
-	}
-	if e = add("audio", c.AudioKey, c.AudioName, audio.MediaType(c.AudioName), c.AudioHash, c.AudioSize); e != nil {
-		internal(w, e)
-		return
-	}
-	var key, digest string
-	var size int64
-	var coverKey *string
-	var coverHash string
-	var coverSize *int64
-	e = tx.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, c.ID).Scan(&coverKey, &coverHash, &coverSize)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
-	}
-	if e == nil && coverKey != nil && coverSize != nil {
-		if e = add("cover", *coverKey, "cover.webp", "image/webp", coverHash, *coverSize); e != nil {
-			internal(w, e)
-			return
+	// stored reads the files a chart read does not carry: its cover and preview clip.
+	stored := func(kind, column, name, media string) error {
+		var key, digest string
+		var size int64
+		e := tx.QueryRow(r.Context(), `SELECT f.storage_key,f.sha256,f.byte_size FROM charts c JOIN chart_resources f ON f.id=c.`+column+` WHERE c.id=$1`, c.ID).Scan(&key, &digest, &size)
+		if errors.Is(e, pgx.ErrNoRows) {
+			return nil
 		}
+		if e != nil {
+			return e
+		}
+		return add(kind, key, name, media, digest, size)
 	}
-	e = tx.QueryRow(r.Context(), `SELECT r.storage_key,r.sha256,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.preview_file WHERE c.id=$1`, c.ID).Scan(&key, &digest, &size)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		internal(w, e)
-		return
+	e = add("tja", c.TJAKey, c.TJAName, "application/octet-stream", c.TJAHash, c.TJASize)
+	if e == nil {
+		e = add("audio", c.AudioKey, c.AudioName, audio.MediaType(c.AudioName), c.AudioHash, c.AudioSize)
 	}
 	if e == nil {
-		if e = add("preview", key, "preview.ogg", "audio/ogg", digest, size); e != nil {
-			internal(w, e)
-			return
-		}
+		e = stored("cover", "cover_file", "cover.webp", "image/webp")
 	}
-
-	if c.BackgroundKey != "" {
-		if e = add("bgimage", c.BackgroundKey, c.BackgroundHash+".webp", "image/webp", c.BackgroundHash, c.BackgroundSize); e != nil {
-			internal(w, e)
-			return
-		}
+	// A chart waiting for its preview clip to be cut has none yet.
+	if e == nil {
+		e = stored("preview", "preview_file", "preview.ogg", "audio/ogg")
 	}
-	if c.MovieKey != "" {
-		if e = add("movie", c.MovieKey, c.MovieHash+"."+video.Extension, video.MediaType, c.MovieHash, c.MovieSize); e != nil {
-			internal(w, e)
-			return
-		}
+	if e == nil && c.BackgroundKey != "" {
+		e = add("bgimage", c.BackgroundKey, c.BackgroundHash+".webp", "image/webp", c.BackgroundHash, c.BackgroundSize)
 	}
-
-	if e = tx.Commit(r.Context()); e != nil {
+	if e == nil && c.MovieKey != "" {
+		e = add("movie", c.MovieKey, c.MovieHash+"."+video.Extension, video.MediaType, c.MovieHash, c.MovieSize)
+	}
+	if e == nil {
+		e = tx.Commit(r.Context())
+	}
+	if e != nil {
 		internal(w, e)
 		return
 	}
-	public, _ := remote.PublicURL(c.TJAKey)
-	respond(w, 200, map[string]any{"urlsExpire": public == "", "chartId": c.ID, "resources": resources})
+	respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }
