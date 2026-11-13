@@ -7,7 +7,7 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Liked Songs and Recently Acclaimed, as on Fanmade: Liked Songs is the viewer's own and
+// Liked Songs and Recently Acclaimed on the official source: Liked Songs is the viewer's own and
 // does not exist for a guest; Recently Acclaimed lists recent charts voted above zero.
 func TestSystemPlaylists(t *testing.T) {
 	w := interactionWorldOf(t, Official)

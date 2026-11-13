@@ -7,7 +7,7 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// The resource manifest lists the cover too, as Fanmade's does: the website's chart
+// On the official source too, the resource manifest lists the cover: the website's chart
 // package carries it.
 func TestResourceManifestCover(t *testing.T) {
 	w := interactionWorldOf(t, Official)

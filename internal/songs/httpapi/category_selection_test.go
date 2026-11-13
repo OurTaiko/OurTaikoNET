@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-// No category chosen is Variety, as on Fanmade; a choice is sorted and deduplicated.
+// On the official source too, no category chosen is Variety; a choice is sorted and
+// deduplicated.
 func TestCategorySelection(t *testing.T) {
 	for raw, want := range map[string][]string{
 		"":                      {"variety"},

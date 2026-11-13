@@ -1,6 +1,6 @@
 package httpapi
 
-// Co-owner invitations and leaving a chart, ported from Fanmade's tests.
+// Co-owner invitations and leaving a chart, on both sources.
 
 import (
 	"context"
