@@ -12,7 +12,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 )
 
-// refreshPreview cuts the game's song-select preview clip (as Fanmade's): 15 seconds of
+// refreshPreview cuts the game's song-select preview clip: 15 seconds of
 // Ogg at the chart's preview range, listed in the resource manifest as "preview". source
 // is a local copy of the chart's current audio, or "" to read the stored one. With force
 // false a chart that has a clip is left alone (the backfill). It runs after the change
@@ -45,12 +45,13 @@ func (s *Server) refreshPreview(parent context.Context, id string, source string
 	defer os.RemoveAll(dir)
 	if source == "" {
 		source = filepath.Join(dir, "audio")
-		if err = s.fetch(ctx, audioKey, audioSHA, audioSize, source); err != nil {
-			return err
-		}
+		err = s.fetch(ctx, audioKey, audioSHA, audioSize, source)
 	}
 	output := filepath.Join(dir, "preview.ogg")
-	if err = audio.Preview(ctx, source, output, start, end, duration); err != nil {
+	if err == nil {
+		err = audio.Preview(ctx, source, output, start, end, duration)
+	}
+	if err != nil {
 		// A stale clip would play the old range: drop it so the backfill makes a new one.
 		if force && previous != nil {
 			if _, e := tx.Exec(ctx, `UPDATE charts SET preview_file=NULL WHERE id=$1`, id); e == nil && tx.Commit(ctx) == nil {
@@ -117,9 +118,9 @@ func (s *Server) BackfillPreviews(ctx context.Context) error {
 	return nil
 }
 
-// RunPreviewBackfill runs BackfillPreviews at start-up and every hour.
+// RunPreviewBackfill runs BackfillPreviews at start-up and every five minutes.
 func (s *Server) RunPreviewBackfill(ctx context.Context) {
-	ticker := time.NewTicker(time.Hour)
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
 		if err := s.BackfillPreviews(ctx); err != nil && ctx.Err() == nil {

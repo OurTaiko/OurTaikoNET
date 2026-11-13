@@ -200,6 +200,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	newPreview := false
 	if len(patch.DemoStart)+len(patch.DemoEnd) > 0 {
 		c, e := s.readChart(tx.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1`, r.PathValue("id")))
 		if e != nil {
@@ -221,11 +222,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if start != c.DemoStart || end != c.DemoEnd || c.PreviewPath == "" {
-			c.DemoStart, c.DemoEnd = start, end
-			if e = s.previewFromStoredAudio(r.Context(), tx, c); e != nil {
-				internal(w, e)
-				return
-			}
+			newPreview = true
 			if _, e = tx.Exec(r.Context(), `UPDATE charts SET demo_start=$2,demo_end=$3 WHERE id=$1`, c.ID, start, end); e != nil {
 				internal(w, e)
 				return
@@ -286,6 +283,14 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	if err = tx.Commit(r.Context()); err != nil {
 		internal(w, err)
 		return
+	}
+	if newPreview {
+		// The clip is cut once the new range stands; a failure is left to the backfill.
+		s.previewAfter(r.Context(), chart.ID, "")
+		if chart, err = s.readChart(s.DB.QueryRow(r.Context(), chartSelect+` WHERE c.id=$1`, chart.ID)); err != nil {
+			internal(w, err)
+			return
+		}
 	}
 	chart.setOwners(s.publicProfiles(r.Context(), chart.OwnerIDs))
 	respond(w, 200, chart)

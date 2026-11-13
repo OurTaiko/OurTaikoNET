@@ -308,9 +308,6 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	if err = setDifficulties(ctx, tx, chartID, j.meta.Difficulties); err != nil {
 		return failed(err)
 	}
-	if err = s.savePreview(ctx, tx, chartID, af.path, j.demoStart, j.demoEnd, duration); err != nil {
-		return failed(err)
-	}
 	if coverData != nil {
 		if err = s.saveCover(ctx, tx, chartID, coverData); err != nil {
 			return failed(err)
@@ -346,6 +343,8 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	if j.existingID != "" {
 		s.cleanupReplacedFiles()
 	}
+	// The clip is cut once the chart stands; a failure is left to the backfill.
+	s.previewAfter(ctx, chartID, af.path)
 	chart, err := s.chart(ctx, chartID)
 	if err != nil {
 		return failed(err)

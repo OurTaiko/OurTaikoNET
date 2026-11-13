@@ -2,10 +2,7 @@ package httpapi
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,87 +12,13 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 )
 
-// The caller holds the chart row lock. Upload first, atomically switch the
-// file reference, then let retirement cleanup delete the previous object.
-// A content-addressed key prevents stale CDN caches and preserves the old preview on failure.
-func (s *Server) savePreview(ctx context.Context, tx pgx.Tx, id, source string, start, end, duration float64) error {
-	dir, err := os.MkdirTemp("", "fanmade-preview-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	output := filepath.Join(dir, "preview.ogg")
-	if err = audio.Preview(ctx, source, output, start, end, duration); err != nil {
-		return err
-	}
-	f, err := os.Open(output)
-	if err != nil {
-		return err
-	}
-	h := sha256.New()
-	size, err := io.Copy(h, f)
-	err = errors.Join(err, f.Close())
-	if err != nil {
-		return err
-	}
-	digest := hex.EncodeToString(h.Sum(nil))
-	file, err := s.storeFile(ctx, tx, output, "preview.ogg", "ogg", "audio/ogg", digest, size)
-	if err != nil {
-		return err
-	}
-	// pending_objects reconciles failed or ambiguous commits without deleting a
-	// potentially live object. The chart trigger queues the replaced file.
-	_, err = tx.Exec(ctx, `UPDATE charts SET preview_file=$2 WHERE id=$1`, id, file)
-	return err
-}
-
-func (s *Server) previewFromStoredAudio(ctx context.Context, tx pgx.Tx, c Chart) error {
-	dir, err := os.MkdirTemp("", "fanmade-preview-source-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	source, err := s.copyAudio(ctx, &c, dir)
-	if err != nil {
-		return err
-	}
-	return s.savePreview(ctx, tx, c.ID, source.path, c.DemoStart, c.DemoEnd, c.Duration)
-}
-
-// Resume existing-chart backfill on startup and retry failures on later passes.
-// Row locks serialize with owner edits and audio replacements across API replicas.
-func (s *Server) BackfillPreviews(ctx context.Context) error {
-	rows, err := s.DB.Query(ctx, `SELECT id FROM charts c WHERE c.status<>'deleted' AND c.preview_file IS NULL ORDER BY id`)
-	if err != nil {
-		return err
-	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err = rows.Scan(&id); err != nil {
-			break
-		}
-		ids = append(ids, id)
-	}
-	err = errors.Join(err, rows.Err())
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	var failures []error
-	for _, id := range ids {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		err := s.backfillPreview(ctx, id)
-		if err != nil {
-			log.Printf("preview backfill for %s failed: %v", id, err)
-			failures = append(failures, err)
-		}
-	}
-	return errors.Join(failures...)
-}
-func (s *Server) backfillPreview(parent context.Context, id string) error {
+// refreshPreview cuts the game's song-select preview clip: 15 seconds of
+// Ogg at the chart's preview range, listed in the resource manifest as "preview". source
+// is a local copy of the chart's current audio, or "" to read the stored one. With force
+// false a chart that has a clip is left alone (the backfill). It runs after the change
+// that calls for it has committed, under the chart's row lock, so the range and audio it
+// reads are current; a failure leaves the chart without a clip, which the backfill retries.
+func (s *Server) refreshPreview(parent context.Context, id string, source string, force bool) (err error) {
 	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 	defer cancel()
 	tx, err := s.DB.Begin(ctx)
@@ -103,33 +26,105 @@ func (s *Server) backfillPreview(parent context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var locked string
-	err = tx.QueryRow(ctx, `SELECT id FROM charts WHERE id=$1 AND status<>'deleted' FOR UPDATE SKIP LOCKED`, id).Scan(&locked)
+	var audioKey, audioSHA string
+	var audioSize int64
+	var start, end, duration float64
+	var previous *int64
+	err = tx.QueryRow(ctx, `SELECT r.storage_key,r.sha256,r.byte_size,c.demo_start,c.demo_end,c.duration,c.preview_file FROM charts c JOIN chart_resources r ON r.id=c.audio_file
+ WHERE c.id=$1 AND `+publishedChart+` FOR UPDATE OF c`, id).Scan(&audioKey, &audioSHA, &audioSize, &start, &end, &duration, &previous)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
+	if err != nil || (!force && previous != nil) {
+		return err
+	}
+	dir, err := os.MkdirTemp(s.Config.Storage, "preview-")
 	if err != nil {
 		return err
 	}
-	var exists bool
-	if err = tx.QueryRow(ctx, `SELECT preview_file IS NOT NULL FROM charts WHERE id=$1`, id).Scan(&exists); err != nil || exists {
+	defer os.RemoveAll(dir)
+	if source == "" {
+		source = filepath.Join(dir, "audio")
+		err = s.fetch(ctx, audioKey, audioSHA, audioSize, source)
+	}
+	output := filepath.Join(dir, "preview.ogg")
+	if err == nil {
+		err = audio.Preview(ctx, source, output, start, end, duration)
+	}
+	if err != nil {
+		// A stale clip would play the old range: drop it so the backfill makes a new one.
+		if force && previous != nil {
+			if _, e := tx.Exec(ctx, `UPDATE charts SET preview_file=NULL WHERE id=$1`, id); e == nil && tx.Commit(ctx) == nil {
+				err = errors.Join(err, s.releaseFiles(parent, []int64{*previous}))
+			}
+		}
 		return err
 	}
-	c, err := s.readChart(tx.QueryRow(ctx, chartSelect+` WHERE c.id=$1`, id))
+	digest, size, err := fileDigest(output)
 	if err != nil {
 		return err
 	}
-	if err = s.previewFromStoredAudio(ctx, tx, c); err != nil {
+	file, err := s.storeFile(ctx, tx, output, "preview.ogg", "ogg", "audio/ogg", digest, size)
+	if err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if _, err = tx.Exec(ctx, `UPDATE charts SET preview_file=$2 WHERE id=$1`, id, file); err != nil {
+		return err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	if previous != nil && *previous != file {
+		return s.releaseFiles(parent, []int64{*previous})
+	}
+	return nil
 }
+
+// previewAfter refreshes a chart's clip after a request changed its audio or range. The
+// change itself stands either way; a failure is logged and left to the backfill.
+func (s *Server) previewAfter(ctx context.Context, id string, source string) {
+	if err := s.refreshPreview(context.WithoutCancel(ctx), id, source, true); err != nil {
+		log.Printf("preview clip for chart %s pending: %v", id, err)
+	}
+}
+
+// BackfillPreviews cuts the clip of every published chart with files that has none,
+// oldest first; a failure is logged and retried on the next pass.
+func (s *Server) BackfillPreviews(ctx context.Context) error {
+	rows, err := s.DB.Query(ctx, `SELECT c.id FROM charts c WHERE `+publishedChart+` AND c.audio_file IS NOT NULL AND c.preview_file IS NULL ORDER BY c.created_at,c.id`)
+	if err != nil {
+		return err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+	if len(ids) > 0 {
+		log.Printf("preview clip backfill: %d charts", len(ids))
+	}
+	failed := 0
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := s.refreshPreview(ctx, id, "", false); err != nil {
+			failed++
+			log.Printf("preview clip for chart %s failed: %v", id, err)
+		}
+	}
+	if len(ids) > 0 {
+		log.Printf("preview clip backfill: %d charts done, %d failed", len(ids)-failed, failed)
+	}
+	return nil
+}
+
+// RunPreviewBackfill runs BackfillPreviews at start-up and every five minutes.
 func (s *Server) RunPreviewBackfill(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
 		if err := s.BackfillPreviews(ctx); err != nil && ctx.Err() == nil {
-			log.Printf("preview backfill pending: %v", err)
+			log.Printf("preview clip backfill pending: %v", err)
 		}
 		select {
 		case <-ctx.Done():

@@ -29,8 +29,8 @@ type storedFile struct {
 func (f storedFile) legacy() bool { return f.id != nil && f.key != f.sha+"."+f.extension }
 
 // fetch copies a stored file into path and verifies it against its record.
-func (s *Server) fetch(ctx context.Context, f storedFile, path string) error {
-	in, err := s.Config.Objects.Open(ctx, f.key)
+func (s *Server) fetch(ctx context.Context, key, sha string, size int64, path string) error {
+	in, err := s.Config.Objects.Open(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -40,12 +40,12 @@ func (s *Server) fetch(ctx context.Context, f storedFile, path string) error {
 		return err
 	}
 	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, f.size+1))
+	n, err := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, size+1))
 	if err = errors.Join(err, out.Close()); err != nil {
 		return err
 	}
-	if n != f.size || hex.EncodeToString(h.Sum(nil)) != f.sha {
-		return fmt.Errorf("stored file integrity mismatch: %s", f.key)
+	if n != size || hex.EncodeToString(h.Sum(nil)) != sha {
+		return fmt.Errorf("stored file integrity mismatch: %s", key)
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ func (s *Server) rekeyChart(parent context.Context, id string) error {
 	if t.legacy() || a.legacy() {
 		// The TJA changes with its audio's name.
 		tjaPath, audioPath := filepath.Join(dir, "tja"), filepath.Join(dir, "audio")
-		if err = errors.Join(s.fetch(ctx, t, tjaPath), s.fetch(ctx, a, audioPath)); err != nil {
+		if err = errors.Join(s.fetch(ctx, t.key, t.sha, t.size, tjaPath), s.fetch(ctx, a.key, a.sha, a.size, audioPath)); err != nil {
 			return err
 		}
 		data, err := os.ReadFile(tjaPath)
@@ -160,7 +160,7 @@ func (s *Server) rekeyChart(parent context.Context, id string) error {
 			continue
 		}
 		path := filepath.Join(dir, column)
-		if err = s.fetch(ctx, f, path); err != nil {
+		if err = s.fetch(ctx, f.key, f.sha, f.size, path); err != nil {
 			return err
 		}
 		if err = store(column, path, f.name, f.extension, media, f.sha, f.size); err != nil {

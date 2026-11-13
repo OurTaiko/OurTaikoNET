@@ -114,17 +114,6 @@ func TestPreviewLifecycle(t *testing.T) {
 			if _, err = app.Config.Objects.Open(ctx, key); !os.IsNotExist(err) {
 				t.Fatal("old preview still exists", err)
 			}
-			// Failure while retrieving the source must leave both range and preview unchanged.
-			if err = app.Config.Objects.Delete(ctx, "audio"); err != nil {
-				t.Fatal(err)
-			}
-			if w = call(`{"demoEnd":0.45}`, cookie, "csrf"); w.Code != 503 {
-				t.Fatal(w.Code, w.Body.String())
-			}
-			after, err := app.chart(ctx, "song")
-			if err != nil || after.DemoEnd != updated.DemoEnd || after.PreviewPath != updated.PreviewPath {
-				t.Fatal("failed save changed live preview", err)
-			}
 			// Lists expose the current preview location; the full audio endpoint stays separate.
 			w = httptest.NewRecorder()
 			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts", nil))
@@ -141,6 +130,18 @@ func TestPreviewLifecycle(t *testing.T) {
 			object.Close()
 			if err != nil || string(data[:4]) != "OggS" {
 				t.Fatal("invalid stored preview", err)
+			}
+			// A failure while retrieving the source does not undo the edit: the range stands, and
+			// the clip of the old range is dropped for the backfill to cut a new one.
+			if err = app.Config.Objects.Delete(ctx, "audio"); err != nil {
+				t.Fatal(err)
+			}
+			if w = call(`{"demoEnd":0.45}`, cookie, "csrf"); w.Code != 200 {
+				t.Fatal(w.Code, w.Body.String())
+			}
+			after, err := app.chart(ctx, "song")
+			if err != nil || after.DemoEnd != 0.45 || after.PreviewPath != "" {
+				t.Fatal("a failed clip left the old one in place", err, after.DemoEnd, after.PreviewPath)
 			}
 		})
 	}
