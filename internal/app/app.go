@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/db"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/awards"
 	fanmade "ourtaiko.dev/net/internal/fanmade/httpapi"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
@@ -74,28 +75,15 @@ type App struct {
 	legacy  legacy.Hosts
 }
 
-// fanmadeAwards and officialAwards record a source's awards with the players' part, under the
-// source's name. The two sources' code is still separate, so each has its own request type.
-type fanmadeAwards struct{ players *profile.Server }
-
-func (a fanmadeAwards) Grant(ctx context.Context, tx pgx.Tx, r fanmade.AwardRequest) (json.RawMessage, error) {
-	answer, err := a.players.Grant(ctx, tx, "fanmade", profile.AwardRequest(r))
-	var rejected *profile.AwardRejection
-	if errors.As(err, &rejected) {
-		return nil, &fanmade.ProfileRejection{Status: rejected.Status, Code: rejected.Code}
-	}
-	return answer, err
+// sourceAwards records a source's awards with the players' part, under the source's name, in
+// the transaction the source saves the attempt in.
+type sourceAwards struct {
+	players *profile.Server
+	source  string
 }
 
-type officialAwards struct{ players *profile.Server }
-
-func (a officialAwards) Grant(ctx context.Context, tx pgx.Tx, r official.AwardRequest) (json.RawMessage, error) {
-	answer, err := a.players.Grant(ctx, tx, "official", profile.AwardRequest(r))
-	var rejected *profile.AwardRejection
-	if errors.As(err, &rejected) {
-		return nil, &official.ProfileRejection{Status: rejected.Status, Code: rejected.Code}
-	}
-	return answer, err
+func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Request) (json.RawMessage, error) {
+	return a.players.Grant(ctx, tx, a.source, request)
 }
 
 // New connects to the database and builds both sources. The database must already hold the
@@ -180,12 +168,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, TrustedProxies: cfg.TrustedProxies,
-		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
+		Profile: fanmadeProfile, Awards: sourceAwards{a.Players, "fanmade"}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
 	a.Official = official.New(officialPool, official.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
-		Profile: officialProfile, Awards: officialAwards{a.Players}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
+		Profile: officialProfile, Awards: sourceAwards{a.Players, "official"}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
 	})
 	if err = errors.Join(a.Fanmade.EnsureStorage(), a.Official.EnsureStorage()); err != nil {
 		a.Close()

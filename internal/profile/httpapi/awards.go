@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/awards"
 )
 
 var serviceID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
@@ -119,27 +120,13 @@ func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 	s.respondAward(w, ctx, body.UserID, granted)
 }
 
-// AwardRequest is one 段位 attempt of a song source: see award.
-type AwardRequest struct {
-	Key         string   `json:"key"`
-	UserID      string   `json:"userId"`
-	CourseID    string   `json:"courseId"`
-	CourseTitle string   `json:"courseTitle"`
-	CourseOwner string   `json:"courseOwnerId"`
-	Official    bool     `json:"official"`
-	Verdict     int      `json:"verdict"`
-	Dan         *int     `json:"dan"`
-	Titles      []string `json:"titles"`
-}
-
-// AwardRejection is an award turned down for good because the request itself is wrong.
-// Asking again cannot help.
-type AwardRejection struct {
-	Status        int
-	Code, Message string
-}
-
-func (e *AwardRejection) Error() string { return "award rejected: " + e.Code }
+// AwardRequest is one 段位 attempt of a song source (see award), and AwardRejection an award
+// turned down for good because the request itself is wrong: asking again cannot help. They
+// are the sources' own types for the same things (package awards).
+type (
+	AwardRequest   = awards.Request
+	AwardRejection = awards.Rejection
+)
 
 // Grant records what an attempt earns inside the caller's transaction, so that a song
 // source saves an attempt and its award together or not at all, and returns what award
@@ -164,7 +151,7 @@ func (s *Server) Grant(ctx context.Context, tx pgx.Tx, service string, request A
 func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body AwardRequest) ([]byte, error) {
 	if len(body.Key) < 1 || len(body.Key) > 100 || !validSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !validSubject(body.CourseOwner)) ||
 		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
-		return nil, &AwardRejection{422, "AWARD_INVALID", "奖励请求无效"}
+		return nil, &AwardRejection{Status: 422, Code: "AWARD_INVALID", Message: "奖励请求无效"}
 	}
 	// The player's awards one at a time, so two attempts cannot both "upgrade" a badge.
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('award:'||$1,0))`, body.UserID); err != nil {
@@ -180,7 +167,7 @@ func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body Awar
 			return nil, err
 		}
 		if user != body.UserID {
-			return nil, &AwardRejection{409, "AWARD_CONFLICT", "该挑战已用于其他玩家"}
+			return nil, &AwardRejection{Status: 409, Code: "AWARD_CONFLICT", Message: "该挑战已用于其他玩家"}
 		}
 		return granted, nil
 	}
