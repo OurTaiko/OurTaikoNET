@@ -151,7 +151,8 @@ func (s *Server) required(w http.ResponseWriter, r *http.Request, csrf bool) (se
 		}
 		return v, false
 	}
-	if csrf && r.Header.Get("X-CSRF-Token") != v.CSRF {
+	// A game signs in with a token, not a cookie: there is nothing for CSRF to protect.
+	if csrf && !isGameRequest(r) && r.Header.Get("X-CSRF-Token") != v.CSRF {
 		problem(w, 403, "CSRF_INVALID", "会话已更新，请刷新页面后重试")
 		return v, false
 	}
@@ -183,7 +184,7 @@ func (s *Server) accountRedirect(w http.ResponseWriter, r *http.Request) {
 func safeReturn(raw string) string {
 	u, e := url.Parse(raw)
 	if e != nil || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") || u.IsAbs() || u.Host != "" {
-		return "/"
+		return defaultReturn
 	}
 	return raw
 }
@@ -238,7 +239,7 @@ func (s *Server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_db_oidc", Value: binding, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
+	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Value: binding, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
 	http.Redirect(w, r, cfg.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusSeeOther)
 }
 func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +248,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	c, e := r.Cookie("ourtaiko_db_oidc")
+	c, e := r.Cookie(oidcCookie)
 	state := r.URL.Query().Get("state")
 	if e != nil || len(c.Value) != 64 || len(state) != 64 {
 		fail()
@@ -255,7 +256,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	var nonce, verifier, destination string
 	e = s.DB.QueryRow(r.Context(), `DELETE FROM oidc_flows WHERE state_hash=$1 AND binding_hash=$2 AND expires_at>now() RETURNING nonce,verifier,return_path`, hash(state), hash(c.Value)).Scan(&nonce, &verifier, &destination)
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_db_oidc", Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	if e != nil || r.URL.Query().Get("error") != "" || r.URL.Query().Get("code") == "" {
 		fail()
 		return

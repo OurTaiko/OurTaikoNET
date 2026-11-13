@@ -107,7 +107,7 @@ func main() {
 			log.Fatal("DEV_USER_ID needs a 32-character lowercase hexadecimal ID and a loopback LISTEN_ADDR")
 		}
 		cfg.DevUserID = devUser
-		log.Printf("development sign-in to the official source and the players' pages enabled for user %s; never use this outside local development", devUser)
+		log.Printf("development sign-in enabled for user %s; never use this outside local development", devUser)
 	} else {
 		log.Print("no SSO_ISSUER: catalogues are public, sign-in and uploads are unavailable")
 	}

@@ -51,8 +51,7 @@ type Config struct {
 	// SSO is the site's client of the account center, used by every part. Nil when there is
 	// none: sign-in is then unavailable.
 	SSO *account.Client
-	// DevUserID signs every sign-in to the official source and the players' pages in as this
-	// user. Local development only.
+	// DevUserID signs every sign-in in as this user, in every part. Local development only.
 	DevUserID string
 
 	// Where each source's chart pages are on the website; players' score lists link there.
@@ -167,7 +166,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 
 	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
-		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, TrustedProxies: cfg.TrustedProxies,
+		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: fanmadeProfile, Awards: sourceAwards{a.Players, "fanmade"}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
 	a.Official = official.New(officialPool, official.Config{

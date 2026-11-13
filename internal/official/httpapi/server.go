@@ -55,7 +55,7 @@ func (s *Server) sessionCookie() string {
 	if s.Config.SessionCookie != "" {
 		return s.Config.SessionCookie
 	}
-	return "ourtaiko_db_session"
+	return defaultSessionCookie
 }
 
 type Server struct {

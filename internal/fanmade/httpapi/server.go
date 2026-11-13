@@ -29,8 +29,13 @@ type Config struct {
 	Objects         objectstore.Store
 	CookieSecure    bool
 	GameOnly        bool
-	SSO             *SSOClient
-	TrustedProxies  []netip.Prefix
+	// SSO is nil when no account center is configured; sign-in is then unavailable unless
+	// DevUserID is set.
+	SSO *SSOClient
+	// DevUserID signs every "login" in as this user without a password. Local development
+	// only: main refuses it with SSO or a non-loopback listener.
+	DevUserID      string
+	TrustedProxies []netip.Prefix
 	// Profile is nil when 段位 attempts earn nothing (no OurTaikoProfile configured).
 	Profile *ProfileClient
 	// Awards, when set, records what 段位 attempts earn in the attempt's own transaction;
@@ -50,7 +55,7 @@ func (s *Server) sessionCookie() string {
 	if s.Config.SessionCookie != "" {
 		return s.Config.SessionCookie
 	}
-	return "ourtaiko_session"
+	return defaultSessionCookie
 }
 
 type Server struct {
