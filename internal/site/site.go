@@ -9,6 +9,7 @@ package site
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // Source is one song source and the handler of its API, which expects paths under /api/v1/.
@@ -40,6 +41,12 @@ func Handler(sources []Source, players http.Handler) http.Handler {
 		api, ok := byID[r.PathValue("source")]
 		if !ok {
 			respond(w, 404, map[string]string{"code": "SOURCE_NOT_FOUND", "message": "No such song source"})
+			return
+		}
+		// The site has one sign-in, /api/v1/auth/…, and a session opened there is a session in
+		// every source. The sign-in routes each source's old site had are not offered.
+		if rest := r.PathValue("rest"); rest == "auth" || strings.HasPrefix(rest, "auth/") {
+			respond(w, 404, map[string]string{"code": "NOT_FOUND", "message": "Sign in at /api/v1/auth/sso/login"})
 			return
 		}
 		// The source's API sees the path it has always had.

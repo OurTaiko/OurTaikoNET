@@ -28,6 +28,10 @@ import (
 // SchemaVersion is the version of ourtaiko_net this program works with.
 const SchemaVersion = 1
 
+// SessionCookie is the one cookie of the site. A session is the same row to all three parts,
+// so with one name signing in once (at /api/v1/auth/…, the players' part) signs in everywhere.
+const SessionCookie = "ourtaiko_net_session"
+
 // Config is everything the two sources need. A nil Objects stores that source's files under
 // StorageDir.
 type Config struct {
@@ -138,6 +142,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.ProfileSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
+		SessionCookie: SessionCookie,
 		Sources: []profile.Source{
 			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
@@ -166,12 +171,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.Fanmade = fanmade.New(fanmadePool, fanmade.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.FanmadeSSO, TrustedProxies: cfg.TrustedProxies,
-		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players},
+		Profile: fanmadeProfile, Awards: fanmadeAwards{a.Players}, SessionCookie: SessionCookie,
 	})
 	a.Official = official.New(officialPool, official.Config{
 		Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.OfficialSSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
-		Profile: officialProfile, Awards: officialAwards{a.Players},
+		Profile: officialProfile, Awards: officialAwards{a.Players}, SessionCookie: SessionCookie,
 	})
 	if err = errors.Join(a.Fanmade.EnsureStorage(), a.Official.EnsureStorage()); err != nil {
 		a.Close()

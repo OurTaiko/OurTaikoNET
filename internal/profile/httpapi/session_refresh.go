@@ -15,7 +15,7 @@ import (
 // credential even if a tab cancels its request, without extending the login deadline.
 func (s *Server) refreshWebSession(r *http.Request) (session, error) {
 	var v session
-	cookie, err := r.Cookie(sessionCookie)
+	cookie, err := r.Cookie(s.sessionCookie())
 	if err != nil {
 		return v, pgx.ErrNoRows
 	}

@@ -29,6 +29,9 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// The song sources whose plays are shown, in display order.
 	Sources []Source
+	// SessionCookie names the cookie a website session is kept in; empty is the players' site's
+	// own name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
+	SessionCookie string
 	// The built website; nil serves only the API.
 	Site fs.FS
 }
@@ -45,6 +48,13 @@ type window struct {
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
 	return &Server{DB: pool, Config: cfg, limits: map[string]window{}}
+}
+
+func (s *Server) sessionCookie() string {
+	if s.Config.SessionCookie != "" {
+		return s.Config.SessionCookie
+	}
+	return defaultSessionCookie
 }
 
 func ID() string {

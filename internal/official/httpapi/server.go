@@ -41,7 +41,18 @@ type Config struct {
 	// Awards, when set, records what 段位 attempts earn in the attempt's own transaction;
 	// Profile is then used for its title catalog only.
 	Awards Awarder
+	// SessionCookie names the cookie a website session is kept in; empty is this site's own
+	// name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
+	SessionCookie string
 }
+
+func (s *Server) sessionCookie() string {
+	if s.Config.SessionCookie != "" {
+		return s.Config.SessionCookie
+	}
+	return "ourtaiko_db_session"
+}
+
 type Server struct {
 	DB      *pgxpool.Pool
 	Config  Config

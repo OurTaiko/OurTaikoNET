@@ -34,7 +34,7 @@ type session struct {
 
 func (s *Server) localSession(r *http.Request) (session, error) {
 	var v session
-	c, e := r.Cookie("ourtaiko_db_session")
+	c, e := r.Cookie(s.sessionCookie())
 	if e != nil || len(c.Value) != 64 {
 		return v, pgx.ErrNoRows
 	}
@@ -184,7 +184,7 @@ func safeReturn(raw string) string {
 }
 
 func (s *Server) setSession(w http.ResponseWriter, raw string, expires time.Time) {
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_db_session", Value: raw, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Value: raw, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
 }
 
 // devLogin opens a session for the configured development user.
@@ -318,7 +318,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	if old, e := r.Cookie("ourtaiko_db_session"); e == nil {
+	if old, e := r.Cookie(s.sessionCookie()); e == nil {
 		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hash(old.Value))
 	}
 	s.setSession(w, rawSession, expires)
@@ -336,7 +336,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			problem(w, 403, "CSRF_INVALID", "会话已更新，请刷新页面后重试")
 			return
 		}
-		c, _ := r.Cookie("ourtaiko_db_session")
+		c, _ := r.Cookie(s.sessionCookie())
 		var access, refresh []byte
 		e = s.DB.QueryRow(r.Context(), `DELETE FROM sessions WHERE token_hash=$1 RETURNING upstream_token,upstream_refresh_token`, hash(c.Value)).Scan(&access, &refresh)
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
@@ -354,6 +354,6 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_db_session", Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	respond(w, 200, map[string]bool{"ok": true})
 }

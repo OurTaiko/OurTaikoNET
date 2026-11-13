@@ -37,8 +37,10 @@ type credentials struct {
 
 func (s *Server) localSession(r *http.Request) (session, error) {
 	var v session
-	c, e := r.Cookie("ourtaiko_session")
-	if e != nil || len(c.Value) != 64 {
+	c, e := r.Cookie(s.sessionCookie())
+	// Without an account center nobody is signed in here, whatever cookie another part of the
+	// site may have set for its development sign-in.
+	if e != nil || len(c.Value) != 64 || s.Config.SSO == nil {
 		return v, pgx.ErrNoRows
 	}
 	var encrypted, refresh []byte
@@ -295,10 +297,10 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	if old, e := r.Cookie("ourtaiko_session"); e == nil {
+	if old, e := r.Cookie(s.sessionCookie()); e == nil {
 		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hash(old.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_session", Value: rawSession, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Value: rawSession, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
 	http.Redirect(w, r, s.Config.Origin+safeReturn(destination), http.StatusSeeOther)
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +315,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			problem(w, 403, "CSRF_INVALID", "会话已更新，请刷新页面后重试")
 			return
 		}
-		c, _ := r.Cookie("ourtaiko_session")
+		c, _ := r.Cookie(s.sessionCookie())
 		var access, refresh []byte
 		e = s.DB.QueryRow(r.Context(), `DELETE FROM sessions WHERE token_hash=$1 RETURNING upstream_token,upstream_refresh_token`, hash(c.Value)).Scan(&access, &refresh)
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
@@ -331,6 +333,6 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: "ourtaiko_session", Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	respond(w, 200, map[string]bool{"ok": true})
 }

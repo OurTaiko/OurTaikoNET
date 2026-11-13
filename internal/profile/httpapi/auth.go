@@ -13,7 +13,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const sessionCookie, flowCookie = "ourtaiko_profile_session", "ourtaiko_profile_oidc"
+const defaultSessionCookie, flowCookie = "ourtaiko_profile_session", "ourtaiko_profile_oidc"
 
 // User is the signed-in website user as the account center describes them. IsAdmin is the
 // Profile application's role there: administrators manage titles and grants.
@@ -36,7 +36,7 @@ type session struct {
 
 func (s *Server) localSession(r *http.Request) (session, error) {
 	var v session
-	c, e := r.Cookie(sessionCookie)
+	c, e := r.Cookie(s.sessionCookie())
 	if e != nil || len(c.Value) != 64 {
 		return v, pgx.ErrNoRows
 	}
@@ -158,7 +158,7 @@ func safeReturn(raw string) string {
 }
 
 func (s *Server) setSession(w http.ResponseWriter, raw string, expires time.Time) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: raw, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Value: raw, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: max(1, int(time.Until(expires).Seconds()))})
 }
 
 // devLogin opens a session for the configured development user.
@@ -262,20 +262,45 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	rawSession, csrf := ID()+ID(), ID()+ID()
-	digest := hash(rawSession)
-	expires := time.Now().Add(7 * 24 * time.Hour)
-	_, e = s.DB.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, digest, u.ID, csrf, expires, s.Config.SSO.seal(token.AccessToken, digest), s.Config.SSO.seal(token.RefreshToken, "refresh:"+digest), token.Expiry)
+	rawSession, expires, e := s.OpenSession(ctx, u.ID, token.AccessToken, token.RefreshToken, token.Expiry)
 	if e != nil {
 		revoke()
 		fail()
 		return
 	}
-	if old, e := r.Cookie(sessionCookie); e == nil {
+	if old, e := r.Cookie(s.sessionCookie()); e == nil {
 		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hash(old.Value))
 	}
 	s.setSession(w, rawSession, expires)
 	http.Redirect(w, r, s.Config.Origin+safeReturn(destination), http.StatusSeeOther)
+}
+
+// OpenSession records that a player has signed in with the account center and returns the
+// value of their session cookie and when it ends. access and refresh are the account center's
+// tokens for them, kept encrypted. The player becomes known to the site if they were not, and
+// this counts as their sign-in for the first-login and last-active times the sources show.
+//
+// A session is the same row to every part of the site: with one cookie name (Config
+// .SessionCookie), signing in here signs in everywhere.
+func (s *Server) OpenSession(ctx context.Context, user, access, refresh string, accessExpires time.Time) (string, time.Time, error) {
+	rawSession, csrf := ID()+ID(), ID()+ID()
+	digest := hash(rawSession)
+	expires := time.Now().Add(7 * 24 * time.Hour)
+	tx, e := s.DB.Begin(ctx)
+	if e != nil {
+		return "", expires, e
+	}
+	defer tx.Rollback(ctx)
+	if _, e = tx.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at) VALUES($1,now(),now())
+ ON CONFLICT(id) DO UPDATE SET first_login_at=COALESCE(users.first_login_at,EXCLUDED.first_login_at),
+ last_active_at=GREATEST(users.last_active_at,EXCLUDED.last_active_at)`, user); e != nil {
+		return "", expires, e
+	}
+	if _, e = tx.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+		digest, user, csrf, expires, s.Config.SSO.seal(access, digest), s.Config.SSO.seal(refresh, "refresh:"+digest), accessExpires); e != nil {
+		return "", expires, e
+	}
+	return rawSession, expires, tx.Commit(ctx)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +315,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			problem(w, 403, "CSRF_INVALID", "会话已更新，请刷新页面后重试")
 			return
 		}
-		c, _ := r.Cookie(sessionCookie)
+		c, _ := r.Cookie(s.sessionCookie())
 		var access, refresh []byte
 		e = s.DB.QueryRow(r.Context(), `DELETE FROM sessions WHERE token_hash=$1 RETURNING upstream_token,upstream_refresh_token`, hash(c.Value)).Scan(&access, &refresh)
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
@@ -308,6 +333,6 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 			_ = s.Config.SSO.call(ctx, "web/revoke", map[string]string{"accessToken": v.Token, "refreshToken": v.RefreshToken}, nil)
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.sessionCookie(), Path: "/", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	respond(w, 200, map[string]bool{"ok": true})
 }

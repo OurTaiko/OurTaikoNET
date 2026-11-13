@@ -44,7 +44,7 @@ func (c *client) do(method, path, body string, header map[string]string) *httpte
 		r.Header.Set("X-CSRF-Token", c.csrf)
 	}
 	if c.cookie != "" {
-		r.AddCookie(&http.Cookie{Name: sessionCookie, Value: c.cookie})
+		r.AddCookie(&http.Cookie{Name: defaultSessionCookie, Value: c.cookie})
 	}
 	for k, v := range header {
 		if v == "" {

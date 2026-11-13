@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +17,7 @@ import (
 	"ourtaiko.dev/net/internal/netdb"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	official "ourtaiko.dev/net/internal/official/httpapi"
+	profile "ourtaiko.dev/net/internal/profile/httpapi"
 )
 
 // One program, one database: each source answers under its name at the new address and as
@@ -248,6 +251,145 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	for _, host := range []string{"net.ourtaiko.org", "profile.ourtaiko.org", "fanmade.ourtaiko.org"} {
 		if w := get("POST", host, "/internal/v1/awards"); w.Code != 404 {
 			t.Errorf("POST /internal/v1/awards on %s: %d, want 404", host, w.Code)
+		}
+	}
+}
+
+// accountCenter stands in for the account center's internal API: the access token
+// "tok:<player id>" is that player's, until it is revoked.
+func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
+	t.Helper()
+	revoked = &sync.Map{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			AccessToken string `json:"accessToken"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		id, ok := strings.CutPrefix(body.AccessToken, "tok:")
+		_, gone := revoked.Load(body.AccessToken)
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/internal/v1/web/revoke":
+			revoked.Store(body.AccessToken, true)
+			w.Write([]byte(`{"ok":true}`))
+		case r.URL.Path == "/internal/v1/web/introspect" && ok && !gone:
+			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": id, "username": "player", "nickname": "Player", "isAdmin": false, "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
+		default:
+			w.WriteHeader(401)
+			w.Write([]byte(`{"code":"UNAUTHORIZED","message":"no"}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.URL, revoked
+}
+
+// One sign-in for the whole site: a session opened by the players' part is a session in both
+// sources, signing out ends it everywhere, and the sources' own sign-in routes are not offered.
+func TestOneSignInForTheWholeSite(t *testing.T) {
+	pool, url := netdbtest.NewURL(t, "fanmade")
+	ctx := context.Background()
+	issuer, _ := accountCenter(t)
+	key, secret := strings.Repeat("k", 64), strings.Repeat("b", 64)
+	fanmadeSSO, err := fanmade.NewSSO(fanmade.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	officialSSO, err := official.NewSSO(official.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileSSO, err := profile.NewSSO(profile.SSOConfig{Issuer: issuer, ServiceID: "net", ServiceKey: key, ClientID: "net", ClientSecret: "secret", RedirectURL: "http://localhost/api/v1/auth/sso/callback", EncryptionKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), FanmadeSSO: fanmadeSSO, OfficialSSO: officialSSO, ProfileSSO: profileSSO})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	h := a.Handler()
+	player := strings.Repeat("7", 32)
+	// Nobody had heard of this player: signing in makes them known and is their first sign-in.
+	cookie, _, err := a.Players.OpenSession(ctx, player, "tok:"+player, "refresh", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var first, last *time.Time
+	if err = pool.QueryRow(ctx, `SELECT first_login_at,last_active_at FROM net.users WHERE id=$1`, player).Scan(&first, &last); err != nil || first == nil || last == nil {
+		t.Fatal("the sign-in is not recorded for the player:", first, last, err)
+	}
+	me := func(path string, signedIn bool) (csrf string) {
+		t.Helper()
+		r := httptest.NewRequest("GET", path, nil)
+		r.Host = "net.ourtaiko.org"
+		if signedIn {
+			r.AddCookie(&http.Cookie{Name: SessionCookie, Value: cookie})
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var body struct {
+			User *struct {
+				ID string `json:"id"`
+			} `json:"user"`
+			CSRF      string `json:"csrf"`
+			CSRFToken string `json:"csrfToken"`
+		}
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &body) != nil {
+			t.Fatalf("%s: %d %s", path, w.Code, w.Body.String())
+		}
+		if signedIn && (body.User == nil || body.User.ID != player) {
+			t.Fatalf("%s does not know the signed-in player: %s", path, w.Body.String())
+		}
+		if !signedIn && body.User != nil {
+			t.Fatalf("%s knows a player without a session: %s", path, w.Body.String())
+		}
+		return body.CSRF + body.CSRFToken
+	}
+	paths := []string{"/api/v1/me", "/api/v1/sources/fanmade/me", "/api/v1/sources/official/me"}
+	tokens := map[string]bool{}
+	for _, path := range paths {
+		me(path, false)
+		tokens[me(path, true)] = true
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("the parts give different CSRF tokens for one session: %v", tokens)
+	}
+	var csrf string
+	for token := range tokens {
+		csrf = token
+	}
+	if csrf == "" {
+		t.Fatal("no CSRF token for the session")
+	}
+
+	// The sources' own sign-in is not offered at the new address.
+	for _, path := range []string{"/api/v1/sources/fanmade/auth/sso/login", "/api/v1/sources/official/auth/sso/login"} {
+		r := httptest.NewRequest("GET", path, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 404 {
+			t.Errorf("%s: %d, want 404", path, w.Code)
+		}
+	}
+
+	// Signing out once signs out of every part.
+	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader("{}"))
+	r.Header.Set("Origin", "http://localhost")
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-CSRF-Token", csrf)
+	r.AddCookie(&http.Cookie{Name: SessionCookie, Value: cookie})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Fatal("sign out:", w.Code, w.Body.String())
+	}
+	for _, path := range paths {
+		r := httptest.NewRequest("GET", path, nil)
+		r.AddCookie(&http.Cookie{Name: SessionCookie, Value: cookie})
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code == 200 && strings.Contains(w.Body.String(), player) {
+			t.Errorf("%s still knows the player after signing out: %s", path, w.Body.String())
 		}
 	}
 }
