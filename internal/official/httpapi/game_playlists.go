@@ -31,7 +31,7 @@ type GamePlaylist struct {
 // gamePlaylists reads the folders for user (nil for a guest) from the
 // catalog snapshot. Empty playlists are left out; owner names and cover
 // links are filled later by gamePlaylistDetails.
-func gamePlaylists(ctx context.Context, tx pgx.Tx, user *User) ([]GamePlaylist, error) {
+func (s *Server) gamePlaylists(ctx context.Context, tx pgx.Tx, user *User) ([]GamePlaylist, error) {
 	items := []GamePlaylist{}
 	viewer := ""
 	if user != nil {
@@ -56,7 +56,7 @@ func gamePlaylists(ctx context.Context, tx pgx.Tx, user *User) ([]GamePlaylist, 
 			if own {
 				p.Kind = "owned"
 			}
-			p.Genre = categoryByFlag(flag).Genre
+			p.Genre = s.source().categoryByFlag(flag).Genre
 			if len(p.ChartIDs) > 0 {
 				items = append(items, p)
 			}
@@ -76,7 +76,7 @@ func gamePlaylists(ctx context.Context, tx pgx.Tx, user *User) ([]GamePlaylist, 
 			return nil, e
 		}
 		if len(ids) > 0 {
-			items = append(items, GamePlaylist{ID: p.id, Title: p.name, Genre: categoryByFlag(p.category).Genre, Kind: "system", ChartIDs: ids})
+			items = append(items, GamePlaylist{ID: p.id, Title: p.name, Genre: s.source().playlistCategory(p.id).Genre, Kind: "system", ChartIDs: ids})
 		}
 	}
 	return items, nil
@@ -108,7 +108,7 @@ func (s *Server) gamePlaylistList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	playlists, err := gamePlaylists(r.Context(), tx, &u.User)
+	playlists, err := s.gamePlaylists(r.Context(), tx, &u.User)
 	if err != nil {
 		internal(w, err)
 		return

@@ -142,7 +142,7 @@ const slotOrder = `array_position(ARRAY['Easy','Normal','Hard','Oni','Edit'],d.c
 
 // chartSelect reads charts for readChart. A song without files (official source) has empty
 // file fields.
-const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,` + officialIDColumn + `,c.owner_ids,c.description,c.created_at,c.update_at,c.duration,c.demo_end,c.category_flags,
+const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_ids,c.description,c.created_at,c.update_at,c.duration,c.demo_end,c.category_flags,
  COALESCE(tf.original_filename,''),COALESCE(af.original_filename,''),COALESCE(tf.sha256,''),COALESCE(tf.byte_size,0),COALESCE(af.sha256,''),COALESCE(af.byte_size,0),COALESCE(tf.storage_key,''),COALESCE(af.storage_key,''),
  COALESCE(cf.sha256,''),COALESCE(pf.storage_key,''),
  c.title,c.subtitle,c.bpm,c.offset_seconds,c.demo_start,COALESCE(af.sha256||'.'||af.extension,''),c.title_translations,c.subtitle_translations,
@@ -156,7 +156,7 @@ const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,` + officialIDColumn +
 
 // readChart reads a row of chartSelect.
 func (s *Server) readChart(row pgx.Row) (Chart, error) {
-	c := Chart{official: officialSource}
+	c := Chart{official: s.source().Official}
 	var difficulties []byte
 	var flags CategoryFlags
 	e := row.Scan(&c.ID, &c.NumberID, &c.NijiiroID, &c.OfficialID, &c.OwnerIDs, &c.Description, &c.CreatedAt, &c.UpdateAt, &c.Duration, &c.DemoEnd, &flags,
@@ -168,7 +168,7 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 		c.OwnerID = c.OwnerIDs[0]
 		c.Score = c.Upvotes - c.Downvotes
 		c.HasFiles = c.TJAKey != ""
-		c.CategoryIDs = flags.IDs()
+		c.CategoryIDs = s.source().categoryIDs(flags)
 		e = json.Unmarshal(difficulties, &c.Difficulties)
 		c.Maker = difficultyMakers(c.Difficulties)
 		c.AudioPreview = audioPreview(c)
@@ -236,7 +236,7 @@ func (s *Server) chartWhere(ctx context.Context, column string, value any) (Char
 // official ID (where the source has one) or any block's maker contains the keyword q; number is
 // keywordNumber(q). An empty keyword matches every chart.
 func keywordClause(q, number string) string {
-	return `(` + q + `='' OR c.title ILIKE '%'||` + q + `||'%' OR c.subtitle ILIKE '%'||` + q + `||'%' OR ` + officialIDColumn + ` ILIKE '%'||` + q + `||'%'
+	return `(` + q + `='' OR c.title ILIKE '%'||` + q + `||'%' OR c.subtitle ILIKE '%'||` + q + `||'%' OR c.official_id ILIKE '%'||` + q + `||'%'
  OR c.nijiiro_id=` + number + ` OR c.number_id=` + number + `
  OR EXISTS(SELECT 1 FROM chart_difficulties dm WHERE dm.chart_id=c.id AND dm.maker ILIKE '%'||` + q + `||'%')
  OR EXISTS(SELECT 1 FROM jsonb_each_text(c.title_translations) t WHERE t.value ILIKE '%'||` + q + `||'%')
@@ -268,7 +268,7 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
 	s.search(w, r, u.User.ID)
 }
 
-// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category,
+// search pages the chart list, Source.PageSize charts at a time. Filters: keyword, owner, category,
 // a course and star level that must hold for the same block (any side), whether the chart
 // has a Nijiiro ID, and whether it has files. Every filter and order is there on both
 // sources; which of them a source's website offers is the website's business.
@@ -290,7 +290,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	var flag CategoryFlags
 	if id := query.Get("category"); id != "" {
 		var ok bool
-		if flag, ok = categoryFlag(id); !ok {
+		if flag, ok = s.source().categoryFlag(id); !ok {
 			problem(w, 400, "QUERY_INVALID", "分类不存在")
 			return
 		}
@@ -361,7 +361,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		internal(w, e)
 		return
 	}
-	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, pageSize, (page-1)*pageSize)...)
+	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, s.source().PageSize, (page-1)*s.source().PageSize)...)
 	if e != nil {
 		internal(w, e)
 		return
@@ -372,7 +372,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		return
 	}
 	s.chartNames(r.Context(), items)
-	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
+	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": s.source().PageSize})
 }
 
 // nijiiroID reads a Nijiiro ID as text: a positive int4 without leading zeros.

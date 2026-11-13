@@ -181,10 +181,13 @@ func (s *Server) accountRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, s.Config.SSO.Config.Issuer+path, http.StatusSeeOther)
 }
-func safeReturn(raw string) string {
+
+// safeReturn is where signing in returns to: the local path asked for, or the source's own
+// default when there is none or it leads elsewhere.
+func (src *Source) safeReturn(raw string) string {
 	u, e := url.Parse(raw)
 	if e != nil || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.ContainsAny(raw, "\\\r\n") || u.IsAbs() || u.Host != "" {
-		return defaultReturn
+		return src.DefaultReturn
 	}
 	return raw
 }
@@ -210,7 +213,7 @@ func (s *Server) devLogin(w http.ResponseWriter, r *http.Request, destination st
 	http.Redirect(w, r, s.Config.Origin+destination, http.StatusSeeOther)
 }
 func (s *Server) ssoLogin(w http.ResponseWriter, r *http.Request) {
-	destination := safeReturn(r.URL.Query().Get("returnTo"))
+	destination := s.source().safeReturn(r.URL.Query().Get("returnTo"))
 	if strings.HasPrefix(destination, "/api/") {
 		problem(w, 400, "RETURN_PATH_INVALID", "返回地址必须是网站页面")
 		return
@@ -239,7 +242,7 @@ func (s *Server) ssoLogin(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Value: binding, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
+	http.SetCookie(w, &http.Cookie{Name: s.source().OIDCCookie, Value: binding, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
 	http.Redirect(w, r, cfg.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusSeeOther)
 }
 func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +251,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	c, e := r.Cookie(oidcCookie)
+	c, e := r.Cookie(s.source().OIDCCookie)
 	state := r.URL.Query().Get("state")
 	if e != nil || len(c.Value) != 64 || len(state) != 64 {
 		fail()
@@ -256,7 +259,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	var nonce, verifier, destination string
 	e = s.DB.QueryRow(r.Context(), `DELETE FROM oidc_flows WHERE state_hash=$1 AND binding_hash=$2 AND expires_at>now() RETURNING nonce,verifier,return_path`, hash(state), hash(c.Value)).Scan(&nonce, &verifier, &destination)
-	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.source().OIDCCookie, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.Config.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	if e != nil || r.URL.Query().Get("error") != "" || r.URL.Query().Get("code") == "" {
 		fail()
 		return
@@ -328,7 +331,7 @@ func (s *Server) ssoCallback(w http.ResponseWriter, r *http.Request) {
 		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hash(old.Value))
 	}
 	s.setSession(w, rawSession, expires)
-	http.Redirect(w, r, s.Config.Origin+safeReturn(destination), http.StatusSeeOther)
+	http.Redirect(w, r, s.Config.Origin+s.source().safeReturn(destination), http.StatusSeeOther)
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	// Local logout still works when SSO is unavailable. Never require a remote refresh first.

@@ -94,7 +94,7 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	playlists, err := gamePlaylists(r.Context(), tx, nil)
+	playlists, err := s.gamePlaylists(r.Context(), tx, nil)
 	if err != nil {
 		internal(w, err)
 		return
@@ -109,8 +109,8 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 			counts[id]++
 		}
 	}
-	categories := make([]Category, 0, len(categoryCatalog))
-	for _, entry := range categoryCatalog {
+	categories := make([]Category, 0, len(s.source().Categories))
+	for _, entry := range s.source().Categories {
 		category := entry.Category
 		category.ChartCount = counts[category.ID]
 		categories = append(categories, category)
@@ -123,10 +123,10 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 	body := map[string]any{
 		"categories": categories, "charts": charts, "chartCount": len(charts), "playlists": playlists, "playlistVersion": 1,
 		"chartSlotVersion": 1, "resourceDownloadVersion": 1, "scoreReplayVersion": 1, "danVersion": 1, "danResultsVersion": 1,
-		"genreFrame": catalogGenreFrame,
+		"genreFrame": s.source().GenreFrame,
 	}
 	// Where charts carry their preview clip (audioPreview).
-	if !officialSource {
+	if !s.source().Official {
 		body["audioPreviewVersion"] = 1
 	}
 	if s.Config.SSO != nil {

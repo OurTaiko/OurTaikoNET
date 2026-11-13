@@ -58,7 +58,7 @@ func (s *Server) replayList(w http.ResponseWriter, r *http.Request) {
 		where += fmt.Sprintf(` AND d.course=$%d`, len(args))
 	}
 	if id := query.Get("categoryId"); id != "" {
-		flag, ok := categoryFlag(id)
+		flag, ok := s.source().categoryFlag(id)
 		if !ok {
 			problem(w, 400, "QUERY_INVALID", "分类不存在")
 			return

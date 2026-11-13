@@ -35,7 +35,7 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 		}
 		return p.Items[0].ID
 	}
-	if p := list(""); p.PageSize != pageSize || pageSize != 12 || p.Total != 2 {
+	if p := list(""); p.PageSize != 12 || p.Total != 2 {
 		t.Fatalf("page %+v", p)
 	}
 	for query, want := range map[string]string{

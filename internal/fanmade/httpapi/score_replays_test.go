@@ -287,7 +287,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		t.Fatalf("past the last page: %+v", v)
 	}
 	// categoryId narrows to the songs of one category (Game here).
-	if _, err := pool.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, song, int(CategoryGame)); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, song, 1); err != nil {
 		t.Fatal(err)
 	}
 	if v := list("/api/v1/replays?categoryId=game"); v.Total != replays.Total || len(v.Items) == 0 || v.Items[0].ID != withOptions.ID {

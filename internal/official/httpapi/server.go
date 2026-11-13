@@ -24,6 +24,8 @@ import (
 )
 
 type Config struct {
+	// Source is the song source this server serves; nil is the Fanmade source.
+	Source          *Source
 	Origin, Storage string
 	// Site is the built website; nil serves the API alone.
 	Site         fs.FS
@@ -55,7 +57,7 @@ func (s *Server) sessionCookie() string {
 	if s.Config.SessionCookie != "" {
 		return s.Config.SessionCookie
 	}
-	return defaultSessionCookie
+	return s.source().SessionCookie
 }
 
 type Server struct {
@@ -222,7 +224,7 @@ func (s *Server) Handler() http.Handler {
 	// What only the Fanmade site's older clients still ask for: the account routes it gave up
 	// when accounts moved to the account center, and its score route from before the game
 	// routes.
-	if !officialSource {
+	if !s.source().Official {
 		mux.HandleFunc("POST /api/v1/auth/email-code", s.retiredAccountAPI)
 		mux.HandleFunc("POST /api/v1/auth/register", s.retiredAccountAPI)
 		mux.HandleFunc("POST /api/v1/auth/login", s.retiredAccountAPI)

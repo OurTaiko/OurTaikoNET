@@ -116,7 +116,7 @@ func TestPlaylistCover(t *testing.T) {
 			t.Fatal(e)
 		}
 		defer tx.Rollback(ctx)
-		items, e := gamePlaylists(ctx, tx, &User{ID: owner})
+		items, e := s.gamePlaylists(ctx, tx, &User{ID: owner})
 		if e == nil {
 			e = app.gamePlaylistDetails(ctx, items)
 		}

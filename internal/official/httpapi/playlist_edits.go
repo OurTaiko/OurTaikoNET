@@ -20,7 +20,7 @@ type playlistRequest struct {
 }
 
 // normalize trims and validates the fields that are present.
-func (body *playlistRequest) normalize(w http.ResponseWriter) (CategoryFlags, bool) {
+func (body *playlistRequest) normalize(w http.ResponseWriter, src *Source) (CategoryFlags, bool) {
 	clean := func(text string, limit int, multiline bool) (string, bool) {
 		text = strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n"))
 		for _, c := range text {
@@ -46,10 +46,10 @@ func (body *playlistRequest) normalize(w http.ResponseWriter) (CategoryFlags, bo
 		}
 		body.Description = &text
 	}
-	flag := CategoryVariety
+	flag, _ := src.categoryFlag("variety")
 	if body.CategoryID != nil {
 		var ok bool
-		if flag, ok = categoryFlag(*body.CategoryID); !ok {
+		if flag, ok = src.categoryFlag(*body.CategoryID); !ok {
 			problem(w, 400, "CATEGORY_INVALID", "分类无效")
 			return 0, false
 		}
@@ -58,7 +58,7 @@ func (body *playlistRequest) normalize(w http.ResponseWriter) (CategoryFlags, bo
 }
 
 func (s *Server) respondPlaylist(w http.ResponseWriter, r *http.Request, status int, viewer, id string) {
-	p, e := readPlaylist(s.DB.QueryRow(r.Context(), playlistSelect+` WHERE p.id=$2`, viewer, id))
+	p, e := s.source().readPlaylist(s.DB.QueryRow(r.Context(), playlistSelect+` WHERE p.id=$2`, viewer, id))
 	if e != nil {
 		internal(w, e)
 		return
@@ -81,7 +81,7 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "PLAYLIST_INVALID", "歌单名称需为 1–50 个字符")
 		return
 	}
-	flag, ok := body.normalize(w)
+	flag, ok := body.normalize(w, s.source())
 	if !ok {
 		return
 	}
@@ -177,7 +177,7 @@ func (s *Server) editPlaylist(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	flag, ok := body.normalize(w)
+	flag, ok := body.normalize(w, s.source())
 	if !ok {
 		return
 	}

@@ -216,7 +216,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 		if user != "" {
 			u = &User{ID: user}
 		}
-		items, e := gamePlaylists(ctx, tx, u)
+		items, e := s.gamePlaylists(ctx, tx, u)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -454,7 +454,7 @@ func TestPlaylistCover(t *testing.T) {
 			t.Fatal(e)
 		}
 		defer tx.Rollback(ctx)
-		items, e := gamePlaylists(ctx, tx, &User{ID: playlistOwner})
+		items, e := app.gamePlaylists(ctx, tx, &User{ID: playlistOwner})
 		if e == nil {
 			e = app.gamePlaylistDetails(ctx, items)
 		}

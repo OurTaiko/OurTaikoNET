@@ -936,6 +936,7 @@ CREATE TABLE fanmade.charts (
     update_at timestamp with time zone DEFAULT now() NOT NULL,
     bgimage_file bigint,
     nijiiro_id integer,
+    official_id text,
     CONSTRAINT charts_bpm_check CHECK (((bpm > (0)::double precision) AND (bpm < 'Infinity'::double precision))),
     CONSTRAINT charts_category_flags_check CHECK (((category_flags >= 0) AND ((category_flags & 63) = category_flags))),
     CONSTRAINT charts_duration_check CHECK (((duration > (0)::double precision) AND (duration <= (1200)::double precision))),
@@ -2774,6 +2775,13 @@ CREATE INDEX charts_movie_file ON fanmade.charts USING btree (movie_file);
 --
 
 CREATE UNIQUE INDEX charts_nijiiro_id ON fanmade.charts USING btree (nijiiro_id) WHERE (nijiiro_id IS NOT NULL);
+
+
+--
+-- Name: charts_official_id; Type: INDEX; Schema: fanmade; Owner: -
+--
+
+CREATE INDEX charts_official_id ON fanmade.charts USING btree (official_id) WHERE (official_id IS NOT NULL);
 
 
 --

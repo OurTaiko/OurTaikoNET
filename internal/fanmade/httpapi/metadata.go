@@ -73,17 +73,17 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	flags, _ := encodeCategories(c.CategoryIDs)
+	flags, _ := s.source().encodeCategories(c.CategoryIDs)
 	if len(patch.CategoryIDs) > 0 {
-		ids, e := categorySelection(patch.CategoryIDs)
+		ids, e := s.source().categorySelection(patch.CategoryIDs)
 		if e != nil {
 			problem(w, 422, "CATEGORIES_INVALID", "分类必须为已有分类 ID 的数组")
 			return
 		}
-		flags, _ = encodeCategories(ids)
+		flags, _ = s.source().encodeCategories(ids)
 	}
 	// Only the official source's songs carry the official game's identifiers.
-	if !officialSource && len(patch.NijiiroID)+len(patch.OfficialID) > 0 {
+	if !s.source().Official && len(patch.NijiiroID)+len(patch.OfficialID) > 0 {
 		problem(w, 422, "IDENTIFIER_INVALID", "这个曲源的谱面没有 Nijiiro ID 和官方 ID")
 		return
 	}
@@ -181,7 +181,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The column is the official source's alone.
-	if officialSource {
+	if s.source().Official {
 		if _, e = tx.Exec(r.Context(), `UPDATE charts SET official_id=$2 WHERE id=$1`, c.ID, officialID); e != nil {
 			internal(w, e)
 			return

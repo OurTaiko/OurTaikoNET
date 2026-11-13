@@ -14,13 +14,13 @@ func TestCategorySelection(t *testing.T) {
 		"[]":                    {"variety"},
 		`["pop","anime","pop"]`: {"anime", "pop"},
 	} {
-		got, err := categorySelection(json.RawMessage(raw))
+		got, err := defaultSource.categorySelection(json.RawMessage(raw))
 		if err != nil || !reflect.DeepEqual(got, want) {
 			t.Fatalf("%q: %v %v", raw, got, err)
 		}
 	}
 	for _, raw := range []string{`"pop"`, `["missing"]`, `[1]`, `{}`} {
-		if _, err := categorySelection(json.RawMessage(raw)); err == nil {
+		if _, err := defaultSource.categorySelection(json.RawMessage(raw)); err == nil {
 			t.Fatalf("%q accepted", raw)
 		}
 	}

@@ -317,7 +317,7 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 		return rejected(409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
 	}
 	// Only the official source's songs have an official ID.
-	if err == nil && officialSource {
+	if err == nil && s.source().Official {
 		_, err = tx.Exec(ctx, `UPDATE charts SET official_id=$2 WHERE id=$1`, id, j.officialID)
 	}
 	if err != nil {

@@ -120,16 +120,16 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		description = value
 	}
-	flags, _ := encodeCategories(c.CategoryIDs)
+	flags, _ := s.source().encodeCategories(c.CategoryIDs)
 	if value, sent := fields["categoryIds"]; sent {
-		ids, e := categorySelection(json.RawMessage(value))
+		ids, e := s.source().categorySelection(json.RawMessage(value))
 		if e != nil {
 			problem(w, 422, "CATEGORIES_INVALID", "分类必须为已有分类 ID 的数组")
 			return
 		}
-		flags, _ = encodeCategories(ids)
+		flags, _ = s.source().encodeCategories(ids)
 	}
-	if !ownIdentifiers(w, fields) {
+	if !s.ownIdentifiers(w, fields) {
 		return
 	}
 	nijiiroID, officialID := c.NijiiroID, c.OfficialID

@@ -127,7 +127,7 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		t.Fatal("past the last page", code, empty)
 	}
 	// categoryId narrows to the songs of one category (Game here).
-	if _, err := s.DB.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, w.song, int(CategoryGame)); err != nil {
+	if _, err := s.DB.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, w.song, 4); err != nil {
 		t.Fatal(err)
 	}
 	var inCategory listing

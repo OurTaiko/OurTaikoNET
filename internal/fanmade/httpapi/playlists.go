@@ -93,17 +93,17 @@ const playlistSelect = `SELECT p.id,p.owner_id,p.name,p.description,p.is_public,
  EXISTS(SELECT 1 FROM playlist_favorites f WHERE f.playlist_id=p.id AND f.user_id=$1)
  FROM playlists p `
 
-func readPlaylist(row pgx.Row) (Playlist, error) {
+func (src *Source) readPlaylist(row pgx.Row) (Playlist, error) {
 	var p Playlist
 	var flag CategoryFlags
 	var created, updated time.Time
 	e := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.Description, &p.Public, &flag, &p.CoverHash, &created, &updated, &p.ChartCount, &p.FavoriteCount, &p.Favorited)
-	category := categoryByFlag(flag)
+	category := src.categoryByFlag(flag)
 	p.CategoryID, p.Genre, p.CreatedAt, p.UpdatedAt = category.ID, category.Genre, &created, &updated
 	return p, e
 }
 
-func readPlaylists(ctx context.Context, db playlistQuerier, sql string, args ...any) ([]Playlist, error) {
+func (src *Source) readPlaylists(ctx context.Context, db playlistQuerier, sql string, args ...any) ([]Playlist, error) {
 	rows, e := db.Query(ctx, sql, args...)
 	if e != nil {
 		return nil, e
@@ -111,7 +111,7 @@ func readPlaylists(ctx context.Context, db playlistQuerier, sql string, args ...
 	defer rows.Close()
 	items := []Playlist{}
 	for rows.Next() {
-		p, e := readPlaylist(rows)
+		p, e := src.readPlaylist(rows)
 		if e != nil {
 			return nil, e
 		}
@@ -211,7 +211,7 @@ func (s *Server) listPlaylists(w http.ResponseWriter, r *http.Request) {
 	viewer := s.viewer(r)
 	listing := playlistSelect + filter
 	if e = tx.QueryRow(r.Context(), `SELECT count(*) FROM (`+listing+`) listed`, viewer, q, owner).Scan(&result.Total); e == nil {
-		result.Items, e = readPlaylists(r.Context(), tx, listing+` ORDER BY `+order+` LIMIT $4 OFFSET $5`, viewer, q, owner, playlistPageSize, (page-1)*playlistPageSize)
+		result.Items, e = s.source().readPlaylists(r.Context(), tx, listing+` ORDER BY `+order+` LIMIT $4 OFFSET $5`, viewer, q, owner, playlistPageSize, (page-1)*playlistPageSize)
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
@@ -237,9 +237,9 @@ func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 	result := MyPlaylists{MaxPlaylists: maxPlaylists, MaxItems: maxPlaylistItems}
-	result.Owned, e = readPlaylists(ctx, tx, playlistSelect+` WHERE p.owner_id=$1 ORDER BY p.updated_at DESC,p.id`, u.User.ID)
+	result.Owned, e = s.source().readPlaylists(ctx, tx, playlistSelect+` WHERE p.owner_id=$1 ORDER BY p.updated_at DESC,p.id`, u.User.ID)
 	if e == nil {
-		result.Favorites, e = readPlaylists(ctx, tx, playlistSelect+` JOIN playlist_favorites mine ON mine.playlist_id=p.id
+		result.Favorites, e = s.source().readPlaylists(ctx, tx, playlistSelect+` JOIN playlist_favorites mine ON mine.playlist_id=p.id
  WHERE mine.user_id=$1 AND p.is_public ORDER BY mine.favorited_at DESC,p.id`, u.User.ID)
 	}
 	if chart := r.URL.Query().Get("chart"); e == nil && chart != "" {
@@ -272,7 +272,7 @@ func (s *Server) storedPlaylistSongs(w http.ResponseWriter, r *http.Request, raw
 	id, ok := playlistID(raw)
 	p, e := Playlist{}, pgx.ErrNoRows
 	if ok {
-		p, e = readPlaylist(s.DB.QueryRow(ctx, playlistSelect+` WHERE p.id=$2`, s.viewer(r), id))
+		p, e = s.source().readPlaylist(s.DB.QueryRow(ctx, playlistSelect+` WHERE p.id=$2`, s.viewer(r), id))
 	}
 	if e == nil && !p.Public {
 		// A private playlist needs a verified session, not just the cookie.
@@ -317,7 +317,7 @@ func (s *Server) playlistDetail(w http.ResponseWriter, r *http.Request) {
 			internal(w, e)
 			return
 		}
-		p = system.playlist(len(ids))
+		p = system.playlist(s.source(), len(ids))
 	} else {
 		var ok bool
 		if p, ids, ok = s.storedPlaylistSongs(w, r, r.PathValue("id")); !ok {

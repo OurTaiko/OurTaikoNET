@@ -57,3 +57,9 @@ $body$ $f$, source);
     END IF;
   END LOOP;
 END $block$;
+
+-- A song's ID in the official game. Only the official source's songs have one, but both
+-- sources' charts are read and searched by the same statements, so both tables have the
+-- column; on fanmade it stays empty.
+ALTER TABLE fanmade.charts ADD COLUMN IF NOT EXISTS official_id text;
+CREATE INDEX IF NOT EXISTS charts_official_id ON fanmade.charts (official_id) WHERE official_id IS NOT NULL;

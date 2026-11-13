@@ -46,7 +46,7 @@ func (s *Server) uploader(w http.ResponseWriter, r *http.Request) (session, bool
 	if !ok {
 		return u, false
 	}
-	if officialSource && !u.User.IsAdmin {
+	if s.source().Official && !u.User.IsAdmin {
 		problem(w, 403, "UPLOAD_FORBIDDEN", "只有管理员可以上传谱面")
 		return u, false
 	}
@@ -55,8 +55,8 @@ func (s *Server) uploader(w http.ResponseWriter, r *http.Request) (session, bool
 
 // ownIdentifiers refuses the identifiers of the official source's songs on a source whose
 // charts have none. It reports false after answering.
-func ownIdentifiers(w http.ResponseWriter, fields map[string]string) bool {
-	if !officialSource && fields["nijiiroId"]+fields["officialId"] != "" {
+func (s *Server) ownIdentifiers(w http.ResponseWriter, fields map[string]string) bool {
+	if !s.source().Official && fields["nijiiroId"]+fields["officialId"] != "" {
 		problem(w, 422, "IDENTIFIER_INVALID", "这个曲源的谱面没有 Nijiiro ID 和官方 ID")
 		return false
 	}
@@ -231,13 +231,13 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	categoryIDs, e := categorySelection(json.RawMessage(fields["categoryIds"]))
+	categoryIDs, e := s.source().categorySelection(json.RawMessage(fields["categoryIds"]))
 	if e != nil {
 		problem(w, 422, "CATEGORIES_INVALID", "分类必须为已有分类 ID 的数组")
 		return
 	}
-	flags, _ := encodeCategories(categoryIDs)
-	if !ownIdentifiers(w, fields) {
+	flags, _ := s.source().encodeCategories(categoryIDs)
+	if !s.ownIdentifiers(w, fields) {
 		return
 	}
 	nijiiroID, officialID, ok := identifiers(fields["nijiiroId"], fields["officialId"])
@@ -258,13 +258,13 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tf, af, cf, mv, bg := files["tja"], files["audio"], files["cover"], files["movie"], files["bgimage"]
-	if officialSource && tf == nil && af == nil && mv == nil && bg == nil {
+	if s.source().Official && tf == nil && af == nil && mv == nil && bg == nil {
 		s.createSong(w, r, u, key, fields, cf, categoryIDs, flags, nijiiroID, officialID, collaborators)
 		return
 	}
 	if tf == nil || af == nil {
 		message := "必须同时选择 TJA 和一个 OGG 或 MP3 音频"
-		if officialSource {
+		if s.source().Official {
 			message += "，或两者都不选以仅登记乐曲"
 		}
 		problem(w, 400, "UPLOAD_FILES_INVALID", message)
