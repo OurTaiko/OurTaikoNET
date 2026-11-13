@@ -34,10 +34,12 @@ type uploadJob struct {
 	categoryIDs              []string
 	collaborators            []string // users a new chart invites as co-creators once published
 	demoStart, demoEnd       float64
-	keepMovie, async         bool
-	keepTitles               bool // a replacement keeps the chart's title, subtitle and translations
-	movieOnly                bool // sets only the background movie of existingID, see replaceMovie
-	done                     chan uploadResult
+	// Whether the request named the range itself; otherwise it is the TJA's DEMOSTART for 15 seconds.
+	demoStartSent, demoEndSent bool
+	keepMovie, async           bool
+	keepTitles                 bool // a replacement keeps the chart's title, subtitle and translations
+	movieOnly                  bool // sets only the background movie of existingID, see replaceMovie
+	done                       chan uploadResult
 }
 
 // fileFailure names an optional file that was left out of a published chart.
@@ -122,6 +124,14 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	duration, err := audio.Validate(ctx, af.path, af.name)
 	if err != nil {
 		return rejected(422, "AUDIO_INVALID", "音频未通过完整性检查，请使用完整的单音轨 Ogg Vorbis 或 MP3 文件（最长 20 分钟）")
+	}
+	// A DEMOSTART outside the audio is not the uploader's choice of range: the preview then
+	// starts at the beginning, as on the official source.
+	if !j.demoStartSent && (j.demoStart < 0 || j.demoStart >= duration) {
+		j.demoStart = 0
+		if !j.demoEndSent {
+			j.demoEnd = 15
+		}
 	}
 	if !audio.ValidPreviewRange(j.demoStart, j.demoEnd, duration) {
 		return rejected(422, "PREVIEW_RANGE_INVALID", "试听起点必须位于音频范围内，终点须晚于起点且不超过 1215 秒")

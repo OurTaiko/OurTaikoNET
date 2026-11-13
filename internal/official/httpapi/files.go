@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/kit/tjatitles"
 	"ourtaiko.dev/net/internal/kit/video"
-	"ourtaiko.dev/net/internal/official/tjatitles"
 )
 
 // publishedFile resolves one file role of a published chart without the

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/fanmade/teststore"
+	"ourtaiko.dev/net/internal/kit/tjatitles"
 )
 
 func TestRekeyFiles(t *testing.T) {
@@ -99,14 +100,15 @@ func TestRekeyFiles(t *testing.T) {
 					t.Fatal("legacy object remains", key, err)
 				}
 			}
-			// The ZIP is built on request and names the audio as the stored TJA does.
+			// The ZIP is built on request and names the audio as the stored TJA does, and the
+			// chart as the site does.
 			w := httptest.NewRecorder()
 			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/a/download", nil))
 			z, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
 			if w.Code != 200 || err != nil || len(z.File) != 2 {
 				t.Fatal("download", w.Code, err)
 			}
-			for name, content := range map[string]string{"a.tja": storedA, wave: audio} {
+			for name, content := range map[string]string{"a.tja": string(tjatitles.WithTitles([]byte(storedA), a.Title, a.Subtitle, a.TitleTranslations, a.SubtitleTranslations)), wave: audio} {
 				f, err := z.Open(name)
 				if err != nil {
 					t.Fatal(name, err)

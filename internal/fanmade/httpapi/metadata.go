@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"mime"
 	"net/http"
 	"ourtaiko.dev/net/internal/kit/audio"
@@ -16,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -34,8 +34,34 @@ type metadataPatch struct {
 }
 type metadataTranslations struct{ Titles, Subtitles map[string]string }
 
-func validDisplayText(s string, title bool) bool {
-	if len(s) > 500 || (title && strings.TrimSpace(s) == "") {
+// patchTranslations merges locale → text into dst; null or "" removes a
+// locale. The TJA's own title and subtitle are not editable here.
+func patchTranslations(raw json.RawMessage, dst map[string]string) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var patch map[string]*string
+	if json.Unmarshal(raw, &patch) != nil {
+		return false
+	}
+	for locale, value := range patch {
+		if locale != "en" && locale != "ja" && locale != "zh" && locale != "ko" {
+			return false
+		}
+		if value == nil || strings.TrimSpace(*value) == "" {
+			delete(dst, locale)
+			continue
+		}
+		if !validDisplayText(*value) {
+			return false
+		}
+		dst[locale] = strings.TrimSpace(*value)
+	}
+	return true
+}
+
+func validDisplayText(s string) bool {
+	if len(s) > 500 || !utf8.ValidString(s) {
 		return false
 	}
 	for _, r := range s {
@@ -46,103 +72,7 @@ func validDisplayText(s string, title bool) bool {
 	return true
 }
 
-// null restores the corresponding value from the original TJA. Dictionaries
-// themselves contain authoritative translations, not an overlay layer.
-func patchTranslations(raw json.RawMessage, dst *map[string]string, original map[string]string, title bool) bool {
-	if len(raw) == 0 {
-		return true
-	}
-	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		*dst = maps.Clone(original)
-		return true
-	}
-	var patch map[string]*string
-	if json.Unmarshal(raw, &patch) != nil {
-		return false
-	}
-	if *dst == nil {
-		*dst = map[string]string{}
-	}
-	for locale, value := range patch {
-		if locale != "en" && locale != "ja" && locale != "zh" && locale != "ko" {
-			return false
-		}
-		if value == nil {
-			if text, ok := original[locale]; ok {
-				(*dst)[locale] = text
-			} else {
-				delete(*dst, locale)
-			}
-		} else {
-			text := strings.TrimSpace(*value)
-			if !validDisplayText(text, title) {
-				return false
-			}
-			(*dst)[locale] = text
-		}
-	}
-	return true
-}
-
-func (p metadataPatch) apply(o *metadataTranslations, original metadataTranslations) bool {
-	if len(p.Title)+len(p.Subtitle)+len(p.TitleTranslations)+len(p.SubtitleTranslations)+len(p.CategoryIDs)+len(p.DemoStart)+len(p.DemoEnd)+len(p.MovieOffset)+len(p.Description)+len(p.DifficultyMakers) == 0 {
-		return false
-	}
-	return patchTranslations(p.TitleTranslations, &o.Titles, original.Titles, true) && patchTranslations(p.SubtitleTranslations, &o.Subtitles, original.Subtitles, false)
-}
-
-// names applies title and subtitle edits (R042 of the official database, adopted
-// here): the chart's own names, independent of the translations, changeable at
-// any time while the stored TJA keeps its headers. null restores the TJA's.
-func (p metadataPatch) names(title, subtitle *string, source func() (tja.Metadata, error)) (bool, error) {
-	for _, field := range []struct {
-		raw   json.RawMessage
-		dst   *string
-		title bool
-	}{{p.Title, title, true}, {p.Subtitle, subtitle, false}} {
-		if len(field.raw) == 0 {
-			continue
-		}
-		if bytes.Equal(bytes.TrimSpace(field.raw), []byte("null")) {
-			parsed, err := source()
-			if err != nil {
-				return false, err
-			}
-			*field.dst = parsed.Subtitle
-			if field.title {
-				*field.dst = parsed.Title
-			}
-			continue
-		}
-		var text string
-		if json.Unmarshal(field.raw, &text) != nil {
-			return false, nil
-		}
-		text = strings.TrimSpace(text)
-		if !validDisplayText(text, field.title) {
-			return false, nil
-		}
-		*field.dst = text
-	}
-	return true, nil
-}
-func translationReset(raw json.RawMessage) bool {
-	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return true
-	}
-	var dict map[string]json.RawMessage
-	if json.Unmarshal(raw, &dict) != nil {
-		return false
-	}
-	for _, v := range dict {
-		if bytes.Equal(bytes.TrimSpace(v), []byte("null")) {
-			return true
-		}
-	}
-	return false
-}
-
-// sourceMetadata parses the chart's stored TJA, whose headers null restores.
+// sourceMetadata parses the chart's stored TJA.
 func (s *Server) sourceMetadata(ctx context.Context, tx pgx.Tx, id string) (tja.Metadata, error) {
 	var key string
 	if err := tx.QueryRow(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1`, id).Scan(&key); err != nil {
@@ -207,34 +137,38 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "FORBIDDEN", "只有作品作者或网站管理员可以修改信息")
 		return
 	}
-	var source *tja.Metadata
-	stored := func() (tja.Metadata, error) {
-		if source == nil {
-			parsed, err := s.sourceMetadata(r.Context(), tx, r.PathValue("id"))
-			if err != nil {
-				return parsed, err
+	// The names and translations the site shows are the chart's own: an edit replaces them,
+	// and nothing here reads the stored TJA's headers.
+	isNull := func(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw), []byte("null")) }
+	title, subtitle := sourceTitle, sourceSubtitle
+	if len(patch.Title) > 0 || len(patch.Subtitle) > 0 {
+		if len(patch.Title) > 0 {
+			if json.Unmarshal(patch.Title, &title) != nil || isNull(patch.Title) {
+				problem(w, 422, "METADATA_INVALID", "曲名必须为文本")
+				return
 			}
-			source = &parsed
+			title = strings.TrimSpace(title)
 		}
-		return *source, nil
-	}
-	original := metadataTranslations{map[string]string{"en": sourceTitle}, map[string]string{"en": sourceSubtitle}}
-	if translationReset(patch.TitleTranslations) || translationReset(patch.SubtitleTranslations) {
-		parsed, err := stored()
-		if err != nil {
-			internal(w, err)
+		if len(patch.Subtitle) > 0 {
+			if json.Unmarshal(patch.Subtitle, &subtitle) != nil || isNull(patch.Subtitle) {
+				problem(w, 422, "METADATA_INVALID", "副标题必须为文本")
+				return
+			}
+			subtitle = strings.TrimSpace(subtitle)
+		}
+		if title == "" || !validDisplayText(title) || !validDisplayText(subtitle) {
+			problem(w, 422, "METADATA_INVALID", "曲名不能为空；曲名和副标题不能超过 500 字节或包含控制字符")
 			return
 		}
-		original = metadataTranslations{parsed.TitleTranslations, parsed.SubtitleTranslations}
 	}
-	title, subtitle := sourceTitle, sourceSubtitle
-	valid, err := patch.names(&title, &subtitle, stored)
-	if err != nil {
-		internal(w, err)
-		return
+	if translations.Titles == nil {
+		translations.Titles = map[string]string{}
 	}
-	if !valid || !patch.apply(&translations, original) {
-		problem(w, 422, "METADATA_INVALID", "需要有效的名称／副标题；每项最多 500 字节，名称不能为空，多语言仅支持 en、ja、zh、ko，null 恢复原文件值")
+	if translations.Subtitles == nil {
+		translations.Subtitles = map[string]string{}
+	}
+	if !patchTranslations(patch.TitleTranslations, translations.Titles) || !patchTranslations(patch.SubtitleTranslations, translations.Subtitles) {
+		problem(w, 422, "TRANSLATIONS_INVALID", "译名必须为 en / ja / zh / ko 到不超过 500 字节文本的映射")
 		return
 	}
 	if len(patch.Description) > 0 {

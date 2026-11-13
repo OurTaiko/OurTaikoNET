@@ -136,29 +136,28 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 			t.Fatalf("server selected %s: %s", lang, ww.Body.String())
 		}
 	}
-	// Restore uses immutable source TJA, without another database overlay.
+	// The site's names are the chart's own. Clearing a translation removes it, whatever the
+	// stored TJA says; a title cannot be cleared.
 	source := []byte("TITLE:Original\nTITLEEN:Source English\nTITLEJA:原文\nSUBTITLE:Raw subtitle\nBPM:120\nWAVE:a.ogg\nCOURSE:Oni\nLEVEL:5\n#START\n1000,\n#END\n")
 	if err = os.WriteFile(filepath.Join(storage, "t"), source, 0600); err != nil {
 		t.Fatal(err)
 	}
-	restored := call("d46774d30dd13b92d9e536808da468a4", "csrf", `{"titleTranslations":{"en":null,"ja":null},"subtitleTranslations":{"en":null}}`)
-	var restoredChart Chart
-	// The source has no SUBTITLEEN: restoring "en" from it removes the key (the subtitle itself
-	// is the origin, not an English translation).
-	if restored.Code != 200 || json.Unmarshal(restored.Body.Bytes(), &restoredChart) != nil {
-		t.Fatalf("source restore failed: %s", restored.Body.String())
+	cleared := call("d46774d30dd13b92d9e536808da468a4", "csrf", `{"titleTranslations":{"en":null,"ja":""},"subtitleTranslations":{"en":null}}`)
+	var clearedChart Chart
+	if cleared.Code != 200 || json.Unmarshal(cleared.Body.Bytes(), &clearedChart) != nil {
+		t.Fatalf("clearing translations failed: %s", cleared.Body.String())
 	}
-	_, subtitleEn := restoredChart.SubtitleTranslations["en"]
-	if restoredChart.TitleTranslations["en"] != "Source English" || restoredChart.TitleTranslations["ja"] != "原文" || restoredChart.TitleTranslations["ko"] != "한국어" || subtitleEn {
-		t.Fatalf("source restore lost translations: %s", restored.Body.String())
+	if len(clearedChart.TitleTranslations) != 2 || clearedChart.TitleTranslations["zh"] != "中文" || clearedChart.TitleTranslations["ko"] != "한국어" || len(clearedChart.SubtitleTranslations) != 3 || clearedChart.Title != "Admin edit" {
+		t.Fatalf("cleared translations: %s", cleared.Body.String())
 	}
-	// The edited title is the chart's own; null restores the stored TJA's.
-	if restoredChart.Title != "Admin edit" {
-		t.Fatalf("translation restore changed the title: %q", restoredChart.Title)
+	for body, code := range map[string]string{`{"title":null}`: "METADATA_INVALID", `{"subtitle":null}`: "METADATA_INVALID", `{"title":" "}`: "METADATA_INVALID", `{"titleTranslations":{"de":"x"}}`: "TRANSLATIONS_INVALID"} {
+		if refused := call("d46774d30dd13b92d9e536808da468a4", "csrf", body); refused.Code != 422 || !strings.Contains(refused.Body.String(), code) {
+			t.Fatalf("%s: %d %s", body, refused.Code, refused.Body.String())
+		}
 	}
-	names := call("d46774d30dd13b92d9e536808da468a4", "csrf", `{"title":null,"subtitle":null}`)
-	if names.Code != 200 || json.Unmarshal(names.Body.Bytes(), &restoredChart) != nil || restoredChart.Title != "Original" || restoredChart.Subtitle != "Raw subtitle" || restoredChart.TitleTranslations["en"] != "Source English" {
-		t.Fatalf("title restore: %s", names.Body.String())
+	// An edit that names nothing changes nothing.
+	if same := call("d46774d30dd13b92d9e536808da468a4", "csrf", `{}`); same.Code != 200 || json.Unmarshal(same.Body.Bytes(), &clearedChart) != nil || clearedChart.Title != "Admin edit" || len(clearedChart.TitleTranslations) != 2 {
+		t.Fatalf("empty edit: %d %s", same.Code, same.Body.String())
 	}
 	r := httptest.NewRequest("GET", "/api/v1/me", nil)
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: tokens["5f63f79d876d201a13f8710453636837"]})
@@ -176,7 +175,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		t.Fatalf("old session kept admin: %s", w.Body.String())
 	}
 	var title string
-	if err = pool.QueryRow(ctx, `SELECT title_translations->>'en' FROM charts WHERE id='chart'`).Scan(&title); err != nil || title != "Source English" {
+	if err = pool.QueryRow(ctx, `SELECT title_translations->>'zh' FROM charts WHERE id='chart'`).Scan(&title); err != nil || title != "中文" {
 		t.Fatalf("denied write changed title: %s %v", title, err)
 	}
 	// Registration does not accept an administrator flag.

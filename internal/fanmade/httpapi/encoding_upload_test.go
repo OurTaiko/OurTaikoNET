@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/text/encoding/japanese"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/kit/tjatitles"
 )
 
 func TestUploadStoresCanonicalUTF8(t *testing.T) {
@@ -113,7 +114,12 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 						}
 					}
 				}
-				if !bytes.Equal(data, stored) {
+				// The file alone is the stored bytes; the package names the chart as the site does.
+				want := stored
+				if kind == "download" {
+					want = tjatitles.WithTitles(stored, chart.Title, chart.Subtitle, chart.TitleTranslations, chart.SubtitleTranslations)
+				}
+				if !bytes.Equal(data, want) {
 					t.Fatal("download differs from normalized stored bytes", kind)
 				}
 			}
@@ -127,6 +133,48 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 	w := post(sjis, ID())
 	if w.Code != 422 || !strings.Contains(w.Body.String(), "TJA_ENCODING_INVALID") {
 		t.Fatal("Shift-JIS must be refused", w.Code, w.Body.String())
+	}
+	// A DEMOSTART outside the audio is not refused: the preview starts at the beginning. A
+	// range the request itself names must lie within the audio.
+	late := bytes.Replace(canonical, []byte("BPM:120\r\n"), []byte("BPM:120\r\nDEMOSTART:9999\r\n"), 1)
+	var started Chart
+	if w = post(late, ID()); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &started) != nil || started.DemoStart != 0 || started.DemoEnd != 15 {
+		t.Fatal("DEMOSTART past the audio", w.Code, w.Body.String())
+	}
+	if w = post(late, ID(), "demoStart", "9999"); w.Code != 422 || !strings.Contains(w.Body.String(), "PREVIEW_RANGE_INVALID") {
+		t.Fatal("a range sent past the audio", w.Code, w.Body.String())
+	}
+	// The package names the chart as the site does once its names are edited there; the
+	// stored file keeps the uploaded headers.
+	edit := httptest.NewRequest("PATCH", "/api/v1/charts/"+started.ID, strings.NewReader(`{"title":"Renamed","titleTranslations":{"en":"Renamed EN"}}`))
+	edit.Header.Set("Content-Type", "application/json")
+	edit.Header.Set("Origin", "http://localhost")
+	edit.Header.Set("X-CSRF-Token", "csrf")
+	edit.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: cookie})
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, edit)
+	if w.Code != 200 {
+		t.Fatal("rename", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+started.ID+"/download", nil))
+	archive, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
+	if w.Code != 200 || err != nil {
+		t.Fatal("package", w.Code, err)
+	}
+	packed, err := archive.Open("chart.tja")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := io.ReadAll(packed)
+	packed.Close()
+	if err != nil || !bytes.Contains(text, []byte("TITLE:Renamed\r\n")) || !bytes.Contains(text, []byte("TITLEEN:Renamed EN\r\n")) || bytes.Contains(text, []byte("初音ミク")) || !bytes.Contains(text, []byte("SUBTITLEJA:日本語の副題\r\n")) {
+		t.Fatalf("packaged TJA: %q %v", text, err)
+	}
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+started.ID+"/tja", nil))
+	if w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte("TITLE:初音ミク\r\n")) {
+		t.Fatal("stored TJA changed", w.Code)
 	}
 	// The encoding field is gone, whatever it says.
 	for _, encoding := range []string{"utf-8", "shift-jis"} {

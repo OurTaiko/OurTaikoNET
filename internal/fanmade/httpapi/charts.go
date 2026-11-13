@@ -22,6 +22,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/kit/tjatitles"
 	"ourtaiko.dev/net/internal/kit/video"
 )
 
@@ -410,10 +411,12 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 			internal(w, e)
 			return
 		}
+		// The package names the chart as the site does, whatever the uploaded file says.
+		chartText := tjatitles.WithTitles(data, c.Title, c.Subtitle, c.TitleTranslations, c.SubtitleTranslations)
 		entries := []struct {
 			name string
 			file io.Reader
-		}{{c.TJAName, bytes.NewReader(data)}, {tja.WaveName(data), af}}
+		}{{c.TJAName, bytes.NewReader(chartText)}, {tja.WaveName(data), af}}
 		if c.MovieKey != "" {
 			mf, e := s.Config.Objects.Open(r.Context(), c.MovieKey)
 			if e != nil {

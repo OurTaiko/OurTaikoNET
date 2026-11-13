@@ -304,6 +304,8 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// The range is checked against the audio's duration once it has been decoded.
 	demoStart := meta.DemoStart
+	_, demoStartSent := fields["demoStart"]
+	_, demoEndSent := fields["demoEnd"]
 	if raw, ok := fields["demoStart"]; ok {
 		demoStart, e = strconv.ParseFloat(strings.TrimSpace(raw), 64)
 		if e != nil {
@@ -356,7 +358,7 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	job := &uploadJob{
 		user: u.User.ID, key: key, dir: dir, tja: tf, audio: af, cover: cf, background: bg, movie: mv, normalized: normalized, meta: meta,
-		description: fields["description"], categoryIDs: categoryIDs, demoStart: demoStart, demoEnd: demoEnd, keepMovie: keepMovie, keepBackground: keepBackground, collaborators: collaborators,
+		description: fields["description"], categoryIDs: categoryIDs, demoStart: demoStart, demoEnd: demoEnd, demoStartSent: demoStartSent, demoEndSent: demoEndSent, keepMovie: keepMovie, keepBackground: keepBackground, collaborators: collaborators,
 		// RFC 7240: the client asks not to wait for processing.
 		async: strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async"), done: make(chan uploadResult, 1),
 	}
