@@ -1,0 +1,28 @@
+{
+  "messages": {
+    "publicChartCount": "Public charts",
+    "firstLogin": "First Fanmade login",
+    "noPublishedChartsYet": "No published charts yet",
+    "memberNamesUnavailable": "Nicknames are temporarily unavailable. Chart and score statistics are still shown.",
+    "userPublishedCharts": "This member’s public charts",
+    "metadataTab_translations": "Names",
+    "originalNames": "Original names",
+    "originalNamesHint": "The title and subtitle can be changed at any time; the site and the game show these. The chart file is not changed, and the BPM always comes from the TJA.",
+    "titleIsRequired": "The title must not be empty; the title and subtitle are at most 500 bytes without control characters.",
+    "metadataTab_previewMovie": "Preview & video"
+  },
+  "common": {
+    "siteTitle": "OurTaiko Fanmade · Community charts"
+  },
+  "interactions": {
+    "orderUpdated": "Recently changed"
+  },
+  "categories": {
+    "game": "Game",
+    "virtual-singer": "Virtual Singer",
+    "pop": "Pop",
+    "classic": "Classical",
+    "variety": "Variety",
+    "anime": "Anime"
+  }
+}

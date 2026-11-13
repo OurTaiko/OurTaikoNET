@@ -1,0 +1,176 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans:
+    ChillRound, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --color-outline: var(--outline);
+  --color-drop: var(--drop);
+  --color-cream: var(--cream);
+  --color-don: var(--don);
+  --color-ka: var(--ka);
+  --color-link: var(--link);
+  --shadow-press: 0 3px 0 var(--outline);
+  --shadow-press-hover: 0 5px 0 var(--outline);
+  --shadow-drop: 0 5px 0 var(--drop);
+  --shadow-drop-hover: 0 8px 0 var(--drop);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Visual language shared with the OurTaikoPlay website (see UIDESIGN.md): paper,
+   ink outlines and solid drop shadows. Fanmade takes the don red as its brand
+   colour; OurTaikoDatabase takes the ka teal. */
+@font-face {
+  font-family: ChillRound;
+  src: url('@sitekit/assets/donder/ChillRoundF.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --don: #f65040;
+  --ka: #68d0d7;
+  --brand: #d83a2c;
+  --hero: #ff6651;
+  --link: #087c95;
+  --cream: #fff4dc;
+  --outline: #382d2a;
+  --drop: #e6d9be;
+  --background: #fffef9;
+  --foreground: #382d2a;
+  --card: #fffefa;
+  --card-foreground: #382d2a;
+  --popover: #fffefa;
+  --popover-foreground: #382d2a;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #fff5d8;
+  --secondary-foreground: #382d2a;
+  --muted: #f7f2e8;
+  --muted-foreground: #726761;
+  --accent: #fff2cc;
+  --accent-foreground: #382d2a;
+  --destructive: #c8322a;
+  --border: #e9e2d8;
+  --input: #d5c7b7;
+  --ring: #087c95;
+  --chart-1: #f65040;
+  --chart-2: #68d0d7;
+  --chart-3: #f3b13c;
+  --chart-4: #a38bd6;
+  --chart-5: #8fae6b;
+  --radius: 0.625rem;
+  --sidebar: #fffefa;
+  --sidebar-foreground: #382d2a;
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff2cc;
+  --sidebar-accent-foreground: #382d2a;
+  --sidebar-border: #e9e2d8;
+  --sidebar-ring: #087c95;
+}
+
+/* The official source's pages wear its colours; the rest is shared. */
+:root[data-source='official'] {
+  --brand: #087c95;
+  --hero: #68d0d7;
+}
+
+.dark {
+  --link: #68d0d7;
+  --cream: #2e2420;
+  --outline: #cbbcaf;
+  --drop: #0f0b0a;
+  --background: #1d1715;
+  --foreground: #f3e9dc;
+  --card: #2a2220;
+  --card-foreground: #f3e9dc;
+  --popover: #2a2220;
+  --popover-foreground: #f3e9dc;
+  --secondary: #3a2e29;
+  --secondary-foreground: #f3e9dc;
+  --muted: #332a26;
+  --muted-foreground: #b7a89d;
+  --accent: #3d322e;
+  --accent-foreground: #f3e9dc;
+  --destructive: #ff8a7a;
+  --border: #3d322e;
+  --input: #5a4b44;
+  --ring: #68d0d7;
+  --sidebar: #2a2220;
+  --sidebar-foreground: #f3e9dc;
+  --sidebar-accent: #3d322e;
+  --sidebar-accent-foreground: #f3e9dc;
+  --sidebar-border: #3d322e;
+  --sidebar-ring: #68d0d7;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* The don/ka stripe under the home banner, as on the OurTaikoPlay website. */
+.drum-stripe {
+  height: 12px;
+  border-block: 2px solid var(--background);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--don) 0 24px,
+    #fff5d8 24px 32px,
+    var(--ka) 32px 56px,
+    #fff5d8 56px 64px
+  );
+}

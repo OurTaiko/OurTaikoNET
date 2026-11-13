@@ -1,0 +1,971 @@
+import { isChartOwner } from '@sitekit/chart-owners'
+import { chartText } from '@sitekit/chart-language'
+import { i18n } from '@sitekit/i18n'
+import { useTranslation } from 'react-i18next'
+import { endpoints } from '@sitekit/api/endpoints'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
+import { AudioPlayer } from '@sitekit/components/audio-player'
+import { Card } from '@sitekit/components/ui/card'
+import { Label } from '@sitekit/components/ui/label'
+import { Input } from '@sitekit/components/ui/input'
+import { Button, buttonVariants } from '@sitekit/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@sitekit/components/ui/table'
+import { Textarea } from '@sitekit/components/ui/textarea'
+import { Progress } from '@sitekit/components/ui/progress'
+import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, DragEvent, FormEvent } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowRightIcon as ArrowRight,
+  WaveformIcon as AudioLines,
+  FileAudioIcon as FileMusic,
+  CheckIcon as Check,
+  CircleNotchIcon as LoaderCircle,
+  UploadSimpleIcon as Upload,
+  WarningIcon,
+  FolderOpenIcon as FolderOpen,
+} from '@phosphor-icons/react'
+import { CoverPicker } from '@sitekit/components/cover-picker'
+import { MoviePicker } from '@sitekit/components/movie-picker'
+import { CategoryPicker } from '@sitekit/categories'
+import { api, previewReplacement, uploadChart } from '@sitekit/api/client'
+import type { PublicUser } from '@sitekit/api/types'
+import type { Chart } from './api/types'
+import { UploadCollaborators } from '@sitekit/collaborations'
+import { Modal, Notice } from '@sitekit/notifications'
+import { useNotification } from '@sitekit/notification-context'
+import { blockName, slotKey } from '@sitekit/courses'
+import { DifficultyBadges } from '@sitekit/components/difficulty-badges'
+import { useSession } from '@sitekit/session-context'
+import { prepareTja, validateFiles, validateMovie } from '@sitekit/tja'
+import type { PreparedTja } from '@sitekit/tja'
+import { audioDiffers, replacementFields, reviewReplacement } from '@sitekit/replacement-diff'
+import type { Proposal, ReplacementPreview, Review } from '@sitekit/replacement-diff'
+import { ReplacementReview } from '@sitekit/replacement-review'
+import { BatchUpload } from '@sitekit/batch-upload'
+import { BackgroundPicker } from '@sitekit/components/background-picker'
+import { chosenFiles, droppedFiles, scanFolder, validateImages } from '@sitekit/folder-upload'
+import type { FolderChart, FolderFile } from '@sitekit/folder-upload'
+
+function createRequestKey() {
+  // getRandomValues remains available over LAN HTTP, unlike randomUUID.
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+export function UpdatePage() {
+  const { t } = useTranslation()
+
+  const { id } = useParams()
+  const session = useSession()
+  const [chart, setChart] = useState<Chart | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    const controller = new AbortController()
+    setChart(null)
+    setError('')
+    if (!id) return
+    api<Chart>(endpoints.chartDetail(id), { signal: controller.signal })
+      .then((loaded) => {
+        if (!controller.signal.aborted) setChart(loaded)
+      })
+      .catch((e: Error) => {
+        if (!controller.signal.aborted) setError(e.message)
+      })
+    return () => controller.abort()
+  }, [id])
+  if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
+  if (error) return <Notice>{error}</Notice>
+  if (!chart || session.loading) return <p role="status">{t('messages.loadingSong')}</p>
+  if (!session.user || (!isChartOwner(chart, session.user.id) && !session.user.isAdmin))
+    return <p>{t('messages.onlyTheUploaderOrAnAdministratorCanUpdateThisSong')}</p>
+  return (
+    <UploadPage
+      key={`${chart.id}:${chart.difficulties.map((d) => d.chartHash ?? '').join(',')}:${chart.audioHash}`}
+      existing={chart}
+    />
+  )
+}
+
+export function UploadPage({
+  existing,
+  embedded = false,
+}: {
+  existing?: Chart
+  embedded?: boolean
+}) {
+  const { t } = useTranslation()
+
+  const { notify } = useNotification()
+  const session = useSession(),
+    navigate = useNavigate()
+  const [tja, setTja] = useState<File | null>(null),
+    [audio, setAudio] = useState<File | null>(null)
+  const [cover, setCover] = useState<File | null>(null)
+  const [movie, setMovie] = useState<File | null>(null)
+  // A folder with several charts publishes them in a batch instead of this form.
+  const [batch, setBatch] = useState<FolderChart[] | null>(null)
+  const [reading, setReading] = useState(false)
+  // The background image, which the TJA must name with BGIMAGE.
+  const [background, setBackground] = useState<File | null>(null)
+  // Chosen images that are not the ones the TJA names (PREIMAGE, BGIMAGE).
+  const [imageError, setImageError] = useState('')
+  const [metadata, setMetadata] = useState<PreparedTja | null>(null),
+    [validating, setValidating] = useState(false),
+    [validationError, setValidationError] = useState('')
+  const [categoryIds, setCategoryIds] = useState<string[]>(existing?.categoryIds ?? [])
+  const [description, setDescription] = useState(existing?.description ?? ''),
+    [busy, setBusy] = useState(false),
+    [progress, setProgress] = useState(0),
+    [audioUrl, setAudioUrl] = useState('')
+  // Makers typed in the makers tab, by slot; the others are the file's.
+  const [typedMakers, setTypedMakers] = useState<Record<string, string>>({})
+  // Users a new chart invites as co-creators once it is published.
+  const [collaborators, setCollaborators] = useState<PublicUser[]>([])
+  // A replacement's review: open while the new file is read (review null) and until confirmed.
+  const [reviewing, setReviewing] = useState<{
+    prepared: PreparedTja
+    preview: ReplacementPreview | null
+    review: Review | null
+    audioChanged: boolean
+  } | null>(null)
+  const attemptedKeep = useRef('')
+  const [tab, setTab] = useState('files')
+  const [demoStart, setDemoStart] = useState('0')
+  const [demoEnd, setDemoEnd] = useState('15')
+  const [audioDuration, setAudioDuration] = useState<number | null>(null)
+  const retainedAudioName = existing?.audioName
+  const hasStoredMovie = !!existing?.movieHash
+  const requestKey = useRef(createRequestKey()),
+    controller = useRef<AbortController | null>(null)
+  const reset = () => {
+    setMetadata(null)
+    setValidationError('')
+    requestKey.current = createRequestKey()
+  }
+  useEffect(() => {
+    let active = true
+    setMetadata(null)
+    setValidationError('')
+    if (!tja || (!audio && !retainedAudioName)) {
+      setValidating(false)
+      return
+    }
+    setValidating(true)
+    const validation = audio ? validateFiles(tja, audio) : prepareTja(tja, '', retainedAudioName)
+    validation
+      .then(async (m) => {
+        validateMovie(m, movie)
+        if (active) {
+          setMetadata(m)
+          setTypedMakers({})
+          setDemoStart(String(m.demoStart))
+          setDemoEnd(String(m.demoStart + 15))
+        }
+      })
+      .catch((e) => {
+        if (active) setValidationError(e.message)
+      })
+      .finally(() => {
+        if (active) setValidating(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [tja, audio, movie, retainedAudioName])
+  useEffect(() => {
+    if (!audio) {
+      setAudioUrl('')
+      return
+    }
+    const url = URL.createObjectURL(audio)
+    setAudioUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [audio])
+  useEffect(() => {
+    setAudioDuration(null)
+    if (!audioUrl) return
+    const player = new Audio(audioUrl)
+    player.preload = 'metadata'
+    player.onloadedmetadata = () => {
+      if (Number.isFinite(player.duration)) setAudioDuration(player.duration)
+    }
+    return () => {
+      player.onloadedmetadata = null
+      player.removeAttribute('src')
+      player.load()
+    }
+  }, [audioUrl])
+  useEffect(() => () => controller.current?.abort(), [])
+  const validPreview = () => {
+    const start = Number(demoStart),
+      end = Number(demoEnd)
+    const duration = audio ? audioDuration : existing?.duration
+    if (
+      !demoStart.trim() ||
+      !demoEnd.trim() ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      start < 0 ||
+      (duration != null && start >= duration) ||
+      end <= start ||
+      end > 1215
+    ) {
+      setTab('preview')
+      notify(t('messages.previewRangeInvalid'), 'error')
+      return false
+    }
+    return true
+  }
+  const choose = (kind: 'tja' | 'audio', e: ChangeEvent<HTMLInputElement>) => {
+    reset()
+    const file = e.target.files?.[0] ?? null
+    if (kind === 'tja') setTja(file)
+    else setAudio(file)
+  }
+  // A drop or chosen folder: one chart fills this form, several are published as a batch.
+  const take = async (files: Promise<FolderFile[]> | FolderFile[]) => {
+    if (busy || reading) return
+    setReading(true)
+    try {
+      const charts = await scanFolder(await files)
+      if (!charts.length) {
+        notify(t('folderUpload.noTja'), 'error')
+        return
+      }
+      if (charts.length > 1) {
+        if (existing) notify(t('folderUpload.oneChartForUpdate', { count: charts.length }), 'error')
+        else setBatch(charts)
+        return
+      }
+      const [chart] = charts
+      reset()
+      setTja(chart.tja)
+      // An update without audio in the folder keeps the chart's own.
+      setAudio(chart.audio ?? (existing ? null : audio))
+      setCover(chart.cover)
+      setBackground(chart.background)
+      setMovie(chart.movie)
+      for (const m of chart.missing)
+        if (m.header !== 'WAVE')
+          notify(t('folderUpload.missingOptional', { header: m.header, value: m.value }), 'info')
+    } catch (e) {
+      notify((e as Error).message, 'error')
+    } finally {
+      setReading(false)
+    }
+  }
+  const drop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (busy) return
+    // The folder entries must be read during the drop event, before anything awaits.
+    void take(droppedFiles(e.dataTransfer))
+  }
+  const prepare = async () => {
+    const prepared = audio
+      ? await validateFiles(tja!, audio)
+      : await prepareTja(tja!, '', existing!.audioName)
+    validateMovie(prepared, movie)
+    await validateImages(prepared, cover, background)
+    return prepared
+  }
+  useEffect(() => {
+    let active = true
+    setImageError('')
+    if (metadata)
+      validateImages(metadata, cover, background).catch((e: Error) => {
+        if (active) setImageError(e.message)
+      })
+    return () => {
+      active = false
+    }
+  }, [metadata, cover, background])
+  const proposal = (): Proposal => ({
+    description,
+    categoryIds,
+    demoStart: Number(demoStart),
+    demoEnd: Number(demoEnd),
+    typedMakers,
+    typedDemo:
+      !metadata ||
+      demoStart !== String(metadata.demoStart) ||
+      demoEnd !== String(metadata.demoStart + 15),
+  })
+  // A replacement first reads the new file on the server and shows what it changes.
+  const startReview = async () => {
+    const abort = new AbortController()
+    controller.current = abort
+    try {
+      const prepared = await prepare()
+      setReviewing({ prepared, preview: null, review: null, audioChanged: false })
+      const [preview, audioChanged] = await Promise.all([
+        previewReplacement(
+          existing!.id,
+          prepared.file,
+          audio?.name,
+          session.csrfToken,
+          abort.signal,
+        ),
+        audioDiffers(existing!, audio),
+      ])
+      if (abort.signal.aborted) return
+      setReviewing({
+        prepared,
+        preview,
+        audioChanged,
+        review: reviewReplacement(existing!, preview, proposal(), audioChanged, {
+          demo: true,
+          makers: true,
+        }),
+      })
+    } catch (e) {
+      setReviewing(null)
+      if (!abort.signal.aborted) notify((e as Error).message, 'error')
+    }
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!tja || !metadata || busy || !!imageError || !validPreview()) return
+    if (existing) void startReview()
+    else void save()
+  }
+  const save = async (kept = new Set<string>()) => {
+    if (!tja || (!audio && !existing) || !metadata || busy || !validPreview()) return
+    const review = reviewing
+    setReviewing(null)
+    setBusy(true)
+    setProgress(0)
+    const abort = new AbortController()
+    controller.current = abort
+    try {
+      const prepared = review?.prepared ?? (await prepare())
+      if (abort.signal.aborted) return
+      const fields =
+        existing && review?.preview
+          ? replacementFields(existing, review.preview, proposal(), kept)
+          : {
+              keepTitles: false,
+              description,
+              categoryIds,
+              demoStart,
+              demoEnd,
+              difficultyMakers: metadata.difficulties.map(({ course, side, maker }) => ({
+                course,
+                side,
+                maker,
+              })),
+            }
+      // Other choices are a different request; the same choices retry the last one.
+      const choices = [...kept].sort().join(',')
+      if (choices !== attemptedKeep.current) requestKey.current = createRequestKey()
+      attemptedKeep.current = choices
+      const form = new FormData()
+      form.append('tja', prepared.file)
+      if (audio) form.append('audio', audio)
+      if (movie) form.append('movie', movie)
+      if (cover) form.append('cover', cover)
+      if (background) form.append('bgimage', background)
+      if (existing) {
+        form.append('confirmReset', 'true')
+        if (fields.keepTitles) form.append('keepTitles', 'true')
+      }
+      form.append('description', fields.description)
+      // A typed or kept range is sent; otherwise the server takes the new file's DEMOSTART.
+      if (proposal().typedDemo || kept.has('demo')) {
+        form.append('demoStart', String(fields.demoStart))
+        form.append('demoEnd', String(fields.demoEnd))
+      }
+      form.append('categoryIds', JSON.stringify(fields.categoryIds))
+      form.append('difficultyMakers', JSON.stringify(fields.difficultyMakers))
+      if (!existing && collaborators.length)
+        form.append('collaboratorIds', JSON.stringify(collaborators.map((user) => user.id)))
+      const chart = await uploadChart<Chart>(
+        form,
+        session.csrfToken,
+        requestKey.current,
+        abort.signal,
+        setProgress,
+        existing?.id,
+      )
+      if ('status' in chart) {
+        navigate('/me/charts')
+        notify(t('messages.uploadAcceptedResultByNotification'), 'success')
+        return
+      }
+      navigate(`/charts/${chart.id}`)
+      notify(
+        existing
+          ? t('messages.songUpdatedAllPreviousChartsAndScoresHaveBeenDeleted')
+          : t('messages.chartPublished'),
+        'success',
+      )
+    } catch (e) {
+      if (!abort.signal.aborted) notify((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+      controller.current = null
+    }
+  }
+  const fileTile = (kind: 'tja' | 'audio') => {
+    const file = kind === 'tja' ? tja : audio
+    return (
+      <Label className="flex min-w-0 flex-col items-start gap-3 rounded-[14px] border p-4 [&>span]:w-full [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-muted-foreground">
+        {kind === 'tja' ? <FileMusic size={24} /> : <AudioLines size={24} />}
+        <span>
+          <b>{kind === 'tja' ? t('messages.tjaChart') : t('messages.oggMp3Audio')}</b>
+          <small>
+            {file
+              ? file.name
+              : kind === 'tja'
+                ? t('messages.tjaUpTo2Mib')
+                : existing
+                  ? t('messages.keepAudio', { filename: existing.audioName })
+                  : t('messages.oggMp3UpTo100Mib')}
+          </small>
+        </span>
+        {file ? (
+          <Check size={18} />
+        ) : (
+          <span className="text-xs text-muted-foreground">{t('messages.choose')}</span>
+        )}
+        <Input
+          type="file"
+          aria-label={
+            kind === 'tja' ? t('messages.chooseTjaChart') : t('messages.chooseOggOrMp3Audio')
+          }
+          accept={kind === 'tja' ? '.tja' : '.ogg,.mp3'}
+          disabled={busy}
+          onChange={(e) => choose(kind, e)}
+        />
+      </Label>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center [&_p]:mt-2 [&_p]:text-sm [&_p]:text-muted-foreground">
+        <div>
+          {!embedded && (
+            <h1 className="text-2xl font-extrabold sm:text-3xl">
+              {existing ? t('messages.updateSongAndCharts') : t('messages.publishYourChart')}
+            </h1>
+          )}
+          {existing && (
+            <p>
+              {t('messages.replaceSongHint', {
+                title: chartText(existing, i18n.resolvedLanguage).title,
+              })}
+            </p>
+          )}
+          <div
+            role="note"
+            className="mt-3 flex items-start gap-2 rounded-[14px] border-[1.5px] border-[#f3b13c] bg-cream px-4 py-3 text-sm font-medium"
+          >
+            <WarningIcon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{t('messages.doNotSubmitOfficialBandaiNamcoChartsOrAudio')}</span>
+          </div>
+        </div>
+      </div>
+      {existing && (
+        <Card
+          className="min-w-0 border p-5 shadow-none sm:p-6 gap-3 border-destructive/30 [&>h2]:text-destructive [&>p]:text-sm [&>p]:leading-relaxed"
+          aria-label={t('messages.beforeUpdating')}
+        >
+          <h2 className="text-base font-extrabold">
+            {t('messages.updatingDeletesAllPreviousScores')}
+          </h2>
+          <p>{t('messages.theNewTjaReplacesEveryChartInThisSongAllPlayersScores')}</p>
+          <p>{t('messages.theSongUrlStaysTheSameTitlesComeFromTheNewTja')}</p>
+        </Card>
+      )}
+      {batch ? (
+        <BatchUpload charts={batch} onExit={() => setBatch(null)} />
+      ) : (
+        <form
+          onSubmit={submit}
+          noValidate
+          className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>div]:space-y-6 [&>aside]:space-y-3"
+        >
+          <div className="min-w-0">
+            <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
+              <TabsList
+                aria-label={t('messages.publishYourChart')}
+                className={`grid h-auto! w-full grid-cols-3 rounded-[14px] ${existing ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}
+              >
+                {(['files', 'categories', 'preview', 'description', 'makers'] as const).map(
+                  (value) => (
+                    <TabsTrigger key={value} value={value} disabled={busy} className="h-auto py-2">
+                      {t(
+                        value === 'files'
+                          ? 'messages.uploadFilesTab'
+                          : `messages.metadataTab_${value}`,
+                      )}
+                    </TabsTrigger>
+                  ),
+                )}
+                {/* An existing chart invites from its own page. */}
+                {!existing && (
+                  <TabsTrigger value="collaborators" disabled={busy} className="h-auto py-2">
+                    {t('collaboration.tab')}
+                  </TabsTrigger>
+                )}
+              </TabsList>
+              <TabsContent value="files" className="space-y-6 pt-4">
+                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-5">
+                  <h2 className="text-base font-extrabold">{t('messages.chooseFiles')}</h2>
+                  <div
+                    className="flex flex-col items-center gap-2 rounded-[14px] border border-dashed p-6 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={drop}
+                    aria-busy={reading}
+                  >
+                    {reading ? (
+                      <LoaderCircle className="animate-spin" size={26} />
+                    ) : (
+                      <Upload size={26} />
+                    )}
+                    <strong>
+                      {reading ? t('folderUpload.reading') : t('folderUpload.dropHere')}
+                    </strong>
+                    <span>
+                      {existing ? t('messages.orChooseFilesBelow') : t('folderUpload.dropHint')}
+                    </span>
+                    <Label
+                      className={buttonVariants({ variant: 'secondary', className: 'mt-2' })}
+                      aria-disabled={busy || reading}
+                    >
+                      <FolderOpen size={18} aria-hidden="true" />
+                      {t('folderUpload.chooseFolder')}
+                      <input
+                        type="file"
+                        className="sr-only"
+                        disabled={busy || reading}
+                        {...{ webkitdirectory: '' }}
+                        onChange={(e) => {
+                          const files = chosenFiles(e.target.files)
+                          e.target.value = ''
+                          void take(files)
+                        }}
+                      />
+                    </Label>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {fileTile('tja')}
+                    {fileTile('audio')}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                      <h3 className="text-sm font-extrabold">{t('messages.songCover')}</h3>
+                      <CoverPicker
+                        file={cover}
+                        disabled={busy}
+                        onChange={(file) => {
+                          setCover(file)
+                          requestKey.current = createRequestKey()
+                        }}
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                      <h3 className="text-sm font-extrabold">{t('messages.backgroundMovie')}</h3>
+                      <MoviePicker
+                        file={movie}
+                        disabled={busy}
+                        hint={
+                          hasStoredMovie ? t('messages.keepMovie') : t('messages.movieUpTo64Mib')
+                        }
+                        onChange={(file) => {
+                          reset()
+                          setMovie(file)
+                        }}
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-3 rounded-[14px] border p-4">
+                      <h3 className="text-sm font-extrabold">
+                        {t('folderUpload.backgroundTitle')}
+                      </h3>
+                      <BackgroundPicker
+                        file={background}
+                        disabled={busy}
+                        hint={
+                          existing?.bgimageHash
+                            ? t('folderUpload.keepBackground')
+                            : t('folderUpload.backgroundHint')
+                        }
+                        onChange={(file) => {
+                          setBackground(file)
+                          requestKey.current = createRequestKey()
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {existing && audio && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="default"
+                      disabled={busy}
+                      onClick={() => {
+                        reset()
+                        setAudio(null)
+                      }}
+                    >
+                      {t('messages.currentAudio', { filename: existing.audioName })}
+                    </Button>
+                  )}
+                  {validationError && (
+                    <Notice title={t('messages.fileValidationFailed')}>{validationError}</Notice>
+                  )}
+                  {!validationError && imageError && (
+                    <Notice title={t('messages.fileValidationFailed')}>{imageError}</Notice>
+                  )}
+                  {metadata && (
+                    <Notice kind="success" title={t('messages.localValidationPassed')}>
+                      {t('messages.encodingDetected', {
+                        encoding: metadata.sourceEncoding,
+                        filename: metadata.wave,
+                      })}
+                    </Notice>
+                  )}
+                </Card>
+              </TabsContent>
+              <TabsContent value="categories" className="pt-4">
+                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                  <CategoryPicker
+                    value={categoryIds}
+                    disabled={busy}
+                    onChange={(ids) => {
+                      setCategoryIds(ids)
+                      requestKey.current = createRequestKey()
+                    }}
+                  />
+                </Card>
+              </TabsContent>
+              <TabsContent value="preview" className="pt-4">
+                <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+                  {metadata ? (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Label
+                          htmlFor="upload-demo-start"
+                          className="flex flex-col items-start gap-2"
+                        >
+                          {t('messages.previewStartSeconds')}
+                          <Input
+                            id="upload-demo-start"
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={demoStart}
+                            disabled={busy}
+                            onChange={(e) => {
+                              setDemoStart(e.target.value)
+                              requestKey.current = createRequestKey()
+                            }}
+                          />
+                        </Label>
+                        <Label
+                          htmlFor="upload-demo-end"
+                          className="flex flex-col items-start gap-2"
+                        >
+                          {t('messages.previewEndSeconds')}
+                          <Input
+                            id="upload-demo-end"
+                            type="number"
+                            min="0"
+                            max="1215"
+                            step="any"
+                            value={demoEnd}
+                            disabled={busy}
+                            onChange={(e) => {
+                              setDemoEnd(e.target.value)
+                              requestKey.current = createRequestKey()
+                            }}
+                          />
+                        </Label>
+                      </div>
+                      {(audioUrl || existing) && (
+                        <AudioPlayer
+                          label={t('messages.localAudioPreview')}
+                          src={audioUrl || endpoints.resource(existing!, 'audio')}
+                          startAt={demoStart.trim() ? Number(demoStart) : NaN}
+                          endAt={demoEnd.trim() ? Number(demoEnd) : NaN}
+                          disabled={busy || Number(demoEnd) > 1215}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {t('messages.chartInformationAppearsHereAfterValidation')}
+                    </p>
+                  )}
+                </Card>
+              </TabsContent>
+              <TabsContent value="makers" className="pt-4">
+                {metadata ? (
+                  <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                    <h2 className="text-base font-extrabold">
+                      {t('messages.difficultiesAndCreators')}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {metadata.maker
+                        ? t('messages.creatorNamesAreFilledFromMakerYouCanEditEachOne')
+                        : t('messages.noMakerWasSpecifiedEnterACreatorForEachDifficulty')}
+                    </p>
+                    <Table className="w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead scope="col">{t('messages.difficulty')}</TableHead>
+                          <TableHead scope="col">{t('messages.creator')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {metadata.difficulties.map((d) => (
+                          <TableRow key={slotKey(d)}>
+                            <TableHead scope="row">
+                              {blockName(d)} · {slotKey(d)} ★{d.level}
+                            </TableHead>
+                            <TableCell>
+                              <Input
+                                aria-label={t('messages.courseCreator', { difficulty: slotKey(d) })}
+                                value={d.maker}
+                                maxLength={500}
+                                placeholder={t('messages.notSpecified')}
+                                disabled={busy}
+                                onChange={(e) => {
+                                  const maker = e.target.value
+                                  setTypedMakers((typed) => ({ ...typed, [slotKey(d)]: maker }))
+                                  setMetadata(
+                                    (current) =>
+                                      current && {
+                                        ...current,
+                                        difficulties: current.difficulties.map((block) =>
+                                          slotKey(block) === slotKey(d)
+                                            ? { ...block, maker }
+                                            : block,
+                                        ),
+                                      },
+                                  )
+                                  requestKey.current = createRequestKey()
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {t('messages.chartInformationAppearsHereAfterValidation')}
+                  </p>
+                )}
+              </TabsContent>
+              <TabsContent value="description" className="pt-4">
+                <Card className="min-w-0 border-[1.5px] border-border p-5 shadow-none sm:p-6 gap-4">
+                  <h2 className="text-base font-extrabold">
+                    {t('messages.notes')}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {t('messages.optional2')}
+                    </span>
+                  </h2>
+                  <Label className="sr-only" htmlFor="description">
+                    {t('messages.notes')}
+                  </Label>
+                  <Textarea
+                    id="description"
+                    rows={5}
+                    maxLength={1000}
+                    placeholder={t('messages.describeThisChartOrLeaveAMessage')}
+                    value={description}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setDescription(e.target.value)
+                      requestKey.current = createRequestKey()
+                    }}
+                  />
+                  <span className="text-right text-xs text-muted-foreground">
+                    {description.length} / 1000
+                  </span>
+                </Card>
+              </TabsContent>
+              {!existing && (
+                <TabsContent value="collaborators" className="pt-4">
+                  <Card className="min-w-0 gap-4 border-[1.5px] border-border p-5 shadow-none sm:p-6">
+                    <UploadCollaborators
+                      value={collaborators}
+                      disabled={busy}
+                      onChange={(users) => {
+                        setCollaborators(users)
+                        requestKey.current = createRequestKey()
+                      }}
+                    />
+                  </Card>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
+          <aside>
+            <Card
+              data-testid="preview-panel"
+              className="min-w-0 border p-5 shadow-none sm:p-6 gap-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-extrabold">
+                  {existing ? t('messages.updatePreview') : t('messages.submissionPreview')}
+                </h2>
+              </div>
+              {metadata ? (
+                <>
+                  <p className="text-sm text-muted-foreground">{metadata.bpm} BPM</p>
+                  <h3 className="text-base font-extrabold">
+                    {chartText(metadata, i18n.resolvedLanguage).title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {chartText(metadata, i18n.resolvedLanguage).subtitle ||
+                      t('messages.taikoChart')}
+                  </p>
+                  <DifficultyBadges difficulties={metadata.difficulties} />
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm [&>dt]:text-muted-foreground [&>dd]:wrap-anywhere mt-4">
+                    <dt>{t('messages.chartCreator')}</dt>
+                    <dd>
+                      {[
+                        ...new Set(
+                          metadata.difficulties.map((d) => d.maker.trim()).filter(Boolean),
+                        ),
+                      ].join(' | ') || t('messages.notSpecified')}
+                    </dd>
+                    <dt>{t('messages.uploader')}</dt>
+                    <dd>{session.user?.nickname || t('messages.notSignedIn')}</dd>
+                    {collaborators.length > 0 && (
+                      <>
+                        <dt>{t('collaboration.chosen')}</dt>
+                        <dd>
+                          {collaborators
+                            .map((user) => user.nickname || t('messages.unknownMember'))
+                            .join(' | ')}
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                </>
+              ) : (
+                <div className="flex min-h-32 items-center justify-center text-center text-sm text-muted-foreground">
+                  <p>{t('messages.chartInformationAppearsHereAfterValidation')}</p>
+                </div>
+              )}
+              <div className="space-y-3 border-t pt-4 [&>p]:text-xs [&>p]:leading-relaxed [&>p]:text-muted-foreground">
+                <Button
+                  type="submit"
+                  variant="default"
+                  size="default"
+                  className="w-full"
+                  disabled={!metadata || validating || busy || !!imageError || !session.user}
+                >
+                  {busy ? (
+                    <LoaderCircle className="animate-spin" size={18} />
+                  ) : (
+                    <Upload size={18} />
+                  )}{' '}
+                  {busy
+                    ? t('messages.saving')
+                    : validating
+                      ? t('messages.validating')
+                      : existing
+                        ? t('messages.updateSongAndCharts')
+                        : t('messages.publishChart')}
+                  {!busy && <ArrowRight size={17} />}
+                </Button>
+                {busy && (
+                  <Modal
+                    title={existing ? t('messages.updatingSong') : t('messages.publishingChart')}
+                    busy
+                    onDismiss={() => {}}
+                    actions={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="default"
+                        onClick={() => controller.current?.abort()}
+                      >
+                        {t('messages.cancelUpload')}
+                      </Button>
+                    }
+                  >
+                    <div className="space-y-3" role="status">
+                      <Progress
+                        aria-label={t('messages.uploadProgress')}
+                        max={100}
+                        value={progress}
+                      />
+                      <span>
+                        {progress < 100
+                          ? t('messages.uploadProgressPercent', { progress: progress })
+                          : t('messages.uploadedValidatingAndSaving')}
+                      </span>
+                    </div>
+                  </Modal>
+                )}
+                {existing && !busy && (
+                  <Link
+                    className={buttonVariants({
+                      variant: 'outline',
+                      size: 'default',
+                      className: 'w-full',
+                    })}
+                    to={`/charts/${existing.id}`}
+                  >
+                    {t('messages.cancel')}
+                  </Link>
+                )}
+                {existing && <p>{t('messages.afterUpdatingScoresForEveryDifficultyStartOver')}</p>}
+              </div>
+            </Card>
+            <Button
+              type="button"
+              variant="ghost"
+              size="default"
+              className="w-full"
+              onClick={() =>
+                notify(
+                  t('messages.waveInTheTjaMustExactlyMatchTheAudioFilenameIncludingCase'),
+                  'info',
+                  t('messages.uploadRules'),
+                )
+              }
+            >
+              {t('messages.viewUploadRules')}
+            </Button>
+          </aside>
+        </form>
+      )}
+      {reviewing && existing && (
+        <ReplacementReview
+          review={reviewing.review}
+          files={{
+            tja: tja?.name ?? '',
+            audio: audio && { name: audio.name, changed: reviewing.audioChanged },
+            keptAudio: existing.audioName,
+            cover: cover?.name ?? null,
+            movie: movie
+              ? { name: movie.name }
+              : !reviewing.prepared.movie && hasStoredMovie
+                ? 'remove'
+                : null,
+          }}
+          onCancel={() => {
+            controller.current?.abort()
+            setReviewing(null)
+          }}
+          onConfirm={(kept) => void save(kept)}
+        />
+      )}
+    </>
+  )
+}
