@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // testDB gives each test its own ourtaiko_net, opened for the official source and dropped
@@ -104,11 +105,11 @@ func newTestClient(t *testing.T, s *Server) testClient {
 	ctx := context.Background()
 	c := testClient{t, s.Handler(), map[string]string{}, &atomic.Int64{}}
 	for name, u := range testUsers {
-		token := ID() + ID()
+		token := web.NewID() + web.NewID()
 		_, err := s.DB.Exec(ctx, `INSERT INTO users(id) VALUES($1) ON CONFLICT DO NOTHING`, u.ID)
 		if err == nil {
 			_, err = s.DB.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,'csrf',now()+interval '1 day',$3)`,
-				hash(token), u.ID, s.Config.SSO.Seal("tok:"+u.ID, hash(token)))
+				web.Hash(token), u.ID, s.Config.SSO.Seal("tok:"+u.ID, web.Hash(token)))
 		}
 		if err != nil {
 			t.Fatal(err)

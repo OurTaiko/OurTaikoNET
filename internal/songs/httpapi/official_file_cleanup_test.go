@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // A file a chart stops referring to is queued by the database in that same change, so the
@@ -13,7 +15,7 @@ func TestQueuedFilesAreCleanedUp(t *testing.T) {
 	w := officialInteractionFixture(t)
 	s, ctx := w.s, context.Background()
 	store := func(extension string) (id int64, key string) {
-		digest := ID() + ID()
+		digest := web.NewID() + web.NewID()
 		key = digest + "." + extension
 		if e := s.Config.Objects.Put(ctx, key, strings.NewReader("x"), 1, "application/octet-stream", digest); e != nil {
 			t.Fatal(e)

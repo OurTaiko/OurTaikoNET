@@ -15,6 +15,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // uploadJob is an accepted upload: its files are staged and its fast checks
@@ -200,12 +201,12 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	// only ever one it declares; without one, the header is cleared.
 	coverName, backgroundName := "", ""
 	if coverData != nil {
-		coverName = hash(string(coverData)) + ".webp"
+		coverName = web.Hash(string(coverData)) + ".webp"
 	} else if j.coverHash != "" {
 		coverName = j.coverHash + ".webp"
 	}
 	if backgroundData != nil {
-		backgroundName = hash(string(backgroundData)) + ".webp"
+		backgroundName = web.Hash(string(backgroundData)) + ".webp"
 	} else if j.keepBackground {
 		backgroundName = j.backgroundHash + ".webp"
 	}
@@ -226,7 +227,7 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	if err := os.WriteFile(tjaPath, stored, 0600); err != nil {
 		return failed(err)
 	}
-	tjaSHA := hash(string(stored))
+	tjaSHA := web.Hash(string(stored))
 
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
@@ -301,24 +302,20 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 		// Names and their translations come from the new TJA again, unless keepTitles keeps the
 		// chart's own. A new audio retires the scores of every block (trigger
 		// charts_retire_scores).
-		_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2,audio_file=$3,cover_file=$4,description=$5,category_flags=$6,nijiiro_id=$7,
- bpm=$10,offset_seconds=$11,demo_start=$12,demo_end=$13,duration=$14,movie_file=$18,movie_offset=$19,bgimage_file=$20,
- title=CASE WHEN $17 THEN title ELSE $8 END,subtitle=CASE WHEN $17 THEN subtitle ELSE $9 END,
- title_translations=CASE WHEN $17 THEN title_translations ELSE $15 END,subtitle_translations=CASE WHEN $17 THEN subtitle_translations ELSE $16 END WHERE id=$1`,
-			id, tjaFile, audioFile, coverFile, j.description, j.flags, j.nijiiroID,
+		_, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2,audio_file=$3,cover_file=$4,description=$5,category_flags=$6,nijiiro_id=$7,official_id=$8,
+ bpm=$11,offset_seconds=$12,demo_start=$13,demo_end=$14,duration=$15,movie_file=$19,movie_offset=$20,bgimage_file=$21,
+ title=CASE WHEN $18 THEN title ELSE $9 END,subtitle=CASE WHEN $18 THEN subtitle ELSE $10 END,
+ title_translations=CASE WHEN $18 THEN title_translations ELSE $16 END,subtitle_translations=CASE WHEN $18 THEN subtitle_translations ELSE $17 END WHERE id=$1`,
+			id, tjaFile, audioFile, coverFile, j.description, j.flags, j.nijiiroID, j.officialID,
 			j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, demoEnd, duration, titles, subtitles, j.keepTitles, movieFile, j.meta.MovieOffset, backgroundFile)
 	} else {
-		id = ID()
-		_, err = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,owner_ids,tja_file,audio_file,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end,movie_file,movie_offset,bgimage_file)
- VALUES($19,$1,ARRAY[$2::text],$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$20)`,
-			j.nijiiroID, j.user, tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
+		id = web.NewID()
+		_, err = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,official_id,owner_ids,tja_file,audio_file,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end,movie_file,movie_offset,bgimage_file)
+ VALUES($20,$1,$2,ARRAY[$3::text],$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$21)`,
+			j.nijiiroID, j.officialID, j.user, tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
 	}
 	if nijiiroConflict(err) {
 		return rejected(409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
-	}
-	// Only the official source's songs have an official ID.
-	if err == nil && s.source().Official {
-		_, err = tx.Exec(ctx, `UPDATE charts SET official_id=$2 WHERE id=$1`, id, j.officialID)
 	}
 	if err != nil {
 		return failed(err)
@@ -442,7 +439,7 @@ func (s *Server) answeredUpload(w http.ResponseWriter, r *http.Request, user, ke
 		return true
 	}
 	if status == "processing" {
-		respond(w, 202, map[string]string{"status": "processing"})
+		web.Respond(w, 202, map[string]string{"status": "processing"})
 		return true
 	}
 	if recordedChart == nil {
@@ -462,7 +459,7 @@ func (s *Server) answeredUpload(w http.ResponseWriter, r *http.Request, user, ke
 		problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开谱面页面")
 		return true
 	}
-	respond(w, 200, c)
+	web.Respond(w, 200, c)
 	return true
 }
 
@@ -508,7 +505,7 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 	}
 	s.enqueue(j)
 	if j.async {
-		respond(w, 202, map[string]string{"status": "processing"})
+		web.Respond(w, 202, map[string]string{"status": "processing"})
 		return true
 	}
 	result := <-j.done
@@ -524,6 +521,6 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 	if existing != nil {
 		status = 200
 	}
-	respond(w, status, result.chart)
+	web.Respond(w, status, result.chart)
 	return true
 }

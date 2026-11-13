@@ -3,9 +3,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"log"
@@ -63,21 +60,8 @@ func (s *Server) sessionCookie() string {
 	return defaultSessionCookie
 }
 
-func ID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b)
-}
-func hash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
-func respond(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
 func problem(w http.ResponseWriter, status int, code, msg string) {
-	respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID")})
+	web.Respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID")})
 }
 func internal(w http.ResponseWriter, err error) {
 	log.Printf("request=%s error=%v", w.Header().Get("X-Request-ID"), err)
@@ -100,7 +84,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]bool{"ok": true}) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { web.Respond(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 		defer cancel()
@@ -108,7 +92,7 @@ func (s *Server) Handler() http.Handler {
 			internal(w, e)
 			return
 		}
-		respond(w, 200, map[string]bool{"ok": true})
+		web.Respond(w, 200, map[string]bool{"ok": true})
 	})
 	mux.HandleFunc("GET /api/v1/auth/sso/login", func(w http.ResponseWriter, r *http.Request) { s.sessions().Login(w, r) })
 	mux.HandleFunc("GET /api/v1/auth/sso/callback", func(w http.ResponseWriter, r *http.Request) { s.sessions().Callback(w, r) })
@@ -139,7 +123,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/internal/", func(w http.ResponseWriter, r *http.Request) { problem(w, 404, "NOT_FOUND", "接口不存在") })
 	mux.HandleFunc("/", s.site)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Request-ID", ID())
+		w.Header().Set("X-Request-ID", web.NewID())
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		api := strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/internal/")

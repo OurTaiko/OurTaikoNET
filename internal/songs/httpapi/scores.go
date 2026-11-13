@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Pointers distinguish required zero-valued counts from missing/null fields.
@@ -137,7 +138,7 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 	input.ReplayData = normalizeScoreReplay(input.ReplayData)
 	input.normalize()
 	payload, _ := json.Marshal(input)
-	digest := hash(string(payload))
+	digest := web.Hash(string(payload))
 	tx, err := s.DB.Begin(r.Context())
 	if err != nil {
 		internal(w, err)
@@ -187,7 +188,7 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 				internal(w, err)
 				return
 			}
-			respond(w, 200, result)
+			web.Respond(w, 200, result)
 			return
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -207,7 +208,7 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 	 (id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
 	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13,$14,$15) RETURNING *)
 	 SELECT `+scoreColumns+` FROM sc JOIN chart_difficulties d ON d.id=sc.difficulty_id`,
-		ID(), u.User.ID, input.DifficultyID, *input.Good, *input.OK, *input.Bad, *input.Score, *input.Drumroll, *input.MaxCombo, key, digest, input.ReplayData, input.ClearStatus, input.adLibValue(), input.Mines))
+		web.NewID(), u.User.ID, input.DifficultyID, *input.Good, *input.OK, *input.Bad, *input.Score, *input.Drumroll, *input.MaxCombo, key, digest, input.ReplayData, input.ClearStatus, input.adLibValue(), input.Mines))
 	if err != nil {
 		internal(w, err)
 		return
@@ -224,5 +225,5 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 201, result)
+	web.Respond(w, 201, result)
 }

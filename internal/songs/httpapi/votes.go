@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Up and down votes on charts, 段位 courses and comments, as on Fanmade.
@@ -104,7 +105,7 @@ func (s *Server) voteSubject(w http.ResponseWriter, r *http.Request, load subjec
 		return
 	}
 	result.Score = *result.Upvotes - *result.Downvotes
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +150,7 @@ func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 // viewer is the signed-in user by the website cookie alone, without asking the

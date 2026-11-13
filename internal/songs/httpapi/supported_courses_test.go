@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Songs withdrawn for a Tower or Dan course (migrations 012 and 042) keep
@@ -43,7 +45,7 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 	}
 	cookie := strings.Repeat("c", 64)
 	token := strings.Repeat("d", 64)
-	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, hash(cookie), hash("game:"+token)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie), web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	const origin = "http://127.0.0.1:5173"
@@ -116,7 +118,7 @@ func TestUploadRejectsUnsupportedCourses(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused');`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, hash(cookie)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie)); err != nil {
 		t.Fatal(err)
 	}
 	storage := t.TempDir()

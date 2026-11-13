@@ -12,6 +12,7 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Difficulty constants from storing to rating: every route stored with the blocks, rated by the
@@ -196,7 +197,7 @@ func TestOfficialDifficultyConstants(t *testing.T) {
  SELECT 'kept-'||course,$2,id,1,0,0,1000,0,1,repeat('a',64) FROM chart_difficulties WHERE chart_id=$1`, w.song, testUsers["owner"].ID); err != nil {
 		t.Fatal(err)
 	}
-	danID := ID()
+	danID := web.NewID()
 	if _, err = s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,code,exams) VALUES($2,$1,'{"en":"Kept"}','SHODAN','[]')`, testUsers["owner"].ID, danID); err != nil {
 		t.Fatal(err)
 	}

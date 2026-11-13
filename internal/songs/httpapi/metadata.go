@@ -17,6 +17,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // editMetadata changes the site's own description of a chart; the stored
@@ -166,8 +167,8 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	// update_at is refreshed by the charts trigger only when something changed.
-	tag, e := tx.Exec(r.Context(), `UPDATE charts c SET description=$2,category_flags=$3,nijiiro_id=$4,title_translations=$5,subtitle_translations=$6,title=$7,subtitle=$8,bpm=$9,demo_start=$10,demo_end=$11 WHERE c.id=$1 AND `+publishedChart,
-		c.ID, description, flags, nijiiroID, titles, subtitles, title, subtitle, bpm, demoStart, demoEnd)
+	tag, e := tx.Exec(r.Context(), `UPDATE charts c SET description=$2,category_flags=$3,nijiiro_id=$4,title_translations=$5,subtitle_translations=$6,title=$7,subtitle=$8,bpm=$9,demo_start=$10,demo_end=$11,official_id=$12 WHERE c.id=$1 AND `+publishedChart,
+		c.ID, description, flags, nijiiroID, titles, subtitles, title, subtitle, bpm, demoStart, demoEnd, officialID)
 	if nijiiroConflict(e) {
 		problem(w, 409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
 		return
@@ -179,13 +180,6 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	if tag.RowsAffected() == 0 {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 		return
-	}
-	// The column is the official source's alone.
-	if s.source().Official {
-		if _, e = tx.Exec(r.Context(), `UPDATE charts SET official_id=$2 WHERE id=$1`, c.ID, officialID); e != nil {
-			internal(w, e)
-			return
-		}
 	}
 	// A changed block refreshes the chart's update_at by trigger.
 	for i, d := range makers {
@@ -228,7 +222,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, updated)
+	web.Respond(w, 200, updated)
 }
 
 type metadataPatch struct {

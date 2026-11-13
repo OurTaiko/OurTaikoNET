@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 const (
@@ -389,7 +390,7 @@ func (s *Server) subjectComments(w http.ResponseWriter, r *http.Request, load su
 		return
 	}
 	s.fillAuthors(ctx, result.Items)
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 // commentThread is a comment's permalink: the comment and all replies below it.
@@ -430,7 +431,7 @@ func (s *Server) commentThread(w http.ResponseWriter, r *http.Request) {
 	}
 	attach(items, replies)
 	s.fillAuthors(ctx, items)
-	respond(w, 200, map[string]any{"item": items[0], "sort": sort})
+	web.Respond(w, 200, map[string]any{"item": items[0], "sort": sort})
 }
 
 type commentRequest struct {
@@ -485,7 +486,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		problem(w, 429, "RATE_LIMITED", "评论过于频繁，请稍后再试")
 		return
 	}
-	id, depth, root := ID(), 0, ""
+	id, depth, root := web.NewID(), 0, ""
 	// Top-level comments notify the song's uploader or the course's maker, replies the parent's author.
 	notice := Notice{Kind: "chart_comment", Actor: u.User.ID, ChartID: subject.chartID, DanID: subject.danID, CommentID: id}
 	if subject.danID != "" {
@@ -553,7 +554,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
-	respond(w, 201, items[0])
+	web.Respond(w, 201, items[0])
 }
 
 func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
@@ -603,7 +604,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
-	respond(w, 200, items[0])
+	web.Respond(w, 200, items[0])
 }
 
 // deleteComment lets an author delete, or an administrator remove, a comment.
@@ -667,7 +668,7 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true, "purged": purged})
+	web.Respond(w, 200, map[string]bool{"ok": true, "purged": purged})
 }
 
 type CommentList struct {
@@ -730,5 +731,5 @@ func (s *Server) commentList(w http.ResponseWriter, r *http.Request, filter, ord
 		return
 	}
 	s.fillAuthors(ctx, result.Items)
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }

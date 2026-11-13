@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"ourtaiko.dev/net/internal/songs/teststore"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+
+	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestChartReplacement(t *testing.T) {
@@ -35,7 +37,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	mustExec(`INSERT INTO users(id,username,password_hash,is_admin) VALUES('d46774d30dd13b92d9e536808da468a4','testd46774d30dd1','unused',false),('9b893bc6d9422c93536ff0df503b81e9','test9b893bc6d942','unused',false),('5f63f79d876d201a13f8710453636837','test5f63f79d876d','unused',true)`)
 	tokens := map[string]string{"d46774d30dd13b92d9e536808da468a4": strings.Repeat("a", 64), "9b893bc6d9422c93536ff0df503b81e9": strings.Repeat("b", 64), "5f63f79d876d201a13f8710453636837": strings.Repeat("c", 64)}
 	for user, token := range tokens {
-		mustExec(`INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$3,'csrf',now()+interval '1 day'),($2,$3,'csrf',now()+interval '1 day')`, hash(token), hash("game:"+token), user)
+		mustExec(`INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$3,'csrf',now()+interval '1 day'),($2,$3,'csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token), user)
 	}
 	storage := t.TempDir()
 	cfg := Config{Origin: "http://localhost", Storage: storage}
@@ -122,7 +124,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Authorization", "Bearer "+tokens[user])
-		key := ID()
+		key := web.NewID()
 		if len(keys) > 0 {
 			key = keys[0]
 		}
@@ -131,9 +133,9 @@ func testChartReplacement(t *testing.T, remote bool) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	original := decode(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", ID(), source, "cbr.mp3", audio, nil), 201)
-	unrelated := decode(request("9b893bc6d9422c93536ff0df503b81e9", "POST", "/api/v1/charts", ID(), source, "cbr.mp3", audio, nil), 201)
-	originalScoreKey := ID()
+	original := decode(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
+	unrelated := decode(request("9b893bc6d9422c93536ff0df503b81e9", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
+	originalScoreKey := web.NewID()
 	status(score(original, "d46774d30dd13b92d9e536808da468a4", originalScoreKey), 201)
 	status(score(original, "9b893bc6d9422c93536ff0df503b81e9"), 201)
 	status(score(unrelated, "9b893bc6d9422c93536ff0df503b81e9"), 201)
@@ -157,7 +159,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 		if err != nil || c.TJAHash != original.TJAHash || count(songScores+` AND sc.is_latest`, original.ID) != 2 {
 			t.Fatal("failed update changed original", c.TJAHash, err)
 		}
-		if b, err := readObject(original.TJAKey); err != nil || string(b) != strings.Replace(source, "cbr.mp3", hash(string(audio))+".mp3", 1) {
+		if b, err := readObject(original.TJAKey); err != nil || string(b) != strings.Replace(source, "cbr.mp3", web.Hash(string(audio))+".mp3", 1) {
 			t.Fatal("old TJA lost", err)
 		}
 		if b, err := readObject(original.AudioKey); err != nil || !bytes.Equal(b, audio) {
@@ -178,16 +180,16 @@ func testChartReplacement(t *testing.T, remote bool) {
 		{"wrong makers", "d46774d30dd13b92d9e536808da468a4", source, "", nil, fields, 422},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			status(request(test.user, "PUT", path, ID(), test.source, test.audioName, test.audio, test.fields), test.code)
+			status(request(test.user, "PUT", path, web.NewID(), test.source, test.audioName, test.audio, test.fields), test.code)
 			unchanged()
 		})
 	}
 	// Fail after the transaction has retired the old scores, proving it all rolls back.
 	mustExec(`CREATE FUNCTION fail_replacement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.maker='B' THEN RAISE EXCEPTION 'test write failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_replacement BEFORE INSERT OR UPDATE ON chart_difficulties FOR EACH ROW EXECUTE FUNCTION fail_replacement()`)
-	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, ID(), replacement, "", nil, fields), 503)
+	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, web.NewID(), replacement, "", nil, fields), 503)
 	unchanged()
 	mustExec(`DROP TRIGGER fail_replacement ON chart_difficulties; DROP FUNCTION fail_replacement()`)
-	key := ID()
+	key := web.NewID()
 	updated := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, key, replacement, "", nil, fields), 200)
 	if remote {
 		verifyResourceLinks(t, handler, original.ID, audio)
@@ -244,7 +246,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	}
 	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, key, source, "", nil, fields), 409)
 	// Storing the same files again is not an update of the chart.
-	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, ID(), replacement, "", nil, fields), 200)
+	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, web.NewID(), replacement, "", nil, fields), 200)
 	if count(songScores+` AND sc.is_latest`, original.ID) != 3 {
 		t.Fatal("identical files retired a score")
 	}
@@ -253,8 +255,8 @@ func testChartReplacement(t *testing.T, remote bool) {
 	changedHard := strings.Replace(replacement, "#START\n1000,", "#START\n1010,", 1)
 	// A preview reads the new file block by block against the stored one and stores nothing.
 	previewSource := strings.Replace(changedHard, "COURSE:Oni\nLEVEL:7\n#START\n1100,\n#END\n", "COURSE:Easy\nLEVEL:2\n#START\n1000,\n#END\n", 1)
-	status(request("9b893bc6d9422c93536ff0df503b81e9", "POST", path+"/preview", ID(), previewSource, "", nil, nil), 403)
-	previewed := request("d46774d30dd13b92d9e536808da468a4", "POST", path+"/preview", ID(), previewSource, "", nil, nil)
+	status(request("9b893bc6d9422c93536ff0df503b81e9", "POST", path+"/preview", web.NewID(), previewSource, "", nil, nil), 403)
+	previewed := request("d46774d30dd13b92d9e536808da468a4", "POST", path+"/preview", web.NewID(), previewSource, "", nil, nil)
 	status(previewed, 200)
 	var preview struct {
 		Metadata struct {
@@ -274,8 +276,8 @@ func testChartReplacement(t *testing.T, remote bool) {
 	if count(songScores+` AND sc.is_latest`, original.ID) != 3 || count(`SELECT count(*) FROM chart_difficulties WHERE chart_id=$1`, original.ID) != 2 {
 		t.Fatal("preview changed the chart")
 	}
-	status(request("d46774d30dd13b92d9e536808da468a4", "POST", path+"/preview", ID(), "broken", "", nil, nil), 422)
-	changed := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, ID(), changedHard, "", nil, fields), 200)
+	status(request("d46774d30dd13b92d9e536808da468a4", "POST", path+"/preview", web.NewID(), "broken", "", nil, nil), 422)
+	changed := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, web.NewID(), changedHard, "", nil, fields), 200)
 	if hard(changed) != hard(original) || count(songScores, original.ID) != 3 || count(songScores+` AND sc.is_latest`, original.ID) != 0 {
 		t.Fatal("a changed block must retire its scores and keep its row")
 	}
@@ -284,11 +286,11 @@ func testChartReplacement(t *testing.T, remote bool) {
 	maps.Copy(keepFields, fields)
 	renamed := strings.Replace(changedHard, "TITLE:Updated", "TITLE:Renamed\nTITLEJA:改名", 1)
 	before, _ := app.chart(ctx, original.ID)
-	kept := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, ID(), renamed, "", nil, keepFields), 200)
+	kept := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, web.NewID(), renamed, "", nil, keepFields), 200)
 	if after, _ := app.chart(ctx, original.ID); kept.Title != "Updated" || kept.TitleTranslations["ja"] != "" || after.TJAHash == before.TJAHash {
 		t.Fatal("keepTitles replaced the names", kept.Title, kept.TitleTranslations)
 	}
-	status(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", ID(), source, "cbr.mp3", audio, map[string]string{"keepTitles": "true"}), 400)
+	status(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, map[string]string{"keepTitles": "true"}), 400)
 	// Independent replacement requests serialize; both may replace current files.
 	nextFields := map[string]string{"confirmReset": "true"}
 	// Renaming the audio alone would store an identical TJA; change its content too. Its Hard
@@ -300,7 +302,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			replies <- request("5f63f79d876d201a13f8710453636837", "PUT", path, ID(), nextSource, "next.mp3", audio, nextFields)
+			replies <- request("5f63f79d876d201a13f8710453636837", "PUT", path, web.NewID(), nextSource, "next.mp3", audio, nextFields)
 		}()
 	}
 	wg.Wait()
@@ -320,7 +322,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	}
 	final, err := app.chart(ctx, original.ID)
 	// The same audio bytes keep the name they were first registered with.
-	if err != nil || final.AudioName != "cbr.mp3" || final.Wave != hash(string(audio))+".mp3" || final.OwnerID != "d46774d30dd13b92d9e536808da468a4" || count(songScores, original.ID) != 3 || count(songScores+` AND sc.is_latest`, original.ID) != 0 {
+	if err != nil || final.AudioName != "cbr.mp3" || final.Wave != web.Hash(string(audio))+".mp3" || final.OwnerID != "d46774d30dd13b92d9e536808da468a4" || count(songScores, original.ID) != 3 || count(songScores+` AND sc.is_latest`, original.ID) != 0 {
 		t.Fatal("admin replacement", final, err)
 	}
 	status(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, key, replacement, "", nil, fields), 409)
@@ -329,14 +331,14 @@ func testChartReplacement(t *testing.T, remote bool) {
 	}
 	// Co-owners can replace files, and replacement preserves the entire owner set.
 	mustExec(`UPDATE charts SET owner_ids=array_append(owner_ids,'9b893bc6d9422c93536ff0df503b81e9') WHERE id=$1`, original.ID)
-	shared := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", path, ID(), nextSource, "next.mp3", audio, nextFields), 200)
+	shared := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", path, web.NewID(), nextSource, "next.mp3", audio, nextFields), 200)
 	if len(shared.OwnerIDs) != 2 || shared.OwnerID != original.OwnerID || !shared.hasOwner("9b893bc6d9422c93536ff0df503b81e9") {
 		t.Fatal("replacement lost ownership", shared.OwnerIDs)
 	}
 	// A block the new file no longer has is removed with its scores; a retried
 	// submission of one of them is refused rather than stored again.
 	onlyOni := strings.Replace(nextSource, "COURSE:Hard\nLEVEL:5\n#START\n1000,\n#END\n", "", 1)
-	trimmed := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, ID(), onlyOni, "next.mp3", audio, nextFields), 200)
+	trimmed := decode(request("d46774d30dd13b92d9e536808da468a4", "PUT", path, web.NewID(), onlyOni, "next.mp3", audio, nextFields), 200)
 	if len(trimmed.Difficulties) != 1 || trimmed.Difficulties[0].Course != "Oni" || count(songScores, original.ID) != 0 {
 		t.Fatal("removed block kept its scores", trimmed.Difficulties)
 	}
@@ -348,7 +350,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 
 	// A replacement keeps the description and categories it does not send, as on OurTaiko Database.
 	mustExec(`UPDATE charts SET description='kept',category_flags=1 WHERE id='` + unrelated.ID + `'`)
-	keptChart := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", "/api/v1/charts/"+unrelated.ID+"/files", ID(), replacement, "", nil, map[string]string{"confirmReset": "true"}), 200)
+	keptChart := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", "/api/v1/charts/"+unrelated.ID+"/files", web.NewID(), replacement, "", nil, map[string]string{"confirmReset": "true"}), 200)
 	if keptChart.Description != "kept" || len(keptChart.CategoryIDs) != 1 || keptChart.CategoryIDs[0] != "game" {
 		t.Fatal("unsent description or categories changed", keptChart.Description, keptChart.CategoryIDs)
 	}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // awarder stands in for the part that keeps titles and badges in the same database.
@@ -54,8 +55,8 @@ func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
 	awards := &awarder{}
 	s := testServer(t, pool, Config{Origin: origin, Awards: awards})
 	handler := s.Handler()
-	token := ID() + ID()
-	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, hash("game:"+token), carol); err != nil {
+	token := web.NewID() + web.NewID()
+	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), carol); err != nil {
 		t.Fatal(err)
 	}
 	var slot int64

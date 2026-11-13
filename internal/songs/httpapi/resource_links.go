@@ -10,6 +10,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // resourceLink tells a client where to download one stored file and how to
@@ -39,8 +40,8 @@ func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, d
 
 // resourceLinks lists where a client downloads a chart's current files and how to verify
 // them: the bucket's public address, a link signed for 15 minutes when the bucket has none
-// (urlsExpire), or this API's own file routes when files are kept on this server's disk. A
-// client never sends its API credentials to these links.
+// (urlsExpire), or this API's own file routes (Config.APIBase) when files are kept on this
+// server's disk. A client never sends its API credentials to these links.
 func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	// One snapshot: every key, hash and size is of one committed upload, even if a
 	// replacement commits while the list is being put together.
@@ -69,7 +70,7 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	// kind is also the last part of this API's route for the file.
 	add := func(kind, key, name, media, digest string, size int64) error {
 		if remote == nil {
-			route := s.Config.Origin + "/api/v1/charts/" + c.ID + "/" + kind
+			route := s.apiBase() + "/charts/" + c.ID + "/" + kind
 			resources[kind] = resourceLink{route, route, digest, size, media}
 			return nil
 		}
@@ -115,5 +116,5 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
+	web.Respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // ReplayListing is one recorded play on the public replay list: the score, the song's title and
@@ -109,5 +111,5 @@ func (s *Server) replayList(w http.ResponseWriter, r *http.Request) {
 		p := profiles[items[i].UserID]
 		items[i].Nickname, items[i].AvatarURL = p.Nickname, p.AvatarURL
 	}
-	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": replayListPageSize, "sort": sort})
+	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": replayListPageSize, "sort": sort})
 }

@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestPublicGameSearch(t *testing.T) {
@@ -104,7 +106,7 @@ func TestPublicGameSearch(t *testing.T) {
 	}
 	webToken := seedWebSession(t, s, "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 	gameToken := strings.Repeat("c", 64)
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, hash("game:"+gameToken)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash("game:"+gameToken)); err != nil {
 		t.Fatal(err)
 	}
 	for _, endpoint := range []string{"/api/v1/game/search"} {

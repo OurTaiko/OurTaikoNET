@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // The game API, as OurTaikoPlay speaks it: chart blocks as slots of course × side
@@ -72,7 +73,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 // gameCatalog is the complete song list for a game client: the categories, every published
@@ -134,7 +135,7 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 	if s.Config.SSO != nil {
 		body["sso"] = s.Config.SSO.GameAccounts()
 	}
-	respond(w, 200, body)
+	web.Respond(w, 200, body)
 }
 
 // gameScoreList returns the signed-in account's scores on published charts,
@@ -157,7 +158,7 @@ func (s *Server) gameScoreList(w http.ResponseWriter, r *http.Request) {
 	if scores == nil {
 		scores = []Score{}
 	}
-	respond(w, 200, map[string]any{"scores": scores})
+	web.Respond(w, 200, map[string]any{"scores": scores})
 }
 
 // devGameToken stands for the account center's game session of DEV_USER_ID on a local server

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // User is someone signed in, as the account center describes them; what IsAdmin means here
@@ -101,12 +102,12 @@ func (s *Server) required(w http.ResponseWriter, r *http.Request, csrf bool) (se
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	v, e := s.current(r)
 	if errors.Is(e, pgx.ErrNoRows) {
-		respond(w, 200, map[string]any{"user": nil, "csrfToken": ""})
+		web.Respond(w, 200, map[string]any{"user": nil, "csrfToken": ""})
 		return
 	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
+	web.Respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
 }

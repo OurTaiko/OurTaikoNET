@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Deleting a song is the same code as on the Fanmade source, whose test covers the scores
@@ -13,7 +15,7 @@ func TestDeleteChart(t *testing.T) {
 	c, s, ctx := w.c, w.s, context.Background()
 	// Each song has its own TJA; both share one audio file.
 	file := func(extension string) (id int64) {
-		digest := ID() + ID()
+		digest := web.NewID() + web.NewID()
 		if e := s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.'||$2,'a.'||$2,$1,1,$2) RETURNING id`, digest, extension).Scan(&id); e != nil {
 			t.Fatal(e)
 		}

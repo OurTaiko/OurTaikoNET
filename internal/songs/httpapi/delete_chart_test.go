@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
@@ -19,7 +20,7 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for id, token := range tokens {
-		if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(token), id); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(token), id); err != nil {
 			t.Fatal(err)
 		}
 	}

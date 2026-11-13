@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	id := ID()
+	id := web.NewID()
 	_, e := pool.Exec(ctx, `INSERT INTO users(id,username,nickname,password_hash) VALUES($1,'Private123','公开昵称','unused')`, id)
 	if e != nil {
 		t.Fatal(e)
@@ -87,8 +88,8 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 	pool := scoreTestDB(t)
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	h := app.Handler()
-	state, binding := ID()+ID(), ID()+ID()
-	_, e := pool.Exec(context.Background(), `INSERT INTO oidc_flows VALUES($1,$2,'nonce','verifier','/upload',now()+interval '5 minutes')`, hash(state), hash(binding))
+	state, binding := web.NewID()+web.NewID(), web.NewID()+web.NewID()
+	_, e := pool.Exec(context.Background(), `INSERT INTO oidc_flows VALUES($1,$2,'nonce','verifier','/upload',now()+interval '5 minutes')`, web.Hash(state), web.Hash(binding))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -99,7 +100,7 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 		h.ServeHTTP(w, r)
 		return w
 	}
-	if w := call(ID()+ID(), "&code=forged"); w.Code != 303 || w.Header().Get("Location") != "http://localhost/login?error=sso" {
+	if w := call(web.NewID()+web.NewID(), "&code=forged"); w.Code != 303 || w.Header().Get("Location") != "http://localhost/login?error=sso" {
 		t.Fatal(w.Code)
 	}
 	var n int
@@ -138,7 +139,7 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 }
 func TestPublicNamesDoNotExposeLogin(t *testing.T) {
 	pool := scoreTestDB(t)
-	id := ID()
+	id := web.NewID()
 	_, e := pool.Exec(context.Background(), `INSERT INTO users(id,username,nickname,password_hash) VALUES($1,'PrivateLogin','公开名','unused')`, id)
 	if e != nil {
 		t.Fatal(e)

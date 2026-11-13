@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // songBPM reads the optional BPM of a song without files; empty means
@@ -55,12 +57,12 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 	}
 	coverSHA := ""
 	if coverData != nil {
-		coverSHA = hash(string(coverData))
+		coverSHA = web.Hash(string(coverData))
 	}
-	payload := hash(strings.Join([]string{"song", title, subtitle, fields["bpm"], coverSHA, description, strings.Join(categoryIDs, ","), fields["nijiiroId"], fields["officialId"]}, "\n"))
+	payload := web.Hash(strings.Join([]string{"song", title, subtitle, fields["bpm"], coverSHA, description, strings.Join(categoryIDs, ","), fields["nijiiroId"], fields["officialId"]}, "\n"))
 	// Requests without co-creators keep the digest they always had.
 	if len(collaborators) > 0 {
-		payload = hash(payload + "\ncollaborators\n" + strings.Join(collaborators, ","))
+		payload = web.Hash(payload + "\ncollaborators\n" + strings.Join(collaborators, ","))
 	}
 
 	ctx := context.WithoutCancel(r.Context())
@@ -92,7 +94,7 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 			internal(w, e)
 			return
 		}
-		respond(w, 200, c)
+		web.Respond(w, 200, c)
 		return
 	}
 	var coverFile *int64
@@ -105,7 +107,7 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 		coverFile = &id
 	}
 	empty, _ := json.Marshal(map[string]string{})
-	id := ID()
+	id := web.NewID()
 	_, e = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,official_id,owner_ids,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end)
  VALUES($11,$1,$2,ARRAY[$3::text],$4,$5,$6,$7,$8,0,0,0,$9,$9,$10,15)`,
 		nijiiroID, officialID, u.User.ID, coverFile, description, title, subtitle, bpm, empty, flags, id)
@@ -134,5 +136,5 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 		internal(w, e)
 		return
 	}
-	respond(w, 201, c)
+	web.Respond(w, 201, c)
 }

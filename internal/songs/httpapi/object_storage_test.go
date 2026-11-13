@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []byte) {
@@ -48,7 +49,7 @@ func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []b
 		}
 		data, e := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if e != nil || resp.StatusCode != 200 || int64(len(data)) != v.Size || hash(string(data)) != v.SHA {
+		if e != nil || resp.StatusCode != 200 || int64(len(data)) != v.Size || web.Hash(string(data)) != v.SHA {
 			t.Fatal("direct integrity", kind, e)
 		}
 		if kind == "audio" && !bytes.Equal(data, audio) {

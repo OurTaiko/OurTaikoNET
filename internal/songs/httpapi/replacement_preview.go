@@ -8,6 +8,7 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // replacementBlock is one course×side slot of a replacement as it would land:
@@ -49,7 +50,7 @@ func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invalid := func(issue *tja.Issue) {
-		respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "validationVersion": tja.Version})
+		web.Respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "validationVersion": tja.Version})
 	}
 	data, issue := tja.NormalizeUTF8(raw)
 	if issue != nil {
@@ -123,5 +124,5 @@ func (s *Server) previewReplacement(w http.ResponseWriter, r *http.Request) {
 			blocks = append(blocks, replacementBlock{Course: slot[0], Side: slot[1], Change: "removed", Scores: old.scores})
 		}
 	}
-	respond(w, 200, map[string]any{"metadata": meta, "previous": previous, "blocks": blocks})
+	web.Respond(w, 200, map[string]any{"metadata": meta, "previous": previous, "blocks": blocks})
 }

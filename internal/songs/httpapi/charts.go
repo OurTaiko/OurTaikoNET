@@ -18,6 +18,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Chart is one song, the same on both song sources. Its JSON has the fields of the chart's
@@ -373,7 +374,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		return
 	}
 	s.chartNames(r.Context(), items)
-	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": s.source().PageSize})
+	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": s.source().PageSize})
 }
 
 // nijiiroID reads a Nijiiro ID as text: a positive int4 without leading zeros.
@@ -443,7 +444,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	respond(w, 200, c)
+	web.Respond(w, 200, c)
 }
 
 // canManage: a song's owners and whoever manages this source may change or delete it.
@@ -506,7 +507,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	if e = s.releaseFiles(context.WithoutCancel(r.Context()), files); e != nil {
 		log.Printf("deleted chart file cleanup pending: %v", e)
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 // deleteChart removes a chart's scores and row, and returns the files it referred to.

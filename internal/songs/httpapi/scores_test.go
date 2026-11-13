@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // scoreTestDB gives a test its own ourtaiko_net, opened for the fanmade source, with the
@@ -54,7 +55,7 @@ func TestSubmitScore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f',$3,now()+interval '1 day'),($2,'d1ee9badde8bb6f733b2315472711632',$3,now()+interval '1 day')`, hash(cookie), hash(cookie2), csrf)
+	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f',$3,now()+interval '1 day'),($2,'d1ee9badde8bb6f733b2315472711632',$3,now()+interval '1 day')`, web.Hash(cookie), web.Hash(cookie2), csrf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +79,7 @@ func TestSubmitScore(t *testing.T) {
 	slot := fmt.Sprintf(`"difficultyId":%d`, oni)
 	handler := testServer(t, pool, Config{Origin: origin}).Handler()
 	nativeToken := strings.Repeat("c", 64)
-	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, hash("game:"+nativeToken)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+nativeToken)); err != nil {
 		t.Fatal(err)
 	}
 	native := func(method, path, body string) *httptest.ResponseRecorder {
@@ -99,7 +100,7 @@ func TestSubmitScore(t *testing.T) {
 	}
 	// Receipts stored before a field was removed hashed it; retries compare the score itself.
 	oldBody := strings.Replace(gameBody, slot, `"versionId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",`+slot, 1)
-	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='game-integration-score-1'`, hash(oldBody)); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='game-integration-score-1'`, web.Hash(oldBody)); err != nil {
 		t.Fatal(err)
 	}
 	if w := native("POST", "/api/v1/game/scores", gameBody); w.Code != 200 || strings.Contains(w.Body.String(), "versionId") {
@@ -354,7 +355,7 @@ func TestScorePlayCounts(t *testing.T) {
  INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES('`+song+`',ARRAY['89b6ef3a5cb57b6e04f74711d15a8a5f'],'Test',120,10,test_file('tja','test.tja',repeat('a',64),1),test_file('ogg','test.ogg',repeat('b',64),1))`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','',now()+interval '1 day')`, web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	var oni int64
@@ -398,7 +399,7 @@ func TestScorePlayCounts(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// A receipt stored without them is matched by a retry without them (the column defaults).
-	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='play-counts-plain-0001'`, hash("an older request")); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='play-counts-plain-0001'`, web.Hash("an older request")); err != nil {
 		t.Fatal(err)
 	}
 	if w := post("play-counts-plain-0001", ""); w.Code != 200 {

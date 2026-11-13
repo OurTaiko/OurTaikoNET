@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/objectstore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // GamePlaylist is a folder of the game's song select: the user's own and
@@ -122,7 +123,7 @@ func (s *Server) gamePlaylistList(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"playlists": playlists, "playlistVersion": 1})
+	web.Respond(w, 200, map[string]any{"playlists": playlists, "playlistVersion": 1})
 }
 
 func (s *Server) gamePlaylistDetails(ctx context.Context, items []GamePlaylist) error {

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // As on Fanmade: the cover sent is the image PREIMAGE names and the background image the one
@@ -96,7 +97,7 @@ func TestOfficialChartImagesFollowTheirHeaders(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = fmt.Sprintf("10.9.%d.1:1234", w.c.n.Add(1)&255)
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["owner"]})
 		rec := httptest.NewRecorder()
@@ -155,7 +156,7 @@ func TestOfficialChartImagesFollowTheirHeaders(t *testing.T) {
 		t.Fatal("images not stored", c.CoverHash, c.BackgroundHash)
 	}
 	declares("\nPREIMAGE:" + c.CoverHash + ".webp\nBGIMAGE:" + c.BackgroundHash + ".webp\n")
-	if code, body := w.c.raw("", w.chart(w.song)+"/bgimage"); code != 200 || hash(string(body)) != c.BackgroundHash {
+	if code, body := w.c.raw("", w.chart(w.song)+"/bgimage"); code != 200 || web.Hash(string(body)) != c.BackgroundHash {
 		t.Fatal("background image not served", code)
 	}
 	var manifest struct {

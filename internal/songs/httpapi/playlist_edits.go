@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 type playlistRequest struct {
@@ -65,7 +66,7 @@ func (s *Server) respondPlaylist(w http.ResponseWriter, r *http.Request, status 
 	}
 	items := []Playlist{p}
 	s.playlistOwners(r.Context(), items)
-	respond(w, status, items[0])
+	web.Respond(w, status, items[0])
 }
 
 func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +106,7 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "PLAYLIST_LIMIT", "每位用户最多创建 100 个歌单")
 		return
 	}
-	id, description := ID(), ""
+	id, description := web.NewID(), ""
 	if body.Description != nil {
 		description = *body.Description
 	}
@@ -244,7 +245,7 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(ctx, covers)
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
@@ -291,7 +292,7 @@ func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
 	if added {
 		status = 201
 	}
-	respond(w, status, map[string]any{"added": added, "itemCount": count})
+	web.Respond(w, status, map[string]any{"added": added, "itemCount": count})
 }
 
 func (s *Server) removePlaylistItem(w http.ResponseWriter, r *http.Request) {
@@ -311,7 +312,7 @@ func (s *Server) removePlaylistItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 // orderPlaylist moves the listed songs to the front in the given order. Songs
@@ -366,7 +367,7 @@ func (s *Server) orderPlaylist(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 // favoritePlaylist keeps a public playlist of another user as a favorite.
@@ -448,5 +449,5 @@ func respondFavorite(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, id s
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]any{"favorited": favorited, "favoriteCount": total})
+	web.Respond(w, 200, map[string]any{"favorited": favorited, "favoriteCount": total})
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Source is a song source whose plays are shown. ID is its name in ourtaiko_net (the schema
@@ -229,9 +230,9 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	total := len(rows)
 	start := min((page-1)*scorePageSize, total)
 	end := min(start+scorePageSize, total)
-	respond(w, 200, map[string]any{"items": rows[start:end], "total": total, "page": page, "pageSize": scorePageSize, "view": view, "sort": order, "sources": statuses})
+	web.Respond(w, 200, map[string]any{"items": rows[start:end], "total": total, "page": page, "pageSize": scorePageSize, "view": view, "sort": order, "sources": statuses})
 }
 
 func (s *Server) sources(w http.ResponseWriter, r *http.Request) {
-	respond(w, 200, map[string]any{"sources": s.Config.Sources})
+	web.Respond(w, 200, map[string]any{"sources": s.Config.Sources})
 }

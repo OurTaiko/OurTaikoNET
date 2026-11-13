@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"ourtaiko.dev/net/internal/kit/constants"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Difficulty constants from upload to rating: every route stored on upload, rated by the first
@@ -24,7 +25,7 @@ func TestDifficultyConstants(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, hash(cookie)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie)); err != nil {
 		t.Fatal(err)
 	}
 	app := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()})
@@ -44,7 +45,7 @@ func TestDifficultyConstants(t *testing.T) {
 	r.Header.Set("Content-Type", form.FormDataContentType())
 	r.Header.Set("Origin", "http://localhost")
 	r.Header.Set("X-CSRF-Token", "csrf")
-	r.Header.Set("Idempotency-Key", ID())
+	r.Header.Set("Idempotency-Key", web.NewID())
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: cookie})
 	w := httptest.NewRecorder()
 	app.Handler().ServeHTTP(w, r)

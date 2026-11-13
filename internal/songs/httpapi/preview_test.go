@@ -13,6 +13,7 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestPreviewLifecycle(t *testing.T) {
@@ -25,7 +26,7 @@ func TestPreviewLifecycle(t *testing.T) {
 			if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'author','unused')`, owner); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(cookie), owner); err != nil {
+			if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 				t.Fatal(err)
 			}
 			cfg := Config{Storage: t.TempDir(), Origin: "http://localhost"}
@@ -41,7 +42,7 @@ func TestPreviewLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = app.Config.Objects.Put(ctx, "audio", file, int64(len(source)), "audio/ogg", hash(string(source)))
+			err = app.Config.Objects.Put(ctx, "audio", file, int64(len(source)), "audio/ogg", web.Hash(string(source)))
 			file.Close()
 			if err != nil {
 				t.Fatal(err)
@@ -51,7 +52,7 @@ func TestPreviewLifecycle(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer tx.Rollback(ctx)
-			if _, err = tx.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,audio_file,tja_file,demo_start) VALUES('song',ARRAY[$1],'Test',120,0.5,test_file('audio','audio.ogg',$2,$3),test_file('tja','song.tja',repeat('a',64),1),0.1)`, owner, hash(string(source)), len(source)); err != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,audio_file,tja_file,demo_start) VALUES('song',ARRAY[$1],'Test',120,0.5,test_file('audio','audio.ogg',$2,$3),test_file('tja','song.tja',repeat('a',64),1),0.1)`, owner, web.Hash(string(source)), len(source)); err != nil {
 				t.Fatal(err)
 			}
 			if err = tx.Commit(ctx); err != nil {

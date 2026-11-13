@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func encodeCover(w http.ResponseWriter, r *http.Request, name string, data []byte) ([]byte, bool) {
@@ -84,7 +85,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 	// without files has none.
 	var released []int64
 	if err == nil && hasFiles {
-		name := hash(string(encoded)) + ".webp"
+		name := web.Hash(string(encoded)) + ".webp"
 		var tjaFile int64
 		tjaFile, released, err = s.rewriteStoredTJA(ctx, tx, c.ID, func(data []byte) ([]byte, bool) {
 			stored, ok := tja.SetSongHeader(data, "PREIMAGE", name)
@@ -109,7 +110,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 			log.Printf("replaced cover cleanup pending: %v", err)
 		}
 	}
-	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
+	web.Respond(w, 200, map[string]string{"coverHash": web.Hash(string(encoded))})
 }
 
 // storeCover stores an encoded WebP cover and returns its file ID.
@@ -129,7 +130,7 @@ func (s *Server) storeImageAs(ctx context.Context, tx pgx.Tx, kind string, data 
 	if e = errors.Join(e, tmp.Close()); e != nil {
 		return 0, e
 	}
-	return s.storeFile(ctx, tx, tmp.Name(), kind+"."+extension, extension, media, hash(string(data)), int64(len(data)))
+	return s.storeFile(ctx, tx, tmp.Name(), kind+"."+extension, extension, media, web.Hash(string(data)), int64(len(data)))
 }
 
 // receiveCover reads the single multipart file field "cover" and encodes it

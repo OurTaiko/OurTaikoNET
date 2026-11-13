@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 const testReplayV2 = `{"version":2,"audio_offset_ms":-20,"visual_offset_ms":10,"inputs":[[-15.5,0],[1234.5,1]],"options":{"speed":25,"inverse":true,"display":false,"random":2,"flipped":[0,3,7]}}`
@@ -110,7 +112,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	}
 	base := fmt.Sprintf(`{"difficultyId":%d,"good":10,"ok":0,"bad":0,"score":10000,"drumroll":0,"max_combo":10}`, slot)
 	app := testServer(t, pool, Config{Origin: origin})
-	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, hash("game:"+token), user)
+	_, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +158,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		legacy := call(path, base, key, 201)
 		var digest string
 		var isNull bool
-		if err := pool.QueryRow(ctx, `SELECT replay_data IS NULL,payload_digest FROM scores WHERE id=$1`, legacy.ID).Scan(&isNull, &digest); err != nil || !isNull || digest != hash(base) {
+		if err := pool.QueryRow(ctx, `SELECT replay_data IS NULL,payload_digest FROM scores WHERE id=$1`, legacy.ID).Scan(&isNull, &digest); err != nil || !isNull || digest != web.Hash(base) {
 			t.Fatalf("legacy payload/digest changed: null=%v err=%v", isNull, err)
 		}
 		// A retry after upgrading the server must match an old request exactly.

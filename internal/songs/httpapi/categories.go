@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 type Category struct {
@@ -91,7 +93,7 @@ func (s *Server) categories(w http.ResponseWriter, r *http.Request) {
 		category.ChartCount = counts[i]
 		items = append(items, category.Category)
 	}
-	respond(w, 200, map[string]any{"items": items, "chartCount": total})
+	web.Respond(w, 200, map[string]any{"items": items, "chartCount": total})
 }
 
 // categorySelection reads a JSON array of category IDs. Omitted, null or empty means

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/awards"
+	"ourtaiko.dev/net/internal/web"
 )
 
 var serviceID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
@@ -22,9 +23,9 @@ func RegisterService(ctx context.Context, db *pgxpool.Pool, id, name string) (st
 	if !serviceID.MatchString(id) || id == "admin" || name == "" || len(name) > 80 {
 		return "", errors.New("give a service id of lowercase letters, digits or - (not admin) and a name of at most 80 characters")
 	}
-	key := ID() + ID()
+	key := web.NewID() + web.NewID()
 	_, err := db.Exec(ctx, `INSERT INTO services(id,name,key_hash) VALUES($1,$2,$3)
- ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,key_hash=EXCLUDED.key_hash,enabled=true`, id, name, hash(key))
+ ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,key_hash=EXCLUDED.key_hash,enabled=true`, id, name, web.Hash(key))
 	return key, err
 }
 
@@ -46,7 +47,7 @@ func (s *Server) service(w http.ResponseWriter, r *http.Request) (string, bool) 
 		internal(w, err)
 		return "", false
 	}
-	if err != nil || len(key) < 32 || subtle.ConstantTimeCompare([]byte(hash(key)), []byte(stored)) != 1 {
+	if err != nil || len(key) < 32 || subtle.ConstantTimeCompare([]byte(web.Hash(key)), []byte(stored)) != 1 {
 		problem(w, 401, "SERVICE_UNAUTHORIZED", "服务凭证无效")
 		return "", false
 	}
@@ -239,5 +240,5 @@ func (s *Server) respondAward(w http.ResponseWriter, ctx context.Context, user s
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"granted": json.RawMessage(granted), "nameplate": plate})
+	web.Respond(w, 200, map[string]any{"granted": json.RawMessage(granted), "nameplate": plate})
 }

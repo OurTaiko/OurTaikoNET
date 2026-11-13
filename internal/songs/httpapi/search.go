@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // chartScoreSQL is a chart's votes: up less down.
@@ -74,5 +75,5 @@ func (s *Server) gameSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.chartNames(r.Context(), items)
-	respond(w, 200, map[string]any{"items": items, "total": len(items)})
+	web.Respond(w, 200, map[string]any{"items": items, "total": len(items)})
 }

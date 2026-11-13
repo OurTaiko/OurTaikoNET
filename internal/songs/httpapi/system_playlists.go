@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // systemPlaylist is a playlist the server computes on request. Its ID is a
@@ -85,5 +86,5 @@ func (s *Server) listSystemPlaylists(w http.ResponseWriter, r *http.Request) {
 			items = append(items, p.playlist(s.source(), len(ids)))
 		}
 	}
-	respond(w, 200, map[string]any{"items": items})
+	web.Respond(w, 200, map[string]any{"items": items})
 }

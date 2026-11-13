@@ -17,6 +17,7 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // The uploaded cover is the image PREIMAGE names and the background image the one BGIMAGE
@@ -32,7 +33,7 @@ func TestChartImagesFollowTheirHeaders(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(cookie), owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 		t.Fatal(err)
 	}
 	// Remote storage, as in production: the resource list needs public links.
@@ -75,7 +76,7 @@ func TestChartImagesFollowTheirHeaders(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: cookie})
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)

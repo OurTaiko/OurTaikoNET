@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -40,13 +42,42 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 `); err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(),
+	storage := t.TempDir()
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: storage,
 		LegacyFanmadeHost: "fanmade.ourtaiko.org", LegacyOfficialHost: "database.ourtaiko.org"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer a.Close()
 	h := a.Handler()
+	// With files on this server's disk, a chart's download links are this site's own routes
+	// of the chart's source, whichever address asked, and they answer.
+	if err := os.WriteFile(filepath.Join(storage, "fanmade", strings.Repeat("1", 64)+".tja"), []byte("TITLE:Fan"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, asked := range []struct{ host, path string }{
+		{"net.ourtaiko.org", "/api/v1/sources/fanmade/charts/" + strings.Repeat("f", 32) + "/resources"},
+		{"fanmade.ourtaiko.org", "/api/v1/charts/" + strings.Repeat("f", 32) + "/resources"},
+	} {
+		r := httptest.NewRequest("GET", asked.path, nil)
+		r.Host = asked.host
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var links struct {
+			Resources map[string]struct {
+				URL string `json:"url"`
+			} `json:"resources"`
+		}
+		want := "http://localhost/api/v1/sources/fanmade/charts/" + strings.Repeat("f", 32) + "/tja"
+		if err := json.Unmarshal(w.Body.Bytes(), &links); err != nil || w.Code != 200 || links.Resources["tja"].URL != want {
+			t.Fatalf("%s%s: %d %s", asked.host, asked.path, w.Code, w.Body.String())
+		}
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", strings.TrimPrefix(want, "http://localhost"), nil))
+		if w.Code != 200 || w.Body.String() != "TITLE:Fan" {
+			t.Fatalf("following %s: %d %s", want, w.Code, w.Body.String())
+		}
+	}
 	titles := func(host, path string) (int, []string) {
 		t.Helper()
 		r := httptest.NewRequest("GET", path, nil)

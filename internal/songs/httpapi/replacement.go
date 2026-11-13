@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ourtaiko.dev/net/internal/kit/audio"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Text fields a replacement may carry; omitted ones keep the chart's values.
@@ -104,7 +105,7 @@ func (s *Server) replaceFiles(w http.ResponseWriter, r *http.Request) {
 			parts = append(parts, f.name, f.sha)
 		}
 	}
-	digest := hash(strings.Join(parts, "\n"))
+	digest := web.Hash(strings.Join(parts, "\n"))
 	if s.answeredUpload(w, r, u.User.ID, key, digest, &c) {
 		return
 	}

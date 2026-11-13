@@ -13,6 +13,7 @@ import (
 
 	jose "github.com/go-jose/go-jose/v4"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
@@ -33,9 +34,9 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			respond(w, 200, map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys", "id_token_signing_alg_values_supported": []string{"RS256"}})
+			web.Respond(w, 200, map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys", "id_token_signing_alg_values_supported": []string{"RS256"}})
 		case "/keys":
-			respond(w, 200, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "test-key", Algorithm: "RS256", Use: "sig"}}})
+			web.Respond(w, 200, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "test-key", Algorithm: "RS256", Use: "sig"}}})
 		case "/token":
 			if err := r.ParseForm(); err != nil {
 				t.Error(err)
@@ -61,15 +62,15 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 				w.WriteHeader(500)
 				return
 			}
-			respond(w, 200, map[string]any{"access_token": "web:" + id, "token_type": "Bearer", "expires_in": 3600, "refresh_token": "refresh:" + id, "id_token": token})
+			web.Respond(w, 200, map[string]any{"access_token": "web:" + id, "token_type": "Bearer", "expires_in": 3600, "refresh_token": "refresh:" + id, "id_token": token})
 		case "/internal/v1/web/introspect":
 			var body struct {
 				Token string `json:"accessToken"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
-			respond(w, 200, map[string]any{"user": User{ID: strings.TrimPrefix(body.Token, "web:"), Nickname: "公開名"}})
+			web.Respond(w, 200, map[string]any{"user": User{ID: strings.TrimPrefix(body.Token, "web:"), Nickname: "公開名"}})
 		case "/internal/v1/web/revoke":
-			respond(w, 200, map[string]bool{"ok": true})
+			web.Respond(w, 200, map[string]bool{"ok": true})
 		default:
 			w.WriteHeader(404)
 		}
@@ -83,8 +84,8 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	app := New(pool, Config{Origin: "http://localhost", SSO: client})
 	callback := func(id string) *httptest.ResponseRecorder {
 		t.Helper()
-		state, binding := ID()+ID(), ID()+ID()
-		if _, err := pool.Exec(ctx, `INSERT INTO oidc_flows VALUES($1,$2,'test-nonce','test-verifier','/users',now()+interval '5 minutes')`, hash(state), hash(binding)); err != nil {
+		state, binding := web.NewID()+web.NewID(), web.NewID()+web.NewID()
+		if _, err := pool.Exec(ctx, `INSERT INTO oidc_flows VALUES($1,$2,'test-nonce','test-verifier','/users',now()+interval '5 minutes')`, web.Hash(state), web.Hash(binding)); err != nil {
 			t.Fatal(err)
 		}
 		req := httptest.NewRequest("GET", "/api/v1/auth/sso/callback?state="+state+"&code="+id, nil)
@@ -93,7 +94,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 		app.Handler().ServeHTTP(response, req)
 		return response
 	}
-	id := ID()
+	id := web.NewID()
 	w := callback(id)
 	if w.Code != 303 || w.Header().Get("Location") != "http://localhost/users" {
 		t.Fatal(w.Code, w.Header(), w.Body.String())
@@ -112,7 +113,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT upstream_refresh_token,expires_at,upstream_expires_at FROM sessions WHERE user_id=$1`, id).Scan(&encryptedRefresh, &deadline, &accessExpiry); err != nil {
 		t.Fatal(err)
 	}
-	plain, err := client.Unseal(encryptedRefresh, "refresh:"+hash(cookie.Value))
+	plain, err := client.Unseal(encryptedRefresh, "refresh:"+web.Hash(cookie.Value))
 	if err != nil || plain != "refresh:"+id || time.Until(deadline) < 167*time.Hour || time.Until(accessExpiry) > time.Hour {
 		t.Fatal("invalid persisted renewal credentials", err)
 	}
@@ -129,7 +130,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
  CREATE TRIGGER fail_test_session BEFORE INSERT ON sessions FOR EACH ROW EXECUTE FUNCTION fail_test_session()`); err != nil {
 		t.Fatal(err)
 	}
-	failedID := ID()
+	failedID := web.NewID()
 	w = callback(failedID)
 	if w.Header().Get("Location") != "http://localhost/login?error=sso" {
 		t.Fatal(w.Header())

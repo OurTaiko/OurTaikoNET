@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Co-creators chosen with a new upload are invited when the chart is published, as on
@@ -89,7 +91,7 @@ func TestOfficialUploadInvitesCollaborators(t *testing.T) {
 		{ids(alice, strings.Repeat("f", 32)), 404, "USER_NOT_FOUND"},
 	} {
 		for _, files := range []bool{true, false} {
-			if w := send("POST", "/api/v1/charts", ID(), "Rejected", tc.field, files, true); w.Code != tc.want || !strings.Contains(w.Body.String(), tc.code) {
+			if w := send("POST", "/api/v1/charts", web.NewID(), "Rejected", tc.field, files, true); w.Code != tc.want || !strings.Contains(w.Body.String(), tc.code) {
 				t.Fatal(tc.field, files, w.Code, w.Body.String())
 			}
 		}
@@ -99,7 +101,7 @@ func TestOfficialUploadInvitesCollaborators(t *testing.T) {
 	}
 
 	// The web uploader does not wait: both are invited once the chart is published.
-	key := ID()
+	key := web.NewID()
 	if w := send("POST", "/api/v1/charts", key, "Together", ids(alice, bob, alice), true, true); w.Code != 202 {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -142,12 +144,12 @@ func TestOfficialUploadInvitesCollaborators(t *testing.T) {
 	}
 
 	// A replacement invites nobody: its chart already has the co-creator dialog.
-	if w := send("PUT", "/api/v1/charts/"+chartID+"/files", ID(), "Replaced", ids(bob), true, false, "confirmReset", "true"); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
+	if w := send("PUT", "/api/v1/charts/"+chartID+"/files", web.NewID(), "Replaced", ids(bob), true, false, "confirmReset", "true"); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 
 	// A song registered without files invites the same way, once however often it is sent.
-	key = ID()
+	key = web.NewID()
 	var song Chart
 	w := send("POST", "/api/v1/charts", key, "Song only", ids(bob), false, false)
 	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &song) != nil || song.ID == "" {
@@ -169,12 +171,12 @@ func TestOfficialUploadInvitesCollaborators(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, files := range []bool{true, false} {
-		if w = send("POST", "/api/v1/charts", ID(), "Too many", ids(alice, bob), files, false); w.Code != 429 || !strings.Contains(w.Body.String(), "RATE_LIMITED") {
+		if w = send("POST", "/api/v1/charts", web.NewID(), "Too many", ids(alice, bob), files, false); w.Code != 429 || !strings.Contains(w.Body.String(), "RATE_LIMITED") {
 			t.Fatal(files, w.Code, w.Body.String())
 		}
 	}
 	// An uploader who waits gets the chart; the last invitation of the day went out with it.
-	w = send("POST", "/api/v1/charts", ID(), "Last one", ids(bob), true, false)
+	w = send("POST", "/api/v1/charts", web.NewID(), "Last one", ids(bob), true, false)
 	var last Chart
 	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &last) != nil || last.ID == "" {
 		t.Fatal(w.Code, w.Body.String())
@@ -186,10 +188,10 @@ func TestOfficialUploadInvitesCollaborators(t *testing.T) {
 		t.Fatal(code)
 	}
 	// Uploads without the field publish as before.
-	if w = send("POST", "/api/v1/charts", ID(), "Alone", "", true, false); w.Code != 201 {
+	if w = send("POST", "/api/v1/charts", web.NewID(), "Alone", "", true, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w = send("POST", "/api/v1/charts", ID(), "Nobody", "[]", false, false); w.Code != 201 {
+	if w = send("POST", "/api/v1/charts", web.NewID(), "Nobody", "[]", false, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	if count(`SELECT count(*) FROM charts`) != charts+5 || count(`SELECT count(*) FROM chart_collaborations WHERE status='pending'`) != 3 {

@@ -10,6 +10,7 @@ import (
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/web"
 )
 
 const defaultSessionCookie, flowCookie = "ourtaiko_profile_session", "ourtaiko_profile_oidc"
@@ -123,12 +124,12 @@ func (s *Server) siteAdmin(w http.ResponseWriter, r *http.Request) (session, boo
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	v, e := s.current(r)
 	if errors.Is(e, pgx.ErrNoRows) {
-		respond(w, 200, map[string]any{"user": nil, "csrfToken": ""})
+		web.Respond(w, 200, map[string]any{"user": nil, "csrfToken": ""})
 		return
 	}
 	if e != nil {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
+	web.Respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
 }

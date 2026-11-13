@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestDanCourses(t *testing.T) {
@@ -51,7 +53,7 @@ func TestDanCourses(t *testing.T) {
 			catalogReads.Add(1)
 			mu.Lock()
 			defer mu.Unlock()
-			respond(w, 200, map[string]any{"titles": titles})
+			web.Respond(w, 200, map[string]any{"titles": titles})
 			return
 		}
 		if r.URL.Path != "/internal/v1/awards" || r.Header.Get("X-Service-ID") != "fanmade" || r.Header.Get("X-Service-Key") != strings.Repeat("k", 64) {
@@ -59,7 +61,7 @@ func TestDanCourses(t *testing.T) {
 			return
 		}
 		if reject.Load() {
-			respond(w, 422, map[string]string{"code": "AWARD_INVALID", "message": "奖励请求无效"})
+			web.Respond(w, 422, map[string]string{"code": "AWARD_INVALID", "message": "奖励请求无效"})
 			return
 		}
 		var request AwardRequest
@@ -67,7 +69,7 @@ func TestDanCourses(t *testing.T) {
 		mu.Lock()
 		asked = append(asked, request)
 		mu.Unlock()
-		respond(w, 200, map[string]any{"granted": map[string]any{"titles": request.Titles, "dan": request.Dan}, "nameplate": map[string]any{"userId": request.UserID}})
+		web.Respond(w, 200, map[string]any{"granted": map[string]any{"titles": request.Titles, "dan": request.Dan}, "nameplate": map[string]any{"userId": request.UserID}})
 	}))
 	defer profile.Close()
 	client, err := NewProfile(ProfileConfig{URL: profile.URL, ServiceID: "fanmade", ServiceKey: strings.Repeat("k", 64)})
@@ -78,13 +80,13 @@ func TestDanCourses(t *testing.T) {
 	handler := s.Handler()
 	game := map[string]string{}
 	for _, user := range []string{carol} {
-		token := ID() + ID()
-		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, hash("game:"+token), user); err != nil {
+		token := web.NewID() + web.NewID()
+		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user); err != nil {
 			t.Fatal(err)
 		}
 		game[user] = token
 	}
-	web := map[string]string{alice: seedWebSession(t, s, alice), boss: seedWebSession(t, s, boss), carol: seedWebSession(t, s, carol)}
+	webSessions := map[string]string{alice: seedWebSession(t, s, alice), boss: seedWebSession(t, s, boss), carol: seedWebSession(t, s, carol)}
 	requests := 0
 	call := func(method, path, body, user string, key ...string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -100,7 +102,7 @@ func TestDanCourses(t *testing.T) {
 		} else {
 			r.Header.Set("Origin", origin)
 			if user != "" {
-				r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: web[user]})
+				r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: webSessions[user]})
 				r.Header.Set("X-CSRF-Token", "csrf")
 			}
 		}
@@ -228,7 +230,7 @@ func TestDanCourses(t *testing.T) {
 	expect(call("POST", "/api/v1/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, "", "attempt-key-0001"), 401, nil)
 	attempt("attempt-key-0001", `{"courseId":"`+created.ID+`","verdict":7,"songsPlayed":2}`, 422)
 	attempt("attempt-key-0001", `{"courseId":"999","verdict":1,"songsPlayed":2}`, 422) // course IDs are 32 hex digits
-	attempt("attempt-key-0001", `{"courseId":"`+ID()+`","verdict":1,"songsPlayed":2}`, 404)
+	attempt("attempt-key-0001", `{"courseId":"`+web.NewID()+`","verdict":1,"songsPlayed":2}`, 404)
 	if !validID(created.ID) {
 		t.Fatal("course ID", created.ID)
 	}

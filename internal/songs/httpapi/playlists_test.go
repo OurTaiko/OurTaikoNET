@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 const (
@@ -425,7 +426,7 @@ func TestPlaylistCover(t *testing.T) {
 		c.handler.ServeHTTP(w, httptest.NewRequest("GET", path+query, nil))
 		return w
 	}
-	if w := get("?v=" + result.CoverHash); w.Code != 200 || w.Header().Get("Content-Type") != "image/webp" || hash(w.Body.String()) != result.CoverHash {
+	if w := get("?v=" + result.CoverHash); w.Code != 200 || w.Header().Get("Content-Type") != "image/webp" || web.Hash(w.Body.String()) != result.CoverHash {
 		t.Fatal("served cover", w.Code)
 	}
 	if w := get(""); w.Code != 404 {

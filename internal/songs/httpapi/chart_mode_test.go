@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
@@ -20,7 +22,7 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','doubletest','unused');`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','csrf',now()+interval '1 day'),($2,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, hash(token), hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','csrf',now()+interval '1 day'),($2,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()}).Handler()
@@ -45,7 +47,7 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: token})
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -89,7 +91,7 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		return string(data)
 	}
 	for i, d := range c.Difficulties {
-		key := ID()
+		key := web.NewID()
 		body := score(d.ID, 1000+i)
 		var v Score
 		if w := call("POST", "/api/v1/game/scores", body, key); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &v) != nil ||
@@ -100,13 +102,13 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 			t.Fatal("retry", w.Code, w.Body.String())
 		}
 	}
-	if w := call("POST", "/api/v1/game/scores", score(c.Difficulties[2].ID+1000, 2000), ID()); w.Code != 404 {
+	if w := call("POST", "/api/v1/game/scores", score(c.Difficulties[2].ID+1000, 2000), web.NewID()); w.Code != 404 {
 		t.Fatal("nonexistent block accepted", w.Code, w.Body.String())
 	}
-	if w := call("POST", "/api/v1/game/scores", score(0, 2000), ID()); w.Code != 422 {
+	if w := call("POST", "/api/v1/game/scores", score(0, 2000), web.NewID()); w.Code != 422 {
 		t.Fatal("missing block accepted", w.Code, w.Body.String())
 	}
-	if w := call("POST", "/api/v1/game/scores", `{"songId":"`+c.ID+`","difficulty":"Oni","good":1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":1}`, ID()); w.Code != 400 {
+	if w := call("POST", "/api/v1/game/scores", `{"songId":"`+c.ID+`","difficulty":"Oni","good":1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":1}`, web.NewID()); w.Code != 400 {
 		t.Fatal("retired score form accepted", w.Code, w.Body.String())
 	}
 	// Every block has its own leaderboard; the default is the first of the hardest course.

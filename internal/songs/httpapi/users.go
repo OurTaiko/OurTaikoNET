@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // PublicUser is intentionally separate from authenticated User: never add login
@@ -83,7 +84,7 @@ func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 			u.Nickname, u.AvatarURL = &p.Nickname, p.AvatarURL
 		}
 	}
-	respond(w, http.StatusOK, result)
+	web.Respond(w, http.StatusOK, result)
 }
 
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
@@ -176,5 +177,5 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	respond(w, http.StatusOK, result)
+	web.Respond(w, http.StatusOK, result)
 }

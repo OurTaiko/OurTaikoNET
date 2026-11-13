@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Collaboration is an invitation as its chart's owners see it. An accepted
@@ -91,7 +92,7 @@ func (s *Server) listCollaborations(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	respond(w, 200, map[string][]Collaboration{"items": items})
+	web.Respond(w, 200, map[string][]Collaboration{"items": items})
 }
 
 // invitationsPerDay bounds the new invitations one user sends in a day, on all charts together.
@@ -110,11 +111,11 @@ func invitationsLeft(ctx context.Context, db rowScanner, inviter string) (left i
 }
 
 func sendInvitation(ctx context.Context, tx pgx.Tx, chart, inviter, recipient string) (string, error) {
-	invitation := ID()
+	invitation := web.NewID()
 	_, e := tx.Exec(ctx, `INSERT INTO chart_collaborations(id,chart_id,inviter_id,recipient_id) VALUES($1,$2,$3,$4)`, invitation, chart, inviter, recipient)
 	if e == nil {
 		// Actionable invitations are always delivered, independently of social-notice mutes.
-		_, e = tx.Exec(ctx, `INSERT INTO notifications(id,recipient_id,kind,actor_id,chart_id,collaboration_id) VALUES($1,$2,'chart_collaboration',$3,$4,$5)`, ID(), recipient, inviter, chart, invitation)
+		_, e = tx.Exec(ctx, `INSERT INTO notifications(id,recipient_id,kind,actor_id,chart_id,collaboration_id) VALUES($1,$2,'chart_collaboration',$3,$4,$5)`, web.NewID(), recipient, inviter, chart, invitation)
 	}
 	return invitation, e
 }
@@ -252,7 +253,7 @@ func (s *Server) inviteCollaborator(w http.ResponseWriter, r *http.Request) {
 	var invitation string
 	e = tx.QueryRow(ctx, `SELECT id FROM chart_collaborations WHERE chart_id=$1 AND recipient_id=$2 AND status='pending'`, r.PathValue("id"), req.UserID).Scan(&invitation)
 	if e == nil {
-		respond(w, 200, map[string]string{"id": invitation, "status": "pending"})
+		web.Respond(w, 200, map[string]string{"id": invitation, "status": "pending"})
 		return
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
@@ -280,7 +281,7 @@ func (s *Server) inviteCollaborator(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 201, map[string]string{"id": invitation, "status": "pending"})
+	web.Respond(w, 201, map[string]string{"id": invitation, "status": "pending"})
 }
 
 // revokeCollaboration lets any owner withdraw a pending invitation, theirs or
@@ -325,7 +326,7 @@ func (s *Server) revokeCollaboration(w http.ResponseWriter, r *http.Request) {
 	}
 	switch status {
 	case "revoked":
-		respond(w, 200, map[string]string{"status": status})
+		web.Respond(w, 200, map[string]string{"status": status})
 		return
 	case "pending":
 	default:
@@ -343,7 +344,7 @@ func (s *Server) revokeCollaboration(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]string{"status": "revoked"})
+	web.Respond(w, 200, map[string]string{"status": "revoked"})
 }
 
 func (s *Server) respondCollaboration(w http.ResponseWriter, r *http.Request) {
@@ -430,7 +431,7 @@ func (s *Server) respondCollaboration(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]string{"status": desired})
+	web.Respond(w, 200, map[string]string{"status": desired})
 }
 
 // leaveChart lets an owner give up a co-owned chart. The last owner cannot
@@ -475,5 +476,5 @@ func (s *Server) leaveChart(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string][]string{"ownerIds": owners})
+	web.Respond(w, 200, map[string][]string{"ownerIds": owners})
 }

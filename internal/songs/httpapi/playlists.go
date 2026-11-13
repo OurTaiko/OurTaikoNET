@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Playlists are the same on both song sources: a player's own, private or public,
@@ -222,7 +223,7 @@ func (s *Server) listPlaylists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.playlistOwners(r.Context(), result.Items)
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +264,7 @@ func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.playlistOwners(ctx, result.Owned, result.Favorites)
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 // storedPlaylistSongs reads a playlist the requester may see and its song
@@ -333,5 +334,5 @@ func (s *Server) playlistDetail(w http.ResponseWriter, r *http.Request) {
 	p.Charts, p.ChartCount = charts, len(charts)
 	items := []Playlist{p}
 	s.playlistOwners(r.Context(), items)
-	respond(w, 200, items[0])
+	web.Respond(w, 200, items[0])
 }

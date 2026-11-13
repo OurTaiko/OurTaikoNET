@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Votes, comments, notifications, leaderboards and user pages, ported from
@@ -34,9 +35,9 @@ func officialInteractionFixture(t *testing.T) interactionWorld {
 	ctx := context.Background()
 	w := interactionWorld{c: c, s: s}
 	owner := testUsers["owner"].ID
-	err := pool.QueryRow(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,demo_end,created_at) VALUES($2,ARRAY[$1::text],'Song',120,0,0,now()-interval '2 days') RETURNING id`, owner, ID()).Scan(&w.song)
+	err := pool.QueryRow(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,demo_end,created_at) VALUES($2,ARRAY[$1::text],'Song',120,0,0,now()-interval '2 days') RETURNING id`, owner, web.NewID()).Scan(&w.song)
 	if err == nil {
-		err = pool.QueryRow(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,demo_end) VALUES($2,ARRAY[$1::text],'Other',120,0,0) RETURNING id`, owner, ID()).Scan(&w.other)
+		err = pool.QueryRow(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,demo_end) VALUES($2,ARRAY[$1::text],'Other',120,0,0) RETURNING id`, owner, web.NewID()).Scan(&w.other)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -524,7 +525,7 @@ func TestOfficialDanInteractions(t *testing.T) {
 	w := officialInteractionFixture(t)
 	c, s := w.c, w.s
 	ctx := context.Background()
-	danID := ID()
+	danID := web.NewID()
 	if _, err := s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,code,exams) VALUES($2,$1,'{"ja":"初段","en":"1st Dan"}','SHODAN','[]')`, testUsers["owner"].ID, danID); err != nil {
 		t.Fatal(err)
 	}
@@ -748,7 +749,7 @@ func TestPlaylistIDs(t *testing.T) {
 	if code := c.do("owner", "PATCH", path, `{"name":"Q"}`, &detail); code != 200 || detail.ID != p.ID || detail.Name != "Q" {
 		t.Fatal("edit", code, detail.ID)
 	}
-	for _, other := range []string{"1", "0123456789ABCDEF0123456789ABCDEF", ID()} {
+	for _, other := range []string{"1", "0123456789ABCDEF0123456789ABCDEF", web.NewID()} {
 		if code := c.do("", "GET", "/api/v1/playlists/"+other, "", nil); code != 404 {
 			t.Fatal("missing playlist", other, code)
 		}

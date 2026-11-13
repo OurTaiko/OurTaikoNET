@@ -3,11 +3,13 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestGameSessionIsolation(t *testing.T) {
@@ -93,7 +95,7 @@ func TestGameSessionIsolation(t *testing.T) {
 	if w := call("GET", "/api/v1/game/scores", "", webToken, "", ""); w.Code != 401 {
 		t.Fatal("browser token accepted as native token")
 	}
-	if _, err = pool.Exec(context.Background(), `UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, hash("game:"+result.AccessToken)); err != nil {
+	if _, err = pool.Exec(context.Background(), `UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, web.Hash("game:"+result.AccessToken)); err != nil {
 		t.Fatal(err)
 	}
 	if w := call("GET", "/api/v1/game/scores", "", result.AccessToken, "", ""); w.Code != 401 {

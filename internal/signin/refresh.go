@@ -9,6 +9,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // refresh renews the account center's tokens of the request's session when they are about to
@@ -20,7 +21,7 @@ func (s *Sessions) refresh(r *http.Request) (Session, error) {
 	if err != nil {
 		return v, pgx.ErrNoRows
 	}
-	digest := hash(cookie.Value)
+	digest := web.Hash(cookie.Value)
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 20*time.Second)
 	defer cancel()
 	tx, err := s.DB.Begin(ctx)

@@ -2,9 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -53,6 +50,18 @@ type Config struct {
 	// SessionCookie names the cookie a website session is kept in; empty is this site's own
 	// name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
 	SessionCookie string
+	// APIBase is the address clients reach this source's API at, up to but not including
+	// /charts and the like; empty is Origin + "/api/v1". Links this API gives to its own
+	// routes are built on it.
+	APIBase string
+}
+
+// apiBase is the address of this source's API (Config.APIBase).
+func (s *Server) apiBase() string {
+	if s.Config.APIBase != "" {
+		return s.Config.APIBase
+	}
+	return s.Config.Origin + "/api/v1"
 }
 
 func (s *Server) sessionCookie() string {
@@ -84,21 +93,8 @@ func New(pool *pgxpool.Pool, cfg Config) *Server {
 	}
 	return &Server{DB: pool, Config: cfg, uploads: make(chan struct{}, 2), pending: make(chan struct{}, maxPendingUploads), jobs: make(chan *uploadJob, maxPendingUploads), limits: map[string]window{}}
 }
-func ID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b)
-}
-func hash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
-func respond(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
 func problem(w http.ResponseWriter, status int, code, msg string) {
-	respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
+	web.Respond(w, status, map[string]any{"code": code, "message": msg, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
 }
 func internal(w http.ResponseWriter, err error) {
 	log.Printf("request=%s error=%v", w.Header().Get("X-Request-ID"), err)
@@ -123,7 +119,7 @@ func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) boo
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]bool{"ok": true}) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { web.Respond(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 		defer cancel()
@@ -131,10 +127,10 @@ func (s *Server) Handler() http.Handler {
 			internal(w, e)
 			return
 		}
-		respond(w, 200, map[string]bool{"ok": true})
+		web.Respond(w, 200, map[string]bool{"ok": true})
 	})
 	mux.HandleFunc("GET /api/v1/upload-rules", func(w http.ResponseWriter, r *http.Request) {
-		respond(w, 200, map[string]any{"validationVersion": tja.Version, "maxTjaBytes": tja.MaxTJA, "maxAudioBytes": tja.MaxAudio, "maxCoverBytes": cover.MaxBytes, "coverExtensions": []string{".jpg", ".png", ".webp"}, "encodings": []string{"utf-8"}, "audioCodecs": []string{"vorbis", "mp3"}, "audioExtensions": []string{".ogg", ".mp3"},
+		web.Respond(w, 200, map[string]any{"validationVersion": tja.Version, "maxTjaBytes": tja.MaxTJA, "maxAudioBytes": tja.MaxAudio, "maxCoverBytes": cover.MaxBytes, "coverExtensions": []string{".jpg", ".png", ".webp"}, "encodings": []string{"utf-8"}, "audioCodecs": []string{"vorbis", "mp3"}, "audioExtensions": []string{".ogg", ".mp3"},
 			"maxMovieBytes": video.MaxBytes, "movieExtensions": []string{".mp4", ".webm", ".mov"},
 			"movieOutput": map[string]any{"codec": "h264", "extension": "." + video.Extension, "maxWidth": video.MaxWidth, "maxHeight": video.MaxHeight, "maxFps": video.MaxFPS, "maxKbps": video.MaxKbps, "audio": false}})
 	})
@@ -235,7 +231,7 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux.HandleFunc("/", s.site)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Request-ID", ID())
+		w.Header().Set("X-Request-ID", web.NewID())
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")

@@ -10,13 +10,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestWebSessionRenewal(t *testing.T) {
 	pool := scoreTestDB(t)
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	ctx := context.Background()
-	id := ID()
+	id := web.NewID()
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id) VALUES($1)`, id); err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +28,7 @@ func TestWebSessionRenewal(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			respond(w, 200, map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys"})
+			web.Respond(w, 200, map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys"})
 		case "/token":
 			rotations.Add(1)
 			if err := r.ParseForm(); err != nil {
@@ -36,14 +38,14 @@ func TestWebSessionRenewal(t *testing.T) {
 				t.Error("incorrect renewal request")
 			}
 			if mode.Load() == 1 {
-				respond(w, 503, map[string]string{"error": "temporarily_unavailable"})
+				web.Respond(w, 503, map[string]string{"error": "temporarily_unavailable"})
 				return
 			}
 			if mode.Load() == 2 {
-				respond(w, 400, map[string]string{"error": "invalid_grant"})
+				web.Respond(w, 400, map[string]string{"error": "invalid_grant"})
 				return
 			}
-			respond(w, 200, map[string]any{"access_token": "access-new", "refresh_token": "refresh-new", "expires_in": 3600, "token_type": "Bearer"})
+			web.Respond(w, 200, map[string]any{"access_token": "access-new", "refresh_token": "refresh-new", "expires_in": 3600, "token_type": "Bearer"})
 		case "/internal/v1/web/introspect":
 			var in map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&in)
@@ -54,14 +56,14 @@ func TestWebSessionRenewal(t *testing.T) {
 			if in["accessToken"] != "access-new" {
 				t.Error("used expired credential")
 			}
-			respond(w, 200, map[string]any{"user": User{ID: id}})
+			web.Respond(w, 200, map[string]any{"user": User{ID: id}})
 		case "/internal/v1/web/revoke":
 			var in map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&in)
 			if in["refreshToken"] != "refresh-new" {
 				t.Error("logout failed to revoke latest refresh credential")
 			}
-			respond(w, 200, map[string]bool{"ok": true})
+			web.Respond(w, 200, map[string]bool{"ok": true})
 		default:
 			w.WriteHeader(404)
 		}
@@ -73,8 +75,8 @@ func TestWebSessionRenewal(t *testing.T) {
 	h := app.Handler()
 	seed := func() string {
 		t.Helper()
-		cookie := ID() + ID()
-		digest := hash(cookie)
+		cookie := web.NewID() + web.NewID()
+		digest := web.Hash(cookie)
 		_, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token,upstream_refresh_token,upstream_expires_at) VALUES($1,$2,'csrf',now()+interval '7 days',$3,$4,now()-interval '2 days')`, digest, id, app.Config.SSO.Seal("access-old", digest), app.Config.SSO.Seal("refresh-old", "refresh:"+digest))
 		if err != nil {
 			t.Fatal(err)
@@ -94,7 +96,7 @@ func TestWebSessionRenewal(t *testing.T) {
 	t.Run("parallel tabs renew once after days away", func(t *testing.T) {
 		cookie := seed()
 		var before, after time.Time
-		_ = pool.QueryRow(ctx, `SELECT expires_at FROM sessions WHERE token_hash=$1`, hash(cookie)).Scan(&before)
+		_ = pool.QueryRow(ctx, `SELECT expires_at FROM sessions WHERE token_hash=$1`, web.Hash(cookie)).Scan(&before)
 		var wg sync.WaitGroup
 		for range 12 {
 			wg.Go(func() {
@@ -109,10 +111,10 @@ func TestWebSessionRenewal(t *testing.T) {
 			t.Fatal("multiple rotations", rotations.Load())
 		}
 		var encrypted []byte
-		if err := pool.QueryRow(ctx, `SELECT expires_at,upstream_refresh_token FROM sessions WHERE token_hash=$1`, hash(cookie)).Scan(&after, &encrypted); err != nil {
+		if err := pool.QueryRow(ctx, `SELECT expires_at,upstream_refresh_token FROM sessions WHERE token_hash=$1`, web.Hash(cookie)).Scan(&after, &encrypted); err != nil {
 			t.Fatal(err)
 		}
-		plain, err := app.Config.SSO.Unseal(encrypted, "refresh:"+hash(cookie))
+		plain, err := app.Config.SSO.Unseal(encrypted, "refresh:"+web.Hash(cookie))
 		if err != nil || plain != "refresh-new" || !before.Equal(after) {
 			t.Fatal("lost rotation or extended absolute deadline")
 		}
@@ -142,14 +144,14 @@ func TestWebSessionRenewal(t *testing.T) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		var n int
-		_ = pool.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE token_hash=$1`, hash(cookie)).Scan(&n)
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE token_hash=$1`, web.Hash(cookie)).Scan(&n)
 		if n != 0 {
 			t.Fatal("invalid grant retained")
 		}
 	})
 	t.Run("seven day deadline is enforced", func(t *testing.T) {
 		cookie := seed()
-		_, err := pool.Exec(ctx, `UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, hash(cookie))
+		_, err := pool.Exec(ctx, `UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1`, web.Hash(cookie))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +165,7 @@ func TestWebSessionRenewal(t *testing.T) {
 	})
 	t.Run("revoked live access token cannot trigger renewal", func(t *testing.T) {
 		cookie := seed()
-		_, err := pool.Exec(ctx, `UPDATE sessions SET upstream_expires_at=now()+interval '1 hour' WHERE token_hash=$1`, hash(cookie))
+		_, err := pool.Exec(ctx, `UPDATE sessions SET upstream_expires_at=now()+interval '1 hour' WHERE token_hash=$1`, web.Hash(cookie))
 		if err != nil {
 			t.Fatal(err)
 		}

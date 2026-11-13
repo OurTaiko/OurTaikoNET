@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // The resource manifest lists the cover too, as Fanmade's does: the website's chart
@@ -12,7 +14,7 @@ func TestResourceManifestCover(t *testing.T) {
 	ctx := context.Background()
 	resource := func(extension string) (id int64, digest string) {
 		t.Helper()
-		digest = ID() + ID()
+		digest = web.NewID() + web.NewID()
 		if err := w.s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.'||$2,'a.'||$2,$1,7,$2) RETURNING id`, digest, extension).Scan(&id); err != nil {
 			t.Fatal(err)
 		}

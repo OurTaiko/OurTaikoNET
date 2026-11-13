@@ -13,6 +13,7 @@ import (
 
 	"ourtaiko.dev/net/internal/kit/tjatitles"
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestRekeyFiles(t *testing.T) {
@@ -31,7 +32,7 @@ func TestRekeyFiles(t *testing.T) {
 			app := testServer(t, pool, cfg)
 			put := func(key, data string) {
 				t.Helper()
-				if err := app.Config.Objects.Put(ctx, key, strings.NewReader(data), int64(len(data)), "application/octet-stream", hash(data)); err != nil {
+				if err := app.Config.Objects.Put(ctx, key, strings.NewReader(data), int64(len(data)), "application/octet-stream", web.Hash(data)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -60,11 +61,11 @@ func TestRekeyFiles(t *testing.T) {
  ('a',ARRAY[$1],'A',120,10,test_file('objects/a/1/tja','a.tja',$2,$4),test_file('objects/a/2/audio','Song.OGG',$5,11),
   test_file('covers/1/cover.webp','cover.webp',$6,11),test_file('previews/a/1/preview.ogg','preview.ogg',$7,13)),
  ('b',ARRAY[$1],'B',120,10,test_file('objects/b/1/tja','b.tja',$3,$4),test_file('objects/b/2/audio','Song.OGG',$5,11),NULL,NULL)`,
-				owner, hash(tjaOf("A")), hash(tjaOf("B")), len(tjaOf("A")), hash(audio), hash(cover), hash(preview))
+				owner, web.Hash(tjaOf("A")), web.Hash(tjaOf("B")), len(tjaOf("A")), web.Hash(audio), web.Hash(cover), web.Hash(preview))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = pool.Exec(ctx, `INSERT INTO upload_requests(user_id,idempotency_key,payload_digest,chart_id,tja_sha256,audio_sha256) VALUES($1,'receipt-for-song-a',repeat('a',64),'a',$2,$3)`, owner, hash(tjaOf("A")), hash(audio)); err != nil {
+			if _, err = pool.Exec(ctx, `INSERT INTO upload_requests(user_id,idempotency_key,payload_digest,chart_id,tja_sha256,audio_sha256) VALUES($1,'receipt-for-song-a',repeat('a',64),'a',$2,$3)`, owner, web.Hash(tjaOf("A")), web.Hash(audio)); err != nil {
 				t.Fatal(err)
 			}
 			for range 2 {
@@ -73,7 +74,7 @@ func TestRekeyFiles(t *testing.T) {
 				}
 				app.cleanupReplacedFiles()
 			}
-			wave := hash(audio) + ".ogg"
+			wave := web.Hash(audio) + ".ogg"
 			a, err := app.chart(ctx, "a")
 			if err != nil {
 				t.Fatal(err)
@@ -83,13 +84,13 @@ func TestRekeyFiles(t *testing.T) {
 				t.Fatal(err)
 			}
 			storedA := strings.Replace(tjaOf("A"), "Song.OGG", wave, 1)
-			if a.TJAHash != hash(storedA) || a.TJAKey != hash(storedA)+".tja" || a.TJAName != "a.tja" || a.Wave != wave || a.AudioName != "Song.OGG" || a.AudioHash != hash(audio) {
+			if a.TJAHash != web.Hash(storedA) || a.TJAKey != web.Hash(storedA)+".tja" || a.TJAName != "a.tja" || a.Wave != wave || a.AudioName != "Song.OGG" || a.AudioHash != web.Hash(audio) {
 				t.Fatalf("song a: %+v", a)
 			}
-			if a.AudioKey != wave || b.AudioKey != wave || b.TJAKey == a.TJAKey || !strings.HasSuffix(a.PreviewPath, hash(preview)+".ogg") {
+			if a.AudioKey != wave || b.AudioKey != wave || b.TJAKey == a.TJAKey || !strings.HasSuffix(a.PreviewPath, web.Hash(preview)+".ogg") {
 				t.Fatal("audio not shared or keys wrong", a.AudioKey, b.AudioKey, a.PreviewPath)
 			}
-			want := map[string]string{a.TJAKey: storedA, b.TJAKey: strings.Replace(tjaOf("B"), "Song.OGG", wave, 1), wave: audio, hash(cover) + ".webp": cover, hash(preview) + ".ogg": preview}
+			want := map[string]string{a.TJAKey: storedA, b.TJAKey: strings.Replace(tjaOf("B"), "Song.OGG", wave, 1), wave: audio, web.Hash(cover) + ".webp": cover, web.Hash(preview) + ".ogg": preview}
 			for key, data := range want {
 				if got, err := read(key); err != nil || got != data {
 					t.Fatal("object", key, err)

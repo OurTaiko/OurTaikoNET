@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestDifficultyMakersFlow(t *testing.T) {
@@ -19,7 +21,7 @@ func TestDifficultyMakersFlow(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('037c0ccac142bf8602cbbe373b9a6f16','makertest','unused')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day'),($2,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day')`, hash(token), hash("game:"+token)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day'),($2,'037c0ccac142bf8602cbbe373b9a6f16','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+token)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()}).Handler()
@@ -65,7 +67,7 @@ func TestDifficultyMakersFlow(t *testing.T) {
 		}
 		return c
 	}
-	original := decode(post("", ID()), 201)
+	original := decode(post("", web.NewID()), 201)
 	if original.Maker != "Original" {
 		t.Fatal(original.Maker)
 	}
@@ -74,7 +76,7 @@ func TestDifficultyMakersFlow(t *testing.T) {
 			t.Fatal(d)
 		}
 	}
-	previewKey := ID()
+	previewKey := web.NewID()
 	custom := map[string]string{"demoStart": "0.1", "demoEnd": "0.3"}
 	preview := decode(post("", previewKey, custom), 201)
 	if preview.DemoStart != 0.1 || preview.DemoEnd != 0.3 || preview.PreviewPath == "" {
@@ -87,12 +89,12 @@ func TestDifficultyMakersFlow(t *testing.T) {
 		t.Fatalf("range conflict: %d %s", w.Code, w.Body.String())
 	}
 	for _, fields := range []map[string]string{{"demoStart": "-1"}, {"demoStart": "NaN"}, {"demoEnd": "Inf"}, {"demoEnd": ""}, {"demoStart": "0.3", "demoEnd": "0.1"}, {"demoStart": "1200"}, {"demoEnd": "1216"}} {
-		if w := post("", ID(), fields); w.Code != 422 {
+		if w := post("", web.NewID(), fields); w.Code != 422 {
 			t.Fatalf("bad range accepted: %d %s", w.Code, w.Body.String())
 		}
 	}
 	makers := `[{"course":"Edit","side":"single","maker":"A"},{"course":"Hard","side":"single","maker":" A "},{"course":"Oni","side":"single","maker":"B"}]`
-	key := ID()
+	key := web.NewID()
 	c := decode(post(makers, key), 201)
 	if c.Maker != "A | B" {
 		t.Fatal(c.Maker)
@@ -110,11 +112,11 @@ func TestDifficultyMakersFlow(t *testing.T) {
 		t.Fatal("maker change must conflict", w.Code, w.Body.String())
 	}
 	for _, raw := range []string{`null`, `[]`, `{}`, `[{"course":"Hard","side":"single","maker":"A"}]`, `[{"course":"Hard","side":"single","maker":"A"},{"course":"Hard","side":"single","maker":"B"},{"course":"Edit","side":"single","maker":"C"}]`, `[{"course":"Hard","side":"single","maker":"A"},{"course":"Oni","side":"single","maker":"B"},{"course":"Missing","side":"single","maker":"C"}]`, `[{"course":"Hard","side":"single","maker":null},{"course":"Oni","side":"single","maker":"B"},{"course":"Edit","side":"single","maker":"C"}]`, strings.Replace(makers, `"B"`, `"B\nC"`, 1), strings.Replace(makers, `"B"`, `"`+strings.Repeat("界", 167)+`"`, 1)} {
-		if w := post(raw, ID()); w.Code != 422 {
+		if w := post(raw, web.NewID()); w.Code != 422 {
 			t.Fatalf("invalid %s: %d %s", raw, w.Code, w.Body.String())
 		}
 	}
-	blank := decode(post(`[{"course":"Hard","side":"single","maker":""},{"course":"Oni","side":"single","maker":" "},{"course":"Edit","side":"single","maker":""}]`, ID()), 201)
+	blank := decode(post(`[{"course":"Hard","side":"single","maker":""},{"course":"Oni","side":"single","maker":" "},{"course":"Edit","side":"single","maker":""}]`, web.NewID()), 201)
 	if blank.Maker != "" {
 		t.Fatal("blank should not fall back to original", blank.Maker)
 	}

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // An uploader who does not wait gets 202 and learns the outcome from a notice.
@@ -22,7 +24,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(cookie), owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 		t.Fatal(err)
 	}
 	app := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()})
@@ -100,11 +102,11 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	sound := part{"audio", "vorbis.ogg", audio}
 
 	// Fast checks still answer at once, without a notice.
-	if w := send("POST", "/api/v1/charts", ID(), part{"tja", "chart.tja", []byte("broken")}, sound); w.Code != 422 {
+	if w := send("POST", "/api/v1/charts", web.NewID(), part{"tja", "chart.tja", []byte("broken")}, sound); w.Code != 422 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Audio that does not decode rejects the whole upload: nothing is stored.
-	key := ID()
+	key := web.NewID()
 	accepted(send("POST", "/api/v1/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
 	if n := outcome(key); n.Data.Status != "failed" || n.Data.Code != "AUDIO_INVALID" || n.Data.Title != "Bad audio" || n.Chart != nil {
 		t.Fatalf("%+v", n)
@@ -120,7 +122,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	accepted(send("POST", "/api/v1/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
 
 	// A bad cover and a bad movie are left out; the chart is published and both are named.
-	key = ID()
+	key = web.NewID()
 	accepted(send("POST", "/api/v1/charts", key, chart("Partial", "BGMOVIE:clip.mp4\n"), sound,
 		part{"cover", "cover.png", []byte("not an image")}, part{"movie", "clip.mp4", []byte("not a video")}))
 	n := outcome(key)
@@ -140,7 +142,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	}
 
 	// A replacement is reported the same way and links to the chart.
-	key = ID()
+	key = web.NewID()
 	accepted(send("PUT", "/api/v1/charts/"+published.ID+"/files", key, chart("Replaced", ""), part{"confirmReset", "", []byte("true")}))
 	if n = outcome(key); n.Data.Status != "updated" || n.Chart == nil || *n.Chart != published.ID || len(n.Data.FailedFiles) != 0 {
 		t.Fatalf("%+v", n)

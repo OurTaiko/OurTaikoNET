@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Makers typed on the website, one per block, as on Fanmade: an upload, an edit and a
@@ -45,7 +46,7 @@ func TestDifficultyMakers(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = "10.8.200.1:1234"
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["admin"]})
 		rec := httptest.NewRecorder()

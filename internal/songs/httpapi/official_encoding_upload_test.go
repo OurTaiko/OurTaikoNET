@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"golang.org/x/text/encoding/japanese"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Uploads are UTF-8 only: the browser converts Shift-JIS and the rest first, and the form has
@@ -41,7 +42,7 @@ func TestUploadsAreUTF8Only(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = "10.8.200.1:1234"
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["admin"]})
 		rec := httptest.NewRecorder()

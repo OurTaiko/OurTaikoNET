@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestBackgroundMovie(t *testing.T) {
@@ -37,7 +38,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES($1,'tester','unused')`, owner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(cookie), owner); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(cookie), owner); err != nil {
 		t.Fatal(err)
 	}
 	cfg := Config{Origin: "http://localhost", Storage: t.TempDir()}
@@ -119,9 +120,9 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	sound, movie := part{"audio", "vorbis.ogg", audio}, part{"movie", "clip.mp4", clip}
 	withMovie := "BGMOVIE:clip.mp4\nMOVIEOFFSET:-0.5\n"
 
-	rejected(send("POST", "/api/v1/charts", ID(), tja("A", withMovie), sound, part{"movie", "other.mp4", clip}), 422, "TJA_MOVIE_MISMATCH")
-	rejected(send("POST", "/api/v1/charts", ID(), tja("A", ""), sound, movie), 400, "UPLOAD_FILES_INVALID")
-	rejected(send("POST", "/api/v1/charts", ID(), tja("A", "BGMOVIE:clip.avi\n"), sound, part{"movie", "clip.avi", clip}), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", withMovie), sound, part{"movie", "other.mp4", clip}), 422, "TJA_MOVIE_MISMATCH")
+	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", ""), sound, movie), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", "BGMOVIE:clip.avi\n"), sound, part{"movie", "clip.avi", clip}), 400, "UPLOAD_FILES_INVALID")
 	app.cleanupReplacedFiles()
 	var n int
 	if err = pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM charts)+(SELECT count(*) FROM chart_resources)+(SELECT count(*) FROM retired_files)`).Scan(&n); err != nil || n != 0 {
@@ -130,7 +131,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 
 	// A movie that cannot be decoded is left out; the chart is still published
 	// and its stored TJA no longer declares the movie.
-	partial := decode(send("POST", "/api/v1/charts", ID(), tja("Partial", withMovie), sound, part{"movie", "clip.mp4", []byte("not a video")}), 201)
+	partial := decode(send("POST", "/api/v1/charts", web.NewID(), tja("Partial", withMovie), sound, part{"movie", "clip.mp4", []byte("not a video")}), 201)
 	if partial.MovieHash != "" || len(partial.FailedFiles) != 1 || partial.FailedFiles[0] != (fileFailure{"movie", "MOVIE_INVALID"}) {
 		t.Fatalf("undecodable movie: %+v", partial)
 	}
@@ -156,16 +157,16 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	}
 	app.cleanupReplacedFiles()
 
-	key := ID()
+	key := web.NewID()
 	chart := decode(send("POST", "/api/v1/charts", key, tja("A", withMovie), sound, movie), 201)
-	if len(chart.MovieHash) != 64 || chart.MovieSize <= 0 || chart.MovieOffset != -0.5 || chart.MovieHash == hash(string(clip)) {
+	if len(chart.MovieHash) != 64 || chart.MovieSize <= 0 || chart.MovieOffset != -0.5 || chart.MovieHash == web.Hash(string(clip)) {
 		t.Fatalf("movie not recorded: %+v", chart)
 	}
 	if retry := decode(send("POST", "/api/v1/charts", key, tja("A", withMovie), sound, movie), 200); retry.ID != chart.ID || retry.MovieHash != chart.MovieHash {
 		t.Fatal("retry did not return the stored chart")
 	}
 	stored, err := read(chart.MovieHash + ".mp4")
-	if err != nil || hash(string(stored)) != chart.MovieHash || int64(len(stored)) != chart.MovieSize {
+	if err != nil || web.Hash(string(stored)) != chart.MovieHash || int64(len(stored)) != chart.MovieSize {
 		t.Fatal("stored movie", err)
 	}
 	// The stored movie is the silent, bounded re-encoding, not the upload.
@@ -257,11 +258,11 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		t.Fatal(err)
 	}
 	moviePath := "/api/v1/charts/" + chart.ID + "/movie"
-	rejected(send("PUT", moviePath, ID()), 400, "UPLOAD_FILES_INVALID")
-	rejected(send("PUT", moviePath, ID(), part{"movie", "clip.avi", otherClip}), 400, "UPLOAD_FILES_INVALID")
-	rejected(send("PUT", moviePath, ID(), part{"movieOffset", "", []byte("x")}, part{"movie", "o.mp4", otherClip}), 422, "TJA_MOVIE_OFFSET_INVALID")
-	rejected(send("PUT", moviePath, ID(), part{"movie", "o.mp4", []byte("not a video")}), 422, "MOVIE_INVALID")
-	swapped := decode(send("PUT", moviePath, ID(), part{"movie", "any name.webm", otherClip}), 200)
+	rejected(send("PUT", moviePath, web.NewID()), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("PUT", moviePath, web.NewID(), part{"movie", "clip.avi", otherClip}), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("PUT", moviePath, web.NewID(), part{"movieOffset", "", []byte("x")}, part{"movie", "o.mp4", otherClip}), 422, "TJA_MOVIE_OFFSET_INVALID")
+	rejected(send("PUT", moviePath, web.NewID(), part{"movie", "o.mp4", []byte("not a video")}), 422, "MOVIE_INVALID")
+	swapped := decode(send("PUT", moviePath, web.NewID(), part{"movie", "any name.webm", otherClip}), 200)
 	if len(swapped.MovieHash) != 64 || swapped.MovieHash == chart.MovieHash || swapped.MovieOffset != 2.5 || swapped.Title != "A" {
 		t.Fatalf("movie not replaced: %+v", swapped)
 	}
@@ -274,7 +275,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		t.Fatal("replaced TJA still stored", err)
 	}
 	// Back to the first movie, so the checks below see it.
-	chart = decode(send("PUT", moviePath, ID(), part{"movie", "clip.mp4", clip}, part{"movieOffset", "", []byte("-0.5")}), 200)
+	chart = decode(send("PUT", moviePath, web.NewID(), part{"movie", "clip.mp4", clip}, part{"movieOffset", "", []byte("-0.5")}), 200)
 	if chart.MovieOffset != -0.5 {
 		t.Fatalf("offset not sent with the movie: %+v", chart)
 	}
@@ -284,7 +285,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	files := "/api/v1/charts/" + chart.ID + "/files"
 	confirm := part{"confirmReset", "", []byte("true")}
 	originalKey := tjaKey(chart.ID)
-	kept := decode(send("PUT", files, ID(), tja("B", "BGMOVIE:renamed.webm\nMOVIEOFFSET:1.25\n"), confirm), 200)
+	kept := decode(send("PUT", files, web.NewID(), tja("B", "BGMOVIE:renamed.webm\nMOVIEOFFSET:1.25\n"), confirm), 200)
 	if kept.MovieHash != chart.MovieHash || kept.MovieOffset != 1.25 || kept.Title != "B" || tjaKey(kept.ID) == originalKey {
 		t.Fatalf("movie not kept: %+v", kept)
 	}
@@ -292,7 +293,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		t.Fatal("replacement TJA does not name the kept movie", err)
 	}
 	// Dropping BGMOVIE removes the movie; the offset falls back to zero.
-	plain := decode(send("PUT", files, ID(), tja("C", ""), confirm), 200)
+	plain := decode(send("PUT", files, web.NewID(), tja("C", ""), confirm), 200)
 	if plain.MovieHash != "" || plain.MovieSize != 0 || plain.MovieOffset != 0 {
 		t.Fatalf("movie not removed: %+v", plain)
 	}
@@ -302,13 +303,13 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	}
 	// A chart without BGMOVIE gains the headers after WAVE.
 	rejected(patch(`{"movieOffset":1}`), 422, "MOVIE_NOT_FOUND")
-	added := decode(send("PUT", moviePath, ID(), part{"movieOffset", "", []byte("0.75")}, part{"movie", "o.mp4", otherClip}), 200)
+	added := decode(send("PUT", moviePath, web.NewID(), part{"movieOffset", "", []byte("0.75")}, part{"movie", "o.mp4", otherClip}), 200)
 	if added.MovieHash != swapped.MovieHash || added.MovieOffset != 0.75 || added.Title != "C" {
 		t.Fatalf("movie not added: %+v", added)
 	}
 	declares(added.ID, "\nWAVE:"+added.AudioHash+".ogg\nBGMOVIE:"+added.MovieHash+".mp4\nMOVIEOFFSET:0.75\n")
 	// Adding it back and deleting the chart removes it again.
-	again := decode(send("PUT", files, ID(), tja("D", withMovie), confirm, movie), 200)
+	again := decode(send("PUT", files, web.NewID(), tja("D", withMovie), confirm, movie), 200)
 	if len(again.MovieHash) != 64 {
 		t.Fatal("movie not added by replacement")
 	}

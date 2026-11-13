@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Notification kinds the server emits, in the order the settings page lists
@@ -72,7 +73,7 @@ func notify(ctx context.Context, db execer, n Notice) error {
 	_, e = db.Exec(ctx, `INSERT INTO notifications(id,recipient_id,kind,actor_id,chart_id,dan_id,comment_id,data,dedupe_key)
 	 SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9 WHERE NOT EXISTS(SELECT 1 FROM notification_mutes WHERE user_id=$2 AND kind=$3)
 	 ON CONFLICT(recipient_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`,
-		ID(), n.Recipient, n.Kind, nullable(n.Actor), nullable(n.ChartID), nullable(n.DanID), nullable(n.CommentID), raw, nullable(n.DedupeKey))
+		web.NewID(), n.Recipient, n.Kind, nullable(n.Actor), nullable(n.ChartID), nullable(n.DanID), nullable(n.CommentID), raw, nullable(n.DedupeKey))
 	return e
 }
 
@@ -226,7 +227,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }
 
 func (s *Server) unreadNotifications(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +240,7 @@ func (s *Server) unreadNotifications(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]int{"count": count})
+	web.Respond(w, 200, map[string]int{"count": count})
 }
 
 // readAllNotifications marks the listed notices read, or all of them when the
@@ -269,7 +270,7 @@ func (s *Server) readAllNotifications(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) markNotification(w http.ResponseWriter, r *http.Request) {
@@ -296,7 +297,7 @@ func (s *Server) markNotification(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "NOTIFICATION_NOT_FOUND", "通知不存在")
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) dismissNotification(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +314,7 @@ func (s *Server) dismissNotification(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "NOTIFICATION_NOT_FOUND", "通知不存在")
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 type notificationSetting struct {
@@ -336,7 +337,7 @@ func (s *Server) writeNotificationSettings(w http.ResponseWriter, r *http.Reques
 	for i, kind := range notificationKinds {
 		items[i] = notificationSetting{kind, !slices.Contains(muted, kind)}
 	}
-	respond(w, 200, map[string]any{"items": items})
+	web.Respond(w, 200, map[string]any{"items": items})
 }
 
 func (s *Server) notificationSettings(w http.ResponseWriter, r *http.Request) {

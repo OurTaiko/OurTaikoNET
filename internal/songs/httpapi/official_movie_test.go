@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Background movies as on Fanmade: a replacement stores the movie transcoded under its hash
@@ -88,7 +89,7 @@ func TestBackgroundMovies(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		if async {
 			r.Header.Set("Prefer", "respond-async")
 		}
@@ -272,7 +273,7 @@ func TestBackgroundMovies(t *testing.T) {
 	r.Header.Set("Content-Type", form.FormDataContentType())
 	r.Header.Set("Origin", "http://localhost")
 	r.Header.Set("X-CSRF-Token", "csrf")
-	r.Header.Set("Idempotency-Key", ID())
+	r.Header.Set("Idempotency-Key", web.NewID())
 	r.RemoteAddr = "10.8.200.1:1234"
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens["admin"]})
 	rec := httptest.NewRecorder()

@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestCategoriesFlow(t *testing.T) {
@@ -25,7 +27,7 @@ func TestCategoriesFlow(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','testd46774d30dd1','unused'),('9b893bc6d9422c93536ff0df503b81e9','test9b893bc6d942','unused');`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($3,'9b893bc6d9422c93536ff0df503b81e9','csrf',now()+interval '1 day')`, hash(token), hash("game:"+gameToken), hash(otherToken)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($2,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day'),($3,'9b893bc6d9422c93536ff0df503b81e9','csrf',now()+interval '1 day')`, web.Hash(token), web.Hash("game:"+gameToken), web.Hash(otherToken)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: origin, Storage: t.TempDir()}).Handler()
@@ -94,13 +96,13 @@ func TestCategoriesFlow(t *testing.T) {
 	}
 	defaultIDs := []string{}
 	for _, raw := range []string{"", "[]", "null"} {
-		c := decodeChart(post(raw, ID()), 201)
+		c := decodeChart(post(raw, web.NewID()), 201)
 		defaultIDs = append(defaultIDs, c.ID)
 		if !reflect.DeepEqual(c.CategoryIDs, []string{"variety"}) {
 			t.Fatal("default", c.CategoryIDs)
 		}
 	}
-	key := ID()
+	key := web.NewID()
 	c := decodeChart(post(`["pop","anime","game","pop"]`, key), 201)
 	if !reflect.DeepEqual(c.CategoryIDs, []string{"anime", "game", "pop"}) {
 		t.Fatal(c.CategoryIDs)
@@ -117,7 +119,7 @@ func TestCategoriesFlow(t *testing.T) {
 		t.Fatal("category change reused upload key", w.Code, w.Body.String())
 	}
 	for _, raw := range []string{`"game"`, `["missing"]`, `[null]`, `[1]`, `{}`} {
-		if w = post(raw, ID()); w.Code != 422 {
+		if w = post(raw, web.NewID()); w.Code != 422 {
 			t.Fatal("invalid category accepted", raw, w.Code, w.Body.String())
 		}
 	}

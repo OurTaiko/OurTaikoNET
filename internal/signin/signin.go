@@ -8,9 +8,6 @@ package signin
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
@@ -23,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Sessions signs players in and reads their sessions for one part of the site.
@@ -57,16 +55,6 @@ type Session struct {
 	AccessExpires time.Time
 }
 
-func newID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b)
-}
-
-func hash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
-
 // DevUser is the only account of a server running without an account center.
 func DevUser(id string) account.User {
 	return account.User{ID: id, Username: "dev", Nickname: "本地开发用户", EmailVerified: true, IsAdmin: true}
@@ -82,7 +70,7 @@ func (s *Sessions) Local(r *http.Request) (Session, error) {
 	}
 	var encrypted, refresh []byte
 	var accessExpires *time.Time
-	e = s.DB.QueryRow(r.Context(), `SELECT user_id,csrf_token,upstream_token,upstream_refresh_token,upstream_expires_at FROM sessions WHERE token_hash=$1 AND expires_at>now()`, hash(c.Value)).Scan(&v.User.ID, &v.CSRF, &encrypted, &refresh, &accessExpires)
+	e = s.DB.QueryRow(r.Context(), `SELECT user_id,csrf_token,upstream_token,upstream_refresh_token,upstream_expires_at FROM sessions WHERE token_hash=$1 AND expires_at>now()`, web.Hash(c.Value)).Scan(&v.User.ID, &v.CSRF, &encrypted, &refresh, &accessExpires)
 	if e != nil {
 		return v, e
 	}
@@ -90,9 +78,9 @@ func (s *Sessions) Local(r *http.Request) (Session, error) {
 		// Development sessions carry no account-center credential.
 		return v, nil
 	}
-	v.Token, e = s.SSO.Unseal(encrypted, hash(c.Value))
+	v.Token, e = s.SSO.Unseal(encrypted, web.Hash(c.Value))
 	if e == nil && len(refresh) > 0 {
-		v.RefreshToken, e = s.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
+		v.RefreshToken, e = s.SSO.Unseal(refresh, "refresh:"+web.Hash(c.Value))
 	}
 	if accessExpires != nil {
 		v.AccessExpires = *accessExpires
@@ -171,8 +159,8 @@ func (s *Sessions) SetCookie(w http.ResponseWriter, raw string, expires time.Tim
 // when it ends. access and refresh are the account center's tokens for them, kept encrypted;
 // a development session (no account center) has none.
 func (s *Sessions) Open(ctx context.Context, user, access, refresh string, accessExpires time.Time) (string, time.Time, error) {
-	rawSession, csrf := newID()+newID(), newID()+newID()
-	digest := hash(rawSession)
+	rawSession, csrf := web.NewID()+web.NewID(), web.NewID()+web.NewID()
+	digest := web.Hash(rawSession)
 	expires := time.Now().Add(7 * 24 * time.Hour)
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
@@ -221,12 +209,12 @@ func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
 		s.Internal(w, e)
 		return
 	}
-	state, binding, nonce, verifier := newID()+newID(), newID()+newID(), newID()+newID(), oauth2.GenerateVerifier()
+	state, binding, nonce, verifier := web.NewID()+web.NewID(), web.NewID()+web.NewID(), web.NewID()+web.NewID(), oauth2.GenerateVerifier()
 	if _, e = s.DB.Exec(r.Context(), `DELETE FROM oidc_flows WHERE expires_at<now()`); e != nil {
 		s.Internal(w, e)
 		return
 	}
-	_, e = s.DB.Exec(r.Context(), `INSERT INTO oidc_flows(state_hash,binding_hash,nonce,verifier,return_path,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval '5 minutes')`, hash(state), hash(binding), nonce, verifier, destination)
+	_, e = s.DB.Exec(r.Context(), `INSERT INTO oidc_flows(state_hash,binding_hash,nonce,verifier,return_path,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval '5 minutes')`, web.Hash(state), web.Hash(binding), nonce, verifier, destination)
 	if e != nil {
 		s.Internal(w, e)
 		return
@@ -251,7 +239,7 @@ func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var nonce, verifier, destination string
-	e = s.DB.QueryRow(r.Context(), `DELETE FROM oidc_flows WHERE state_hash=$1 AND binding_hash=$2 AND expires_at>now() RETURNING nonce,verifier,return_path`, hash(state), hash(c.Value)).Scan(&nonce, &verifier, &destination)
+	e = s.DB.QueryRow(r.Context(), `DELETE FROM oidc_flows WHERE state_hash=$1 AND binding_hash=$2 AND expires_at>now() RETURNING nonce,verifier,return_path`, web.Hash(state), web.Hash(c.Value)).Scan(&nonce, &verifier, &destination)
 	http.SetCookie(w, &http.Cookie{Name: s.FlowCookie, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	if e != nil || r.URL.Query().Get("error") != "" || r.URL.Query().Get("code") == "" {
 		fail()
@@ -301,7 +289,7 @@ func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if old, e := r.Cookie(s.Cookie); e == nil {
-		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hash(old.Value))
+		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, web.Hash(old.Value))
 	}
 	s.SetCookie(w, rawSession, expires)
 	http.Redirect(w, r, s.Origin+s.SafeReturn(destination), http.StatusSeeOther)
@@ -322,16 +310,16 @@ func (s *Sessions) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 		c, _ := r.Cookie(s.Cookie)
 		var access, refresh []byte
-		e = s.DB.QueryRow(r.Context(), `DELETE FROM sessions WHERE token_hash=$1 RETURNING upstream_token,upstream_refresh_token`, hash(c.Value)).Scan(&access, &refresh)
+		e = s.DB.QueryRow(r.Context(), `DELETE FROM sessions WHERE token_hash=$1 RETURNING upstream_token,upstream_refresh_token`, web.Hash(c.Value)).Scan(&access, &refresh)
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 			s.Internal(w, e)
 			return
 		}
 		if e == nil && s.SSO != nil {
-			v.Token, _ = s.SSO.Unseal(access, hash(c.Value))
+			v.Token, _ = s.SSO.Unseal(access, web.Hash(c.Value))
 			v.RefreshToken = ""
 			if len(refresh) > 0 {
-				v.RefreshToken, _ = s.SSO.Unseal(refresh, "refresh:"+hash(c.Value))
+				v.RefreshToken, _ = s.SSO.Unseal(refresh, "refresh:"+web.Hash(c.Value))
 			}
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 			defer cancel()

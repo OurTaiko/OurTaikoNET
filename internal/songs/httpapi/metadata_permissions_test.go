@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestMetadataAuthorOrAdmin(t *testing.T) {
@@ -21,7 +23,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	}
 	tokens := map[string]string{"d46774d30dd13b92d9e536808da468a4": strings.Repeat("1", 64), "9b893bc6d9422c93536ff0df503b81e9": strings.Repeat("2", 64), "5f63f79d876d201a13f8710453636837": strings.Repeat("3", 64)}
 	for id, token := range tokens {
-		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, hash(token), id); err != nil {
+		if _, err = pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'csrf',now()+interval '1 day')`, web.Hash(token), id); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -95,7 +97,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	// Seed cover storage directly: editing display metadata must preserve it
 	// regardless of upload/audio validation and return the same hash as GET.
 	coverBytes := []byte("existing cover fixture")
-	coverHash := hash(string(coverBytes))
+	coverHash := web.Hash(string(coverBytes))
 	if err = os.WriteFile(filepath.Join(storage, "cover.webp"), coverBytes, 0600); err != nil {
 		t.Fatal(err)
 	}

@@ -18,6 +18,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestAudioPreviewWindow(t *testing.T) {
@@ -74,8 +75,8 @@ func testAudioStreamHTTP(t *testing.T, remote bool) {
 			if remote {
 				teststore.Seed(t, cfg.Objects.(*objectstore.S3), filename, data)
 			}
-			song, tjaID := ID(), ID()
-			digest := hash(string(data))
+			song, tjaID := web.NewID(), web.NewID()
+			digest := web.Hash(string(data))
 			tx, err := pool.Begin(ctx)
 			if err != nil {
 				t.Fatal(err)

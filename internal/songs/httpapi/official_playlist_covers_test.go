@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // A playlist's cover on this source: the website's image and the game's small JPEG are
@@ -67,7 +68,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 		c.handler.ServeHTTP(rec, httptest.NewRequest("GET", path+query, nil))
 		return rec
 	}
-	if rec := get("?v=" + result.CoverHash); rec.Code != 200 || rec.Header().Get("Content-Type") != "image/webp" || hash(rec.Body.String()) != result.CoverHash {
+	if rec := get("?v=" + result.CoverHash); rec.Code != 200 || rec.Header().Get("Content-Type") != "image/webp" || web.Hash(rec.Body.String()) != result.CoverHash {
 		t.Fatal("served cover", rec.Code)
 	}
 	if rec := get(""); rec.Code != 404 {
@@ -92,7 +93,7 @@ func TestOfficialPlaylistCover(t *testing.T) {
 
 	// Its folder in the game lists songs of the catalog: with a TJA and a category.
 	var tja, audio int64
-	digest := ID() + ID()
+	digest := web.NewID() + web.NewID()
 	e = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.tja','a.tja',$1,1,'tja') RETURNING id`, digest).Scan(&tja)
 	if e == nil {
 		e = s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.ogg','a.ogg',$1,1,'ogg') RETURNING id`, digest).Scan(&audio)

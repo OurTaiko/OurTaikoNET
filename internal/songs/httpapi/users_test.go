@@ -14,12 +14,13 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	pool := scoreTestDB(t)
 	ctx := context.Background()
-	id := ID()
+	id := web.NewID()
 	password, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 		t.Fatal("failed SSO auth marked active")
 	}
 	// Concurrent first observations create one row, retain one first-login value.
-	newID := ID()
+	newID := web.NewID()
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -151,7 +152,7 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 	}
 	app := testServer(t, pool, Config{})
 	// An SSO-only identity must never appear in the Fanmade directory.
-	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'SsoOnly','SSO独有','private-hash')`, ID()); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,nickname,password_hash) VALUES($1,'SsoOnly','SSO独有','private-hash')`, web.NewID()); err != nil {
 		t.Fatal(err)
 	}
 	for i, id := range ids[:14] {
@@ -175,7 +176,7 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 			t.Fatal(err)
 		}
 		for j := 0; j < 2; j++ {
-			if _, err = tx.Exec(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,payload_digest) VALUES($1,$2,test_slot($3,'Oni'),1,0,0,1000,0,1,repeat('a',64))`, ID(), ids[0], song); err != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,payload_digest) VALUES($1,$2,test_slot($3,'Oni'),1,0,0,1000,0,1,repeat('a',64))`, web.NewID(), ids[0], song); err != nil {
 				t.Fatal(err)
 			}
 		}

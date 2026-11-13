@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Regression tests run the production ID-only schema and real HTTP SSO bridge.
@@ -54,17 +55,17 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 				w.WriteHeader(401)
 				return
 			}
-			token := ID() + ID()
-			_, e = pool.Exec(r.Context(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, hash("game:"+token), u.ID)
+			token := web.NewID() + web.NewID()
+			_, e = pool.Exec(r.Context(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), u.ID)
 			if e != nil {
 				w.WriteHeader(503)
 				return
 			}
-			respond(w, 200, map[string]any{"user": u, "accessToken": token, "expiresIn": 86400})
+			web.Respond(w, 200, map[string]any{"user": u, "accessToken": token, "expiresIn": 86400})
 		case "/internal/v1/game/introspect", "/internal/v1/web/introspect":
 			var id string
 			if strings.Contains(r.URL.Path, "/game/") {
-				_ = pool.QueryRow(r.Context(), `SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at>now()`, hash("game:"+str("accessToken"))).Scan(&id)
+				_ = pool.QueryRow(r.Context(), `SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at>now()`, web.Hash("game:"+str("accessToken"))).Scan(&id)
 			} else {
 				v, ok := strings.CutPrefix(str("accessToken"), "web:")
 				if ok {
@@ -76,9 +77,9 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 				w.WriteHeader(401)
 				return
 			}
-			respond(w, 200, map[string]any{"user": u})
+			web.Respond(w, 200, map[string]any{"user": u})
 		case "/internal/v1/web/revoke":
-			respond(w, 200, map[string]bool{"ok": true})
+			web.Respond(w, 200, map[string]bool{"ok": true})
 		case "/internal/v1/users/lookup":
 			var ids []string
 			_ = json.Unmarshal(body["userIds"], &ids)
@@ -89,7 +90,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 					users = append(users, map[string]string{"id": u.ID, "nickname": u.Nickname})
 				}
 			}
-			respond(w, 200, map[string]any{"users": users})
+			web.Respond(w, 200, map[string]any{"users": users})
 		case "/internal/v1/users/search":
 			ids := []string{}
 			rows, e := pool.Query(r.Context(), `SELECT id FROM test_sso_users WHERE nickname ILIKE '%'||$1||'%'`, str("query"))
@@ -103,7 +104,7 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 				_ = rows.Scan(&id)
 				ids = append(ids, id)
 			}
-			respond(w, 200, map[string]any{"userIds": ids, "next": ""})
+			web.Respond(w, 200, map[string]any{"userIds": ids, "next": ""})
 		default:
 			w.WriteHeader(404)
 		}
@@ -140,8 +141,8 @@ func testServer(t *testing.T, pool *pgxpool.Pool, cfg Config) *Server {
 }
 func seedWebSession(t *testing.T, s *Server, id string) string {
 	t.Helper()
-	token := ID() + ID()
-	digest := hash(token)
+	token := web.NewID() + web.NewID()
+	digest := web.Hash(token)
 	_, e := s.DB.Exec(context.Background(), `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at,upstream_token) VALUES($1,$2,'csrf',now()+interval '1 day',$3)`, digest, id, s.Config.SSO.Seal("web:"+id, digest))
 	if e != nil {
 		t.Fatal(e)

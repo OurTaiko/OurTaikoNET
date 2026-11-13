@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/cover"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func (s *Server) getPlaylistCover(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(r.Context(), previous)
-	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
+	web.Respond(w, 200, map[string]string{"coverHash": web.Hash(string(encoded))})
 }
 
 func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
@@ -95,5 +96,5 @@ func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(r.Context(), previous)
-	respond(w, 200, map[string]string{"coverHash": ""})
+	web.Respond(w, 200, map[string]string{"coverHash": ""})
 }

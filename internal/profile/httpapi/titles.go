@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Title is one title of the catalog. Style names the game's title band. OwnerID is the player
@@ -148,7 +149,7 @@ func (s *Server) userNameplate(w http.ResponseWriter, r *http.Request) {
 	}
 	p, _, _ := s.profile(r.Context(), id)
 	plate.Nickname, plate.AvatarURL = p.Nickname, p.AvatarURL
-	respond(w, 200, plate)
+	web.Respond(w, 200, plate)
 }
 
 // nameplates is GET /api/v1/nameplates?ids=a,b,…: up to 100 players' titles and 段位 at once,
@@ -175,7 +176,7 @@ func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
 		}
 		plates[id] = plate
 	}
-	respond(w, 200, map[string]any{"nameplates": plates})
+	web.Respond(w, 200, map[string]any{"nameplates": plates})
 }
 
 // userProfile is GET /api/v1/users/{id}: who the player is, their nameplate and the services
@@ -197,7 +198,7 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plate.Nickname, plate.AvatarURL = p.Nickname, p.AvatarURL
-	respond(w, 200, map[string]any{
+	web.Respond(w, 200, map[string]any{
 		"user":              map[string]any{"id": id, "nickname": p.Nickname, "avatarUrl": p.AvatarURL},
 		"nameplate":         plate,
 		"sources":           s.Config.Sources,
@@ -228,7 +229,7 @@ func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"titles": titles})
+	web.Respond(w, 200, map[string]any{"titles": titles})
 }
 
 // HeldTitle is a title a player holds and what gave it.
@@ -266,7 +267,7 @@ func (s *Server) userTitles(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"titles": held})
+	web.Respond(w, 200, map[string]any{"titles": held})
 }
 
 // AwardRecord is one 段位 attempt that asked for awards.
@@ -328,7 +329,7 @@ func (s *Server) userDans(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"badges": badges, "history": history})
+	web.Respond(w, 200, map[string]any{"badges": badges, "history": history})
 }
 
 // wearNameplate is PUT /api/v1/me/nameplate {titleId: string|null, showDan}: one of the
@@ -372,7 +373,7 @@ func (s *Server) wearNameplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plate.Nickname, plate.AvatarURL = v.User.Nickname, v.User.AvatarURL
-	respond(w, 200, plate)
+	web.Respond(w, 200, plate)
 }
 
 // titleBody is a title as the website sends it.
@@ -424,7 +425,7 @@ func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, t)
+	web.Respond(w, 200, t)
 }
 
 func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
@@ -440,7 +441,7 @@ func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 // createOwnTitle is POST /api/v1/me/titles {name, nameTranslations, description, style}: a
@@ -481,7 +482,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,official,owner_id) VALUES($1,$2,$3,$4,$5,false,$6)
- RETURNING `+titleColumns, ID(), body.Name, translations, body.Description, body.Style, v.User.ID))
+ RETURNING `+titleColumns, web.NewID(), body.Name, translations, body.Description, body.Style, v.User.ID))
 	if err != nil {
 		internal(w, err)
 		return
@@ -490,7 +491,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 201, t)
+	web.Respond(w, 201, t)
 }
 
 // saveOwnTitle is PUT /api/v1/me/titles/{id}, the same body: the maker changes a community
@@ -540,7 +541,7 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, t)
+	web.Respond(w, 200, t)
 }
 
 // deleteOwnTitle is DELETE /api/v1/me/titles/{id}: the maker removes a community title. The
@@ -569,7 +570,7 @@ func (s *Server) deleteOwnTitle(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 type grantBody struct {
@@ -609,7 +610,7 @@ func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 	}
 	granted, _ := json.Marshal(map[string]any{"titles": []string{body.TitleID}, "by": v.User.ID})
 	var award int64
-	if err = tx.QueryRow(r.Context(), `INSERT INTO awards(service,request_key,user_id,granted) VALUES('admin',$1,$2,$3) RETURNING id`, ID(), body.UserID, granted).Scan(&award); err != nil {
+	if err = tx.QueryRow(r.Context(), `INSERT INTO awards(service,request_key,user_id,granted) VALUES('admin',$1,$2,$3) RETURNING id`, web.NewID(), body.UserID, granted).Scan(&award); err != nil {
 		internal(w, err)
 		return
 	}
@@ -621,7 +622,7 @@ func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) revokeTitle(w http.ResponseWriter, r *http.Request) {
@@ -641,5 +642,5 @@ func (s *Server) revokeTitle(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "GRANT_NOT_FOUND", "该用户没有这个称号")
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }

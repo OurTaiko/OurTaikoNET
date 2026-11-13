@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 const (
@@ -124,5 +125,5 @@ func (s *Server) scoreReplay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	profile := s.publicProfiles(r.Context(), []string{v.UserID})[v.UserID]
-	respond(w, 200, map[string]any{"score": v, "nickname": profile.Nickname, "avatarUrl": profile.AvatarURL, "replay": json.RawMessage(replay)})
+	web.Respond(w, 200, map[string]any{"score": v, "nickname": profile.Nickname, "avatarUrl": profile.AvatarURL, "replay": json.RawMessage(replay)})
 }

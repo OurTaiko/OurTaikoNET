@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // A chart's leaderboard, as on Fanmade: each block (course and side) ranks on
@@ -125,5 +126,5 @@ func (s *Server) leaderboard(w http.ResponseWriter, r *http.Request) {
 		p := profiles[result.Items[i].UserID]
 		result.Items[i].Nickname, result.Items[i].AvatarURL = p.Nickname, p.AvatarURL
 	}
-	respond(w, 200, result)
+	web.Respond(w, 200, result)
 }

@@ -164,12 +164,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	officialProfile.UseTransport(catalog)
 
 	a.Fanmade = songs.New(fanmadePool, songs.Config{
-		Source: songs.Fanmade, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
+		Source: songs.Fanmade, Origin: cfg.Origin, APIBase: cfg.Origin + "/api/v1/sources/fanmade", Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: fanmadeProfile, Awards: sourceAwards{a.Players, "fanmade"}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
 	a.Official = songs.New(officialPool, songs.Config{
-		Source: songs.Official, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
+		Source: songs.Official, Origin: cfg.Origin, APIBase: cfg.Origin + "/api/v1/sources/official", Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: officialProfile, Awards: sourceAwards{a.Players, "official"}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
 	})

@@ -21,6 +21,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 type stagedFile struct {
@@ -318,12 +319,12 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		// RFC 7240: the client asks not to wait for processing.
 		async: strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async"), done: make(chan uploadResult, 1),
 	}
-	accepted = s.acceptUpload(w, r, job, hash(strings.Join(parts, "\n")), nil)
+	accepted = s.acceptUpload(w, r, job, web.Hash(strings.Join(parts, "\n")), nil)
 }
 
 // invalidTJA answers an upload whose TJA has an issue.
 func invalidTJA(w http.ResponseWriter, issue *tja.Issue) {
-	respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
+	web.Respond(w, 422, map[string]any{"code": issue.Code, "message": issue.Message, "errors": []*tja.Issue{issue}, "requestId": w.Header().Get("X-Request-ID"), "validationVersion": tja.Version})
 }
 
 // normalizedTJA reads an uploaded TJA as UTF-8 text. From here on the file is known by that
@@ -340,7 +341,7 @@ func normalizedTJA(w http.ResponseWriter, tf *stagedFile) ([]byte, bool) {
 		invalidTJA(w, issue)
 		return nil, false
 	}
-	tf.sha = hash(string(data))
+	tf.sha = web.Hash(string(data))
 	return data, true
 }
 

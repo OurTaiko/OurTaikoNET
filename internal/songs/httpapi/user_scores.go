@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // UserScore is one row of a player's public score list: a play, the song's title and the
@@ -125,5 +126,5 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": userScorePageSize, "view": view, "sort": sort})
+	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": userScorePageSize, "view": view, "sort": sort})
 }

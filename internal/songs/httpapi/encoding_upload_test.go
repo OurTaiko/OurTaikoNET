@@ -18,6 +18,7 @@ import (
 	"golang.org/x/text/encoding/japanese"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/tjatitles"
+	"ourtaiko.dev/net/internal/web"
 )
 
 func TestUploadStoresCanonicalUTF8(t *testing.T) {
@@ -27,7 +28,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO users(id,username,password_hash) VALUES('89b6ef3a5cb57b6e04f74711d15a8a5f','tester','unused')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, hash(cookie)); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'89b6ef3a5cb57b6e04f74711d15a8a5f','csrf',now()+interval '1 day')`, web.Hash(cookie)); err != nil {
 		t.Fatal(err)
 	}
 	handler := testServer(t, pool, Config{Origin: "http://localhost", Storage: t.TempDir()}).Handler()
@@ -41,8 +42,8 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Stored bytes differ from the normalized upload only in the WAVE header.
-	stored, ok := tja.SetWave(canonical, hash(string(audio))+".mp3")
-	if !ok || !bytes.Contains(stored, []byte("\r\nWAVE:"+hash(string(audio))+".mp3\r\nCOURSE:Oni\r\n")) {
+	stored, ok := tja.SetWave(canonical, web.Hash(string(audio))+".mp3")
+	if !ok || !bytes.Contains(stored, []byte("\r\nWAVE:"+web.Hash(string(audio))+".mp3\r\nCOURSE:Oni\r\n")) {
 		t.Fatal("WAVE header not rewritten in place")
 	}
 	post := func(data []byte, key string, fields ...string) *httptest.ResponseRecorder {
@@ -74,7 +75,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 		{"UTF-8 BOM", append([]byte("\uFEFF"), canonical...)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			key := ID()
+			key := web.NewID()
 			w := post(tc.data, key)
 			var chart Chart
 			if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &chart) != nil {
@@ -130,7 +131,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 		})
 	}
 	// Uploads are UTF-8 only: the browser converts Shift-JIS and the rest first.
-	w := post(sjis, ID())
+	w := post(sjis, web.NewID())
 	if w.Code != 422 || !strings.Contains(w.Body.String(), "TJA_ENCODING_INVALID") {
 		t.Fatal("Shift-JIS must be refused", w.Code, w.Body.String())
 	}
@@ -138,10 +139,10 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 	// range the request itself names must lie within the audio.
 	late := bytes.Replace(canonical, []byte("BPM:120\r\n"), []byte("BPM:120\r\nDEMOSTART:9999\r\n"), 1)
 	var started Chart
-	if w = post(late, ID()); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &started) != nil || started.DemoStart != 0 || started.DemoEnd != 15 {
+	if w = post(late, web.NewID()); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &started) != nil || started.DemoStart != 0 || started.DemoEnd != 15 {
 		t.Fatal("DEMOSTART past the audio", w.Code, w.Body.String())
 	}
-	if w = post(late, ID(), "demoStart", "9999"); w.Code != 422 || !strings.Contains(w.Body.String(), "PREVIEW_RANGE_INVALID") {
+	if w = post(late, web.NewID(), "demoStart", "9999"); w.Code != 422 || !strings.Contains(w.Body.String(), "PREVIEW_RANGE_INVALID") {
 		t.Fatal("a range sent past the audio", w.Code, w.Body.String())
 	}
 	// The package names the chart as the site does once its names are edited there; the
@@ -178,7 +179,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 	}
 	// The encoding field is gone, whatever it says.
 	for _, encoding := range []string{"utf-8", "shift-jis"} {
-		if w = post(canonical, ID(), "encoding", encoding); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
+		if w = post(canonical, web.NewID(), "encoding", encoding); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
 			t.Fatal("encoding field accepted", encoding, w.Code, w.Body.String())
 		}
 	}

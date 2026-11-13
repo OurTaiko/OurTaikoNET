@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // A replacement's preview reads the new TJA block by block against the stored
@@ -74,7 +75,7 @@ func TestReplacementPreview(t *testing.T) {
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		r.Header.Set("Idempotency-Key", ID())
+		r.Header.Set("Idempotency-Key", web.NewID())
 		r.RemoteAddr = fmt.Sprintf("10.9.%d.1:1234", w.c.n.Add(1)&255)
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_db_session", Value: w.c.tokens[user]})
 		rec := httptest.NewRecorder()

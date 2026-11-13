@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // A 段位 course takes votes and comments like a song: its own tallies, the
@@ -10,7 +12,7 @@ import (
 func TestDanInteractions(t *testing.T) {
 	c, s := interactionFixture(t)
 	ctx := context.Background()
-	dan := ID()
+	dan := web.NewID()
 	if _, err := s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,code,exams) VALUES($1,'d46774d30dd13b92d9e536808da468a4','{"ja":"初段","en":"1st Dan"}','SHODAN','[]')`, dan); err != nil {
 		t.Fatal(err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // replaceMovie sets a chart's background movie apart from its other files, as replaceCover
@@ -132,14 +133,14 @@ func (s *Server) replaceMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	job := &uploadJob{
-		user: u.User.ID, key: ID(), dir: dir, existingID: c.ID, movie: movie, movieOnly: true,
+		user: u.User.ID, key: web.NewID(), dir: dir, existingID: c.ID, movie: movie, movieOnly: true,
 		meta:  tja.Metadata{Title: c.Title, MovieOffset: offset},
 		async: strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async"), done: make(chan uploadResult, 1),
 	}
 	accepted = true
 	s.enqueue(job)
 	if job.async {
-		respond(w, 202, map[string]string{"status": "processing"})
+		web.Respond(w, 202, map[string]string{"status": "processing"})
 		return
 	}
 	result := <-job.done
@@ -151,7 +152,7 @@ func (s *Server) replaceMovie(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	respond(w, 200, result.chart)
+	web.Respond(w, 200, result.chart)
 }
 
 // processMovie transcodes a job's movie and makes it the chart's, unlike an upload rejecting
@@ -263,7 +264,7 @@ func (s *Server) rewriteStoredTJA(ctx context.Context, tx pgx.Tx, chartID string
 	if err = errors.Join(err, staged.Close()); err != nil {
 		return 0, nil, err
 	}
-	tjaFile, err := s.storeFile(ctx, tx, staged.Name(), name, "tja", "application/octet-stream", hash(string(stored)), int64(len(stored)))
+	tjaFile, err := s.storeFile(ctx, tx, staged.Name(), name, "tja", "application/octet-stream", web.Hash(string(stored)), int64(len(stored)))
 	if err != nil {
 		return 0, nil, err
 	}

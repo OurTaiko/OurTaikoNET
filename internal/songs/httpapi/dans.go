@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // 段位 courses in the format of OurTaikoPlay's .otdan.json (OurTaikoLogs DanDojo.md): one to
@@ -391,7 +392,7 @@ func (s *Server) listDans(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"dans": courses})
+	web.Respond(w, 200, map[string]any{"dans": courses})
 }
 
 func (s *Server) danDetail(w http.ResponseWriter, r *http.Request) {
@@ -416,7 +417,7 @@ func (s *Server) danDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	respond(w, 200, courses[0])
+	web.Respond(w, 200, courses[0])
 }
 
 func (s *Server) saveDanSongs(ctx context.Context, tx pgx.Tx, course string, songs []danSongRow) error {
@@ -491,7 +492,7 @@ func (s *Server) createDan(w http.ResponseWriter, r *http.Request) {
 			code = ""
 		}
 	}
-	id = ID()
+	id = web.NewID()
 	if _, err = tx.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,color,code,exams,rewards) VALUES($7,$1,$2,$3,$4,$5,$6)`, u.User.ID, titleJSON, in.Color, code, exams, rewards, id); err != nil {
 		internal(w, err)
 		return
@@ -509,7 +510,7 @@ func (s *Server) createDan(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 201, courses[0])
+	web.Respond(w, 201, courses[0])
 }
 
 // ownDan is the course (and its maker) for its owner or an administrator to change.
@@ -577,7 +578,7 @@ func (s *Server) updateDan(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, courses[0])
+	web.Respond(w, 200, courses[0])
 }
 
 // deleteDan takes a course off the lists; its attempts stay recorded.
@@ -590,7 +591,7 @@ func (s *Server) deleteDan(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
 // markDanOfficial is PUT /api/v1/dans/{id}/official {official}: administrators only.
@@ -618,7 +619,7 @@ func (s *Server) markDanOfficial(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "DAN_NOT_FOUND", "段位不存在")
 		return
 	}
-	respond(w, 200, map[string]bool{"official": body.Official})
+	web.Respond(w, 200, map[string]bool{"official": body.Official})
 }
 
 // gameDans is GET /api/v1/game/dans: the official courses for the game's list, which finds
@@ -630,7 +631,7 @@ func (s *Server) gameDans(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"dans": courses, "danVersion": 1})
+	web.Respond(w, 200, map[string]any{"dans": courses, "danVersion": 1})
 }
 
 // gameDanByCode is GET /api/v1/game/dans/{code}: one published course, official or not, by
@@ -651,7 +652,7 @@ func (s *Server) gameDanByCode(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "DAN_NOT_FOUND", "段位不存在")
 		return
 	}
-	respond(w, 200, courses[0])
+	web.Respond(w, 200, courses[0])
 }
 
 // danPlayable: every song of the course is still the block it was set up on.
@@ -791,10 +792,10 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 	}
 	c := courses[0]
 	// An attempt without scores digests as before they were sent with it.
-	digest := hash(strings.Join([]string{body.CourseID, strconv.Itoa(body.Verdict), strconv.Itoa(played)}, "|"))
+	digest := web.Hash(strings.Join([]string{body.CourseID, strconv.Itoa(body.Verdict), strconv.Itoa(played)}, "|"))
 	if together {
 		payload, _ := json.Marshal(body.Scores)
-		digest = hash(digest + "|" + string(payload))
+		digest = web.Hash(digest + "|" + string(payload))
 	}
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
@@ -823,7 +824,7 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 			if score == nil {
 				continue
 			}
-			id, err := s.saveDanAttemptScore(ctx, tx, u.User.ID, hash("dan-score:"+key+":"+strconv.Itoa(i)), score)
+			id, err := s.saveDanAttemptScore(ctx, tx, u.User.ID, web.Hash("dan-score:"+key+":"+strconv.Itoa(i)), score)
 			if err != nil {
 				internal(w, err)
 				return
@@ -831,7 +832,7 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 			ids[i] = id
 		}
 		err = tx.QueryRow(ctx, `INSERT INTO dan_attempts(id,course_id,user_id,idempotency_key,payload_digest,verdict,songs_played) VALUES($1,$2,$3,$4,$5,$6,$7)
- RETURNING id,course_id,verdict,songs_played,submitted_at`, ID(), course, u.User.ID, key, digest, body.Verdict, ids).Scan(&a.ID, &a.CourseID, &a.Verdict, &a.ScoreIDs, &a.SubmittedAt)
+ RETURNING id,course_id,verdict,songs_played,submitted_at`, web.NewID(), course, u.User.ID, key, digest, body.Verdict, ids).Scan(&a.ID, &a.CourseID, &a.Verdict, &a.ScoreIDs, &a.SubmittedAt)
 		if err == nil && !together && played > 0 {
 			err = tx.QueryRow(ctx, `UPDATE dan_attempts a SET songs_played=dan_attempt_scores(a.id) WHERE a.id=$1 RETURNING songs_played`, a.ID).Scan(&a.ScoreIDs)
 		}
@@ -906,7 +907,7 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 			reply["profile"] = answer
 		}
 	}
-	respond(w, 200, reply)
+	web.Respond(w, 200, reply)
 }
 
 // saveDanAttemptScore saves a score that came with its attempt, under the key the attempt gives
@@ -931,7 +932,7 @@ func (s *Server) saveDanAttemptScore(ctx context.Context, tx pgx.Tx, user, key s
 	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
 	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
-		ID(), user, v.DifficultyID, *v.Good, *v.OK, *v.Bad, *v.Score, *v.Drumroll, *v.MaxCombo, key, hash(string(payload)), v.ReplayData, v.ClearStatus, v.adLibValue(), v.Mines).Scan(&id)
+		web.NewID(), user, v.DifficultyID, *v.Good, *v.OK, *v.Bad, *v.Score, *v.Drumroll, *v.MaxCombo, key, web.Hash(string(payload)), v.ReplayData, v.ClearStatus, v.adLibValue(), v.Mines).Scan(&id)
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/groups"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // The manage panel's part about players' groups. Only the site's administrator (the account
@@ -17,7 +18,7 @@ func (s *Server) groupCatalog(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
 		return
 	}
-	respond(w, 200, map[string]any{"groups": groups.All()})
+	web.Respond(w, 200, map[string]any{"groups": groups.All()})
 }
 
 // groupMembers is GET /api/v1/admin/users: the players who are in any group, or with
@@ -42,7 +43,7 @@ func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"users": members})
+	web.Respond(w, 200, map[string]any{"users": members})
 }
 
 // giveGroups is PUT /api/v1/admin/users/{id}/groups with {"groups": ["OFFICIAL_MANAGER", …]}:
@@ -87,5 +88,5 @@ func (s *Server) giveGroups(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"user": groups.Member{ID: id, Groups: set.Names(), Bits: set}, "before": before.Names()})
+	web.Respond(w, 200, map[string]any{"user": groups.Member{ID: id, Groups: set.Names(), Bits: set}, "before": before.Names()})
 }

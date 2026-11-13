@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"testing"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Liked Songs and Recently Acclaimed, as on Fanmade: Liked Songs is the viewer's own and
@@ -12,7 +14,7 @@ func TestSystemPlaylists(t *testing.T) {
 	c, ctx := w.c, context.Background()
 	// System playlists list charts of the game catalog only: with a TJA and a category.
 	var tja, audio int64
-	digest := ID() + ID()
+	digest := web.NewID() + web.NewID()
 	err := w.s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.tja','a.tja',$1,1,'tja') RETURNING id`, digest).Scan(&tja)
 	if err == nil {
 		err = w.s.DB.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1||'.ogg','a.ogg',$1,1,'ogg') RETURNING id`, digest).Scan(&audio)
