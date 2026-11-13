@@ -217,7 +217,7 @@ func (s *Server) listPlaylists(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "QUERY_INVALID", "顺序必须为 updated / newest / favorites")
 		return
 	}
-	// The plaza leaves out playlists without a published chart; one user's list shows them all.
+	// The plaza leaves out playlists without a public song; a user's own page lists them all.
 	const filter = ` WHERE p.is_public AND ($2='' OR position(lower($2) in lower(p.name||' '||p.description))>0)
  AND (CASE WHEN $3='' THEN ` + playlistChartCount + `>0 ELSE p.owner_id=$3 END)`
 	tx, e := s.DB.BeginTx(r.Context(), pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})

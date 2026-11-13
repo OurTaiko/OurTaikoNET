@@ -14,7 +14,7 @@ type systemPlaylist struct {
 	category              CategoryFlags
 	// personal lists depend on the viewer and do not exist for a guest.
 	personal bool
-	// query selects chart IDs from charts c in playlist order; a personal
+	// query selects song IDs from charts c in playlist order; a personal
 	// query takes the viewer as $1.
 	query string
 }

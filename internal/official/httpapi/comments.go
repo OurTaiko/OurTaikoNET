@@ -28,7 +28,7 @@ const (
 // by an administrator keeps its place while replies remain, without author or text.
 type Comment struct {
 	ID string `json:"id"`
-	// A comment hangs on a chart or on a 段位 course; the other is empty.
+	// A comment hangs on a song or on a 段位 course; the other is empty.
 	ChartID         string            `json:"chartId,omitempty"`
 	ChartTitle      string            `json:"chartTitle,omitempty"`
 	DanID           string            `json:"danId,omitempty"`
@@ -180,7 +180,7 @@ func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string
 	items := []*Comment{}
 	for rows.Next() {
 		c := &Comment{Replies: []*Comment{}}
-		var chartID, danID, chartTitle *string
+		var chartID, chartTitle, danID *string
 		var danTitle []byte
 		dest := []any{&c.ID, &chartID, &danID, &c.ParentID, &c.Depth, &c.AuthorID, &c.Body, &c.CreatedAt, &c.EditedAt, &c.Deleted, &c.Removed, &c.Score, &c.ReplyCount, &c.MyVote}
 		if withTitle {

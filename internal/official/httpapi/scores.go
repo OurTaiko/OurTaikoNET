@@ -13,7 +13,7 @@ import (
 
 // Pointers distinguish required zero-valued counts from missing/null fields.
 type scoreSubmission struct {
-	// The chart_difficulties row of the block that was really played (R020).
+	// The chart_difficulties row of the block that was really played.
 	DifficultyID int64           `json:"difficultyId"`
 	Good         *int64          `json:"good"`
 	OK           *int64          `json:"ok"`
@@ -22,10 +22,10 @@ type scoreSubmission struct {
 	Drumroll     *int64          `json:"drumroll"`
 	MaxCombo     *int64          `json:"max_combo"`
 	ReplayData   json.RawMessage `json:"replay_data,omitempty"`
-	// Omitted when zero, as the Fanmade digest does.
+	// Omit zero from the digest to preserve retries of pre-ClearStatus requests.
 	ClearStatus int `json:"ClearStatus,omitempty"`
-	// Ad-Libs hit as [良, 可] and mines hit, outside good/ok/bad (R056); optional, and left out of
-	// the digest when zero for the same reason (normalize turns [0,0] into nil).
+	// Ad-Libs hit as [良, 可] and mines hit, outside good/ok/bad; optional, and left out of the
+	// digest when zero for the same reason (normalize turns [0,0] into nil).
 	AdLib []int64 `json:"adlib,omitempty"`
 	Mines int64   `json:"mines,omitempty"`
 }
@@ -45,10 +45,10 @@ type Score struct {
 	Drumroll     int64  `json:"drumroll"`
 	MaxCombo     int64  `json:"max_combo"`
 	ClearStatus  int    `json:"ClearStatus"`
-	// [良, 可] of the Ad-Libs hit and the mines hit (R056); zero for plays from before they were kept.
+	// [良, 可] of the Ad-Libs hit and the mines hit; zero for plays from before they were kept.
 	AdLib [2]int64 `json:"adlib"`
 	Mines int64    `json:"mines"`
-	// False once the chart's TJA or audio was replaced after this play (R022).
+	// False once the song's TJA or audio was replaced after this play.
 	IsLatest    bool      `json:"isLatest"`
 	SubmittedAt time.Time `json:"submittedAt"`
 	// The play's recording is kept: GET /api/v1/scores/{id}/replay.

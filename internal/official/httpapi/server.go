@@ -62,8 +62,7 @@ type Server struct {
 	DB      *pgxpool.Pool
 	Config  Config
 	uploads chan struct{}
-	// Accepted uploads (as Fanmade's): pending bounds how many wait with staged files, jobs
-	// feeds the one worker that processes them.
+	// Accepted uploads: pending bounds how many wait with staged files.
 	pending chan struct{}
 	jobs    chan *uploadJob
 	worker  sync.Once

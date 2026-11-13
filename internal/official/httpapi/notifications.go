@@ -17,8 +17,8 @@ import (
 // them. A new event registers its kind here and calls notify. As on Fanmade.
 var notificationKinds = []string{
 	"comment_reply",   // someone replied to the recipient's comment
-	"chart_comment",   // someone commented on the recipient's chart
-	"chart_upvotes",   // the recipient's chart reached an upvote milestone
+	"chart_comment",   // someone commented on the recipient's song
+	"chart_upvotes",   // the recipient's song reached an upvote milestone
 	"dan_comment",     // someone commented on the recipient's 段位 course
 	"dan_upvotes",     // the recipient's course reached an upvote milestone
 	"comment_upvotes", // the recipient's comment reached an upvote milestone
@@ -37,7 +37,8 @@ var upvoteMilestones = []int{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 100
 
 // Notice is one event for one recipient. Empty or zero IDs mean "not linked".
 type Notice struct {
-	Recipient, Kind, Actor, CommentID, ChartID, DanID string
+	// DanID links a 段位 course instead of a song.
+	Recipient, Kind, Actor, ChartID, CommentID, DanID string
 	// DedupeKey makes the event notify the recipient at most once.
 	DedupeKey string
 	Data      map[string]any
@@ -183,8 +184,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	actors := []string{}
 	for rows.Next() {
 		var n Notification
-		var actor, chartTitle, commentID, parentID, excerpt *string
-		var chartID *string
+		var actor, chartID, chartTitle, commentID, parentID, excerpt *string
 		var danID *string
 		var danTitle []byte
 		if e = rows.Scan(&n.ID, &n.Kind, &n.CreatedAt, &n.Read, &actor, &chartID, &chartTitle, &danID, &danTitle, &commentID, &parentID, &excerpt, &n.Data); e != nil {

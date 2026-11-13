@@ -19,7 +19,8 @@ type leaderboardEntry struct {
 }
 
 type leaderboardResponse struct {
-	SongID       string             `json:"songId"`
+	SongID string `json:"songId"`
+	// The ranked block; each block of a song has its own leaderboard.
 	DifficultyID int64              `json:"difficultyId"`
 	Course       string             `json:"course"`
 	Side         string             `json:"side"`

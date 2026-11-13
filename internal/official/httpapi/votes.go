@@ -15,7 +15,7 @@ type voteRequest struct {
 // VoteResult is the target's tally after the viewer's vote was applied.
 type VoteResult struct {
 	Score int `json:"score"`
-	// Only charts and courses publish their separate counts; comments show the score alone.
+	// Only songs publish their separate counts; comments show the score alone.
 	Upvotes   *int `json:"upvotes,omitempty"`
 	Downvotes *int `json:"downvotes,omitempty"`
 	MyVote    int  `json:"myVote"`

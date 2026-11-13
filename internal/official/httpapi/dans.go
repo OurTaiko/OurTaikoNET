@@ -75,7 +75,7 @@ type DanCourse struct {
 	Owner     string          `json:"owner"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
-	// Votes and comments as on charts; MyVote is only filled on the detail page.
+	// Votes and comments as on songs; MyVote is only filled on the detail page.
 	Score        int `json:"score"`
 	Upvotes      int `json:"upvotes"`
 	Downvotes    int `json:"downvotes"`

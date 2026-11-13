@@ -396,9 +396,7 @@ func (s *Server) FailInterruptedUploads(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	type interrupted struct {
-		user, key, title, chart string
-	}
+	type interrupted struct{ user, key, title, chart string }
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (v interrupted, e error) {
 		e = row.Scan(&v.user, &v.key, &v.title, &v.chart)
 		return

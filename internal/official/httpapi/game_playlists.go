@@ -17,7 +17,8 @@ type GamePlaylist struct {
 	Kind    string `json:"kind"`
 	OwnerID string `json:"ownerId,omitempty"`
 	Owner   string `json:"owner"`
-	// Cover is the folder's JPEG at its CDN address; left out without one.
+	// Cover is the JPEG for the folder; only servers with direct downloads
+	// (resourceDownloadVersion 1) provide it.
 	Cover    *resourceLink `json:"cover,omitempty"`
 	ChartIDs []string      `json:"chartIds"`
 	// The stored game cover, resolved to Cover after the snapshot.

@@ -21,7 +21,7 @@ type PublicUser struct {
 	ChartCount   int64      `json:"chartCount"`
 	ScoreCount   int64      `json:"scoreCount"`
 	CommentCount int64      `json:"commentCount"`
-	// Karma counts other users' votes on the user's charts, courses and comments.
+	// Karma counts other users' votes on the user's songs and comments.
 	Karma int64 `json:"karma"`
 	// PlaylistCount counts public playlists only.
 	PlaylistCount int64 `json:"playlistCount"`
