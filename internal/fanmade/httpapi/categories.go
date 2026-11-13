@@ -24,7 +24,7 @@ const (
 	CategoryGame          CategoryFlags = 1
 	CategoryVirtualSinger CategoryFlags = 2
 	CategoryPop           CategoryFlags = 4
-	CategoryClassic       CategoryFlags = 8
+	CategoryClassics      CategoryFlags = 8
 	CategoryVariety       CategoryFlags = 16
 	CategoryAnime         CategoryFlags = 32
 )
@@ -37,7 +37,7 @@ var categoryCatalog = [...]struct {
 	{CategoryGame, Category{"game", "Game", "GAME"}},
 	{CategoryVirtualSinger, Category{"virtual-singer", "Virtual Singer", "VOCALOID"}},
 	{CategoryPop, Category{"pop", "Pop", "J-POP"}},
-	{CategoryClassic, Category{"classic", "Classic", "CLASSICAL"}},
+	{CategoryClassics, Category{"classic", "Classic", "CLASSICAL"}},
 	{CategoryVariety, Category{"variety", "Variety", "VARIETY"}},
 	{CategoryAnime, Category{"anime", "Anime", "ANIME"}},
 }

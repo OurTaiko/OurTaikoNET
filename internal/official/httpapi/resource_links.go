@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
@@ -106,4 +108,19 @@ type resourceLink struct {
 	SHA256      string `json:"sha256"`
 	Size        int64  `json:"size"`
 	ContentType string `json:"contentType"`
+}
+
+// directLink is the public address of an object, or one signed for 15 minutes
+// when the bucket has no public address.
+func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, digest string, size int64) (resourceLink, error) {
+	public, e := remote.PublicURL(key)
+	if e != nil || public != "" {
+		return resourceLink{public, public, digest, size, media}, e
+	}
+	get, e := remote.Sign(ctx, key, "GET", name, media, 15*time.Minute)
+	if e != nil {
+		return resourceLink{}, e
+	}
+	head, e := remote.Sign(ctx, key, "HEAD", name, media, 15*time.Minute)
+	return resourceLink{get, head, digest, size, media}, e
 }

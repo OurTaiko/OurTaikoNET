@@ -8,7 +8,8 @@ import (
 )
 
 // systemPlaylist is a playlist the server computes on request. Its ID is a
-// plain word, which no stored playlist ID (32 hex digits) can equal.
+// plain word, which no stored playlist ID (32 hex digits) can equal. The category
+// only chooses the folder artwork.
 type systemPlaylist struct {
 	id, name, description string
 	category              CategoryFlags
@@ -21,7 +22,7 @@ type systemPlaylist struct {
 
 // Only songs of the game catalog are listed, so the website and the game show
 // the same songs.
-const systemChart = publishedChart + ` AND c.category_flags<>0`
+const systemChart = playableChart + ` AND c.category_flags<>0`
 
 // Names are English like the category titles; the website translates them by ID.
 var systemPlaylists = []systemPlaylist{
@@ -31,7 +32,7 @@ var systemPlaylists = []systemPlaylist{
 	{"popular", "Popular This Week", "The 20 most played songs of the last 7 days.", CategoryGame, false,
 		`SELECT c.id FROM charts c JOIN (SELECT d.chart_id AS song_id,count(*) AS plays FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id WHERE sc.submitted_at>now()-interval '7 days' GROUP BY d.chart_id) played ON played.song_id=c.id
  WHERE ` + systemChart + ` ORDER BY played.plays DESC,c.created_at DESC,c.id LIMIT 20`},
-	{"acclaimed", "Recently Acclaimed", "The 20 best rated songs uploaded in the last 30 days.", CategoryClassic, false,
+	{"acclaimed", "Recently Acclaimed", "The 20 best rated songs uploaded in the last 30 days.", CategoryClassics, false,
 		`SELECT c.id FROM charts c WHERE ` + systemChart + ` AND c.created_at>now()-interval '30 days' AND ` + chartScoreSQL + `>0
  ORDER BY ` + chartScoreSQL + ` DESC,c.created_at DESC,c.id LIMIT 20`},
 	// The date seeds the draw, so everyone gets the same ten songs until midnight in China.

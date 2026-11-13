@@ -36,7 +36,7 @@ func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "COVER_NOT_FOUND", "该封面已被替换")
 		return
 	}
-	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
+	s.serveCover(w, r, digest, key)
 }
 
 func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	file, err := s.storeImage(ctx, tx, encoded)
+	file, err := s.storeCover(ctx, tx, encoded)
 	if err == nil {
 		_, err = tx.Exec(ctx, `UPDATE charts SET cover_file=$2 WHERE id=$1`, c.ID, file)
 	}
@@ -103,7 +103,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeImage stores an encoded WebP cover and returns its file ID.
-func (s *Server) storeImage(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
+func (s *Server) storeCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
 	return s.storeImageAs(ctx, tx, "cover", data, "webp", "image/webp")
 }
 
@@ -156,4 +156,28 @@ func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 		return nil, false
 	}
 	return encoded, true
+}
+
+// storeGameCover stores the copy of a playlist's cover that the game shows.
+func (s *Server) storeGameCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
+	return s.storeImageAs(ctx, tx, "cover", data, cover.GameExtension, cover.GameMediaType)
+}
+
+// serveCover sends a cover image, or redirects to its CDN address.
+func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, digest, key string) {
+	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
+}
+
+// releaseCovers deletes a playlist's former cover files unless something
+// still refers to them; a failure leaves them for the next release.
+func (s *Server) releaseCovers(ctx context.Context, covers []*int64) {
+	ids := []int64{}
+	for _, id := range covers {
+		if id != nil {
+			ids = append(ids, *id)
+		}
+	}
+	if e := s.releaseFiles(context.WithoutCancel(ctx), ids); e != nil {
+		log.Printf("playlist cover cleanup pending: %v", e)
+	}
 }

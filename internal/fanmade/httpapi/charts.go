@@ -400,3 +400,20 @@ func canManage(u User, c Chart) bool {
 }
 
 const pageSize = 24
+
+// playlistCharts reads public songs in the order of ids.
+func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
+	rows, e := s.DB.Query(ctx, chartSelect+` JOIN unnest($1::text[]) WITH ORDINALITY listed(id,ord) ON listed.id=c.id WHERE `+publishedChart+` ORDER BY listed.ord`, ids)
+	if e != nil {
+		return nil, e
+	}
+	charts, e := s.readCharts(rows)
+	if e == nil {
+		e = s.coverHashes(ctx, charts)
+	}
+	if e != nil {
+		return nil, e
+	}
+	s.chartNames(ctx, charts)
+	return charts, nil
+}

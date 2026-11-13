@@ -34,17 +34,19 @@ def get(base, path, host=None):
 
 
 IGNORED = set()
+# Fields left out of the answers to one question only: {path: {field}}.
+IGNORED_IN = {}
 
 
-def without_ignored(value):
+def without_ignored(value, fields):
     if isinstance(value, dict):
-        return {k: without_ignored(v) for k, v in value.items() if k not in IGNORED}
+        return {k: without_ignored(v, fields) for k, v in value.items() if k not in fields}
     if isinstance(value, list):
-        return [without_ignored(v) for v in value]
+        return [without_ignored(v, fields) for v in value]
     return value
 
 
-def parsed(body):
+def parsed(body, path=""):
     try:
         value = json.loads(body)
     except ValueError:
@@ -52,7 +54,7 @@ def parsed(body):
     # An error names the request it answers with a random id: never the same twice.
     if isinstance(value, dict) and "code" in value:
         value.pop("requestId", None)
-    return without_ignored(value)
+    return without_ignored(value, IGNORED | IGNORED_IN.get(path, set()))
 
 
 def where(a, b, path=""):
@@ -92,11 +94,17 @@ def main():
                    help="a question not asked, because its answer differs on purpose")
     p.add_argument("--ignore", action="append", default=[], metavar="FIELD",
                    help="a field left out of the comparison wherever it appears, because it differs on purpose")
+    p.add_argument("--ignore-in", action="append", default=[], metavar="PATH:FIELD",
+                   help="a field left out of the answers to one question only, because it differs on purpose")
     args = p.parse_args()
 
     if bool(args.source) == args.players:
         p.error("give either --source or --players")
     IGNORED.update(args.ignore)
+    for item in args.ignore_in:
+        path, _, field = item.rpartition(":")
+        IGNORED_IN.setdefault(path, set()).add(field)
+    on_purpose = ", ".join(sorted(IGNORED) + args.skip + [f"{f} of {q}" for q in sorted(IGNORED_IN) for f in sorted(IGNORED_IN[q])])
     # A source's routes are under its name at the new address; players' routes are not under any.
     new_prefix = "/api/v1" if args.players else f"/api/v1/sources/{args.source}"
     asked = 0
@@ -112,9 +120,9 @@ def main():
             "old address": get(args.new, "/api/v1" + path, args.legacy_host),
             "new address": get(args.new, new_prefix + path),
         }
-        old = parsed(old_body)
+        old = parsed(old_body, path)
         for name, (status, body) in answers.items():
-            new = parsed(body)
+            new = parsed(body, path)
             if status != old_status:
                 differing.append(f"{path} [{name}]: status {old_status} against {status}")
             elif old != new:
@@ -132,7 +140,7 @@ def main():
                          "/scores?view=best&source=fanmade", "/scores?view=all&source=official", "/scores?view=all&page=2"):
                 ask(f"/users/{user}{path}")
         print(f"players: {len(args.user)} players, {asked} questions asked three ways, {len(differing)} differences"
-              + (f" (left out as different on purpose: {', '.join(sorted(IGNORED) + args.skip)})" if IGNORED or args.skip else ""))
+              + (f" (left out as different on purpose: {on_purpose})" if on_purpose else ""))
         for line in differing[: args.show]:
             print("  " + line)
         if len(differing) > args.show:
@@ -193,7 +201,7 @@ def main():
         ask(f"/users/{user}/comments")
 
     print(f"{args.source}: {len(charts)} charts in the catalog, {asked} questions asked three ways, {len(differing)} differences"
-          + (f" (left out as different on purpose: {', '.join(sorted(IGNORED) + args.skip)})" if IGNORED or args.skip else ""))
+          + (f" (left out as different on purpose: {on_purpose})" if on_purpose else ""))
     for line in differing[: args.show]:
         print("  " + line)
     if len(differing) > args.show:

@@ -331,7 +331,9 @@ func TestPlaylistLifecycle(t *testing.T) {
 func TestPlaylistLimits(t *testing.T) {
 	c, s := interactionFixture(t)
 	ctx := context.Background()
-	if _, e := s.DB.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,is_public) SELECT 'p'||n,$1,'List '||n,true FROM generate_series(1,$2) n`, playlistOwner, maxPlaylists-1); e != nil {
+	// Stored playlists have ids of 32 hex digits; these are 1, 2, … padded with zeros.
+	firstListed := strings.Repeat("0", 31) + "1"
+	if _, e := s.DB.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,is_public) SELECT lpad(n::text,32,'0'),$1,'List '||n,true FROM generate_series(1,$2) n`, playlistOwner, maxPlaylists-1); e != nil {
 		t.Fatal(e)
 	}
 	// Concurrent creations cannot exceed the limit.
@@ -358,17 +360,17 @@ func TestPlaylistLimits(t *testing.T) {
  SELECT 'c'||n,ARRAY[$1::text],'Song '||n,120,10,test_file('song/tja','a.tja',repeat('a',64),14),test_file('song/audio','a.ogg',repeat('a',64),14) FROM generate_series(1,$2) n`, playlistOwner, maxPlaylistItems); e != nil {
 		t.Fatal(e)
 	}
-	if _, e := s.DB.Exec(ctx, `INSERT INTO playlist_items(playlist_id,chart_id,position) SELECT 'p1','c'||n,n FROM generate_series(1,$1) n`, maxPlaylistItems); e != nil {
+	if _, e := s.DB.Exec(ctx, `INSERT INTO playlist_items(playlist_id,chart_id,position) SELECT lpad('1',32,'0'),'c'||n,n FROM generate_series(1,$1) n`, maxPlaylistItems); e != nil {
 		t.Fatal(e)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/p1/items/song", `{}`, nil); code != 409 {
+	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/song", `{}`, nil); code != 409 {
 		t.Fatal("add to a full playlist", code)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/p1/items/c7", `{}`, nil); code != 200 {
+	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/c7", `{}`, nil); code != 200 {
 		t.Fatal("existing song of a full playlist", code)
 	}
 	var p Playlist
-	if code := c.do("", "GET", "/api/v1/playlists/p1", "", &p); code != 200 || len(p.Charts) != maxPlaylistItems || p.Charts[0].ID != "c1" || p.Charts[maxPlaylistItems-1].ID != fmt.Sprint("c", maxPlaylistItems) {
+	if code := c.do("", "GET", "/api/v1/playlists/"+firstListed, "", &p); code != 200 || len(p.Charts) != maxPlaylistItems || p.Charts[0].ID != "c1" || p.Charts[maxPlaylistItems-1].ID != fmt.Sprint("c", maxPlaylistItems) {
 		t.Fatal("full playlist", code, len(p.Charts))
 	}
 	var page PlaylistPage

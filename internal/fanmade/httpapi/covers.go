@@ -249,3 +249,19 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 	s.cleanupReplacedFiles()
 	respond(w, 200, map[string]string{"coverHash": hash(string(encoded))})
 }
+
+// storeGameCover stores the copy of a playlist's cover that the game shows.
+func (s *Server) storeGameCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
+	return s.storeImage(ctx, tx, data, cover.GameExtension, cover.GameMediaType)
+}
+
+// releaseCovers deletes a playlist's former cover files unless something still
+// refers to them. This source sweeps for every file nothing refers to.
+func (s *Server) releaseCovers(_ context.Context, covers []*int64) {
+	for _, id := range covers {
+		if id != nil {
+			s.cleanupReplacedFiles()
+			return
+		}
+	}
+}

@@ -122,10 +122,14 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 
 // lockOwnPlaylist locks a playlist for the rest of tx and reports whether the
 // user owns it. Others see a private playlist as missing.
-func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, id, user string) bool {
+func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, raw, user string) (string, bool) {
+	id, valid := playlistID(raw)
 	var owner string
 	var public bool
-	e := tx.QueryRow(ctx, `SELECT owner_id,is_public FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &public)
+	e := pgx.ErrNoRows
+	if valid {
+		e = tx.QueryRow(ctx, `SELECT owner_id,is_public FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &public)
+	}
 	switch {
 	case e != nil && !errors.Is(e, pgx.ErrNoRows):
 		internal(w, e)
@@ -134,33 +138,34 @@ func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, id, 
 	case owner != user:
 		problem(w, 403, "FORBIDDEN", "只能修改自己的歌单")
 	default:
-		return true
+		return id, true
 	}
-	return false
+	return "", false
 }
 
 // ownPlaylist runs change in a transaction holding the user's playlist. change
 // reports false after it has written its own error response.
-func (s *Server) ownPlaylist(w http.ResponseWriter, r *http.Request, user string, change func(tx pgx.Tx) (bool, error)) bool {
+func (s *Server) ownPlaylist(w http.ResponseWriter, r *http.Request, user string, change func(tx pgx.Tx, id string) (bool, error)) (string, bool) {
 	ctx := r.Context()
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		internal(w, e)
-		return false
+		return "", false
 	}
 	defer tx.Rollback(ctx)
-	if !lockOwnPlaylist(w, ctx, tx, r.PathValue("id"), user) {
-		return false
+	id, ok := lockOwnPlaylist(w, ctx, tx, r.PathValue("id"), user)
+	if !ok {
+		return "", false
 	}
-	ok, e := change(tx)
+	ok, e = change(tx, id)
 	if e == nil && ok {
 		e = tx.Commit(ctx)
 	}
 	if e != nil {
 		internal(w, e)
-		return false
+		return "", false
 	}
-	return ok
+	return id, ok
 }
 
 func (s *Server) editPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -181,16 +186,16 @@ func (s *Server) editPlaylist(w http.ResponseWriter, r *http.Request) {
 		category = &flag
 	}
 	// An empty description clears it; only an absent field keeps the old value.
-	ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx) (bool, error) {
+	id, ok := s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
 		_, e := tx.Exec(r.Context(), `UPDATE playlists SET name=COALESCE($2,name),description=COALESCE($3,description),
  is_public=COALESCE($4,is_public),category_flag=COALESCE($5,category_flag),updated_at=now() WHERE id=$1`,
-			r.PathValue("id"), body.Name, body.Description, body.Public, category)
+			id, body.Name, body.Description, body.Public, category)
 		return true, e
 	})
 	if !ok {
 		return
 	}
-	s.respondPlaylist(w, r, 200, u.User.ID, r.PathValue("id"))
+	s.respondPlaylist(w, r, 200, u.User.ID, id)
 }
 
 // deletePlaylist lets the owner delete a playlist, and an administrator a
@@ -200,7 +205,8 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
+	ctx := r.Context()
+	id, valid := playlistID(r.PathValue("id"))
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		internal(w, e)
@@ -208,8 +214,12 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 	var owner, name string
-	var public, cover bool
-	e = tx.QueryRow(ctx, `SELECT owner_id,name,is_public,cover_file IS NOT NULL FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &name, &public, &cover)
+	var public bool
+	var covers []*int64
+	e = pgx.ErrNoRows
+	if valid {
+		e = tx.QueryRow(ctx, `SELECT owner_id,name,is_public,ARRAY[cover_file,game_cover_file] FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &name, &public, &covers)
+	}
 	if errors.Is(e, pgx.ErrNoRows) || (e == nil && owner != u.User.ID && !public) {
 		problem(w, 404, "PLAYLIST_NOT_FOUND", "歌单不存在或未公开")
 		return
@@ -233,9 +243,7 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	if cover {
-		s.cleanupReplacedFiles()
-	}
+	s.releaseCovers(ctx, covers)
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
@@ -244,14 +252,14 @@ func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
+	ctx := r.Context()
+	chart := r.PathValue("chart")
 	added, count := false, 0
-	ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx) (bool, error) {
+	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
 		// Holding the song row FOR SHARE serializes the addition with a deletion.
-		var chart string
-		e := tx.QueryRow(ctx, `SELECT c.id FROM charts c WHERE c.id=$1 AND `+publishedChart+` FOR SHARE`, r.PathValue("chart")).Scan(&chart)
+		e := tx.QueryRow(ctx, `SELECT c.id FROM charts c WHERE c.id=$1 AND `+publishedChart+` FOR SHARE`, chart).Scan(&chart)
 		if errors.Is(e, pgx.ErrNoRows) {
-			problem(w, 404, "CHART_NOT_FOUND", "作品不存在或已删除")
+			problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
 			return false, nil
 		}
 		var exists bool
@@ -291,9 +299,10 @@ func (s *Server) removePlaylistItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
-	ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx) (bool, error) {
-		tag, e := tx.Exec(ctx, `DELETE FROM playlist_items WHERE playlist_id=$1 AND chart_id=$2`, id, r.PathValue("chart"))
+	ctx := r.Context()
+	chart := r.PathValue("chart")
+	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
+		tag, e := tx.Exec(ctx, `DELETE FROM playlist_items WHERE playlist_id=$1 AND chart_id=$2`, id, chart)
 		if e == nil && tag.RowsAffected() > 0 {
 			_, e = tx.Exec(ctx, `UPDATE playlists SET updated_at=now() WHERE id=$1`, id)
 		}
@@ -327,8 +336,8 @@ func (s *Server) orderPlaylist(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "PLAYLIST_INVALID", "歌曲顺序无效")
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
-	ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx) (bool, error) {
+	ctx := r.Context()
+	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
 		rows, e := tx.Query(ctx, `SELECT chart_id FROM playlist_items WHERE playlist_id=$1 ORDER BY position,added_at,chart_id`, id)
 		if e != nil {
 			return false, e
@@ -366,7 +375,8 @@ func (s *Server) favoritePlaylist(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
+	ctx := r.Context()
+	id, valid := playlistID(r.PathValue("id"))
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		internal(w, e)
@@ -375,7 +385,10 @@ func (s *Server) favoritePlaylist(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 	// Holding the playlist FOR SHARE serializes the favorite with a deletion.
 	var owner string
-	e = tx.QueryRow(ctx, `SELECT owner_id FROM playlists WHERE id=$1 AND is_public FOR SHARE`, id).Scan(&owner)
+	e = pgx.ErrNoRows
+	if valid {
+		e = tx.QueryRow(ctx, `SELECT owner_id FROM playlists WHERE id=$1 AND is_public FOR SHARE`, id).Scan(&owner)
+	}
 	if errors.Is(e, pgx.ErrNoRows) {
 		problem(w, 404, "PLAYLIST_NOT_FOUND", "歌单不存在或未公开")
 		return
@@ -409,7 +422,8 @@ func (s *Server) unfavoritePlaylist(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, id := r.Context(), r.PathValue("id")
+	ctx := r.Context()
+	id, _ := playlistID(r.PathValue("id"))
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
 		internal(w, e)

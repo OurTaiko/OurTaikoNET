@@ -24,7 +24,7 @@ func (s *Server) getPlaylistCover(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
+	s.serveCover(w, r, digest, key)
 }
 
 // setPlaylistCover points a playlist at its website cover and the game's copy
@@ -62,11 +62,11 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 	var previous []*int64
 	// Ownership is checked after encoding, under the playlist's lock.
 	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
-		file, e := s.storeImage(r.Context(), tx, encoded)
+		file, e := s.storeCover(r.Context(), tx, encoded)
 		if e != nil {
 			return false, e
 		}
-		gameFile, e := s.storeImageAs(r.Context(), tx, "cover", game, "jpg", "image/jpeg")
+		gameFile, e := s.storeGameCover(r.Context(), tx, game)
 		if e != nil {
 			return false, e
 		}

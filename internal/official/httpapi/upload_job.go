@@ -265,7 +265,7 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	}
 	coverFile := previousCover
 	if coverData != nil {
-		id, err := s.storeImage(ctx, tx, coverData)
+		id, err := s.storeCover(ctx, tx, coverData)
 		if err != nil {
 			return failed(err)
 		}

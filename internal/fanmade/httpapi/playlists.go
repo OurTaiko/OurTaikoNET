@@ -13,6 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Playlists are the same on both song sources: a player's own, private or public,
+// ordered, with one category and an optional cover; favorites of other players'
+// public playlists; and system playlists the server computes.
 const (
 	maxPlaylists         = 100
 	maxPlaylistItems     = 500
@@ -22,8 +25,16 @@ const (
 	playlistPageSize     = 12
 )
 
-// Playlist is an ordered list of songs. A system playlist is computed by the
-// server: it has no owner and cannot be edited or kept as a favorite.
+// PlaylistOwner is the public profile of a playlist's owner.
+type PlaylistOwner struct {
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarUrl"`
+}
+
+// Playlist is an ordered list of songs. A stored playlist's ID is 32 hex digits;
+// a system playlist's is a word, and it has no owner and cannot be edited or kept
+// as a favorite.
 type Playlist struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -31,13 +42,13 @@ type Playlist struct {
 	Public      bool   `json:"public"`
 	System      bool   `json:"system"`
 	// The category's genre selects the folder artwork in the game.
-	CategoryID    string             `json:"categoryId"`
-	Genre         string             `json:"genre"`
-	OwnerID       string             `json:"ownerId,omitempty"`
-	Owner         *NotificationActor `json:"owner"`
-	CoverHash     string             `json:"coverHash,omitempty"`
-	ChartCount    int                `json:"chartCount"`
-	FavoriteCount int                `json:"favoriteCount"`
+	CategoryID    string         `json:"categoryId"`
+	Genre         string         `json:"genre"`
+	OwnerID       string         `json:"ownerId,omitempty"`
+	Owner         *PlaylistOwner `json:"owner"`
+	CoverHash     string         `json:"coverHash,omitempty"`
+	ChartCount    int            `json:"chartCount"`
+	FavoriteCount int            `json:"favoriteCount"`
 	// Favorited is only filled for a signed-in viewer.
 	Favorited bool       `json:"favorited"`
 	CreatedAt *time.Time `json:"createdAt"`
@@ -67,7 +78,12 @@ type playlistQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
-// playlistChartCount counts the songs of playlist p that are still public.
+// playlistID parses a stored playlist's ID.
+func playlistID(raw string) (string, bool) {
+	return raw, validID(raw)
+}
+
+// playlistChartCount counts the songs of playlist p that are still published.
 const playlistChartCount = `(SELECT count(*) FROM playlist_items i JOIN charts c ON c.id=i.chart_id WHERE i.playlist_id=p.id AND ` + publishedChart + `)`
 
 // $1 is the viewer, empty for a guest.
@@ -104,13 +120,36 @@ func readPlaylists(ctx context.Context, db playlistQuerier, sql string, args ...
 	return items, rows.Err()
 }
 
+// profiles looks up public profiles; the account center being down leaves
+// them unknown rather than failing the request.
+func (s *Server) profiles(ctx context.Context, ids []string) map[string]PublicProfile {
+	found := map[string]PublicProfile{}
+	if s.Config.SSO == nil {
+		for _, id := range ids {
+			if id == s.Config.DevUserID {
+				found[id] = PublicProfile{Nickname: devUser(id).Nickname}
+			}
+		}
+		return found
+	}
+	if len(ids) > 0 {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		if result, e := s.Config.SSO.Profiles(ctx, ids); e == nil {
+			found = result
+		}
+	}
+	return found
+}
+
 // playlistOwners fills the owners' public profiles; call it after the database
 // work is done, because it contacts SSO.
 func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
-	ids := []string{}
+	ids, seen := []string{}, map[string]bool{}
 	for _, items := range lists {
 		for _, p := range items {
-			if p.OwnerID != "" {
+			if p.OwnerID != "" && !seen[p.OwnerID] {
+				seen[p.OwnerID] = true
 				ids = append(ids, p.OwnerID)
 			}
 		}
@@ -118,11 +157,15 @@ func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
 	if len(ids) == 0 {
 		return
 	}
-	profiles := s.publicProfiles(ctx, ids)
+	profiles := s.profiles(ctx, ids)
 	for _, items := range lists {
 		for i := range items {
 			if id := items[i].OwnerID; id != "" {
-				items[i].Owner = &NotificationActor{ID: id, Nickname: profiles[id].Nickname, AvatarURL: profiles[id].AvatarURL}
+				p, ok := profiles[id]
+				if !ok {
+					p.Nickname = "未知用户"
+				}
+				items[i].Owner = &PlaylistOwner{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL}
 			}
 		}
 	}
@@ -222,44 +265,15 @@ func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, result)
 }
 
-// playlistCharts reads public songs in the order of ids.
-func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
-	rows, e := s.DB.Query(ctx, chartSelect+` JOIN unnest($1::text[]) WITH ORDINALITY listed(id,ord) ON listed.id=c.id WHERE `+publishedChart+` ORDER BY listed.ord`, ids)
-	if e != nil {
-		return nil, e
-	}
-	charts, e := s.readCharts(rows)
-	if e == nil {
-		e = s.coverHashes(ctx, charts)
-	}
-	if e != nil {
-		return nil, e
-	}
-	s.chartNames(ctx, charts)
-	return charts, nil
-}
-
-// systemPlaylistSongs computes a system playlist for the viewer. It reports
-// false after writing the error response.
-func (s *Server) systemPlaylistSongs(w http.ResponseWriter, r *http.Request, system *systemPlaylist) (Playlist, []string, bool) {
-	viewer := s.viewer(r)
-	if system.personal && viewer == "" {
-		problem(w, 401, "UNAUTHORIZED", "请先登录")
-		return Playlist{}, nil, false
-	}
-	ids, e := system.chartIDs(r.Context(), s.DB, viewer)
-	if e != nil {
-		internal(w, e)
-		return Playlist{}, nil, false
-	}
-	return system.playlist(len(ids)), ids, true
-}
-
-// storedPlaylistSongs reads a playlist the requester may see and its song IDs
-// in order. It reports false after writing the error response.
-func (s *Server) storedPlaylistSongs(w http.ResponseWriter, r *http.Request, id string) (Playlist, []string, bool) {
+// storedPlaylistSongs reads a playlist the requester may see and its song
+// IDs in order. It reports false after writing the error response.
+func (s *Server) storedPlaylistSongs(w http.ResponseWriter, r *http.Request, raw string) (Playlist, []string, bool) {
 	ctx := r.Context()
-	p, e := readPlaylist(s.DB.QueryRow(ctx, playlistSelect+` WHERE p.id=$2`, s.viewer(r), id))
+	id, ok := playlistID(raw)
+	p, e := Playlist{}, pgx.ErrNoRows
+	if ok {
+		p, e = readPlaylist(s.DB.QueryRow(ctx, playlistSelect+` WHERE p.id=$2`, s.viewer(r), id))
+	}
 	if e == nil && !p.Public {
 		// A private playlist needs a verified session, not just the cookie.
 		u, ue := s.current(r)
@@ -292,14 +306,23 @@ func (s *Server) storedPlaylistSongs(w http.ResponseWriter, r *http.Request, id 
 func (s *Server) playlistDetail(w http.ResponseWriter, r *http.Request) {
 	var p Playlist
 	var ids []string
-	var ok bool
 	if system := systemPlaylistByID(r.PathValue("id")); system != nil {
-		p, ids, ok = s.systemPlaylistSongs(w, r, system)
+		viewer := s.viewer(r)
+		if system.personal && viewer == "" {
+			problem(w, 401, "UNAUTHORIZED", "请先登录")
+			return
+		}
+		var e error
+		if ids, e = system.chartIDs(r.Context(), s.DB, viewer); e != nil {
+			internal(w, e)
+			return
+		}
+		p = system.playlist(len(ids))
 	} else {
-		p, ids, ok = s.storedPlaylistSongs(w, r, r.PathValue("id"))
-	}
-	if !ok {
-		return
+		var ok bool
+		if p, ids, ok = s.storedPlaylistSongs(w, r, r.PathValue("id")); !ok {
+			return
+		}
 	}
 	charts, e := s.playlistCharts(r.Context(), ids)
 	if e != nil {
@@ -310,38 +333,4 @@ func (s *Server) playlistDetail(w http.ResponseWriter, r *http.Request) {
 	items := []Playlist{p}
 	s.playlistOwners(r.Context(), items)
 	respond(w, 200, items[0])
-}
-
-// playlistID parses a stored playlist's ID.
-func playlistID(raw string) (string, bool) {
-	return raw, validID(raw)
-}
-
-// PlaylistOwner is the public profile of a playlist's owner.
-type PlaylistOwner struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
-}
-
-// profiles looks up public profiles; the account center being down leaves
-// them unknown rather than failing the request.
-func (s *Server) profiles(ctx context.Context, ids []string) map[string]PublicProfile {
-	found := map[string]PublicProfile{}
-	if s.Config.SSO == nil {
-		for _, id := range ids {
-			if id == s.Config.DevUserID {
-				found[id] = PublicProfile{Nickname: devUser(id).Nickname}
-			}
-		}
-		return found
-	}
-	if len(ids) > 0 {
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		if result, e := s.Config.SSO.Profiles(ctx, ids); e == nil {
-			found = result
-		}
-	}
-	return found
 }

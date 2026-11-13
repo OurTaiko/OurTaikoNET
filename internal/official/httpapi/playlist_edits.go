@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -106,13 +105,12 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "PLAYLIST_LIMIT", "每位用户最多创建 100 个歌单")
 		return
 	}
-	description := ""
+	id, description := ID(), ""
 	if body.Description != nil {
 		description = *body.Description
 	}
-	id := ID()
-	if _, e = tx.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,description,is_public,category_flag) VALUES($6,$1,$2,$3,$4,$5)`,
-		u.User.ID, *body.Name, description, body.Public != nil && *body.Public, flag, id); e == nil {
+	if _, e = tx.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,description,is_public,category_flag) VALUES($1,$2,$3,$4,$5,$6)`,
+		id, u.User.ID, *body.Name, description, body.Public != nil && *body.Public, flag); e == nil {
 		e = tx.Commit(ctx)
 	}
 	if e != nil {
@@ -201,7 +199,7 @@ func (s *Server) editPlaylist(w http.ResponseWriter, r *http.Request) {
 }
 
 // deletePlaylist lets the owner delete a playlist, and an administrator a
-// public one; the owner is then told, as on Fanmade.
+// public one; the owner is then told which playlist was removed.
 func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -249,20 +247,6 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
-// releaseCovers deletes a playlist's former cover files unless something
-// still refers to them; a failure leaves them for the next release.
-func (s *Server) releaseCovers(ctx context.Context, covers []*int64) {
-	ids := []int64{}
-	for _, id := range covers {
-		if id != nil {
-			ids = append(ids, *id)
-		}
-	}
-	if e := s.releaseFiles(context.WithoutCancel(ctx), ids); e != nil {
-		log.Printf("playlist cover cleanup pending: %v", e)
-	}
-}
-
 func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -272,7 +256,7 @@ func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
 	chart := r.PathValue("chart")
 	added, count := false, 0
 	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
-		// Holding the chart row FOR SHARE serializes the addition with a deletion.
+		// Holding the song row FOR SHARE serializes the addition with a deletion.
 		e := tx.QueryRow(ctx, `SELECT c.id FROM charts c WHERE c.id=$1 AND `+publishedChart+` FOR SHARE`, chart).Scan(&chart)
 		if errors.Is(e, pgx.ErrNoRows) {
 			problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
@@ -287,7 +271,7 @@ func (s *Server) addPlaylistItem(w http.ResponseWriter, r *http.Request) {
 			return true, e
 		}
 		if count >= maxPlaylistItems {
-			problem(w, 409, "PLAYLIST_FULL", "每个歌单最多收录 500 首谱面")
+			problem(w, 409, "PLAYLIST_FULL", "每个歌单最多收录 500 首歌曲")
 			return false, nil
 		}
 		position := 0
@@ -330,9 +314,9 @@ func (s *Server) removePlaylistItem(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
-// orderPlaylist moves the listed charts to the front in the given order.
-// Charts the request leaves out, such as ones hidden from the editor, keep
-// their relative order behind them.
+// orderPlaylist moves the listed songs to the front in the given order. Songs
+// the request leaves out, such as ones hidden from the editor, keep their
+// relative order behind them.
 func (s *Server) orderPlaylist(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -341,7 +325,7 @@ func (s *Server) orderPlaylist(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ChartIDs []string `json:"chartIds"`
 	}
-	if !decode(w, r, &body) {
+	if !decodeLimit(w, r, &body, 64*1024) {
 		return
 	}
 	seen := map[string]bool{}
@@ -349,7 +333,7 @@ func (s *Server) orderPlaylist(w http.ResponseWriter, r *http.Request) {
 		seen[chart] = true
 	}
 	if len(body.ChartIDs) > maxPlaylistItems || len(seen) != len(body.ChartIDs) {
-		problem(w, 400, "PLAYLIST_INVALID", "谱面顺序无效")
+		problem(w, 400, "PLAYLIST_INVALID", "歌曲顺序无效")
 		return
 	}
 	ctx := r.Context()

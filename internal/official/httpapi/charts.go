@@ -470,3 +470,17 @@ func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 	}
 	return ids, tx.Commit(ctx)
 }
+
+// playlistCharts reads published charts in the order of ids.
+func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
+	rows, e := s.DB.Query(ctx, chartSelect+` JOIN unnest($1::text[]) WITH ORDINALITY listed(id,ord) ON listed.id=c.id WHERE `+publishedChart+` ORDER BY listed.ord`, ids)
+	if e != nil {
+		return nil, e
+	}
+	charts, e := readCharts(rows)
+	if e != nil {
+		return nil, e
+	}
+	s.chartNames(ctx, charts)
+	return charts, nil
+}

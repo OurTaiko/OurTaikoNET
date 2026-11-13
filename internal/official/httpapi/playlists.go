@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Playlists follow the Fanmade site's (R035): user playlists that are private
-// or public, ordered, with one category and an optional cover; favorites of
-// other users' public playlists; and system playlists the server computes.
+// Playlists are the same on both song sources: a player's own, private or public,
+// ordered, with one category and an optional cover; favorites of other players'
+// public playlists; and system playlists the server computes.
 const (
 	maxPlaylists         = 100
 	maxPlaylistItems     = 500
@@ -32,9 +32,9 @@ type PlaylistOwner struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
-// Playlist is an ordered list of charts. A stored playlist's ID is its row ID
-// in decimal; a system playlist's is a word, and it has no owner and cannot
-// be edited or kept as a favorite.
+// Playlist is an ordered list of songs. A stored playlist's ID is 32 hex digits;
+// a system playlist's is a word, and it has no owner and cannot be edited or kept
+// as a favorite.
 type Playlist struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -53,7 +53,7 @@ type Playlist struct {
 	Favorited bool       `json:"favorited"`
 	CreatedAt *time.Time `json:"createdAt"`
 	UpdatedAt *time.Time `json:"updatedAt"`
-	// Only in the viewer's own list when it asks about one chart.
+	// Only in the viewer's own list when it asks about one song.
 	ContainsChart *bool `json:"containsChart,omitempty"`
 	// Only in the detail response, in playlist order.
 	Charts []Chart `json:"charts,omitempty"`
@@ -83,7 +83,7 @@ func playlistID(raw string) (string, bool) {
 	return raw, validID(raw)
 }
 
-// playlistChartCount counts the charts of playlist p that are still published.
+// playlistChartCount counts the songs of playlist p that are still published.
 const playlistChartCount = `(SELECT count(*) FROM playlist_items i JOIN charts c ON c.id=i.chart_id WHERE i.playlist_id=p.id AND ` + publishedChart + `)`
 
 // $1 is the viewer, empty for a guest.
@@ -242,10 +242,9 @@ func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
 		result.Favorites, e = readPlaylists(ctx, tx, playlistSelect+` JOIN playlist_favorites mine ON mine.playlist_id=p.id
  WHERE mine.user_id=$1 AND p.is_public ORDER BY mine.favorited_at DESC,p.id`, u.User.ID)
 	}
-	if raw := r.URL.Query().Get("chart"); e == nil && raw != "" {
-		chart := raw
+	if chart := r.URL.Query().Get("chart"); e == nil && chart != "" {
 		var rows pgx.Rows
-		if rows, e = tx.Query(ctx, `SELECT i.playlist_id::text FROM playlist_items i JOIN playlists p ON p.id=i.playlist_id WHERE p.owner_id=$1 AND i.chart_id=$2`, u.User.ID, chart); e == nil {
+		if rows, e = tx.Query(ctx, `SELECT i.playlist_id FROM playlist_items i JOIN playlists p ON p.id=i.playlist_id WHERE p.owner_id=$1 AND i.chart_id=$2`, u.User.ID, chart); e == nil {
 			var containing []string
 			if containing, e = pgx.CollectRows(rows, pgx.RowTo[string]); e == nil {
 				for i := range result.Owned {
@@ -266,21 +265,7 @@ func (s *Server) myPlaylists(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, result)
 }
 
-// playlistCharts reads published charts in the order of ids.
-func (s *Server) playlistCharts(ctx context.Context, ids []string) ([]Chart, error) {
-	rows, e := s.DB.Query(ctx, chartSelect+` JOIN unnest($1::text[]) WITH ORDINALITY listed(id,ord) ON listed.id=c.id WHERE `+publishedChart+` ORDER BY listed.ord`, ids)
-	if e != nil {
-		return nil, e
-	}
-	charts, e := readCharts(rows)
-	if e != nil {
-		return nil, e
-	}
-	s.chartNames(ctx, charts)
-	return charts, nil
-}
-
-// storedPlaylistSongs reads a playlist the requester may see and its chart
+// storedPlaylistSongs reads a playlist the requester may see and its song
 // IDs in order. It reports false after writing the error response.
 func (s *Server) storedPlaylistSongs(w http.ResponseWriter, r *http.Request, raw string) (Playlist, []string, bool) {
 	ctx := r.Context()

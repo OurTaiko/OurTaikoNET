@@ -104,7 +104,7 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 	}
 	var coverFile *int64
 	if coverData != nil {
-		id, e := s.storeImage(ctx, tx, coverData)
+		id, e := s.storeCover(ctx, tx, coverData)
 		if e != nil {
 			internal(w, e)
 			return
