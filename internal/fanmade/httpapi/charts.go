@@ -192,6 +192,31 @@ func (s *Server) readCharts(rows pgx.Rows) ([]Chart, error) {
 	}
 	return items, rows.Err()
 }
+
+// chartID checks the {id} path value; chart IDs are 32 lowercase hex digits, as Fanmade's.
+func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return "", false
+	}
+	return id, true
+}
+
+// validID reports whether id has the form of every random ID here (charts, courses,
+// playlists): 32 lowercase hex digits.
+func validID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+	for _, c := range id {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Server) chart(ctx context.Context, id string) (Chart, error) {
 	return s.chartWhere(ctx, "c.id", id)
 }
@@ -205,21 +230,6 @@ func (s *Server) chartWhere(ctx context.Context, column string, value any) (Char
 		c = items[0]
 	}
 	return c, e
-}
-func (s *Server) list(w http.ResponseWriter, r *http.Request) {
-	owner := r.URL.Query().Get("owner")
-	if owner != "" && !validSubject(owner) {
-		problem(w, 400, "QUERY_INVALID", "用户标识无效")
-		return
-	}
-	s.search(w, r, owner)
-}
-func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, false)
-	if !ok {
-		return
-	}
-	s.search(w, r, u.User.ID)
 }
 
 // keywordClause matches a chart whose title, subtitle, any translation,
@@ -240,6 +250,22 @@ func keywordNumber(q string) int64 {
 		return n
 	}
 	return -1
+}
+
+func (s *Server) list(w http.ResponseWriter, r *http.Request) {
+	owner := r.URL.Query().Get("owner")
+	if owner != "" && !validSubject(owner) {
+		problem(w, 400, "QUERY_INVALID", "用户标识无效")
+		return
+	}
+	s.search(w, r, owner)
+}
+func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.required(w, r, false)
+	if !ok {
+		return
+	}
+	s.search(w, r, u.User.ID)
 }
 
 // search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category,
@@ -347,20 +373,6 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	}
 	s.chartNames(r.Context(), items)
 	respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
-}
-
-// validID reports whether id has the form of every random ID here (charts, courses,
-// playlists): 32 lowercase hex digits.
-func validID(id string) bool {
-	if len(id) != 32 {
-		return false
-	}
-	for _, c := range id {
-		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-			return false
-		}
-	}
-	return true
 }
 
 // nijiiroID reads a Nijiiro ID as text: a positive int4 without leading zeros.
@@ -521,16 +533,6 @@ func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 		}
 	}
 	return ids, tx.Commit(ctx)
-}
-
-// chartID checks the {id} path value; chart IDs are 32 lowercase hex digits, as Fanmade's.
-func chartID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	id := r.PathValue("id")
-	if !validID(id) {
-		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
-		return "", false
-	}
-	return id, true
 }
 
 // playlistCharts reads published charts in the order of ids.

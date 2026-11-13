@@ -219,6 +219,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/playlists/{id}/order", s.orderPlaylist)
 	mux.HandleFunc("PUT /api/v1/playlists/{id}/favorite", s.favoritePlaylist)
 	mux.HandleFunc("DELETE /api/v1/playlists/{id}/favorite", s.unfavoritePlaylist)
+	// What only the Fanmade site's older clients still ask for: the account routes it gave up
+	// when accounts moved to the account center, and its score route from before the game
+	// routes.
+	if !officialSource {
+		mux.HandleFunc("POST /api/v1/auth/email-code", s.retiredAccountAPI)
+		mux.HandleFunc("POST /api/v1/auth/register", s.retiredAccountAPI)
+		mux.HandleFunc("POST /api/v1/auth/login", s.retiredAccountAPI)
+		mux.HandleFunc("PATCH /api/v1/me", s.retiredAccountAPI)
+		mux.HandleFunc("POST /api/v1/scores", s.submitScore)
+	}
 	mux.HandleFunc("/", s.site)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Request-ID", ID())
@@ -267,4 +277,10 @@ func (s *Server) EnsureStorage() error {
 		return errors.New("storage directory required")
 	}
 	return os.MkdirAll(s.Config.Storage, 0700)
+}
+
+// retiredAccountAPI answers the account routes a site gave up when accounts moved to the
+// account center.
+func (s *Server) retiredAccountAPI(w http.ResponseWriter, r *http.Request) {
+	problem(w, 410, "SSO_REQUIRED", "账号管理已迁至 OurTaiko 账号中心，请使用 SSO 登录或管理账号")
 }
