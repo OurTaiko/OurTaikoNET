@@ -5,12 +5,7 @@ import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { Group, GroupMember } from '@players/api/types'
 import { Button } from '@sitekit/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@sitekit/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'

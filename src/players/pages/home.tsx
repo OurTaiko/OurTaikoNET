@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
-import {
-  ChartBarIcon,
-  IdentificationCardIcon,
-  MedalIcon,
-} from '@phosphor-icons/react'
+import { ChartBarIcon, IdentificationCardIcon, MedalIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import type { ChartBase, ChartList } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
@@ -72,36 +68,36 @@ function SourceCard({ source, library }: { source: SourceId; library?: Library |
       <ul className="space-y-1.5">
         {ready
           ? ready.items.slice(0, 3).map((chart) => {
-            const text = chartText(chart, i18n.resolvedLanguage)
-            return (
-              <li key={chart.id}>
-                <a
-                  href={songPage(source, chart.id)}
-                  className="group flex items-center gap-3 hover:bg-muted p-1.5 rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
-                >
-                  <SongCover
-                    image={coverOf(source, chart)}
-                    categoryIds={chart.categoryIds}
-                    className="rounded-[10px] size-11 shrink-0"
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-semibold text-sm truncate">{text.title}</span>
-                    <span className="block text-muted-foreground text-xs truncate">
-                      {text.subtitle}
+              const text = chartText(chart, i18n.resolvedLanguage)
+              return (
+                <li key={chart.id}>
+                  <a
+                    href={songPage(source, chart.id)}
+                    className="group flex items-center gap-3 hover:bg-muted p-1.5 rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
+                  >
+                    <SongCover
+                      image={coverOf(source, chart)}
+                      categoryIds={chart.categoryIds}
+                      className="rounded-[10px] size-11 shrink-0"
+                    />
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-semibold text-sm truncate">{text.title}</span>
+                      <span className="block text-muted-foreground text-xs truncate">
+                        {text.subtitle}
+                      </span>
                     </span>
-                  </span>
-                  <LevelChips difficulties={chart.difficulties.slice(-1)} />
-                </a>
-              </li>
-            )
-          })
+                    <LevelChips difficulties={chart.difficulties.slice(-1)} />
+                  </a>
+                </li>
+              )
+            })
           : library === 'failed'
             ? null
             : [0, 1, 2].map((row) => (
-              <li key={row}>
-                <Skeleton className="rounded-[14px] h-14" />
-              </li>
-            ))}
+                <li key={row}>
+                  <Skeleton className="rounded-[14px] h-14" />
+                </li>
+              ))}
       </ul>
       {library === 'failed' && <Notice>{t('home.loadFailed')}</Notice>}
       <div className="flex flex-wrap gap-2 mt-auto">
