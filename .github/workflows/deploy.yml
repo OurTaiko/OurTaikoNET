@@ -72,21 +72,15 @@ jobs:
           SERVER_ADDR: ${{ secrets.SERVER_ADDR }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
           DEPLOY_FINGERPRINT: ${{ secrets.DEPLOY_FINGERPRINT }}
         run: |
           # SERVER_ADDR is the organization's; the rest are this repository's.
-          for name in SERVER_ADDR DEPLOY_USER DEPLOY_FINGERPRINT; do
+          for name in SERVER_ADDR DEPLOY_USER DEPLOY_KEY DEPLOY_FINGERPRINT; do
             if [[ -z "${!name}" ]]; then
               echo "::error::Missing required secret: $name"
               exit 1
             fi
           done
-          # Signing in takes a key or a password.
-          if [[ -z "$DEPLOY_KEY" && -z "$DEPLOY_PASSWORD" ]]; then
-            echo "::error::Set DEPLOY_KEY (a private key) or DEPLOY_PASSWORD"
-            exit 1
-          fi
 
       - name: Upload the build
         if: vars.DEPLOY_ENABLED == 'true'
@@ -96,7 +90,6 @@ jobs:
           host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
           key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           source: web.tar.gz
@@ -124,7 +117,6 @@ jobs:
           host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
           key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           version: '1.8.1'
