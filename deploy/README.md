@@ -7,7 +7,8 @@ old APIs from it and have their pages redirected to the new site (`internal/lega
 database `ourtaiko_net` is the only one written; files are in the bucket the old sites used,
 each source signing with its old site's key. The three old containers, their images and
 their deploy folders were removed on 2026-11-14, 07:30 UTC: there is no going back to them.
-Their databases are still there, unused, as they were at the switch. A push to
+Their databases were dropped on 2026-11-14, 08:57 UTC, after every row of them was found in
+`ourtaiko_net`; a last dump of each is kept. A push to
 `main` of this repository or OurTaikoNetWeb publishes to production. Nobody is the site's
 administrator until the role is given in the account center's admin (Client roles), and
 `rollback.yml` has not been run.
@@ -190,8 +191,7 @@ to `ourtaiko_net`, with the two accounts it already used for the old databases
 Both give up a transaction left open for five minutes, so a forgotten one cannot hold a lock
 against a migration. An edit made there goes around the server: the database's own triggers
 still apply (replacing a chart's file queues the old one for deletion), the server's checks do
-not. The connections named "old database (frozen …)" are to the databases nothing reads any
-more.
+not. The two connections to the old databases were removed with those databases.
 
 ## What is left of the old sites
 
@@ -199,13 +199,25 @@ Removed on 2026-11-14: the containers `ourtaiko-fanmade`, `ourtaiko-database` an
 `ourtaiko-profile`, their images, `/opt/ourtaiko-{fanmade,database,profile}` and the daily
 backup timers of their databases. The switch cannot be undone any more.
 
+Dropped on 2026-11-14, 08:57 UTC: the databases `ourtaiko_fanmade`, `ourtaiko_database` and
+`ourtaiko_profile`. Before that each of their tables was compared with its table here by
+primary key (54 tables, 46,978 rows; the 56 players by id): nothing was missing but what this
+server had removed since the switch — two chart files their authors replaced, and twelve
+difficulty constants no chart used even in the old databases. The last dump of each, taken
+minutes before, is `/var/backups/ourtaiko-{fanmade,database,profile}/daily/20261114T0856…/`
+on the server and under `{fanmade,database,profile}/backups/postgresql/` in the private
+bucket; nothing deletes them. `deploy/server/import.sh` has nothing left to read and must not
+be pointed at a restored copy: it replaces what players have done since.
+
 Still there, on purpose:
 
 - The three old host names, their 1Panel sites and certificates, and `LEGACY_*_HOST` here:
   every released game before 2026-11-14 asks the old addresses.
-- The databases `ourtaiko_fanmade`, `ourtaiko_database` and `ourtaiko_profile`, unused, and
-  the last dump of each from the switch (locally under `/var/backups/ourtaiko-*`, and in the
-  private bucket). Nothing backs them up any more, and nothing deletes those dumps.
+- The old databases' roles (`ourtaiko`, `ourtaiko_database`, `ourtaiko_profile`,
+  `ourtaiko_database_viewer`): they own nothing now. `ourtaiko_viewer` and
+  `ourtaiko_database_editor` are the console's accounts and are in use.
+- The units `ourtaiko-{fanmade,database,profile}-backup.service`, without timers; they would
+  fail now, their database being gone.
 - `/usr/local/libexec/ourtaiko-fanmade-backup`: the account center's daily backup runs it.
 - `/etc/ourtaiko-{fanmade,database,profile}`: the old settings. The storage keys in them are
   the ones this server signs with (its own copy is in `storage.env`); the two IAM users they

@@ -51,6 +51,8 @@ The three old databases are on one server (`SRC_HOST`, `SRC_PORT`, `SRC_USER`, `
 
 OurTaikoProfile's awards filed under `database` are filed under `official` here.
 
+This is for development copies only. Production was imported for the last time at the switch on 2026-11-14 and its three old databases were dropped the same day; an import there would replace what players have done since.
+
 ## Testing locally
 
 ```sh
