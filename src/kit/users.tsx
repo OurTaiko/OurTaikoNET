@@ -14,10 +14,9 @@ import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
 import { Marked } from './components/page-hero'
 import type { SourceId } from './source'
-import type { ReactNode } from 'react'
 
 /** source: whose players to list; the page's own source when left out. */
-export function UsersPage({ source, children }: { source?: SourceId; children?: ReactNode }) {
+export function UsersPage({ source }: { source?: SourceId }) {
   const { t } = useTranslation()
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -77,7 +76,6 @@ export function UsersPage({ source, children }: { source?: SourceId; children?: 
           <h1 id="users-heading" className="text-4xl font-extrabold tracking-tight sm:text-5xl">
             <Marked text={t('messages.userSquare')} />
           </h1>
-          {children}
         </div>
         <Button
           variant="outline"
