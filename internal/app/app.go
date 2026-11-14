@@ -57,8 +57,9 @@ type Config struct {
 	// Empty: <Origin>/fanmade and <Origin>/official.
 	FanmadeSite, OfficialSite string
 
-	// The host names of the three old sites, answered as those sites answered (package
-	// legacy). Empty: that old address is not served.
+	// The host names of the three old sites. Their APIs are answered as those sites answered,
+	// and their pages are sent to the same pages under Origin (package legacy). Empty: that
+	// old address is not served.
 	LegacyFanmadeHost, LegacyOfficialHost, LegacyProfileHost string
 }
 
@@ -177,14 +178,15 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		a.Close()
 		return nil, err
 	}
+	// Each old host still answers its API; its pages are those of the new site now.
 	if cfg.LegacyFanmadeHost != "" {
-		a.legacy[cfg.LegacyFanmadeHost] = a.Fanmade.Handler()
+		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.Fanmade.Handler(), Page: legacy.Under(cfg.Origin, "/fanmade")}
 	}
 	if cfg.LegacyOfficialHost != "" {
-		a.legacy[cfg.LegacyOfficialHost] = a.Official.Handler()
+		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.Official.Handler(), Page: legacy.Under(cfg.Origin, "/official")}
 	}
 	if cfg.LegacyProfileHost != "" {
-		a.legacy[cfg.LegacyProfileHost] = legacy.PublicOnly(a.Players.Handler())
+		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.Players.Handler()), Page: legacy.Players(cfg.Origin)}
 	}
 	return a, nil
 }

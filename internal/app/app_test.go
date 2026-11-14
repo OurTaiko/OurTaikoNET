@@ -50,6 +50,20 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 	}
 	defer a.Close()
 	h := a.Handler()
+	// A page of an old site is the same page of this one now; the old API stays where it was.
+	for asked, want := range map[string]string{
+		"fanmade.ourtaiko.org/charts/" + strings.Repeat("f", 32): "http://localhost/fanmade/charts/" + strings.Repeat("f", 32),
+		"database.ourtaiko.org/playlists?sort=newest":            "http://localhost/official/playlists?sort=newest",
+	} {
+		host, path, _ := strings.Cut(asked, "/")
+		r := httptest.NewRequest("GET", "/"+path, nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != want {
+			t.Errorf("%s: %d to %q, want 301 to %q", asked, w.Code, w.Header().Get("Location"), want)
+		}
+	}
 	// With files on this server's disk, a chart's download links are this site's own routes
 	// of the chart's source, whichever address asked, and they answer.
 	if err := os.WriteFile(filepath.Join(storage, "fanmade", strings.Repeat("1", 64)+".tja"), []byte("TITLE:Fan"), 0600); err != nil {
