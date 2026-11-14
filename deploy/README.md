@@ -1,7 +1,9 @@
 # Deploying OurTaikoNet
 
-Status: written and tried on a developer's machine. **Nothing here has run on the server or in
-GitHub Actions yet**; the first real run of each step should be watched.
+Status: the tests run in GitHub Actions; on the server the database, the settings files and the
+directories exist (2026-11-14). **No image has been published and no container runs yet**: the
+publish half of the workflows and `publish.sh` have never run, and the first run should be
+watched.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -63,18 +65,22 @@ docker run --rm -e DATABASE_TEST_URL=postgres://postgres:postgres@<a PostgreSQL 
 
 Each step touches production and is done with the owner's go-ahead.
 
-1. **Database.** In the shared PostgreSQL create the database `ourtaiko_net` and a role for
-   the application. Create the schema with the image: `ourtaiko-net -init` against the empty
-   database (`DATABASE_URL`). Fill it with `db/import.sh` (see `db/README.md`): it reads the
-   three old databases and compares every table with its origin. It can be repeated, so it can
-   run nightly while the preview lasts.
-2. **Settings.** Write `/etc/ourtaiko-net/docker/api.env` and `storage.env` from
-   `api.env.example`. Leave the three `LEGACY_*_HOST` empty for now, and keep the preview away
-   from the old sites' files (next section).
+1. **Database.** `deploy/server/create-database.sh` makes the role and the empty database
+   `ourtaiko_net` in the shared PostgreSQL and writes the two settings files with a password it
+   generates and never prints. `build-schema.sh` builds the schema as that role. `import.sh`
+   fills it from the three old databases, which it only reads, and compares every table with
+   its origin (see `db/README.md`); it can be repeated, so it can run nightly while the
+   preview lasts. Each is copied to the server and run from a file there, beside the SQL
+   files it names. **Done on 2026-11-14.**
+2. **Settings.** `create-database.sh` wrote `/etc/ourtaiko-net/docker/api.env` (database,
+   origin, secure cookies, the proxy's address) and `storage.env` (`STORAGE_BACKEND=local`: the
+   preview stays away from the old sites' files, next section). The account center's values
+   and the three `LEGACY_*_HOST` are added later; see `api.env.example`. **Done on 2026-11-14.**
 3. **Account center.** Register one Application for `net.ourtaiko.org` and put its client and
    service credentials in `api.env`.
-4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, writable by the
-   deploy user; the container reads `web/` as user 10001.
+4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, owned by the
+   deploy user; the container reads `web/` as user 10001. `/etc/ourtaiko-net/docker`, root
+   only. **Done on 2026-11-14.**
 5. **Proxy.** A server block for `net.ourtaiko.org` with its certificate, including
    `net.locations.conf`.
 6. **Release** this repository, then OurTaikoNetWeb.
