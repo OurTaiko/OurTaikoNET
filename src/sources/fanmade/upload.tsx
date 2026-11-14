@@ -2,6 +2,7 @@ import { isChartOwner } from '@sitekit/chart-owners'
 import { chartText } from '@sitekit/chart-language'
 import { i18n } from '@sitekit/i18n'
 import { useTranslation } from 'react-i18next'
+import { Marked } from '@sitekit/components/page-hero'
 import { endpoints } from '@sitekit/api/endpoints'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
 import { AudioPlayer } from '@sitekit/components/audio-player'
@@ -453,8 +454,10 @@ export function UploadPage({
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center [&_p]:mt-2 [&_p]:text-sm [&_p]:text-muted-foreground">
         <div>
           {!embedded && (
-            <h1 className="text-2xl font-extrabold sm:text-3xl">
-              {existing ? t('messages.updateSongAndCharts') : t('messages.publishYourChart')}
+            <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
+              <Marked
+                text={existing ? t('messages.updateSongAndCharts') : t('messages.publishYourChart')}
+              />
             </h1>
           )}
           {existing && (
@@ -466,7 +469,7 @@ export function UploadPage({
           )}
           <div
             role="note"
-            className="mt-3 flex items-start gap-2 rounded-[20px] border border-[#f3b13c] bg-cream px-4 py-3 text-sm font-medium"
+            className="mt-3 flex items-start gap-2 rounded-[20px] bg-[#ffecc2] px-4 py-3 text-sm font-medium text-[#4a3200] dark:bg-[#4a3500] dark:text-[#ffdf9e]"
           >
             <WarningIcon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>{t('messages.doNotSubmitOfficialBandaiNamcoChartsOrAudio')}</span>
@@ -475,7 +478,7 @@ export function UploadPage({
       </div>
       {existing && (
         <Card
-          className="min-w-0 border p-5 shadow-none sm:p-6 gap-3 border-destructive/30 [&>h2]:text-destructive [&>p]:text-sm [&>p]:leading-relaxed"
+          className="rounded-[28px] border min-w-0 p-5 shadow-none sm:p-6 gap-3 border-destructive/30 [&>h2]:text-destructive [&>p]:text-sm [&>p]:leading-relaxed"
           aria-label={t('messages.beforeUpdating')}
         >
           <h2 className="text-base font-extrabold">
@@ -491,7 +494,7 @@ export function UploadPage({
         <form
           onSubmit={submit}
           noValidate
-          className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>div]:space-y-6 [&>aside]:space-y-3"
+          className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>aside]:space-y-3 lg:[&>aside]:sticky lg:[&>aside]:top-4 [&>div]:space-y-6"
         >
           <div className="min-w-0">
             <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
@@ -518,7 +521,7 @@ export function UploadPage({
                 )}
               </TabsList>
               <TabsContent value="files" className="space-y-6 pt-4">
-                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-5">
+                <Card className="rounded-[28px] min-w-0 p-5 sm:p-6 gap-5">
                   <h2 className="text-base font-extrabold">{t('messages.chooseFiles')}</h2>
                   <div
                     className="flex flex-col items-center gap-2 rounded-[20px] border border-dashed p-6 text-center text-sm text-muted-foreground [&>strong]:text-foreground"
@@ -636,7 +639,7 @@ export function UploadPage({
                 </Card>
               </TabsContent>
               <TabsContent value="categories" className="pt-4">
-                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
+                <Card className="rounded-[28px] min-w-0 p-5 sm:p-6 gap-4">
                   <CategoryPicker
                     value={categoryIds}
                     disabled={busy}
@@ -648,7 +651,7 @@ export function UploadPage({
                 </Card>
               </TabsContent>
               <TabsContent value="preview" className="pt-4">
-                <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
+                <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
                   {metadata ? (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -709,7 +712,7 @@ export function UploadPage({
               </TabsContent>
               <TabsContent value="makers" className="pt-4">
                 {metadata ? (
-                  <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
+                  <Card className="rounded-[28px] min-w-0 p-5 sm:p-6 gap-4">
                     <h2 className="text-base font-extrabold">
                       {t('messages.difficultiesAndCreators')}
                     </h2>
@@ -768,7 +771,7 @@ export function UploadPage({
                 )}
               </TabsContent>
               <TabsContent value="description" className="pt-4">
-                <Card className="min-w-0 border border-border p-5 shadow-none sm:p-6 gap-4">
+                <Card className="rounded-[28px] min-w-0 p-5 sm:p-6 gap-4">
                   <h2 className="text-base font-extrabold">
                     {t('messages.notes')}
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -797,7 +800,7 @@ export function UploadPage({
               </TabsContent>
               {!existing && (
                 <TabsContent value="collaborators" className="pt-4">
-                  <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
+                  <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
                     <UploadCollaborators
                       value={collaborators}
                       disabled={busy}
@@ -812,10 +815,7 @@ export function UploadPage({
             </Tabs>
           </div>
           <aside>
-            <Card
-              data-testid="preview-panel"
-              className="min-w-0 border p-5 shadow-none sm:p-6 gap-4"
-            >
+            <Card data-testid="preview-panel" className="rounded-[28px] min-w-0 p-5 sm:p-6 gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-base font-extrabold">
                   {existing ? t('messages.updatePreview') : t('messages.submissionPreview')}

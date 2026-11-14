@@ -7,6 +7,7 @@ import { cn } from '../lib/utils'
 import { CoverUploadDialog } from './cover-dialog'
 import type { ChartBase } from '../api/types'
 import { coverSource } from '../cover'
+import { categoryStripeColor } from '../category-colors'
 
 export function ChartCover({ chart, className }: { chart: ChartBase; className?: string }) {
   const { t } = useTranslation()
@@ -17,7 +18,7 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
   return (
     <div
       className={cn(
-        'flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[20px] bg-muted',
+        'flex aspect-square items-center justify-center overflow-hidden rounded-[28px] bg-muted shadow-elev-1',
         className,
       )}
     >
@@ -31,10 +32,13 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
           onError={() => setFailedSource(source)}
         />
       ) : (
-        <div className="flex justify-center items-center bg-cream size-full">
+        <div
+          className="flex size-full items-center justify-center"
+          style={{ background: categoryStripeColor(chart.categoryIds) }}
+        >
           <span
             aria-hidden="true"
-            className="bg-(--hero) border-[2.5px] border-border rounded-full w-2/5 max-w-28 aspect-square shadow-[inset_0_0_0_10px_rgb(255_255_255/0.5)]"
+            className="aspect-square w-[44%] rounded-full border-[14px] border-white/75 shadow-[0_0_0_9px_rgb(255_255_255/0.3)] sm:border-[20px] sm:shadow-[0_0_0_13px_rgb(255_255_255/0.3)]"
           />
           <span className="sr-only">
             {source ? t('messages.coverTemporarilyUnavailable') : t('messages.noCover')}

@@ -24,6 +24,7 @@ import {
   DownloadSimpleIcon as Download,
   UploadSimpleIcon as Upload,
   ArrowSquareOutIcon,
+  GitBranchIcon,
   ChatCircleIcon,
   CaretRightIcon,
   FileDashedIcon,
@@ -32,9 +33,9 @@ import {
 import { api, jsonRequest } from './api/client'
 import type { ChartBase, ChartList, ScoreReplay, Vote, VoteResult } from './api/types'
 import { SiteChartCard, formatDuration } from './components/chart-card'
-import { slotKey, supportsChart } from './courses'
+import { blockName, isSupportedCourse, slotKey, supportsChart } from './courses'
 import { defaultDifficulty, hasConstants } from './chart-difficulty'
-import { DifficultyConstants } from './difficulty-constants'
+import { DifficultyConstants, formatConstant } from './difficulty-constants'
 import { useSession } from './session-context'
 import { useSite } from './site'
 import { ChartActivity } from './chart-activity'
@@ -47,7 +48,9 @@ import { VoteControl } from './components/vote-control'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { cn } from './lib/utils'
 import { coverSource } from './cover'
-import { PageHero } from './components/page-hero'
+import { Marked, PageHero } from './components/page-hero'
+import { SourceTag } from './components/source-tag'
+import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { EmptyState } from './components/empty-state'
 
@@ -279,7 +282,10 @@ export function Auth({ register = false }: { register?: boolean }) {
     </div>
   )
 }
-const detailCardClassName = 'rounded-[20px] border border-border bg-card p-6 shadow-drop'
+const detailCardClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
+// A list of facts, one to a row: the name at the left, what it is at the right.
+const rowsClassName =
+  '-mt-px grid grid-cols-[auto_minmax(0,1fr)] text-sm [&>dd]:border-t [&>dd]:py-2.5 [&>dd]:text-right [&>dd]:font-semibold [&>dd]:wrap-anywhere [&>dt]:border-t [&>dt]:py-2.5 [&>dt]:pr-4 [&>dt]:text-muted-foreground'
 const manageItemClassName =
   'flex min-h-11 w-full items-center justify-between gap-3 text-left text-sm text-foreground transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md'
 
@@ -464,52 +470,58 @@ export function Detail() {
   }
   return (
     <div className="flex flex-col gap-6">
-      <section
-        aria-labelledby="chart-title"
-        className="overflow-hidden rounded-[20px] border border-border bg-card shadow-drop"
-      >
-        <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-4 p-4 sm:grid-cols-[16rem_minmax(0,1fr)] sm:gap-x-8 sm:gap-y-5 sm:p-8 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-10">
-          <ChartCover chart={chart} className="sm:row-span-3" />
-          <div className="flex min-w-0 flex-col gap-1 self-center sm:gap-2 sm:self-start">
-            <CategoryLabels ids={chart.categoryIds} />
-            <h1 id="chart-title" className="text-xl font-extrabold wrap-anywhere sm:text-4xl">
-              {text.title}
-            </h1>
-            {text.subtitle && (
-              <p className="truncate text-sm text-muted-foreground sm:whitespace-normal sm:text-lg sm:wrap-anywhere">
-                {text.subtitle}
-              </p>
-            )}
-            {chart.title !== text.title && (
-              <p className="text-sm text-muted-foreground wrap-anywhere">{chart.title}</p>
-            )}
-            <p data-testid="detail-facts" className="text-sm text-muted-foreground wrap-anywhere">
-              {t('messages.chartCreator')}{' '}
-              <span className="font-medium text-foreground">{chart.maker || chart.uploader}</span>
+      <header className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <SourceTag source={SOURCE} />
+          {chartStats && (
+            <dl className="contents [&>div]:inline-flex [&>div]:h-[1.375rem] [&>div]:items-center [&>div]:gap-1.5 [&>div]:rounded-[7px] [&>div]:border [&>div]:px-2 [&>div]:text-xs [&_dd]:font-semibold [&_dd]:tabular-nums [&_dt]:text-muted-foreground">
+              {chartStats(chart)}
+            </dl>
+          )}
+          <CategoryLabels ids={chart.categoryIds} />
+        </div>
+        <h1
+          id="chart-title"
+          className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl"
+        >
+          <Marked text={text.title} wholeUpTo={12} />
+        </h1>
+        {text.subtitle && (
+          <p className="text-muted-foreground wrap-anywhere sm:text-lg">{text.subtitle}</p>
+        )}
+        {chart.title !== text.title && (
+          <p className="text-sm text-muted-foreground wrap-anywhere">{chart.title}</p>
+        )}
+        <p data-testid="detail-facts" className="text-sm text-muted-foreground wrap-anywhere">
+          {t('messages.chartCreator')}{' '}
+          <span className="font-medium text-foreground">{chart.maker || chart.uploader}</span>
+        </p>
+      </header>
+      {error && <Notice>{error}</Notice>}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        {/* The cover with what one does with the song: listen, take it, keep it, rate it. */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-1">
+          {/* Below lg the cover is kept small, so what one does with the song is on screen. */}
+          <ChartCover chart={chart} className="max-lg:w-48 sm:max-lg:w-64" />
+          {hasFiles ? (
+            <AudioPlayer
+              compact
+              className="rounded-[20px] border-0 bg-card px-4 py-3 shadow-elev-1"
+              label={t('messages.audioPreview')}
+              src={endpoints.resource(chart, 'audio')}
+              startAt={chart.demoStart}
+              knownDuration={chart.duration}
+            />
+          ) : (
+            <p
+              role="status"
+              className="flex items-center gap-2 rounded-[20px] bg-muted px-4 py-3 text-sm text-muted-foreground"
+            >
+              <FileDashedIcon size={18} aria-hidden="true" />
+              {t('messages.noFilesText')}
             </p>
-          </div>
-          <dl className="col-span-2 flex max-w-xl flex-wrap justify-around gap-x-6 gap-y-2 rounded-xl bg-muted p-3 text-center sm:col-span-1 sm:col-start-2 sm:justify-start sm:gap-x-8 sm:bg-transparent sm:p-0 sm:text-left sm:dark:bg-transparent [&_dd]:text-base [&_dd]:font-semibold [&_dd]:tabular-nums sm:[&_dd]:text-xl [&_dt]:text-xs [&_dt]:text-muted-foreground">
-            {chartStats?.(chart)}
-            <div>
-              <dt>{t('messages.chartNumber')}</dt>
-              <dd>{chart.numberId}</dd>
-            </div>
-            <div>
-              <dt>BPM</dt>
-              <dd>{chart.bpm > 0 ? chart.bpm : '—'}</dd>
-            </div>
-            <div>
-              <dt>{t('messages.duration')}</dt>
-              <dd>{hasFiles ? formatDuration(chart.duration) : '—'}</dd>
-            </div>
-            {votes > 0 && (
-              <div>
-                <dt>{t('interactions.approval')}</dt>
-                <dd>{Math.round((chart.upvotes / votes) * 100)}%</dd>
-              </div>
-            )}
-          </dl>
-          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2 sm:gap-3">
+          )}
+          <div className="flex flex-wrap items-center gap-2">
             {hasFiles ? (
               <>
                 <Button
@@ -550,7 +562,6 @@ export function Detail() {
                 <span className="max-sm:hidden">{t('playlists.addToPlaylist')}</span>
               </Button>
             )}
-            <div className="hidden flex-1 sm:block" />
             <VoteControl
               className="rounded-full bg-muted px-1 py-0.5"
               score={chart.score}
@@ -578,152 +589,129 @@ export function Detail() {
             </a>
           </div>
         </div>
-        {hasFiles ? (
-          <AudioPlayer
-            compact
-            className="rounded-none border-0 border-t bg-muted/60 px-4 py-3 sm:px-8"
-            label={t('messages.audioPreview')}
-            src={endpoints.resource(chart, 'audio')}
-            startAt={chart.demoStart}
-            knownDuration={chart.duration}
-          />
-        ) : (
-          <p
-            role="status"
-            className="flex items-center gap-2 border-t bg-muted/60 px-4 py-3 text-sm text-muted-foreground sm:px-8"
-          >
-            <FileDashedIcon size={18} aria-hidden="true" />
-            {t('messages.noFilesText')}
-          </p>
-        )}
-      </section>
-      {error && <Notice>{error}</Notice>}
-      {editing && canManage && (
-        <EditMetadata
-          key={chart.id}
-          chart={chart}
-          csrf={session.csrfToken}
-          onDismiss={() => setEditing(false)}
-          onSaved={(updated) => {
-            setChart(updated as Chart)
-            setEditing(false)
-            notify(t('messages.chartInformationSaved'), 'success', '', editButton)
-          }}
-        />
-      )}
-      {collecting && session.user && (
-        <AddToPlaylistDialog chart={chart} onDismiss={() => setCollecting(false)} />
-      )}
-      {collaborating && isOwner && (
-        <CollaborationDialog chart={chart} onDismiss={() => setCollaborating(false)} />
-      )}
-      {coverEditing && canManage && (
-        <CoverDialog
-          chart={chart}
-          onDismiss={() => setCoverEditing(false)}
-          onSaved={(coverHash) =>
-            setChart((current) => (current?.id === chart.id ? { ...current, coverHash } : current))
-          }
-        />
-      )}
-      <Tabs
-        value={pageTab}
-        onValueChange={(value) => selectPageTab(value as PageTab)}
-        className="lg:hidden"
-      >
-        {/* Short labels, each tab as wide as its label needs; one that still does not fit is cut short. */}
-        <TabsList
-          aria-label={t('messages.chartSections')}
-          className="flex h-auto w-full gap-0.5 rounded-[16px] bg-muted p-1"
+        <Tabs
+          value={pageTab}
+          onValueChange={(value) => selectPageTab(value as PageTab)}
+          className="lg:hidden"
         >
-          {pageTabs.map(([value, label]) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="h-9 min-w-0 flex-auto px-1.5 text-sm text-muted-foreground after:hidden"
-            >
-              <span className="truncate">{label}</span>
-              {value === 'comments' && chart.commentCount > 0 && (
-                <span className="text-xs tabular-nums">{chart.commentCount}</span>
-              )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          {/* Short labels, each tab as wide as its label needs; one that still does not fit is cut short. */}
+          <TabsList
+            aria-label={t('messages.chartSections')}
+            className="flex h-auto w-full gap-0.5 rounded-[16px] bg-muted p-1"
+          >
+            {pageTabs.map(([value, label]) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="h-9 min-w-0 flex-auto px-1.5 text-sm text-muted-foreground after:hidden"
+              >
+                <span className="truncate">{label}</span>
+                {value === 'comments' && chart.commentCount > 0 && (
+                  <span className="text-xs tabular-nums">{chart.commentCount}</span>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <div
           className={cn(
-            'flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1',
-            section === 'info' && 'max-lg:hidden',
-          )}
-        >
-          <div
-            className={cn('flex min-w-0 flex-col gap-6', section !== 'activity' && 'max-lg:hidden')}
-          >
-            {/* Below lg the constants head the chart section; from lg, the sidebar. */}
-            {showConstants && (
-              <DifficultyConstants
-                key={course}
-                difficulty={chosenDifficulty}
-                className="lg:hidden"
-              />
-            )}
-            {hasFiles ? (
-              <ChartActivity
-                key={`${chart.id}:${chart.difficulties.map((d) => d.chartHash ?? '').join(',')}:${chart.audioHash}`}
-                chart={chart}
-                tab={activityTab}
-                onTabChange={setActivityTab}
-                course={course}
-                onCourseChange={setChosenCourse}
-                replay={replay}
-                onReplay={showReplay}
-              />
-            ) : (
-              <section
-                className={cn(
-                  detailCardClassName,
-                  'flex flex-col items-center gap-3 py-12 text-center',
-                )}
-                aria-label={t('messages.chartImage')}
-              >
-                <FileDashedIcon size={32} className="text-muted-foreground" aria-hidden="true" />
-                <h2 className="text-lg font-extrabold">{t('messages.noFiles')}</h2>
-                <p className="max-w-md text-sm text-muted-foreground">
-                  {canManage ? t('messages.noFilesManagerText') : t('messages.noFilesText')}
-                </p>
-                {canManage && (
-                  <Link
-                    className={buttonVariants({ variant: 'outline' })}
-                    to={`/charts/${chart.id}/update`}
-                  >
-                    <Upload size={16} aria-hidden="true" />
-                    {t('messages.uploadChartFiles')}
-                  </Link>
-                )}
-              </section>
-            )}
-          </div>
-          <div className={cn('min-w-0', section !== 'comments' && 'max-lg:hidden')}>
-            <CommentSection
-              subject={chartSubject(chart)}
-              focusId={commentId}
-              onCountChange={(delta) =>
-                setChart((current) =>
-                  current?.id === chart.id
-                    ? { ...current, commentCount: Math.max(0, current.commentCount + delta) }
-                    : current,
-                )
-              }
-            />
-          </div>
-        </div>
-        <aside
-          className={cn(
-            'flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1',
+            'flex min-w-0 flex-col gap-5 lg:col-start-2 lg:row-span-2 lg:row-start-1',
             section !== 'info' && 'max-lg:hidden',
           )}
         >
+          <section aria-labelledby="chart-information-heading" className={detailCardClassName}>
+            <h2 id="chart-information-heading" className="pb-2 text-lg font-extrabold">
+              {t('messages.chartInformation')}
+            </h2>
+            <div className="overflow-hidden">
+              <dl className={rowsClassName}>
+                <dt>{t('messages.chartNumber')}</dt>
+                <dd className="tabular-nums">{chart.numberId}</dd>
+                <dt>BPM</dt>
+                <dd className="tabular-nums">{chart.bpm > 0 ? chart.bpm : '—'}</dd>
+                <dt>{t('messages.duration')}</dt>
+                <dd className="tabular-nums">{hasFiles ? formatDuration(chart.duration) : '—'}</dd>
+                {votes > 0 && (
+                  <>
+                    <dt>{t('interactions.approval')}</dt>
+                    <dd className="tabular-nums">{Math.round((chart.upvotes / votes) * 100)}%</dd>
+                  </>
+                )}
+                <dt className="self-center">{t('collaboration.owners')}</dt>
+                <dd className="flex flex-wrap justify-end gap-3">
+                  {chartOwners(chart).map((owner) => (
+                    <PlayerLink
+                      key={owner.id}
+                      className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
+                      id={owner.id}
+                    >
+                      <UserAvatar
+                        nickname={owner.nickname}
+                        avatarUrl={owner.avatarUrl}
+                        className="size-6"
+                        fallbackClassName="text-xs"
+                      />
+                      <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
+                    </PlayerLink>
+                  ))}
+                </dd>
+                {chartRecord?.(chart)}
+                <dt>{t('messages.createdAt')}</dt>
+                <dd>
+                  <time dateTime={chart.createdAt}>{date(chart.createdAt)}</time>
+                </dd>
+                <dt>{t('messages.lastChanged')}</dt>
+                <dd>
+                  <time dateTime={chart.updateAt}>{date(chart.updateAt)}</time>
+                </dd>
+              </dl>
+            </div>
+          </section>
+          <section aria-labelledby="chart-difficulties-heading" className={detailCardClassName}>
+            <h2 id="chart-difficulties-heading" className="pb-2 text-lg font-extrabold">
+              {t('messages.chartDifficulty')}
+            </h2>
+            {/* Choosing one turns the constants, the chart image and the leaderboard to it. */}
+            <ul className="-mx-2 space-y-0.5" data-testid="detail-difficulties">
+              {chart.difficulties
+                .filter((d) => isSupportedCourse(d.course))
+                .map((d) => {
+                  const rated = d.constants?.find((r) => r.route === 'master') ?? d.constants?.[0]
+                  return (
+                    <li key={slotKey(d)}>
+                      <button
+                        type="button"
+                        aria-pressed={slotKey(d) === course}
+                        onClick={() => setChosenCourse(slotKey(d))}
+                        className="flex min-h-11 w-full items-center gap-3 rounded-[14px] px-2 text-left text-sm transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring aria-pressed:bg-secondary aria-pressed:text-secondary-foreground"
+                      >
+                        <span
+                          className={cn(
+                            'inline-flex h-[1.375rem] min-w-[1.625rem] shrink-0 items-center justify-center rounded-[7px] px-1.5 text-xs font-bold text-white tabular-nums',
+                            difficultyColors[d.course as keyof typeof difficultyColors] ??
+                              'bg-muted',
+                          )}
+                        >
+                          {d.level}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-medium">{blockName(d)}</span>
+                        {d.branching && (
+                          <GitBranchIcon
+                            className="size-3.5 shrink-0"
+                            aria-label={t('messages.hasBranching')}
+                          />
+                        )}
+                        {rated && rated.mainConstant > 0 && (
+                          <span className="shrink-0 text-xs tabular-nums opacity-80">
+                            {t('constants.main')} {formatConstant(rated.mainConstant)}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+            </ul>
+          </section>
           {showConstants && (
             <DifficultyConstants
               key={course}
@@ -731,6 +719,14 @@ export function Detail() {
               className="max-lg:hidden"
             />
           )}
+        </div>
+        {/* From lg these go under the cover, where the other column leaves room. */}
+        <div
+          className={cn(
+            'flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-start-2',
+            section !== 'info' && 'max-lg:hidden',
+          )}
+        >
           <section
             aria-labelledby="chart-notes-heading"
             className={cn(detailCardClassName, 'space-y-3')}
@@ -741,43 +737,6 @@ export function Detail() {
             <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground wrap-anywhere">
               {chart.description || t('messages.noNotesYet')}
             </p>
-          </section>
-          <section
-            aria-labelledby="chart-information-heading"
-            className={cn(detailCardClassName, 'space-y-4')}
-          >
-            <h2 id="chart-information-heading" className="text-lg font-extrabold">
-              {t('messages.chartInformation')}
-            </h2>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm [&>dt]:text-muted-foreground [&>dd]:wrap-anywhere">
-              <dt className="self-center">{t('collaboration.owners')}</dt>
-              <dd className="flex flex-wrap gap-3">
-                {chartOwners(chart).map((owner) => (
-                  <PlayerLink
-                    key={owner.id}
-                    className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
-                    id={owner.id}
-                  >
-                    <UserAvatar
-                      nickname={owner.nickname}
-                      avatarUrl={owner.avatarUrl}
-                      className="size-6"
-                      fallbackClassName="text-xs"
-                    />
-                    <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
-                  </PlayerLink>
-                ))}
-              </dd>
-              {chartRecord?.(chart)}
-              <dt>{t('messages.createdAt')}</dt>
-              <dd>
-                <time dateTime={chart.createdAt}>{date(chart.createdAt)}</time>
-              </dd>
-              <dt>{t('messages.lastChanged')}</dt>
-              <dd>
-                <time dateTime={chart.updateAt}>{date(chart.updateAt)}</time>
-              </dd>
-            </dl>
           </section>
           {canManage && (
             <section
@@ -933,8 +892,90 @@ export function Detail() {
               )}
             </section>
           )}
-        </aside>
+        </div>
       </div>
+      <div className={cn('flex min-w-0 flex-col gap-5', section !== 'activity' && 'max-lg:hidden')}>
+        {/* Below lg the constants head the chart section; from lg they sit beside the cover. */}
+        {showConstants && (
+          <DifficultyConstants key={course} difficulty={chosenDifficulty} className="lg:hidden" />
+        )}
+        {hasFiles ? (
+          <ChartActivity
+            key={`${chart.id}:${chart.difficulties.map((d) => d.chartHash ?? '').join(',')}:${chart.audioHash}`}
+            chart={chart}
+            tab={activityTab}
+            onTabChange={setActivityTab}
+            course={course}
+            onCourseChange={setChosenCourse}
+            replay={replay}
+            onReplay={showReplay}
+          />
+        ) : (
+          <section
+            className={cn(
+              detailCardClassName,
+              'flex flex-col items-center gap-3 py-12 text-center',
+            )}
+            aria-label={t('messages.chartImage')}
+          >
+            <FileDashedIcon size={32} className="text-muted-foreground" aria-hidden="true" />
+            <h2 className="text-lg font-extrabold">{t('messages.noFiles')}</h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              {canManage ? t('messages.noFilesManagerText') : t('messages.noFilesText')}
+            </p>
+            {canManage && (
+              <Link
+                className={buttonVariants({ variant: 'outline' })}
+                to={`/charts/${chart.id}/update`}
+              >
+                <Upload size={16} aria-hidden="true" />
+                {t('messages.uploadChartFiles')}
+              </Link>
+            )}
+          </section>
+        )}
+      </div>
+      <div className={cn('min-w-0', section !== 'comments' && 'max-lg:hidden')}>
+        <CommentSection
+          subject={chartSubject(chart)}
+          focusId={commentId}
+          onCountChange={(delta) =>
+            setChart((current) =>
+              current?.id === chart.id
+                ? { ...current, commentCount: Math.max(0, current.commentCount + delta) }
+                : current,
+            )
+          }
+        />
+      </div>
+      {editing && canManage && (
+        <EditMetadata
+          key={chart.id}
+          chart={chart}
+          csrf={session.csrfToken}
+          onDismiss={() => setEditing(false)}
+          onSaved={(updated) => {
+            setChart(updated as Chart)
+            setEditing(false)
+            notify(t('messages.chartInformationSaved'), 'success', '', editButton)
+          }}
+        />
+      )}
+      {collecting && session.user && (
+        <AddToPlaylistDialog chart={chart} onDismiss={() => setCollecting(false)} />
+      )}
+      {collaborating && isOwner && (
+        <CollaborationDialog chart={chart} onDismiss={() => setCollaborating(false)} />
+      )}
+      {coverEditing && canManage && (
+        <CoverDialog
+          chart={chart}
+          onDismiss={() => setCoverEditing(false)}
+          onSaved={(coverHash) =>
+            setChart((current) => (current?.id === chart.id ? { ...current, coverHash } : current))
+          }
+        />
+      )}
     </div>
   )
 }
@@ -949,7 +990,12 @@ export function ChartManagerPage() {
   const tab = pathname.replace(/\/$/, '').endsWith('/publish') ? 'publish' : 'charts'
   return (
     <>
-      <h1 className="font-extrabold text-2xl sm:text-3xl">{t('messages.chartManager')}</h1>
+      <div className="space-y-1.5">
+        <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
+        <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
+          <Marked text={t('messages.chartManager')} />
+        </h1>
+      </div>
       <Tabs
         value={tab}
         onValueChange={(value) =>

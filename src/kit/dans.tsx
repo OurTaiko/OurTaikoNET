@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { slotFromKey, slotKey } from './courses'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -49,6 +49,10 @@ import {
 } from './profile-titles'
 import { useSession } from './session-context'
 import { cn } from './lib/utils'
+import { Marked } from './components/page-hero'
+import { SourceTag } from './components/source-tag'
+import { difficultyColors } from './components/difficulty-badges'
+import { SOURCE } from './source'
 
 // 段位 courses as OurTaikoPlay plays them (one to three songs with conditions). The game reads
 // them from this server; passing an official one gives a 段位 badge on OurTaikoProfile.
@@ -194,6 +198,25 @@ function HiddenTitle({ seed }: { seed: string }) {
   )
 }
 
+// A song's place in a course as a small square of its difficulty's colour with its stars.
+function SongLevel({ song }: { song: Dan['songs'][number] }) {
+  const { t } = useTranslation()
+  return (
+    <span className="ml-auto inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+      {t(`dans.courses.${song.chart.course}`)}
+      {song.chart.side !== 'single' && ` · ${t(`dans.sides.${song.chart.side}`)}`}
+      <span
+        className={cn(
+          'inline-flex h-[1.375rem] min-w-[1.625rem] items-center justify-center rounded-[7px] px-1.5 font-bold text-white tabular-nums',
+          difficultyColors[song.chart.course as keyof typeof difficultyColors] ?? 'bg-muted',
+        )}
+      >
+        {song.level}
+      </span>
+    </span>
+  )
+}
+
 function DanCard({ dan }: { dan: Dan }) {
   const { t, i18n } = useTranslation()
   const session = useSession()
@@ -202,14 +225,22 @@ function DanCard({ dan }: { dan: Dan }) {
   return (
     <Link
       to={`/dans/${dan.id}`}
-      className="block rounded-[20px] border border-border bg-card p-5 shadow-drop transition hover:-translate-y-0.5 hover:shadow-drop-hover motion-reduce:transform-none"
+      className="flex flex-col gap-4 rounded-[20px] bg-card p-5 shadow-elev-1 transition-[translate,box-shadow] duration-200 ease-emphasized outline-none hover:-translate-y-0.5 hover:shadow-elev-2 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-extrabold">
+      <div className="flex items-start gap-3">
+        {/* The colour of the course's box in the game. */}
+        <span
+          aria-hidden="true"
+          className="flex size-11 shrink-0 items-center justify-center rounded-[14px] text-black/60"
+          style={{ background: (danColors.find((c) => c.value === dan.color) ?? danColors[0]).hex }}
+        >
+          <MedalIcon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-lg font-extrabold tracking-tight">
             {danTitle(dan.title, i18n.resolvedLanguage)}
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             {dan.owner || t('dans.unknownOwner')}
             <span aria-hidden="true"> · </span>
             {t('interactions.points', { count: dan.score })}
@@ -232,26 +263,23 @@ function DanCard({ dan }: { dan: Dan }) {
           )}
         </div>
       </div>
-      <ol className="mt-4 space-y-1 text-sm">
+      <ol className="space-y-1.5 text-sm">
         {dan.songs.map((song, i) => (
-          <li key={i} className="flex items-center gap-2">
+          <li key={i} className="flex min-w-0 items-center gap-2">
             <span className="w-5 shrink-0 text-muted-foreground tabular-nums">{i + 1}</span>
             {song.hidden && !isOwner ? (
               <span className="truncate">
                 <HiddenTitle seed={`${dan.id}/${i}`} />
               </span>
             ) : (
-              <span className="truncate">{song.title}</span>
+              <span className="truncate font-medium">{song.title}</span>
             )}
             {song.hidden && (
               <Badge variant="outline" className="shrink-0">
                 {t('dans.hiddenTitle')}
               </Badge>
             )}
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-              {t(`dans.courses.${song.chart.course}`)} ★{song.level}
-              {song.chart.side !== 'single' && ` · ${t(`dans.sides.${song.chart.side}`)}`}
-            </span>
+            <SongLevel song={song} />
           </li>
         ))}
       </ol>
@@ -274,8 +302,11 @@ export function DansPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-extrabold">{t('dans.heading')}</h1>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
+          <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
+            <Marked text={t('dans.heading')} />
+          </h1>
         </div>
         {session.user && (
           <Link className={buttonVariants()} to="/dans/new">
@@ -287,9 +318,11 @@ export function DansPage() {
       {error && <Notice>{error}</Notice>}
       {!dans && !error && <p role="status">{t('dans.loading')}</p>}
       {dans?.length === 0 && (
-        <p className="py-12 text-center text-muted-foreground">{t('dans.empty')}</p>
+        <p className="rounded-[28px] bg-muted py-12 text-center text-muted-foreground">
+          {t('dans.empty')}
+        </p>
       )}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {dans?.map((dan) => (
           <DanCard key={dan.id} dan={dan} />
         ))}
@@ -331,66 +364,42 @@ export function DanPage() {
   }
   return (
     <div className="space-y-6">
-      <Card className="rounded-[20px]">
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-3xl tracking-tight">
-              {danTitle(dan.title, i18n.resolvedLanguage)}
-            </CardTitle>
-            {dan.official ? (
-              <Badge>{t('dans.official')}</Badge>
-            ) : (
-              <Badge variant="secondary">{t('dans.community')}</Badge>
-            )}
-          </div>
-          <CardDescription>
-            {t('dans.by', { owner: dan.owner || t('dans.unknownOwner') })}
-          </CardDescription>
-          <p className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">{t('dans.code')}</span>
-            <code className="rounded-md bg-muted px-2 py-0.5 font-mono text-base tracking-[0.2em]">
-              {dan.code}
-            </code>
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <VoteControl
-              className="rounded-full bg-muted px-1 py-0.5"
-              score={dan.score}
-              myVote={dan.myVote}
-              label={t('interactions.voteOnDan')}
-              onVote={(value: Vote) =>
-                api<VoteResult>(
-                  endpoints.danVote(dan.id),
-                  jsonRequest('PUT', { value }, session.csrfToken),
-                )
-              }
-              onResult={(result) =>
-                setDan((current) => (current?.id === dan.id ? { ...current, ...result } : current))
-              }
-            />
-            <a
-              href="#comments"
-              className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ChatCircleIcon size={18} aria-hidden="true" />
-              {t('interactions.commentCount', { count: dan.commentCount })}
-            </a>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {dan.songs.some((s) => !s.available) && <Notice>{t('dans.unavailableExplained')}</Notice>}
-          <section className="space-y-2">
-            <h2 className="font-extrabold">{t('dans.songs')}</h2>
-            <ol className="space-y-2">
+      <header className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <SourceTag source={SOURCE} />
+          {dan.official ? (
+            <Badge>
+              <SealCheckIcon aria-hidden="true" />
+              {t('dans.official')}
+            </Badge>
+          ) : (
+            <Badge variant="secondary">{t('dans.community')}</Badge>
+          )}
+        </div>
+        <h1 className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl">
+          <Marked text={danTitle(dan.title, i18n.resolvedLanguage)} wholeUpTo={12} />
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {t('dans.by', { owner: dan.owner || t('dans.unknownOwner') })}
+        </p>
+      </header>
+      {dan.songs.some((s) => !s.available) && <Notice>{t('dans.unavailableExplained')}</Notice>}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <section className={panelClassName} aria-labelledby="dan-songs-heading">
+            <h2 id="dan-songs-heading" className="text-lg font-extrabold">
+              {t('dans.songs')}
+            </h2>
+            <ol className="divide-y">
               {dan.songs.map((song, i) => (
                 <li
                   key={i}
                   className={cn(
-                    'flex flex-wrap items-center gap-3 rounded-[20px] border p-3',
+                    'flex flex-wrap items-center gap-3 py-3',
                     !song.available && 'opacity-60',
                   )}
                 >
-                  <span className="text-lg font-bold tabular-nums text-muted-foreground">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground tabular-nums">
                     {i + 1}
                   </span>
                   {song.hidden && !isOwner ? (
@@ -408,23 +417,66 @@ export function DanPage() {
                       )}
                     </Link>
                   )}
-                  <span className="ml-auto text-sm text-muted-foreground">
-                    {t(`dans.courses.${song.chart.course}`)} ★{song.level}
-                    {song.chart.side !== 'single' && ` · ${t(`dans.sides.${song.chart.side}`)}`}
-                  </span>
+                  <SongLevel song={song} />
                   {song.hidden && <Badge variant="outline">{t('dans.hiddenTitle')}</Badge>}
                   {!song.available && <Badge variant="destructive">{t('dans.changed')}</Badge>}
                 </li>
               ))}
             </ol>
           </section>
-          <section className="space-y-2">
-            <h2 className="font-extrabold">{t('dans.exams')}</h2>
-            <ExamTable dan={dan} />
+          <section className={cn(panelClassName, 'space-y-3')} aria-labelledby="dan-exams-heading">
+            <h2 id="dan-exams-heading" className="text-lg font-extrabold">
+              {t('dans.exams')}
+            </h2>
+            <div className="overflow-x-auto">
+              <ExamTable dan={dan} />
+            </div>
             <p className="text-xs text-muted-foreground">{t('dans.examsExplained')}</p>
           </section>
-          <section className="space-y-2">
-            <h2 className="font-extrabold">{t('dans.rewards')}</h2>
+        </div>
+        <aside className="flex min-w-0 flex-col gap-5">
+          {/* The code is what a player types into the game to play this course. */}
+          <section className={cn(panelClassName, 'space-y-4')}>
+            <div className="space-y-1.5">
+              <h2 className="text-sm font-semibold text-muted-foreground">{t('dans.code')}</h2>
+              <code className="block rounded-[14px] bg-muted px-3 py-2 text-center font-mono text-2xl font-bold tracking-[0.3em]">
+                {dan.code}
+              </code>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <VoteControl
+                className="rounded-full bg-muted px-1 py-0.5"
+                score={dan.score}
+                myVote={dan.myVote}
+                label={t('interactions.voteOnDan')}
+                onVote={(value: Vote) =>
+                  api<VoteResult>(
+                    endpoints.danVote(dan.id),
+                    jsonRequest('PUT', { value }, session.csrfToken),
+                  )
+                }
+                onResult={(result) =>
+                  setDan((current) =>
+                    current?.id === dan.id ? { ...current, ...result } : current,
+                  )
+                }
+              />
+              <a
+                href="#comments"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ChatCircleIcon size={18} aria-hidden="true" />
+                {t('interactions.commentCount', { count: dan.commentCount })}
+              </a>
+            </div>
+          </section>
+          <section
+            className={cn(panelClassName, 'space-y-3')}
+            aria-labelledby="dan-rewards-heading"
+          >
+            <h2 id="dan-rewards-heading" className="text-lg font-extrabold">
+              {t('dans.rewards')}
+            </h2>
             <ul className="space-y-1 text-sm">
               {dan.rewards.dan !== undefined && (
                 <li className="flex items-center gap-2">
@@ -467,56 +519,64 @@ export function DanPage() {
             </ul>
           </section>
           {(canEdit || session.user?.isAdmin) && (
-            <div className="flex flex-wrap gap-2 border-t pt-4">
-              {canEdit && (
-                <Link
-                  className={buttonVariants({ variant: 'outline' })}
-                  to={`/dans/${dan.id}/edit`}
-                >
-                  <PencilSimpleIcon aria-hidden="true" />
-                  {t('dans.edit')}
-                </Link>
-              )}
-              {session.user?.isAdmin && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await api(
-                        endpoints.danOfficial(dan.id),
-                        jsonRequest('PUT', { official: !dan.official }, session.csrfToken),
-                      )
-                      setDan({ ...dan, official: !dan.official })
-                    })
-                  }
-                >
-                  <SealCheckIcon aria-hidden="true" />
-                  {dan.official ? t('dans.unmarkOfficial') : t('dans.markOfficial')}
-                </Button>
-              )}
-              {canEdit && (
-                <Button
-                  variant="destructive"
-                  disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm(t('dans.confirmDelete'))) return
-                    void run(async () => {
-                      await api(endpoints.dan(dan.id), {
-                        ...jsonRequest('DELETE', {}, session.csrfToken),
+            <section
+              className={cn(panelClassName, 'space-y-3')}
+              aria-labelledby="dan-manage-heading"
+            >
+              <h2 id="dan-manage-heading" className="text-lg font-extrabold">
+                {t('messages.manageChart')}
+              </h2>
+              <div className="flex flex-col gap-2 [&>*]:justify-start">
+                {canEdit && (
+                  <Link
+                    className={buttonVariants({ variant: 'outline' })}
+                    to={`/dans/${dan.id}/edit`}
+                  >
+                    <PencilSimpleIcon aria-hidden="true" />
+                    {t('dans.edit')}
+                  </Link>
+                )}
+                {session.user?.isAdmin && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        await api(
+                          endpoints.danOfficial(dan.id),
+                          jsonRequest('PUT', { official: !dan.official }, session.csrfToken),
+                        )
+                        setDan({ ...dan, official: !dan.official })
                       })
-                      navigate('/dans')
-                    })
-                  }}
-                >
-                  <TrashIcon aria-hidden="true" />
-                  {t('dans.delete')}
-                </Button>
-              )}
-            </div>
+                    }
+                  >
+                    <SealCheckIcon aria-hidden="true" />
+                    {dan.official ? t('dans.unmarkOfficial') : t('dans.markOfficial')}
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!window.confirm(t('dans.confirmDelete'))) return
+                      void run(async () => {
+                        await api(endpoints.dan(dan.id), {
+                          ...jsonRequest('DELETE', {}, session.csrfToken),
+                        })
+                        navigate('/dans')
+                      })
+                    }}
+                  >
+                    <TrashIcon aria-hidden="true" />
+                    {t('dans.delete')}
+                  </Button>
+                )}
+              </div>
+            </section>
           )}
-        </CardContent>
-      </Card>
+        </aside>
+      </div>
       <CommentSection
         subject={danSubject(dan)}
         focusId={commentId}
@@ -529,6 +589,20 @@ export function DanPage() {
         }
       />
     </div>
+  )
+}
+
+const panelClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
+
+/** The heading of one part of the course form, with its place in the order. */
+function StepTitle({ number, children }: { number: number; children: ReactNode }) {
+  return (
+    <CardTitle className="flex items-center gap-2.5 text-lg font-extrabold">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm text-secondary-foreground tabular-nums">
+        {number}
+      </span>
+      {children}
+    </CardTitle>
   )
 }
 
@@ -763,18 +837,21 @@ export function DanEditorPage() {
   }
   return (
     <form className="space-y-6" onSubmit={(e) => void save(e)}>
-      <h1 className="text-3xl font-extrabold">
-        {id ? t('dans.editHeading') : t('dans.createHeading')}
-      </h1>
+      <div className="space-y-1.5">
+        <p className="text-sm font-semibold text-muted-foreground">{t('dans.heading')}</p>
+        <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
+          <Marked text={id ? t('dans.editHeading') : t('dans.createHeading')} />
+        </h1>
+      </div>
       {!id && (
         <p className="text-sm text-muted-foreground">
           {t('dans.limitExplained', { limit: communityLimit })}
         </p>
       )}
       {error && <Notice>{error}</Notice>}
-      <Card className="rounded-[20px]">
+      <Card className="rounded-[28px]">
         <CardHeader>
-          <CardTitle>{t('dans.basics')}</CardTitle>
+          <StepTitle number={1}>{t('dans.basics')}</StepTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {titleLanguages.map((language) => (
@@ -824,9 +901,9 @@ export function DanEditorPage() {
           </div>
         </CardContent>
       </Card>
-      <Card className="rounded-[20px]">
+      <Card className="rounded-[28px]">
         <CardHeader>
-          <CardTitle>{t('dans.songs')}</CardTitle>
+          <StepTitle number={2}>{t('dans.songs')}</StepTitle>
           <CardDescription>{t('dans.songsExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -874,14 +951,14 @@ export function DanEditorPage() {
           )}
         </CardContent>
       </Card>
-      <Card className="rounded-[20px]">
+      <Card className="rounded-[28px]">
         <CardHeader>
-          <CardTitle>{t('dans.exams')}</CardTitle>
+          <StepTitle number={3}>{t('dans.exams')}</StepTitle>
           <CardDescription>{t('dans.examsEditExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {exams.map((row, i) => (
-            <div key={i} className="space-y-3 rounded-[20px] border p-3">
+            <div key={i} className="space-y-3 rounded-[20px] bg-muted p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <ChoiceSelect
                   label={t('dans.exam')}
@@ -1024,9 +1101,9 @@ export function DanEditorPage() {
           )}
         </CardContent>
       </Card>
-      <Card className="rounded-[20px]">
+      <Card className="rounded-[28px]">
         <CardHeader>
-          <CardTitle>{t('dans.rewards')}</CardTitle>
+          <StepTitle number={4}>{t('dans.rewards')}</StepTitle>
           <CardDescription>{t('dans.rewardsExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1139,7 +1216,8 @@ export function DanEditorPage() {
           </p>
         </CardContent>
       </Card>
-      <div className="flex gap-2">
+      {/* Stays in reach while the form scrolls; on a phone it sits above the bottom bar. */}
+      <div className="sticky bottom-24 z-10 flex w-fit gap-2 rounded-full bg-card p-2 shadow-elev-2 lg:bottom-4">
         <Button type="submit" disabled={busy || songs.length === 0}>
           {t('dans.save')}
         </Button>

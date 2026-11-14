@@ -15,13 +15,18 @@ export class ApiError extends Error {
 }
 export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...init })
-  const data = await response.json().catch(() => ({
-    code: response.status === 413 ? 'FILE_TOO_LARGE' : 'SERVICE_UNAVAILABLE',
-    message:
-      response.status === 413
-        ? t('messages.fileExceedsTheUploadSizeLimit')
-        : t('messages.unexpectedServerResponsePleaseTryAgainLater'),
-  }))
+  const data = await response.json().catch((e: unknown) => {
+    // A request given up while its answer was still arriving has no answer: the caller gets
+    // the abort, not a made-up one (which, on a 200, would pass for the data asked for).
+    if (init.signal?.aborted) throw e
+    return {
+      code: response.status === 413 ? 'FILE_TOO_LARGE' : 'SERVICE_UNAVAILABLE',
+      message:
+        response.status === 413
+          ? t('messages.fileExceedsTheUploadSizeLimit')
+          : t('messages.unexpectedServerResponsePleaseTryAgainLater'),
+    }
+  })
   if (!response.ok)
     throw new ApiError(apiErrorMessage(data), Number(response.headers.get('Retry-After')) || 0)
   return data as T

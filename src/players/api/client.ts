@@ -20,7 +20,11 @@ function errorMessage(data: { code?: string; message?: string }, status: number)
 
 export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...init })
-  const data = await response.json().catch(() => ({}))
+  const data = await response.json().catch((e: unknown) => {
+    // Given up while the answer was arriving: the caller gets the abort, not an empty answer.
+    if (init.signal?.aborted) throw e
+    return {}
+  })
   if (!response.ok)
     throw new ApiError(errorMessage(data, response.status), response.status, data.code ?? '')
   return data as T

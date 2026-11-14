@@ -14,7 +14,9 @@ const maxValue = 15.5
 const dimensions = ['stamina', 'handspeed', 'burst', 'rhythm', 'complex'] as const
 type Dimension = (typeof dimensions)[number]
 
-const format = (value: number) => value.toFixed(1)
+/** A constant as it is written: one decimal place. */
+export const formatConstant = (value: number) => value.toFixed(1)
+const format = formatConstant
 
 export function DifficultyConstants({
   difficulty,
@@ -37,10 +39,7 @@ export function DifficultyConstants({
   return (
     <section
       aria-labelledby={heading}
-      className={cn(
-        '@container rounded-[20px] border border-border bg-card p-5 shadow-drop sm:p-6',
-        className,
-      )}
+      className={cn('@container rounded-[28px] bg-card p-5 shadow-elev-1 sm:p-6', className)}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={heading} className="text-lg font-extrabold">
@@ -104,7 +103,7 @@ export function DifficultyConstants({
 function ConstantValues({ values }: { values: Constants }) {
   const { t } = useTranslation()
   return (
-    <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-4 rounded-[14px] border border-border bg-cream p-4 @lg:w-56 @lg:shrink-0 @lg:grid-cols-1 @lg:gap-y-4">
+    <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-4 rounded-[20px] bg-muted p-4 @lg:w-56 @lg:shrink-0 @lg:grid-cols-1 @lg:gap-y-4">
       <div>
         <dt className="text-xs font-bold text-muted-foreground">{t('constants.main')}</dt>
         <dd className="mt-1 text-5xl leading-none font-extrabold tabular-nums">

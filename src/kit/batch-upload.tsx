@@ -231,10 +231,10 @@ export function BatchUpload({
 
   return (
     <div className="space-y-6">
-      <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
+      <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
         <CategoryPicker value={categoryIds} disabled={running} onChange={setCategoryIds} />
       </Card>
-      <Card className="min-w-0 gap-4 border border-border p-5 shadow-none sm:p-6">
+      <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-extrabold">{t('folderUpload.batchTitle')}</h2>

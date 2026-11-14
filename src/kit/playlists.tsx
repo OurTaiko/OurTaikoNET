@@ -26,6 +26,9 @@ import { DialogClose } from './components/ui/dialog'
 import { Skeleton } from './components/ui/skeleton'
 import { UserAvatar } from './components/user-avatar'
 import { cn } from './lib/utils'
+import { Marked } from './components/page-hero'
+import { SourceTag } from './components/source-tag'
+import { SOURCE } from './source'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session-context'
@@ -44,7 +47,7 @@ import { PlaylistDialog, PlaylistCoverDialog } from './playlist-dialogs'
 const sorts = ['updated', 'newest', 'favorites'] as const
 type Sort = (typeof sorts)[number]
 
-const panelClassName = 'rounded-[20px] border border-border bg-card p-6 shadow-drop'
+const panelClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
 
 // Public playlists, optionally of one user, with search, order and paging kept
 // in the address unless the list is embedded in another page.
@@ -208,10 +211,14 @@ export function PlaylistsPage() {
   }, [session.user?.id])
   return (
     <section className="space-y-8" aria-labelledby="playlists-heading">
-      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-        <div className="space-y-3">
-          <h1 id="playlists-heading" className="text-3xl font-extrabold sm:text-4xl">
-            {t('playlists.plaza')}
+      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
+          <h1
+            id="playlists-heading"
+            className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl"
+          >
+            <Marked text={t('playlists.plaza')} />
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -229,10 +236,10 @@ export function PlaylistsPage() {
       </div>
       {systems.length > 0 && (
         <section className="space-y-4" aria-labelledby="system-playlists-heading">
-          <h2 id="system-playlists-heading" className="text-base font-extrabold">
+          <h2 id="system-playlists-heading" className="text-xl font-extrabold tracking-tight">
             {t('playlists.systemSection')}
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {systems.map((playlist) => (
               <PlaylistCard key={playlist.id} playlist={playlist} />
             ))}
@@ -285,10 +292,14 @@ export function MyPlaylistsPage() {
     )
   return (
     <section className="space-y-8" aria-labelledby="my-playlists-heading">
-      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-        <div className="space-y-3">
-          <h1 id="my-playlists-heading" className="text-3xl font-extrabold sm:text-4xl">
-            {t('playlists.mine')}
+      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
+          <h1
+            id="my-playlists-heading"
+            className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl"
+          >
+            <Marked text={t('playlists.mine')} />
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -311,7 +322,7 @@ export function MyPlaylistsPage() {
       ) : (
         <>
           <section className="space-y-4" aria-labelledby="owned-playlists-heading">
-            <h2 id="owned-playlists-heading" className="text-base font-extrabold">
+            <h2 id="owned-playlists-heading" className="text-xl font-extrabold tracking-tight">
               {t('playlists.owned')}{' '}
               <span className="text-muted-foreground">{data.owned.length}</span>
             </h2>
@@ -321,7 +332,7 @@ export function MyPlaylistsPage() {
             />
           </section>
           <section className="space-y-4" aria-labelledby="favorite-playlists-heading">
-            <h2 id="favorite-playlists-heading" className="text-base font-extrabold">
+            <h2 id="favorite-playlists-heading" className="text-xl font-extrabold tracking-tight">
               {t('playlists.favorites')}{' '}
               <span className="text-muted-foreground">{data.favorites.length}</span>
             </h2>
@@ -538,51 +549,21 @@ export function PlaylistPage() {
   return (
     <section className="space-y-6" aria-labelledby="playlist-heading">
       {back}
-      <div className={cn(panelClassName, 'flex flex-col gap-6 sm:flex-row')}>
-        <div className="flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-muted sm:w-44">
-          {source && failedCover !== source ? (
-            <img
-              src={source}
-              alt={t('playlists.coverAlt', { name: text.name })}
-              className="size-full object-cover"
-              onError={() => setFailedCover(source)}
-            />
-          ) : (
-            <PlaylistIcon className="size-12 text-muted-foreground" aria-hidden="true" />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="space-y-2">
-            <h1 id="playlist-heading" className="text-2xl font-extrabold wrap-anywhere sm:text-4xl">
-              {text.name}
-            </h1>
-            {text.description && (
-              <p className="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground wrap-anywhere">
-                {text.description}
-              </p>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex aspect-square w-44 items-center justify-center overflow-hidden rounded-[28px] bg-secondary text-secondary-foreground shadow-elev-1 sm:w-56 lg:w-full">
+            {source && failedCover !== source ? (
+              <img
+                src={source}
+                alt={t('playlists.coverAlt', { name: text.name })}
+                className="size-full object-cover"
+                onError={() => setFailedCover(source)}
+              />
+            ) : (
+              <PlaylistIcon className="size-1/3" aria-hidden="true" />
             )}
           </div>
-          {playlist.owner && (
-            <p className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="text-muted-foreground">{t('playlists.creator')}</span>
-              <PlayerLink
-                id={playlist.owner.id}
-                className="flex min-w-0 items-center gap-2 font-medium hover:text-link"
-              >
-                <UserAvatar
-                  nickname={playlist.owner.nickname || t('messages.unknownMember')}
-                  avatarUrl={playlist.owner.avatarUrl}
-                  className="size-6 shrink-0"
-                  fallbackClassName="text-xs"
-                />
-                <span className="truncate">
-                  {playlist.owner.nickname || t('messages.unknownMember')}
-                </span>
-              </PlayerLink>
-            </p>
-          )}
-          <PlaylistFacts playlist={playlist} />
-          <div className="mt-auto flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {owned ? (
               <>
                 <Button disabled={busy} onClick={() => setDialog('edit')}>
@@ -632,27 +613,70 @@ export function PlaylistPage() {
             )}
           </div>
         </div>
-      </div>
-      {charts.length === 0 ? (
-        <div className={emptyStateClassName}>
-          <h2 className="text-base font-extrabold">{t('playlists.emptySongs')}</h2>
-          {owned && <p>{t('playlists.emptySongsOwner')}</p>}
-          {owned && (
-            <Button variant="outline" onClick={() => setDialog('songs')}>
-              <PlusIcon aria-hidden="true" />
-              {t('playlists.addSongs')}
-            </Button>
+        <div className="min-w-0 space-y-6">
+          <header className="space-y-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <SourceTag source={SOURCE} />
+              <PlaylistFacts playlist={playlist} />
+            </div>
+            <h1
+              id="playlist-heading"
+              className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl"
+            >
+              <Marked text={text.name} wholeUpTo={12} />
+            </h1>
+            {text.description && (
+              <p className="max-w-3xl text-sm leading-relaxed whitespace-pre-line text-muted-foreground wrap-anywhere">
+                {text.description}
+              </p>
+            )}
+            {playlist.owner && (
+              <p className="flex min-w-0 items-center gap-2 text-sm">
+                <span className="text-muted-foreground">{t('playlists.creator')}</span>
+                <PlayerLink
+                  id={playlist.owner.id}
+                  className="flex min-w-0 items-center gap-2 font-medium hover:text-link"
+                >
+                  <UserAvatar
+                    nickname={playlist.owner.nickname || t('messages.unknownMember')}
+                    avatarUrl={playlist.owner.avatarUrl}
+                    className="size-6 shrink-0"
+                    fallbackClassName="text-xs"
+                  />
+                  <span className="truncate">
+                    {playlist.owner.nickname || t('messages.unknownMember')}
+                  </span>
+                </PlayerLink>
+              </p>
+            )}
+          </header>
+          {charts.length === 0 ? (
+            <div className={emptyStateClassName}>
+              <h2 className="text-base font-extrabold">{t('playlists.emptySongs')}</h2>
+              {owned && <p>{t('playlists.emptySongsOwner')}</p>}
+              {owned && (
+                <Button variant="outline" onClick={() => setDialog('songs')}>
+                  <PlusIcon aria-hidden="true" />
+                  {t('playlists.addSongs')}
+                </Button>
+              )}
+            </div>
+          ) : arranging ? (
+            <PlaylistSongOrder
+              charts={charts}
+              disabled={busy}
+              onMove={move}
+              onRemove={removeSong}
+            />
+          ) : (
+            <div className="song-grid">
+              {charts.map((chart) => (
+                <SiteChartCard key={chart.id} chart={chart} />
+              ))}
+            </div>
           )}
         </div>
-      ) : arranging ? (
-        <PlaylistSongOrder charts={charts} disabled={busy} onMove={move} onRemove={removeSong} />
-      ) : (
-        <div className="song-grid">
-          {charts.map((chart) => (
-            <SiteChartCard key={chart.id} chart={chart} />
-          ))}
-        </div>
-      )}
+      </div>
       {dialog === 'songs' && owned && (
         <PlaylistSongSearchDialog
           charts={charts}
