@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { ArrowRightIcon as ArrowRight } from '@phosphor-icons/react'
 import { buttonVariants } from './components/ui/button'
 import { EmptyState } from './components/empty-state'
 import { loginPath } from './components/vote-control'
@@ -21,7 +20,6 @@ export function RequireSignIn() {
           to={loginPath(location)}
         >
           {t('messages.signIn')}
-          <ArrowRight size={16} />
         </Link>
       </EmptyState>
     )

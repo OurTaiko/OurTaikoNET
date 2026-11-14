@@ -35,7 +35,7 @@ import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { Badge } from './components/ui/badge'
 import { Button, buttonVariants } from './components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
@@ -49,7 +49,6 @@ import {
 } from './profile-titles'
 import { useSession } from './session-context'
 import { cn } from './lib/utils'
-import { Marked } from './components/page-hero'
 import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
@@ -111,8 +110,6 @@ function ColorSwatch({ hex }: { hex: string }) {
 }
 // The game offers 五級 (6) .. 達人 (24); 0–5 exist in the numbering only.
 const danFirst = 6
-// A player publishes at most this many courses that are not official.
-const communityLimit = 10
 
 function Line({ value }: { value: number[] | null }) {
   const { t } = useTranslation()
@@ -303,9 +300,8 @@ export function DansPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1.5">
-          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
           <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-            <Marked text={t('dans.heading')} />
+            {t('dans.heading')}
           </h1>
         </div>
         {session.user && (
@@ -377,7 +373,7 @@ export function DanPage() {
           )}
         </div>
         <h1 className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl">
-          <Marked text={danTitle(dan.title, i18n.resolvedLanguage)} wholeUpTo={12} />
+          {danTitle(dan.title, i18n.resolvedLanguage)}
         </h1>
         <p className="text-sm text-muted-foreground">
           {t('dans.by', { owner: dan.owner || t('dans.unknownOwner') })}
@@ -431,7 +427,6 @@ export function DanPage() {
             <div className="overflow-x-auto">
               <ExamTable dan={dan} />
             </div>
-            <p className="text-xs text-muted-foreground">{t('dans.examsExplained')}</p>
           </section>
         </div>
         <aside className="flex min-w-0 flex-col gap-5">
@@ -838,16 +833,10 @@ export function DanEditorPage() {
   return (
     <form className="space-y-6" onSubmit={(e) => void save(e)}>
       <div className="space-y-1.5">
-        <p className="text-sm font-semibold text-muted-foreground">{t('dans.heading')}</p>
         <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-          <Marked text={id ? t('dans.editHeading') : t('dans.createHeading')} />
+          {id ? t('dans.editHeading') : t('dans.createHeading')}
         </h1>
       </div>
-      {!id && (
-        <p className="text-sm text-muted-foreground">
-          {t('dans.limitExplained', { limit: communityLimit })}
-        </p>
-      )}
       {error && <Notice>{error}</Notice>}
       <Card className="rounded-[28px]">
         <CardHeader>
@@ -904,7 +893,6 @@ export function DanEditorPage() {
       <Card className="rounded-[28px]">
         <CardHeader>
           <StepTitle number={2}>{t('dans.songs')}</StepTitle>
-          <CardDescription>{t('dans.songsExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {songs.map((song, i) => (
@@ -954,7 +942,6 @@ export function DanEditorPage() {
       <Card className="rounded-[28px]">
         <CardHeader>
           <StepTitle number={3}>{t('dans.exams')}</StepTitle>
-          <CardDescription>{t('dans.examsEditExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {exams.map((row, i) => (
@@ -1104,7 +1091,6 @@ export function DanEditorPage() {
       <Card className="rounded-[28px]">
         <CardHeader>
           <StepTitle number={4}>{t('dans.rewards')}</StepTitle>
-          <CardDescription>{t('dans.rewardsExplained')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <ChoiceSelect

@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
-  ArrowRightIcon,
   ArrowUpIcon,
   HeartIcon,
   PlaylistIcon,
@@ -26,7 +25,6 @@ import { DialogClose } from './components/ui/dialog'
 import { Skeleton } from './components/ui/skeleton'
 import { UserAvatar } from './components/user-avatar'
 import { cn } from './lib/utils'
-import { Marked } from './components/page-hero'
 import { SourceTag } from './components/source-tag'
 import { SOURCE } from './source'
 import { Modal, Notice } from './notifications'
@@ -213,12 +211,11 @@ export function PlaylistsPage() {
     <section className="space-y-8" aria-labelledby="playlists-heading">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div className="space-y-1.5">
-          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
           <h1
             id="playlists-heading"
             className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl"
           >
-            <Marked text={t('playlists.plaza')} />
+            {t('playlists.plaza')}
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -285,7 +282,6 @@ export function MyPlaylistsPage() {
         {!session.loading && (
           <Link className={buttonVariants()} to="/login">
             {t('messages.signIn')}
-            <ArrowRightIcon size={16} aria-hidden="true" />
           </Link>
         )}
       </div>
@@ -294,12 +290,11 @@ export function MyPlaylistsPage() {
     <section className="space-y-8" aria-labelledby="my-playlists-heading">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div className="space-y-1.5">
-          <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
           <h1
             id="my-playlists-heading"
             className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl"
           >
-            <Marked text={t('playlists.mine')} />
+            {t('playlists.mine')}
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -623,7 +618,7 @@ export function PlaylistPage() {
               id="playlist-heading"
               className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl"
             >
-              <Marked text={text.name} wholeUpTo={12} />
+              {text.name}
             </h1>
             {text.description && (
               <p className="max-w-3xl text-sm leading-relaxed whitespace-pre-line text-muted-foreground wrap-anywhere">

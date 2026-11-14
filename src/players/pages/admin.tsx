@@ -6,13 +6,7 @@ import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { TitleStyle } from '@players/api/types'
 import { Button } from '@sitekit/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@sitekit/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
@@ -93,7 +87,6 @@ export function AdminPage() {
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('admin.editTitle')}</CardTitle>
-          <CardDescription>{t('admin.editTitleExplained')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={save}>
@@ -245,7 +238,6 @@ export function AdminPage() {
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('admin.grant')}</CardTitle>
-          <CardDescription>{t('admin.grantExplained')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-wrap items-end gap-3" onSubmit={send('POST')}>

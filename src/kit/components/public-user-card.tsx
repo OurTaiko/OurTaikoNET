@@ -1,6 +1,5 @@
 import { PlayerLink } from './player-link'
 import { useTranslation } from 'react-i18next'
-import { ArrowRightIcon } from '@phosphor-icons/react'
 import type { PublicUser } from '../api/types'
 import { UserAvatar } from './user-avatar'
 import { buttonVariants } from './ui/button'
@@ -86,7 +85,6 @@ export function PublicUserCard({
           })}
         >
           {t('messages.visitUserSpace')}
-          <ArrowRightIcon aria-hidden="true" />
         </PlayerLink>
       )}
     </Card>

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRightIcon,
   ChartBarIcon,
   IdentificationCardIcon,
   MedalIcon,
@@ -61,15 +60,8 @@ function SourceCard({ source, library }: { source: SourceId; library?: Library |
       className="flex flex-col gap-5 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0"
     >
       <div className="flex justify-between items-start gap-4">
-        <div className="space-y-1.5 min-w-0">
-          <p className="flex items-center gap-2 font-semibold text-primary text-sm">
-            <span aria-hidden="true" className="bg-primary-container rounded-full size-2.5" />
-            {source === 'fanmade' ? 'Ka' : 'Don'}
-          </p>
-          <h2 className="font-extrabold text-3xl tracking-tight">{name}</h2>
-          <p className="text-muted-foreground text-sm">{t(`home.${source}Text`)}</p>
-        </div>
-        <span className="inline-flex items-center bg-secondary px-3 rounded-full h-8 font-semibold text-secondary-foreground text-sm tabular-nums whitespace-nowrap shrink-0">
+        <h2 className="min-w-0 font-extrabold text-3xl tracking-tight">{name}</h2>
+        <span className="inline-flex items-center bg-secondary px-3 rounded-full h-8 font-semibold tabular-nums text-secondary-foreground text-sm whitespace-nowrap shrink-0">
           {ready ? (
             t('home.songs', { n: ready.total.toLocaleString(i18n.resolvedLanguage) })
           ) : (
@@ -80,42 +72,41 @@ function SourceCard({ source, library }: { source: SourceId; library?: Library |
       <ul className="space-y-1.5">
         {ready
           ? ready.items.slice(0, 3).map((chart) => {
-              const text = chartText(chart, i18n.resolvedLanguage)
-              return (
-                <li key={chart.id}>
-                  <a
-                    href={songPage(source, chart.id)}
-                    className="group flex items-center gap-3 hover:bg-muted p-1.5 rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
-                  >
-                    <SongCover
-                      image={coverOf(source, chart)}
-                      categoryIds={chart.categoryIds}
-                      className="rounded-[10px] size-11 shrink-0"
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block font-semibold text-sm truncate">{text.title}</span>
-                      <span className="block text-muted-foreground text-xs truncate">
-                        {text.subtitle}
-                      </span>
+            const text = chartText(chart, i18n.resolvedLanguage)
+            return (
+              <li key={chart.id}>
+                <a
+                  href={songPage(source, chart.id)}
+                  className="group flex items-center gap-3 hover:bg-muted p-1.5 rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
+                >
+                  <SongCover
+                    image={coverOf(source, chart)}
+                    categoryIds={chart.categoryIds}
+                    className="rounded-[10px] size-11 shrink-0"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-semibold text-sm truncate">{text.title}</span>
+                    <span className="block text-muted-foreground text-xs truncate">
+                      {text.subtitle}
                     </span>
-                    <LevelChips difficulties={chart.difficulties.slice(-1)} />
-                  </a>
-                </li>
-              )
-            })
+                  </span>
+                  <LevelChips difficulties={chart.difficulties.slice(-1)} />
+                </a>
+              </li>
+            )
+          })
           : library === 'failed'
             ? null
             : [0, 1, 2].map((row) => (
-                <li key={row}>
-                  <Skeleton className="rounded-[14px] h-14" />
-                </li>
-              ))}
+              <li key={row}>
+                <Skeleton className="rounded-[14px] h-14" />
+              </li>
+            ))}
       </ul>
       {library === 'failed' && <Notice>{t('home.loadFailed')}</Notice>}
       <div className="flex flex-wrap gap-2 mt-auto">
         <a className={buttonVariants()} href={`/${source}/`}>
           {t('home.browse', { name })}
-          <ArrowRightIcon aria-hidden="true" />
         </a>
         <a
           className={buttonVariants({ variant: 'secondary' })}
@@ -153,7 +144,6 @@ function You() {
       <section className="gap-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] bg-card shadow-elev-1 p-6 rounded-[28px]">
         <div className="space-y-4">
           <h2 className="font-extrabold text-2xl tracking-tight">{t('home.signInTitle')}</h2>
-          <p className="text-muted-foreground text-sm">{t('home.signInText')}</p>
           <div className="flex flex-wrap gap-2">
             <a className={buttonVariants()} href={endpoints.login('/')}>
               {t('nav.signIn')}
@@ -166,12 +156,14 @@ function You() {
             </a>
           </div>
         </div>
-        <ul className="gap-3 grid grid-cols-1 sm:grid-cols-3">
+        <ul className="space-y-3">
           {features.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="space-y-1.5 bg-muted p-4 rounded-[20px]">
-              <Icon className="size-6 text-primary" aria-hidden="true" />
-              <h3 className="font-bold text-sm">{title}</h3>
-              <p className="text-muted-foreground text-xs leading-relaxed">{text}</p>
+            <li key={title} className="flex gap-3 text-sm">
+              <Icon className="mt-0.5 size-5 text-primary shrink-0" aria-hidden="true" />
+              <p>
+                <span className="block font-bold">{title}</span>
+                <span className="text-muted-foreground">{text}</span>
+              </p>
             </li>
           ))}
         </ul>
@@ -180,7 +172,7 @@ function You() {
   }
   const user = session.user
   return (
-    <section className="flex sm:flex-row flex-col sm:items-center gap-6 min-w-0 bg-card shadow-elev-1 p-6 rounded-[28px]">
+    <section className="flex sm:flex-row flex-col sm:items-center gap-6 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0">
       <div className="flex-1 space-y-3 min-w-0">
         <h2 className="font-extrabold text-2xl tracking-tight">{t('home.plate')}</h2>
         <Nameplate
@@ -194,12 +186,10 @@ function You() {
             avatarUrl: user.avatarUrl ?? '',
           }}
         />
-        <p className="text-muted-foreground text-sm">{t('home.plateNote')}</p>
       </div>
       <div className="flex sm:flex-col flex-wrap gap-2 shrink-0">
         <Link className={buttonVariants()} to={`/players/${user.id}`}>
           {t('home.openMyPage')}
-          <ArrowRightIcon aria-hidden="true" />
         </Link>
         <a className={buttonVariants({ variant: 'secondary' })} href={`/${source}/me/playlists`}>
           {t('home.myPlaylists')}
@@ -246,7 +236,7 @@ export function HomePage() {
           ))}
           {loading &&
             [0, 1, 2, 3, 4, 5].map((tile) => (
-              <Skeleton key={tile} className="rounded-[20px] aspect-[3/4]" />
+              <Skeleton key={tile} className="rounded-[20px] aspect-3/4" />
             ))}
         </div>
       </section>

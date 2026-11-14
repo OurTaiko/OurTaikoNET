@@ -12,7 +12,6 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-import { Marked } from './components/page-hero'
 import type { SourceId } from './source'
 
 /** source: whose players to list; the page's own source when left out. */
@@ -74,7 +73,7 @@ export function UsersPage({ source }: { source?: SourceId }) {
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div className="space-y-3">
           <h1 id="users-heading" className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            <Marked text={t('messages.userSquare')} />
+            {t('messages.userSquare')}
           </h1>
         </div>
         <Button

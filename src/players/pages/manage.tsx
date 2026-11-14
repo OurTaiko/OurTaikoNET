@@ -8,7 +8,6 @@ import { Button } from '@sitekit/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@sitekit/components/ui/card'
@@ -25,14 +24,14 @@ function Player({ member }: { member: GroupMember }) {
   const { t } = useTranslation()
   const nickname = member.nickname || t('manage.unnamed')
   return (
-    <span className="flex min-w-0 items-center gap-3">
+    <span className="flex items-center gap-3 min-w-0">
       <UserAvatar nickname={nickname} avatarUrl={member.avatarUrl} className="size-9 shrink-0" />
       <span className="min-w-0">
-        <Link className="block truncate font-semibold underline" to={`/players/${member.id}`}>
+        <Link className="block font-semibold underline truncate" to={`/players/${member.id}`}>
           {nickname}
         </Link>
         {member.username && (
-          <span className="block truncate text-xs text-muted-foreground">@{member.username}</span>
+          <span className="block text-muted-foreground text-xs truncate">@{member.username}</span>
         )}
       </span>
     </span>
@@ -43,7 +42,7 @@ function GroupNames({ names }: { names: string[] }) {
   return (
     <span className="flex flex-wrap gap-1.5">
       {names.map((name) => (
-        <span key={name} className="rounded-full border px-2 py-0.5 font-mono text-xs">
+        <span key={name} className="px-2 py-0.5 border rounded-full font-mono text-xs">
           {name}
         </span>
       ))}
@@ -139,15 +138,13 @@ export function ManagePage() {
   return (
     <div className="space-y-6" data-testid="manage-panel">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('manage.heading')}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('manage.lead')}</p>
+        <h1 className="font-semibold text-2xl tracking-tight">{t('manage.heading')}</h1>
       </div>
       {message && <Notice kind={message.kind}>{message.text}</Notice>}
 
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('manage.setHeading')}</CardTitle>
-          <CardDescription>{t('manage.setLead')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-1.5">
@@ -163,15 +160,15 @@ export function ManagePage() {
             />
           </div>
           {text && results && results.length === 0 && (
-            <p className="text-sm text-muted-foreground" data-testid="manage-no-match">
+            <p className="text-muted-foreground text-sm" data-testid="manage-no-match">
               {t('manage.noMatch')}
             </p>
           )}
           {text && results && results.length > 0 && (
-            <ul className="divide-y rounded-2xl border px-4" data-testid="manage-found">
+            <ul className="px-4 border rounded-2xl divide-y" data-testid="manage-found">
               {results.map((member) => (
                 <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span className="min-w-0 flex-1">
+                  <span className="flex-1 min-w-0">
                     <Player member={member} />
                   </span>
                   <GroupNames names={member.groups} />
@@ -190,7 +187,7 @@ export function ManagePage() {
             </ul>
           )}
           {editing && (
-            <div className="space-y-4 rounded-2xl border p-4" data-testid="manage-editing">
+            <div className="space-y-4 p-4 border rounded-2xl" data-testid="manage-editing">
               <Player member={editing.member} />
               <div className="space-y-3">
                 {groups.map((group) => (
@@ -204,7 +201,7 @@ export function ManagePage() {
                       <Label htmlFor={`group-${group.name}`} className="font-mono">
                         {group.name}
                       </Label>
-                      <p className="text-sm text-muted-foreground">{group.about}</p>
+                      <p className="text-muted-foreground text-sm">{group.about}</p>
                     </div>
                   </div>
                 ))}
@@ -225,16 +222,15 @@ export function ManagePage() {
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('manage.membersHeading')}</CardTitle>
-          <CardDescription>{t('manage.membersLead')}</CardDescription>
         </CardHeader>
         <CardContent>
           {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('manage.nobody')}</p>
+            <p className="text-muted-foreground text-sm">{t('manage.nobody')}</p>
           ) : (
             <ul className="divide-y" data-testid="manage-members">
               {members.map((member) => (
                 <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span className="min-w-0 flex-1">
+                  <span className="flex-1 min-w-0">
                     <Player member={member} />
                   </span>
                   <GroupNames names={member.groups} />

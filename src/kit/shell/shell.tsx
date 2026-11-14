@@ -428,7 +428,6 @@ export function Shell({
 
   return (
     <div className="isolate relative bg-background min-h-svh text-foreground">
-      <Backdrop />
       <div className="flex flex-col gap-4 sm:gap-5 mx-auto p-3 sm:p-4 max-w-[92rem]">
         {/* The top row stays in reach while the page scrolls: the name with the route, the
             search, and the tools. */}
@@ -655,23 +654,5 @@ function ShellLink({
     <Link to={href.slice(base.length) || '/'} {...props}>
       {children}
     </Link>
-  )
-}
-
-// A few faint shapes in the accent behind the page's top, as on Moesekai.
-function Backdrop() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 1440 720"
-      preserveAspectRatio="xMidYMin slice"
-      className="-z-10 absolute inset-x-0 top-0 opacity-25 dark:opacity-20 w-full h-[45rem] pointer-events-none"
-    >
-      <circle cx="360" cy="76" r="14" fill="none" stroke="var(--primary)" strokeWidth="3" />
-      <circle cx="1290" cy="330" r="46" fill="none" stroke="var(--primary)" strokeWidth="3" />
-      <path d="M1060 150l26 10-20 20z" fill="none" stroke="var(--primary)" strokeWidth="3" />
-      <path d="M430 560l-30 16 28 18z" fill="var(--primary-container)" />
-      <circle cx="800" cy="96" r="8" fill="var(--primary-container)" />
-    </svg>
   )
 }

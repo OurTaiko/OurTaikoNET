@@ -254,10 +254,6 @@
 }
 
 /* The marker under the word of a page heading that says what the page is. */
-.mark {
-  box-shadow: inset 0 -0.36em 0 var(--primary-container);
-}
-
 /* The don/ka stripe: the drum's two hits, used sparingly as a divider. */
 .drum-stripe {
   height: 6px;

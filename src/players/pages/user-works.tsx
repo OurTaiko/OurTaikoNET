@@ -68,13 +68,7 @@ export function SourceStats({ profiles }: { profiles: SourceProfiles }) {
           key={tile.key}
           className="flex flex-col gap-1 bg-card shadow-elev-1 p-4 rounded-[20px] min-w-0"
         >
-          <div className="h-[1.375rem]">
-            {tile.source ? (
-              <SourceTag source={tile.source} />
-            ) : (
-              <span className="text-muted-foreground text-xs">{t('profile.stats.site')}</span>
-            )}
-          </div>
+          <div className="h-[1.375rem]">{tile.source && <SourceTag source={tile.source} />}</div>
           <dd className="font-extrabold text-3xl tabular-nums tracking-tight">
             {loading ? (
               <Skeleton className="rounded-md w-12 h-9" />

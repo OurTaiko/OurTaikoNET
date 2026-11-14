@@ -551,7 +551,7 @@ export function NotificationsPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-              <span className="mark">{t('notificationCenter.title')}</span>
+              {t('notificationCenter.title')}
             </h1>
             {data && (
               <p className="text-sm text-muted-foreground">

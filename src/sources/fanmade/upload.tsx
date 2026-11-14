@@ -2,7 +2,6 @@ import { isChartOwner } from '@sitekit/chart-owners'
 import { chartText } from '@sitekit/chart-language'
 import { i18n } from '@sitekit/i18n'
 import { useTranslation } from 'react-i18next'
-import { Marked } from '@sitekit/components/page-hero'
 import { endpoints } from '@sitekit/api/endpoints'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
 import { AudioPlayer } from '@sitekit/components/audio-player'
@@ -455,9 +454,7 @@ export function UploadPage({
         <div>
           {!embedded && (
             <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-              <Marked
-                text={existing ? t('messages.updateSongAndCharts') : t('messages.publishYourChart')}
-              />
+              {existing ? t('messages.updateSongAndCharts') : t('messages.publishYourChart')}
             </h1>
           )}
           {existing && (

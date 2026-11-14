@@ -55,7 +55,6 @@ export function ProfilePage() {
             fallbackClassName="text-2xl"
           />
           <h2 className="text-base font-extrabold">{user.nickname}</h2>
-          <p className="text-sm text-muted-foreground">{t('messages.theNameOthersSee')}</p>
           <PlayerLink id={user.id} className={buttonVariants({ variant: 'outline' })}>
             {t('messages.myUserSpace')}
           </PlayerLink>

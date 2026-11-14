@@ -8,13 +8,7 @@ import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
 import { Badge } from '@sitekit/components/ui/badge'
 import { Button } from '@sitekit/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@sitekit/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
@@ -117,7 +111,6 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
     <Card className="rounded-3xl">
       <CardHeader>
         <CardTitle>{t('titles.mine')}</CardTitle>
-        <CardDescription>{t('titles.mineExplained', { limit: titleLimit })}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {message && <Notice kind={message.kind}>{message.text}</Notice>}
@@ -296,7 +289,6 @@ export function TitlesPage() {
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('titles.catalog')}</CardTitle>
-          <CardDescription>{t('titles.catalogExplained')}</CardDescription>
         </CardHeader>
         <CardContent>
           {error && <Notice>{error}</Notice>}

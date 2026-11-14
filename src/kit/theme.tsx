@@ -112,9 +112,6 @@ export function ThemeToggle() {
               {t('shell.ka')}
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
-          <p className="max-w-56 px-2 pt-1 pb-1.5 text-xs text-muted-foreground">
-            {t('shell.accentNote')}
-          </p>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

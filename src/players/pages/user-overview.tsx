@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowRightIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import type { ChartBase, ChartList } from '@sitekit/api/types'
 import { RelativeTime } from '@sitekit/comments'
@@ -48,7 +47,6 @@ function Panel({
           className="inline-flex items-center gap-1 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring font-semibold text-primary text-sm hover:underline"
         >
           {more}
-          <ArrowRightIcon className="size-3.5" aria-hidden="true" />
         </button>
       </div>
       {children}
@@ -186,7 +184,6 @@ function Titles({ id, plate, onMore }: { id: string; plate: Plate; onMore: () =>
               </li>
             ))}
           </ul>
-          <p className="text-muted-foreground text-xs">{t('profile.overview.titlesNote')}</p>
         </>
       )}
     </Panel>

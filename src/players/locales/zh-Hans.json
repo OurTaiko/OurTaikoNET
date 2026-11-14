@@ -36,19 +36,15 @@
     "plateTitle": "名牌",
     "plateText": "选好佩戴的称号，游戏里 1P、2P 的名牌都会跟着变。",
     "songs": "{{n}} 首",
-    "fanmadeText": "玩家制作并分享的谱面。",
-    "officialText": "官方游戏的歌曲，由管理员维护。",
     "browse": "浏览{{name}}曲库",
     "upload": "上传谱面",
     "dans": "段位道场",
     "newest": "最新歌曲",
     "plate": "你的名牌",
-    "plateNote": "游戏里和这里的每个页面都显示同一块名牌。",
     "openMyPage": "打开我的主页",
     "myCharts": "我的谱面",
     "myPlaylists": "我的歌单",
     "signInTitle": "登录后保存你的成绩",
-    "signInText": "用 OurTaiko 账号登录，查看你的全部成绩，收集称号和段位，挑选游戏里显示的名牌。",
     "loadFailed": "歌曲加载失败。"
   },
   "profile": {
@@ -68,8 +64,7 @@
       "plays": "游玩记录",
       "charts": "上传的谱面",
       "playlists": "公开歌单",
-      "comments": "评论",
-      "site": "两个曲源合计"
+      "comments": "评论"
     },
     "since": "{{first}} 加入 · 最近活跃 {{last}}",
     "more": "显示更多",
@@ -81,7 +76,6 @@
       "recent": "最近游玩",
       "both": "全部",
       "allScores": "全部成绩",
-      "titlesNote": "通过任一曲源的段位道场获得，或由玩家制作。带圈的是正在佩戴的。",
       "allTitles": "全部称号",
       "dans": "段位",
       "highest": "最高段位",
@@ -94,7 +88,6 @@
     "view": "显示方式",
     "best": "最佳成绩",
     "all": "游玩记录",
-    "bestExplained": "每个谱面块一行：分数取最高的一局，皇冠取所有游玩里最好的；谱面换过文件时优先显示新版本的成绩。",
     "source": "服务器",
     "allSources": "全部服务器",
     "course": "难度",
@@ -134,8 +127,6 @@
   },
   "titles": {
     "held": "已获得的称号",
-    "heldExplained": "挑战在线段位等方式获得的称号。",
-    "wearExplained": "选择一个称号佩戴，游戏和网站上的名牌都会显示它。",
     "showDan": "名牌上显示最高段位",
     "none": "还没有称号。",
     "official": "官方",
@@ -145,10 +136,8 @@
     "takeOff": "取下",
     "catalogLink": "查看全部称号",
     "catalog": "称号目录",
-    "catalogExplained": "所有可以获得的称号，以及它们在名牌上的样子。",
     "catalogEmpty": "还没有称号。",
     "mine": "我的称号",
-    "mineExplained": "为你自己创建的段位制作称号，玩家通过段位后获得。社区称号最多 {{limit}} 个，被管理员设为官方后不再占用名额。社区称号只能用在你自己的段位里，官方称号只能由官方段位授予。",
     "quota": "社区称号已用 {{used}} / {{limit}} 个",
     "changeBand": "改颜色",
     "edit": "修改",
@@ -167,7 +156,6 @@
   },
   "dans": {
     "badges": "段位徽章",
-    "badgesExplained": "官方在线段位合格后获得，只升不降。底色按全连状态：银粹（未全连）、金粹（全连）、虹粹（全良）；字色按合格线：白字赤合格、金字金合格。",
     "notYet": "未获得",
     "history": "挑战记录",
     "noHistory": "还没有在线段位挑战。",
@@ -186,7 +174,6 @@
   },
   "admin": {
     "editTitle": "新建或修改称号",
-    "editTitleExplained": "ID 只能用小写字母、数字和连字符，保存后不能改。同一 ID 再次保存即为修改。",
     "id": "ID",
     "name": "名称",
     "nameIn": "名称（{{language}}）",
@@ -201,7 +188,6 @@
     "confirmDelete": "删除称号 {{id}}？已获得它的玩家也会失去它。",
     "deleted": "已删除。",
     "grant": "手动授予称号",
-    "grantExplained": "用于活动或测试。用户 ID 是账号中心的 32 位 ID。",
     "userId": "用户 ID",
     "title": "称号",
     "grantButton": "授予",
@@ -241,10 +227,8 @@
     "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。"
   },
   "manage": {
-    "heading": "管理",
-    "lead": "用户组决定谁能使用不对所有人开放的功能。只有你（站点管理员）可以授予和收回用户组；管理员身份本身不属于任何用户组。",
+    "heading": "用户组",
     "setHeading": "设置玩家的用户组",
-    "setLead": "按昵称或用户名找到玩家，再勾选要加入的用户组。还没登录过的玩家也可以预先设置。",
     "search": "搜索玩家",
     "searchPlaceholder": "昵称，或完整的用户名",
     "noMatch": "没有找到。昵称输入一部分即可，用户名要输入完整。",
@@ -254,7 +238,6 @@
     "cancel": "取消",
     "saved": "用户组已保存。",
     "membersHeading": "已有用户组的玩家",
-    "membersLead": "至少属于一个用户组的所有玩家。",
     "nobody": "还没有人属于任何用户组。",
     "change": "修改"
   }

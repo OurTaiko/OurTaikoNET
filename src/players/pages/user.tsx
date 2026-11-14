@@ -26,13 +26,7 @@ import { ChoiceSelect } from '@players/components/choice-select'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Badge } from '@sitekit/components/ui/badge'
 import { Button } from '@sitekit/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@sitekit/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sitekit/components/ui/tabs'
@@ -104,7 +98,6 @@ export function UserPage() {
           <div className="min-w-0 flex-1 space-y-3">
             <Nameplate plate={plate} />
             <Seen profiles={works} />
-            <p className="truncate font-mono text-xs text-muted-foreground">{id}</p>
             {!profile.profilesAvailable && (
               <Notice kind="info">{t('profile.accountCenterDown')}</Notice>
             )}
@@ -254,7 +247,6 @@ function ScoresTab({ id, profile }: { id: string; profile: PublicProfile }) {
             }))}
           />
         </div>
-        {view === 'best' && <CardDescription>{t('scores.bestExplained')}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <Notice>{error}</Notice>}
@@ -450,9 +442,6 @@ function TitlesTab({
     <Card className="rounded-3xl">
       <CardHeader>
         <CardTitle>{t('titles.held')}</CardTitle>
-        <CardDescription>
-          {mine ? t('titles.wearExplained') : t('titles.heldExplained')}
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <Notice>{error}</Notice>}
@@ -546,7 +535,6 @@ function DansTab({ id }: { id: string }) {
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('dans.badges')}</CardTitle>
-          <CardDescription>{t('dans.badgesExplained')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ol className="grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-10">

@@ -20,7 +20,6 @@ import { UserAvatar } from './components/user-avatar'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRightIcon as ArrowRight,
   DownloadSimpleIcon as Download,
   UploadSimpleIcon as Upload,
   ArrowSquareOutIcon,
@@ -48,7 +47,7 @@ import { VoteControl } from './components/vote-control'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { cn } from './lib/utils'
 import { coverSource } from './cover'
-import { Marked, PageHero } from './components/page-hero'
+import { PageHero } from './components/page-hero'
 import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
@@ -126,7 +125,6 @@ export function Library({
         ) : (
           <Link className={buttonVariants({ variant: 'default', size: 'default' })} to="/login">
             {t('messages.signIn')}
-            <ArrowRight size={16} />
           </Link>
         )}
       </EmptyState>
@@ -157,7 +155,7 @@ export function Library({
             </a>
           </>
         ) : (
-          <PageHero title={t('messages.exploreCharts')} kicker={t(`shell.${SOURCE}`)} />
+          <PageHero title={t('messages.exploreCharts')} />
         ))}
       {site.chartSearch({
         query: q,
@@ -263,7 +261,6 @@ export function Auth({ register = false }: { register?: boolean }) {
           href={endpoints.login(destination)}
         >
           {t('messages.goToAccountCenter')}
-          <ArrowRight size={17} />
         </a>
         <a
           className={buttonVariants({ variant: 'outline', size: 'default', className: 'w-full' })}
@@ -484,7 +481,7 @@ export function Detail() {
           id="chart-title"
           className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl"
         >
-          <Marked text={text.title} wholeUpTo={12} />
+          {text.title}
         </h1>
         {text.subtitle && (
           <p className="text-muted-foreground wrap-anywhere sm:text-lg">{text.subtitle}</p>
@@ -991,9 +988,8 @@ export function ChartManagerPage() {
   return (
     <>
       <div className="space-y-1.5">
-        <p className="text-sm font-semibold text-muted-foreground">{t(`shell.${SOURCE}`)}</p>
         <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-          <Marked text={t('messages.chartManager')} />
+          {t('messages.chartManager')}
         </h1>
       </div>
       <Tabs
