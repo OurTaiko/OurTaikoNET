@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
@@ -48,6 +49,27 @@ func applyVote(ctx context.Context, tx pgx.Tx, table, column string, target any,
 
 func (s *Server) voteChart(w http.ResponseWriter, r *http.Request) {
 	s.voteSubject(w, r, chartSubject)
+}
+
+// gameChartVote is the player's own vote on a chart (1, -1, or 0 for none). The game asks it
+// after a play, to offer the vote only to a player who has not given one; the vote itself is
+// voteChart's, with the game's token (PUT /api/v1/game/charts/{id}/vote).
+func (s *Server) gameChartVote(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.required(w, r, false)
+	if !ok {
+		return
+	}
+	subject, ok := chartSubject(w, r, s.DB, "")
+	if !ok {
+		return
+	}
+	value := 0
+	e := s.DB.QueryRow(r.Context(), `SELECT value FROM chart_votes WHERE chart_id=$1 AND user_id=$2`, subject.chartID, u.User.ID).Scan(&value)
+	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+		internal(w, e)
+		return
+	}
+	web.Respond(w, 200, map[string]int{"myVote": value})
 }
 
 // voteDan is a chart vote on a 段位 course; the course keeps its own tallies.

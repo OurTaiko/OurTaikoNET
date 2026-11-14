@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"sync"
@@ -621,5 +622,60 @@ func TestPlaylistIDs(t *testing.T) {
 	}
 	if code := c.do("owner", "DELETE", path, "", nil); code != 200 {
 		t.Fatal("delete", code)
+	}
+}
+
+func TestGameChartVote(t *testing.T) { bothSources(t, testGameChartVote) }
+
+// The game's own two calls: a player's vote on a chart, read and given with the game's token.
+func testGameChartVote(t *testing.T, w interactionWorld) {
+	token := web.NewID() + web.NewID()
+	if _, err := w.s.DB.Exec(context.Background(), `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`,
+		web.Hash("game:"+token), testUsers["alice"].ID); err != nil {
+		t.Fatal(err)
+	}
+	handler := w.s.Handler()
+	call := func(bearer, method, path, body string, out any) int {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		if bearer != "" {
+			r.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, r)
+		if out != nil && rec.Code < 300 {
+			if e := json.Unmarshal(rec.Body.Bytes(), out); e != nil {
+				t.Fatal(e)
+			}
+		}
+		return rec.Code
+	}
+	path := "/api/v1/game/charts/" + w.song + "/vote"
+	var mine struct{ MyVote *int }
+	if code := call("", "GET", path, "", nil); code != 401 {
+		t.Fatal("guest read", code)
+	}
+	if code := call("", "PUT", path, `{"value":1}`, nil); code != 401 {
+		t.Fatal("guest vote", code)
+	}
+	if code := call(token, "GET", "/api/v1/game/charts/999999/vote", "", nil); code != 404 {
+		t.Fatal("missing chart", code)
+	}
+	if code := call(token, "GET", path, "", &mine); code != 200 || mine.MyVote == nil || *mine.MyVote != 0 {
+		t.Fatal("no vote yet", code, mine.MyVote)
+	}
+	var v VoteResult
+	if code := call(token, "PUT", path, `{"value":-1}`, &v); code != 200 || v.MyVote != -1 || *v.Downvotes != 1 {
+		t.Fatalf("game vote: %d %+v", code, v)
+	}
+	if code := call(token, "GET", path, "", &mine); code != 200 || *mine.MyVote != -1 {
+		t.Fatal("vote read back", code, *mine.MyVote)
+	}
+	// The website shows the same vote.
+	var chart Chart
+	w.c.do("alice", "GET", w.chart(w.song)+"?by=id", "", &chart)
+	if chart.MyVote != -1 || chart.Downvotes != 1 {
+		t.Fatalf("website: %+v %+v", chart.MyVote, chart.Downvotes)
 	}
 }

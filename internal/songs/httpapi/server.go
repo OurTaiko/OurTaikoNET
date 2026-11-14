@@ -199,6 +199,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/game/dan-attempts", s.submitDanAttempt)
 	mux.HandleFunc("POST /api/v1/game/scores", s.submitScore)
 	mux.HandleFunc("GET /api/v1/game/playlists", s.gamePlaylistList)
+	mux.HandleFunc("GET /api/v1/game/charts/{id}/vote", s.gameChartVote)
+	mux.HandleFunc("PUT /api/v1/game/charts/{id}/vote", s.voteChart)
 	mux.HandleFunc("GET /api/v1/playlists", s.listPlaylists)
 	mux.HandleFunc("POST /api/v1/playlists", s.createPlaylist)
 	mux.HandleFunc("GET /api/v1/playlists/system", s.listSystemPlaylists)
