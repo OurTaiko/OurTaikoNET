@@ -15,12 +15,14 @@ services:
     environment:
       LISTEN_ADDR: 0.0.0.0:8080
       STORAGE_DIR: /tmp/staging
-      STORAGE_BACKEND: s3
+      # STORAGE_BACKEND comes from storage.env: `local` until the switch (see
+      # deploy/README.md, "Files before the switch"), `s3` from then on.
       # The website's current release (OurTaikoNetWeb puts releases beside each other and
       # points `current` at one).
       WEB_DIR: /srv/web/current
-    # 8080 is Fanmade's on this server until the switch.
-    ports: ['127.0.0.1:8090:8080']
+    # On this server 8080 is Fanmade's, 8081 Database's, 8090 the account center's, 8093
+    # Profile's and 8094-8095 another site's.
+    ports: ['127.0.0.1:8096:8080']
     volumes:
       - /opt/ourtaiko-net/web:/srv/web:ro
     read_only: true

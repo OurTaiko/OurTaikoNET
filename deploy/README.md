@@ -69,8 +69,8 @@ Each step touches production and is done with the owner's go-ahead.
    three old databases and compares every table with its origin. It can be repeated, so it can
    run nightly while the preview lasts.
 2. **Settings.** Write `/etc/ourtaiko-net/docker/api.env` and `storage.env` from
-   `api.env.example`. Leave the three `LEGACY_*_HOST` empty for now. During the preview give
-   uploads their own S3 prefixes, so that nothing written there mixes with the old sites' files.
+   `api.env.example`. Leave the three `LEGACY_*_HOST` empty for now, and keep the preview away
+   from the old sites' files (next section).
 3. **Account center.** Register one Application for `net.ourtaiko.org` and put its client and
    service credentials in `api.env`.
 4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, writable by the
@@ -79,14 +79,28 @@ Each step touches production and is done with the owner's go-ahead.
    `net.locations.conf`.
 6. **Release** this repository, then OurTaikoNetWeb.
 
+## Files before the switch
+
+Until the switch the database here is a copy of the old ones, refreshed by the import, while
+the old sites go on changing theirs. The server does not only read files: in the background it
+deletes the files its database says nothing refers to any more, moves files to new names, and
+writes previews. Run on a copy that is hours old, with the right to write where the old sites
+keep their files, it would delete or move files the old sites still use.
+
+So before the switch the container gets no credentials for the files at all:
+`STORAGE_BACKEND=local` in `storage.env`. Covers, audio and chart files are then not served on
+the preview (the pages show their placeholders), and nothing can be uploaded. To see files on
+the preview without that risk it needs either credentials that can only read, or a way to turn
+the background jobs off; neither exists yet.
+
 ## The switch
 
 In one maintenance window, after the proof (PLAN.md, section 5):
 
 1. Stop the three old containers. Released games queue their uploads and retry.
 2. Back up the old databases; run `db/import.sh` a last time; it must finish clean.
-3. Set the three `LEGACY_*_HOST` in `api.env`, point uploads at the real S3 prefixes, and
-   recreate the container.
+3. Set the three `LEGACY_*_HOST` in `api.env`, set `storage.env` to `s3` with the real bucket,
+   prefixes and credentials, and recreate the container.
 4. In the server blocks of `fanmade.ourtaiko.org`, `database.ourtaiko.org` and
    `profile.ourtaiko.org`, replace what they proxy to with `net.locations.conf`. From then on
    their APIs are answered as before and their pages are redirected to the new site.

@@ -28,7 +28,7 @@ sudo -n docker tag "ourtaiko-net:$revision" ourtaiko-net:release
 install -m 0644 "$incoming/compose.production.yml" "$base/compose.production.yml"
 
 sudo -n docker compose -f "$base/compose.production.yml" up -d --wait --no-deps net
-curl -fsS http://127.0.0.1:8090/readyz
+curl -fsS http://127.0.0.1:8096/readyz
 echo "Published OurTaikoNet $revision"
 
 rm -f -- "$archive" "$incoming/compose.production.yml"
