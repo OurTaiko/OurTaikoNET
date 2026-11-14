@@ -1,5 +1,5 @@
 // What the frame knows of the whole site, whichever area shows it.
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { sourceOf, type SourceId } from '../source'
 
 const sourceKey = 'ourtaiko-net-source'
@@ -13,12 +13,24 @@ export function rememberedSource(): SourceId {
   }
 }
 
+const sourceWatchers = new Set<() => void>()
 export function rememberSource(source: SourceId) {
   try {
     localStorage.setItem(sourceKey, source)
   } catch {
     // The choice is simply not remembered.
   }
+  sourceWatchers.forEach((watcher) => watcher())
+}
+/**
+ * The source the menu's switch is at, kept up to date: what a page of no source shows the
+ * songs or players of.
+ */
+export function useRememberedSource(): SourceId {
+  return useSyncExternalStore((watcher) => {
+    sourceWatchers.add(watcher)
+    return () => void sourceWatchers.delete(watcher)
+  }, rememberedSource)
 }
 
 export type SiteRoles = {

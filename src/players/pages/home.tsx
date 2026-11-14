@@ -15,7 +15,7 @@ import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { SongCover } from '@sitekit/components/song-cover'
 import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
-import { rememberedSource } from '@sitekit/shell/site'
+import { useRememberedSource } from '@sitekit/shell/site'
 import type { SourceId } from '@sitekit/source'
 import { cn } from '@sitekit/lib/utils'
 import { endpoints } from '@players/api/endpoints'
@@ -132,6 +132,7 @@ function You() {
   const { t } = useTranslation()
   const session = useSession()
   const id = session.user?.id
+  const source = useRememberedSource()
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   useEffect(() => {
     if (!id) return
@@ -177,7 +178,6 @@ function You() {
       </section>
     )
   }
-  const source = rememberedSource()
   const user = session.user
   return (
     <section className="flex sm:flex-row flex-col sm:items-center gap-6 min-w-0 bg-card shadow-elev-1 p-6 rounded-[28px]">

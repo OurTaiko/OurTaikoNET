@@ -43,7 +43,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
-import { rememberedSource, rememberSource, useSiteRoles } from './site'
+import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 
 export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
 
@@ -91,8 +91,8 @@ export function Shell({
   const here = base + (pathname === '/' ? (base ? '/' : '/') : pathname)
   const roles = useSiteRoles(user?.id)
   // The source the Songs group points at: this page's, or the one used last.
-  const [chosen, setChosen] = useState<SourceId>(() => area || rememberedSource())
-  const source = area || chosen
+  const remembered = useRememberedSource()
+  const source = area || remembered
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('ourtaiko-net-menu') === 'collapsed'
@@ -202,7 +202,7 @@ export function Shell({
   // elsewhere it only turns the Songs group to it.
   const choose = (next: SourceId) => {
     rememberSource(next)
-    if (!area) return setChosen(next)
+    if (!area) return
     if (next === area) return
     const section = pathname.split('/')[1]
     const twin = ['playlists', 'dans'].includes(section) ? `/${section}` : '/'
