@@ -36,7 +36,7 @@ func Web(dir string, api http.Handler) http.Handler {
 		}
 		// A missing script, style or picture is missing: answering with the page instead
 		// would hand a browser HTML where it asked for something else.
-		if strings.HasPrefix(name, "assets/") || path.Ext(name) != "" {
+		if name != "index.html" && (strings.HasPrefix(name, "assets/") || path.Ext(name) != "") {
 			http.NotFound(w, r)
 			return
 		}
@@ -77,6 +77,10 @@ func serveFile(w http.ResponseWriter, r *http.Request, files fs.FS, name string)
 		w.Header().Set("Cache-Control", "no-cache")
 	default:
 		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
+	// The image has no table of file types, and Go's own does not know this one.
+	if path.Ext(name) == ".webmanifest" {
+		w.Header().Set("Content-Type", "application/manifest+json")
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, name, info.ModTime(), content)

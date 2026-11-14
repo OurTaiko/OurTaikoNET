@@ -1,9 +1,11 @@
 # Deploying OurTaikoNet
 
-Status: the tests run in GitHub Actions; on the server the database, the settings files and the
-directories exist (2026-11-14). **No image has been published and no container runs yet**: the
-publish half of the workflows and `publish.sh` have never run, and the first run should be
-watched.
+Status: published for the first time on 2026-11-14, this repository and then OurTaikoNetWeb,
+both by their workflows. The container runs on the server at `127.0.0.1:8096` on a database
+imported once from the three old ones, and serves the website. **It is not reachable from
+outside yet**: there is no DNS record, certificate or server block for `net.ourtaiko.org`. It
+has no account center application either, so nobody can sign in, and it keeps files locally,
+so covers and audio answer 503 (see "Files before the switch"). `rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -33,16 +35,17 @@ server and restarts nothing. When a change needs both, release this repository f
 
 `rollback.yml` republishes an archived image by commit. It does not touch the database.
 
-Publishing is off until the repository variable `DEPLOY_ENABLED` is `true` (Settings >
-Variables); until then a push runs the tests and stops. The same holds for OurTaikoNetWeb,
-which stops after its build.
+Publishing happens only while the repository variable `DEPLOY_ENABLED` is `true` (Settings >
+Variables); otherwise a push runs the tests and stops. The same holds for OurTaikoNetWeb,
+which stops after its build. Both are `true` since 2026-11-14: **a push to `main` of either
+repository publishes to the server.**
 
 Secrets: the server's address is the organization's `SERVER_ADDR`. Each of the two
 repositories has `DEPLOY_USER` (`ourtaiko-ci`), `DEPLOY_FINGERPRINT` (the server's SSH host key)
 and `DEPLOY_KEY`, a private key whose public half is in that user's `authorized_keys`: signing in
 is by key only. Optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. This repository also
 needs the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`, which
-are given to selected repositories: add it to them.
+are given to selected repositories; this one was added on 2026-11-14.
 
 ## The account the workflows sign in as
 
@@ -100,7 +103,7 @@ Each step touches production and is done with the owner's go-ahead.
    only. **Done on 2026-11-14.**
 5. **Proxy.** A server block for `net.ourtaiko.org` with its certificate, including
    `net.locations.conf`.
-6. **Release** this repository, then OurTaikoNetWeb.
+6. **Release** this repository, then OurTaikoNetWeb. **Done on 2026-11-14**, before steps 3 and 5.
 
 ## Files before the switch
 

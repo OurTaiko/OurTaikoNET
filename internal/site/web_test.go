@@ -99,9 +99,25 @@ func TestWithoutAWebsiteThereIsOnlyTheAPI(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	// A directory that has no website yet says so instead of pretending a page is missing.
-	w = httptest.NewRecorder()
-	Web(t.TempDir(), api).ServeHTTP(w, httptest.NewRequest("GET", "/fanmade/", nil))
-	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "not installed") {
-		t.Fatal(w.Code, w.Body.String())
+	empty := t.TempDir()
+	for _, address := range []string{"/fanmade/", "/", "/index.html"} {
+		w = httptest.NewRecorder()
+		Web(empty, api).ServeHTTP(w, httptest.NewRequest("GET", address, nil))
+		if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "not installed") {
+			t.Fatal(address, w.Code, w.Body.String())
+		}
+	}
+}
+
+// The image the server runs in has no table of file types, so the ones Go does not know by
+// itself are named here; with nosniff a browser takes the type as given.
+func TestTheManifestIsServedAsAManifest(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "index.html", "<!doctype html>page")
+	write(t, dir, "site.webmanifest", `{"name":"OurTaikoNET"}`)
+	w := httptest.NewRecorder()
+	Web(dir, http.NotFoundHandler()).ServeHTTP(w, httptest.NewRequest("GET", "/site.webmanifest", nil))
+	if got := w.Header().Get("Content-Type"); w.Code != 200 || got != "application/manifest+json" {
+		t.Fatal(w.Code, got)
 	}
 }
