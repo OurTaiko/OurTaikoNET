@@ -209,15 +209,16 @@ on the server and under `{fanmade,database,profile}/backups/postgresql/` in the 
 bucket; nothing deletes them. `deploy/server/import.sh` has nothing left to read and must not
 be pointed at a restored copy: it replaces what players have done since.
 
+Removed after them, the same day: the old databases' roles (`ourtaiko`, `ourtaiko_database`,
+`ourtaiko_profile`, `ourtaiko_database_viewer`), which owned nothing any more, and the units
+`ourtaiko-{fanmade,database,profile}-backup.{service,timer}`. To read one of the last dumps,
+restore it into a scratch database with `--no-owner`.
+
 Still there, on purpose:
 
 - The three old host names, their 1Panel sites and certificates, and `LEGACY_*_HOST` here:
   every released game before 2026-11-14 asks the old addresses.
-- The old databases' roles (`ourtaiko`, `ourtaiko_database`, `ourtaiko_profile`,
-  `ourtaiko_database_viewer`): they own nothing now. `ourtaiko_viewer` and
-  `ourtaiko_database_editor` are the console's accounts and are in use.
-- The units `ourtaiko-{fanmade,database,profile}-backup.service`, without timers; they would
-  fail now, their database being gone.
+- The roles `ourtaiko_viewer` and `ourtaiko_database_editor`: the console's accounts, in use.
 - `/usr/local/libexec/ourtaiko-fanmade-backup`: the account center's daily backup runs it.
 - `/etc/ourtaiko-{fanmade,database,profile}`: the old settings. The storage keys in them are
   the ones this server signs with (its own copy is in `storage.env`); the two IAM users they
