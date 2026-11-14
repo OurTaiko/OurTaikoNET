@@ -44,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
+import { twinPath } from './twin'
 
 export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
 
@@ -198,15 +199,15 @@ export function Shell({
       (!item.exact && here.startsWith(item.href.replace(/\/$/, '') + '/')) ||
       !!item.also?.some((prefix) => here.startsWith(prefix)))
 
-  // Choosing the other source on one of a source's pages goes to that page's twin there;
-  // elsewhere it only turns the Songs group to it.
+  // Choosing the other source on one of a source's pages goes to the same page there (see
+  // ./twin); elsewhere it only turns the Songs group to it.
   const choose = (next: SourceId) => {
     rememberSource(next)
-    if (!area) return
-    if (next === area) return
-    const section = pathname.split('/')[1]
-    const twin = ['playlists', 'dans'].includes(section) ? `/${section}` : '/'
-    visit(`/${next}${twin}`)
+    if (!area || next === area) return
+    // This area's session says who uploads here; for the other source the site's groups do:
+    // anyone uploads to Fanmade, the official source's songs are its managers'.
+    const mayUpload = next === 'fanmade' || roles.groups.includes('OFFICIAL_MANAGER')
+    visit(`/${next}${twinPath(pathname, mayUpload)}`)
   }
 
   const entry = (item: Item, rail: boolean) => (
