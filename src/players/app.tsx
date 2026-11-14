@@ -1,16 +1,14 @@
 // The pages that belong to no song source: home, players (their scores on both sources, titles,
 // 段位 badges and nameplate), the title catalog, and for the site's administrator the manage
 // panel.
-import { StrictMode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
-import { I18nextProvider, useTranslation } from 'react-i18next'
-import { IconContext } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
 import { NotificationsPage } from '@sitekit/notification-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { SessionProvider } from '@sitekit/session'
-import { ThemeProvider } from '@sitekit/theme'
-import { i18n } from './i18n'
+import { RouterBridge } from '@sitekit/navigation'
+import { catalogues } from './i18n'
 import { endpoints } from './api/endpoints'
 import { Layout } from '@players/components/layout'
 import { HomePage } from './pages/home'
@@ -39,43 +37,31 @@ function OldUserAddress() {
 
 function App() {
   return (
-    <StrictMode>
-      <IconContext.Provider value={{ weight: 'bold' }}>
-        <ThemeProvider storageKey="ourtaiko-net-theme">
-          <BrowserRouter>
-            <NotificationProvider>
-              <SessionProvider me={endpoints.me}>
-                <LanguageProvider>
-                  <DocumentLanguage />
-                  <Routes>
-                    <Route element={<Layout />}>
-                      <Route index element={<HomePage />} />
-                      <Route path="players" element={<DirectoryPage />} />
-                      <Route path="players/users/:id" element={<OldUserAddress />} />
-                      <Route path="players/:id" element={<UserPage />} />
-                      <Route path="titles" element={<TitlesPage />} />
-                      <Route path="notifications" element={<NotificationsPage />} />
-                      <Route path="admin" element={<AdminPage />} />
-                      <Route path="manage" element={<ManagePage />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Route>
-                  </Routes>
-                </LanguageProvider>
-              </SessionProvider>
-            </NotificationProvider>
-          </BrowserRouter>
-        </ThemeProvider>
-      </IconContext.Provider>
-    </StrictMode>
+    <BrowserRouter>
+      <RouterBridge />
+      <NotificationProvider>
+        <SessionProvider me={endpoints.me}>
+          <LanguageProvider>
+            <DocumentLanguage />
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="players" element={<DirectoryPage />} />
+                <Route path="players/users/:id" element={<OldUserAddress />} />
+                <Route path="players/:id" element={<UserPage />} />
+                <Route path="titles" element={<TitlesPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="admin" element={<AdminPage />} />
+                <Route path="manage" element={<ManagePage />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </LanguageProvider>
+        </SessionProvider>
+      </NotificationProvider>
+    </BrowserRouter>
   )
 }
 
-/** The app to render for a page of this area. */
-export function players() {
-  document.title = 'OurTaiko'
-  return (
-    <I18nextProvider i18n={i18n}>
-      <App />
-    </I18nextProvider>
-  )
-}
+/** These pages, ready to show: their own words, and the pages themselves. */
+export const players = { catalogues, App }

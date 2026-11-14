@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import {
   ArrowBendUpLeftIcon,
   ArrowFatUpIcon,
@@ -37,7 +37,8 @@ import { cn } from './lib/utils'
 import { Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session-context'
-import { AREA, sources } from './source'
+import { visit } from './navigation'
+import { sources } from './source'
 import type { SourceId } from './source'
 
 // One inbox for the whole site. Each source keeps its own notices, so the bell and the inbox
@@ -65,12 +66,8 @@ const newestFirst = (a: AppNotification, b: AppNotification) => when(b) - when(a
 const changedEvent = 'ourtaiko:notifications-changed'
 const announceChange = () => window.dispatchEvent(new Event(changedEvent))
 
-/** Goes to a page of a source, or of none (''): within this area without loading anew. */
-function useGo() {
-  const navigate = useNavigate()
-  return (area: SourceId | '', path: string) =>
-    area === AREA ? navigate(path) : location.assign(`${area && `/${area}`}${path}`)
-}
+/** Goes to a page of a source, or of none (''). */
+const useGo = () => (area: SourceId | '', path: string) => visit(`${area && `/${area}`}${path}`)
 
 function useNotificationText() {
   const { t, i18n } = useTranslation()
@@ -248,13 +245,20 @@ function merge(loaded: Loaded[]) {
     .sort(newestFirst)
 }
 
+// The count last seen, so the bell of the next area shown starts from it and not from nothing.
+let lastCount = 0
+
 // The bell in the top bar: how many are unread, and a menu of the latest.
 export function NotificationBell() {
   const { t } = useTranslation()
   const { user, csrfToken } = useSession()
   const location = useLocation()
   const go = useGo()
-  const [count, setCount] = useState(0)
+  const [count, setCountState] = useState(lastCount)
+  const setCount = useCallback((next: number) => {
+    lastCount = next
+    setCountState(next)
+  }, [])
   const [recent, setRecent] = useState<Sourced[] | null>(null)
   const refresh = useCallback(() => {
     if (!user) return
@@ -266,7 +270,7 @@ export function NotificationBell() {
           .catch(() => 0),
       ),
     ).then((counts) => setCount(counts.reduce((a, b) => a + b, 0)))
-  }, [user])
+  }, [user, setCount])
   useEffect(() => {
     if (!user) {
       setCount(0)
@@ -281,7 +285,7 @@ export function NotificationBell() {
       window.removeEventListener('focus', refresh)
       window.removeEventListener(changedEvent, refresh)
     }
-  }, [user, refresh, location.pathname])
+  }, [user, refresh, setCount, location.pathname])
   if (!user) return null
   const open = (n: Sourced) => {
     void markRead(n, csrfToken).catch(() => {})

@@ -39,14 +39,16 @@ export function browserLanguage(): Language {
 
 // Start with the browser language; LanguageProvider applies the SSO preference
 // once the session is available. No separate preference is stored locally.
-// The text both sources share. A source adds its own keys with addSourceCatalogues.
+// The words every area shares, kept apart from the store: an area's own are merged into the
+// store, and the next area starts from these again.
+const shared: Record<Language, object> = { 'zh-Hans': zh, en, ja, ko }
 export const i18n = i18next.createInstance()
 void i18n.use(initReactI18next).init({
   resources: {
-    'zh-Hans': { translation: zh },
-    en: { translation: en },
-    ja: { translation: ja },
-    ko: { translation: ko },
+    'zh-Hans': { translation: structuredClone(zh) },
+    en: { translation: structuredClone(en) },
+    ja: { translation: structuredClone(ja) },
+    ko: { translation: structuredClone(ko) },
   },
   lng: browserLanguage(),
   fallbackLng: 'zh-Hans',
@@ -62,6 +64,23 @@ void i18n.use(initReactI18next).init({
 export function addSourceCatalogues(catalogues: Record<Language, object>) {
   for (const [language, catalogue] of Object.entries(catalogues))
     i18n.addResourceBundle(language, 'translation', catalogue, true, true)
+}
+/**
+ * Makes the words those of one area: the shared ones with the area's own over them, and
+ * nothing left of the area shown before. What is on screen is drawn again by whoever calls.
+ */
+export function setAreaCatalogues(catalogues: Record<Language, object>) {
+  for (const language of Object.keys(shared) as Language[]) {
+    i18n.removeResourceBundle(language, 'translation')
+    i18n.addResourceBundle(language, 'translation', structuredClone(shared[language]))
+    i18n.addResourceBundle(
+      language,
+      'translation',
+      structuredClone(catalogues[language]),
+      true,
+      true,
+    )
+  }
 }
 // Utilities translate at call time; React components use useTranslation instead.
 export const t = i18n.t.bind(i18n)

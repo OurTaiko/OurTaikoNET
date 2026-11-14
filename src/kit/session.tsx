@@ -5,6 +5,10 @@ import { SessionContext, type SessionState } from './session-context'
 import type { ReactNode } from 'react'
 import { api, jsonRequest } from './api/client'
 import type { Session } from './api/types'
+// What each address last said, so an area shown again (or another area asking the same
+// address) starts from it instead of from nobody; it is asked again all the same.
+const known = new Map<string, Session>()
+
 /** me: where the signed-in player is described; a song source's own by default. */
 export function SessionProvider({
   children,
@@ -14,8 +18,10 @@ export function SessionProvider({
   me?: string
 }) {
   const { pathname } = useLocation()
-  const [session, setSession] = useState<Session>({ user: null, csrfToken: '' })
-  const [loading, setLoading] = useState(true),
+  const [session, setSession] = useState<Session>(
+    () => known.get(me) ?? { user: null, csrfToken: '' },
+  )
+  const [loading, setLoading] = useState(() => !known.has(me)),
     [error, setError] = useState('')
   const revision = useRef(0)
   const requested = useRef(false)
@@ -33,6 +39,7 @@ export function SessionProvider({
       api<Session>(me, { signal: current.signal })
         .then((next) => {
           if (!current.signal.aborted && startedAt === revision.current) {
+            known.set(me, next)
             setSession(next)
             setError('')
           }
@@ -56,6 +63,8 @@ export function SessionProvider({
   const logout = async () => {
     await api(endpoints.logout, jsonRequest('POST', {}, session.csrfToken))
     revision.current++
+    // One sign-in for the whole site: every area's copy goes.
+    known.clear()
     setError('')
     setSession({ user: null, csrfToken: '' })
   }

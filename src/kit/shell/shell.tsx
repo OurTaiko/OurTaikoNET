@@ -1,10 +1,11 @@
 // The site's one frame, the same on every page of every area: a menu that floats at the left
 // (a bar at the bottom on a phone), a top row of pills, and the page between them.
 //
-// The site has three areas, each a single-page app of its own (see main.tsx): the two song
+// The site has three areas, each with a router of its own (see src/root.tsx): the two song
 // sources, under /fanmade and /official, and everything that belongs to no source (home,
 // players, titles), at the top. The frame's links are whole addresses; one that stays in the
-// area it is shown in is a router link, any other loads its area anew.
+// area it is shown in is a router link, any other is a plain link, which the root follows by
+// swapping the area in place.
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -30,6 +31,7 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
+import { visit } from '../navigation'
 import { sources, type SourceId } from '../source'
 import { ThemeToggle } from '../theme'
 import { UserAvatar } from '../components/user-avatar'
@@ -197,7 +199,7 @@ export function Shell({
     if (next === area) return
     const section = pathname.split('/')[1]
     const twin = ['playlists', 'dans'].includes(section) ? `/${section}` : '/'
-    location.assign(`/${next}${twin}`)
+    visit(`/${next}${twin}`)
   }
 
   const entry = (item: Item, rail: boolean) => (
@@ -337,7 +339,12 @@ export function Shell({
   )
   const bar: Item[] = [
     home,
-    { ...songs[0], label: t('shell.songs'), exact: false, also: [`/${source}/`] },
+    // Lit on the source's song pages, but not on its playlists, which have the next item.
+    {
+      ...songs[0],
+      label: t('shell.songs'),
+      also: [`/${source}/charts`, `/${source}/dans`, `/${source}/me/charts`],
+    },
     songs[1],
     players[0],
     ...(user ? [{ ...you[0], label: t('shell.you') }] : []),

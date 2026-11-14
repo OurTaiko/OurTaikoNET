@@ -6,7 +6,7 @@ Status: the two song sources' pages and the players' pages run in one app, again
 
 ## How it is put together
 
-The site has three areas, told apart by how the address starts: the two song sources, `/fanmade/…` and `/official/…`, and the pages about players, `/players/…`. Each is a single-page app under its prefix, loaded only when one of its pages is opened; going from one area to another loads the page anew. An address outside all three goes to the source used last.
+The site has three areas, told apart by how the address starts: the two song sources, `/fanmade/…` and `/official/…`, and the pages that belong to no source (home, players, titles), at the top. Each has a router and pages of its own, fetched the first time one of its pages is opened; `src/root.tsx` shows one area at a time and moves between them without loading the page anew. What depends on the area (`SOURCE`, `BASE`, `AREA` in `src/kit/source.ts`, the API addresses in `src/kit/api/endpoints.ts`, the words) follows the area being shown, so code reads these when it needs them and never keeps a copy at module level. An address outside all three goes to the source used last.
 
 | Folder | What it is |
 |---|---|
