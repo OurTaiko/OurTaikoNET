@@ -12,7 +12,7 @@ import type { SourceId } from '@sitekit/source'
 import { endpoints } from '@players/api/endpoints'
 import type { PublicProfile } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
-import { inTurns } from '@players/in-turns'
+import { newestOf } from '@players/newest'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
 import { CommunityActivity } from '@players/components/community-activity'
@@ -131,7 +131,7 @@ export function HomePage() {
   const { t } = useTranslation()
   const [params] = useSearchParams()
   const libraries = useLibraries()
-  // Each source's ten newest.
+  // Each source's ten newest: the ten newest of all are among them.
   const newest = sources.map((source) => {
     const library = libraries[source]
     return library && library !== 'failed'
@@ -145,7 +145,7 @@ export function HomePage() {
       <h1 className="sr-only">{t('shell.home')}</h1>
       <div className="gap-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         <RecentWorks
-          works={inTurns(newest, 10, (work) => work.chart.createdAt)}
+          works={newestOf(newest, 10, (work) => work.chart.createdAt)}
           loading={loading}
           failed={sources.every((source) => libraries[source] === 'failed')}
         />
