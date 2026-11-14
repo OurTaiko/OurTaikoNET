@@ -9,6 +9,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { I18nextProvider } from 'react-i18next'
 import { IconContext } from '@phosphor-icons/react'
+import { applyTone } from '@sitekit/accent'
 import { i18n, setAreaCatalogues, type Language } from '@sitekit/i18n'
 import { moveInArea, setVisitor } from '@sitekit/navigation'
 import { rememberSource, rememberedSource } from '@sitekit/shell/site'
@@ -66,6 +67,7 @@ function turnTo(area: Area, part: Part, now: boolean) {
     document.documentElement.dataset.source = area
     rememberSource(area)
   } else delete document.documentElement.dataset.source
+  applyTone()
   show({ area, part }, now)
 }
 

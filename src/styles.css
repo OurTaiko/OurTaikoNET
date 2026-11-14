@@ -142,8 +142,9 @@
   --drop: var(--border);
 }
 
-/* Ka. */
-:root[data-source='fanmade'] {
+/* Ka: Fanmade's pages, and the pages of no source for a player who chose it (data-tone is
+   set by src/kit/accent.ts, and before the first paint by index.html). */
+:root[data-tone='ka'] {
   --primary: #006970;
   --primary-container: #68d0d7;
   --on-primary-container: #062a2d;
@@ -178,7 +179,7 @@
   --ring: #ffb4a8;
 }
 
-.dark[data-source='fanmade'] {
+.dark[data-tone='ka'] {
   --primary: #6fdbe3;
   --primary-foreground: #00363b;
   --secondary: #1f4f54;

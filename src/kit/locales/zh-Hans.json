@@ -964,6 +964,10 @@
     "accountCenter": "账号中心",
     "fanmade": "自制",
     "official": "官方",
-    "more": "更多"
+    "more": "更多",
+    "accent": "强调色",
+    "accentNote": "用于首页和玩家页面；歌曲页面跟随曲源的颜色。",
+    "don": "咚（红）",
+    "ka": "咔（青）"
   }
 }

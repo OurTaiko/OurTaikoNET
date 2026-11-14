@@ -975,6 +975,10 @@
     "accountCenter": "Account center",
     "fanmade": "Fanmade",
     "official": "Official",
-    "more": "More"
+    "more": "More",
+    "accent": "Accent colour",
+    "accentNote": "On Home and the player pages. Song pages wear their source's colour.",
+    "don": "Don (red)",
+    "ka": "Ka (teal)"
   }
 }

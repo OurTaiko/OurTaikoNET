@@ -15,10 +15,19 @@
           (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.classList.toggle('dark', dark)
         document.documentElement.classList.add(dark ? 'scheme-dark' : 'scheme-light')
-        // Each song source has its colours; set before the first paint.
+        // Each song source has its colours; set before the first paint. The pages of no source
+        // wear the accent the player chose (src/kit/accent.ts keeps this in step afterwards).
         const source = location.pathname.split('/')[1]
-        if (source === 'fanmade' || source === 'official')
+        let tone = 'don'
+        if (source === 'fanmade' || source === 'official') {
           document.documentElement.dataset.source = source
+          if (source === 'fanmade') tone = 'ka'
+        } else {
+          try {
+            if (localStorage.getItem('ourtaiko-net-accent') === 'ka') tone = 'ka'
+          } catch {}
+        }
+        document.documentElement.dataset.tone = tone
       })()
     </script>
     <meta name="description" content="OurTaiko：太鼓自制谱社区与官方谱面数据库" />

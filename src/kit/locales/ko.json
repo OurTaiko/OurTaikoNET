@@ -964,6 +964,10 @@
     "accountCenter": "계정 센터",
     "fanmade": "Fanmade",
     "official": "공식",
-    "more": "더 보기"
+    "more": "더 보기",
+    "accent": "강조 색",
+    "accentNote": "홈과 플레이어 페이지에 쓰입니다. 곡 페이지는 소스의 색을 따릅니다.",
+    "don": "동 (빨강)",
+    "ka": "캇 (청록)"
   }
 }

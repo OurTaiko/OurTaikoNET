@@ -9,10 +9,14 @@ import { Button } from './components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
+import { chooseTone, useChosenTone, type Tone } from './accent'
 
 /** storageKey names the browser's saved choice, one per site. */
 export function ThemeProvider({
@@ -66,6 +70,7 @@ export function ThemeToggle() {
   const { t } = useTranslation()
 
   const { theme, setTheme } = useTheme()
+  const tone = useChosenTone()
   const Icon = theme === 'system' ? Monitor : theme === 'dark' ? Moon : Sun
   return (
     <DropdownMenu>
@@ -89,6 +94,28 @@ export function ThemeToggle() {
             {t('messages.system')}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        {/* The accent of the pages that belong to no song source; see ./accent. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t('shell.accent')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={tone}
+            onValueChange={(value) => chooseTone(value as Tone)}
+            data-testid="accent-choice"
+          >
+            <DropdownMenuRadioItem value="don">
+              <span aria-hidden="true" className="size-3 rounded-full bg-don" />
+              {t('shell.don')}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="ka">
+              <span aria-hidden="true" className="size-3 rounded-full bg-ka" />
+              {t('shell.ka')}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <p className="max-w-56 px-2 pt-1 pb-1.5 text-xs text-muted-foreground">
+            {t('shell.accentNote')}
+          </p>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
