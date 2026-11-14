@@ -31,6 +31,10 @@ server and restarts nothing. When a change needs both, release this repository f
 
 `rollback.yml` republishes an archived image by commit. It does not touch the database.
 
+Publishing is off until the repository variable `DEPLOY_ENABLED` is `true` (Settings >
+Variables); until then a push runs the tests and stops. The same holds for OurTaikoNetWeb,
+which stops after its build.
+
 The repository needs the secrets Fanmade's has: `DEPLOY_HOST`, `DEPLOY_USER`,
 `DEPLOY_PASSWORD`, `DEPLOY_FINGERPRINT` (and optionally `DEPLOY_PORT`, `DEPLOY_BASE_PATH`), and
 the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`.
