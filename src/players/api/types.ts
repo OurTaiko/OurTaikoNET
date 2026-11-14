@@ -86,6 +86,24 @@ export type ScoreRow = {
   /** The play's recording on the chart's page of its service; absent when there is none to show. */
   replayUrl?: string
 }
+/** Something a player just did: a play they cleared, or a chart they uploaded. */
+export type Activity = {
+  kind: 'score' | 'upload'
+  at: string
+  source: string
+  /** nickname and avatarUrl are empty while the site has none for the player. */
+  user: { id: string; nickname: string; avatarUrl: string }
+  chart: { id: string; title: string; titleTranslations: Record<string, string> }
+  /** The play of a 'score'. */
+  play?: {
+    id: string
+    course: Course
+    side: 'single' | 'p1' | 'p2'
+    level: number
+    score: number
+    clearStatus: number
+  }
+}
 export type ScoreView = 'best' | 'all'
 export type ScoreSort = 'level' | 'score' | 'recent'
 export type ScorePage = {

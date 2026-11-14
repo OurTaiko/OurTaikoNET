@@ -4,10 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ChartBarIcon, IdentificationCardIcon, MedalIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import type { ChartBase, ChartList } from '@sitekit/api/types'
-import { chartText } from '@sitekit/chart-language'
 import { supportsChart } from '@sitekit/courses'
-import { LevelChips } from '@sitekit/components/difficulty-badges'
-import { SongCover } from '@sitekit/components/song-cover'
 import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { useRememberedSource } from '@sitekit/shell/site'
@@ -16,9 +13,12 @@ import { cn } from '@sitekit/lib/utils'
 import { endpoints } from '@players/api/endpoints'
 import type { PublicProfile } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
+import { inTurns } from '@players/in-turns'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
-import { SongTile, coverOf, songPage, sourceApi, sources } from '@players/components/song-tile'
+import { CommunityActivity } from '@players/components/community-activity'
+import { RecentWorks } from '@players/components/recent-works'
+import { SongTile, sourceApi, sources } from '@players/components/song-tile'
 
 type Library = { total: number; items: ChartBase[] }
 
@@ -43,76 +43,6 @@ function useLibraries() {
     return () => controller.abort()
   }, [])
   return libraries
-}
-
-function SourceCard({ source, library }: { source: SourceId; library?: Library | 'failed' }) {
-  const { t, i18n } = useTranslation()
-  const name = t(`shell.${source}`)
-  const ready = library && library !== 'failed' ? library : null
-  return (
-    <section
-      data-accent={source}
-      data-testid={`home-${source}`}
-      className="flex flex-col gap-5 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0"
-    >
-      <div className="flex justify-between items-start gap-4">
-        <h2 className="min-w-0 font-extrabold text-3xl tracking-tight">{name}</h2>
-        <span className="inline-flex items-center bg-secondary px-3 rounded-full h-8 font-semibold tabular-nums text-secondary-foreground text-sm whitespace-nowrap shrink-0">
-          {ready ? (
-            t('home.songs', { n: ready.total.toLocaleString(i18n.resolvedLanguage) })
-          ) : (
-            <span aria-hidden="true">…</span>
-          )}
-        </span>
-      </div>
-      <ul className="space-y-1.5">
-        {ready
-          ? ready.items.slice(0, 3).map((chart) => {
-              const text = chartText(chart, i18n.resolvedLanguage)
-              return (
-                <li key={chart.id}>
-                  <a
-                    href={songPage(source, chart.id)}
-                    className="group flex items-center gap-3 hover:bg-muted p-1.5 rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
-                  >
-                    <SongCover
-                      image={coverOf(source, chart)}
-                      categoryIds={chart.categoryIds}
-                      className="rounded-[10px] size-11 shrink-0"
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block font-semibold text-sm truncate">{text.title}</span>
-                      <span className="block text-muted-foreground text-xs truncate">
-                        {text.subtitle}
-                      </span>
-                    </span>
-                    <LevelChips difficulties={chart.difficulties.slice(-1)} />
-                  </a>
-                </li>
-              )
-            })
-          : library === 'failed'
-            ? null
-            : [0, 1, 2].map((row) => (
-                <li key={row}>
-                  <Skeleton className="rounded-[14px] h-14" />
-                </li>
-              ))}
-      </ul>
-      {library === 'failed' && <Notice>{t('home.loadFailed')}</Notice>}
-      <div className="flex flex-wrap gap-2 mt-auto">
-        <a className={buttonVariants()} href={`/${source}/`}>
-          {t('home.browse', { name })}
-        </a>
-        <a
-          className={buttonVariants({ variant: 'secondary' })}
-          href={source === 'fanmade' ? '/fanmade/upload' : '/official/dans'}
-        >
-          {source === 'fanmade' ? t('home.upload') : t('home.dans')}
-        </a>
-      </div>
-    </section>
-  )
 }
 
 function You() {
@@ -202,24 +132,30 @@ export function HomePage() {
   const { t } = useTranslation()
   const [params] = useSearchParams()
   const libraries = useLibraries()
-  // Both sources' newest, the newest of all first.
-  const newest = sources
-    .flatMap((source) => {
+  // Each source's newest, as many as `each`.
+  const newestOf = (each: number) =>
+    sources.map((source) => {
       const library = libraries[source]
       return library && library !== 'failed'
-        ? library.items.slice(0, 6).map((chart) => ({ source, chart }))
+        ? library.items.slice(0, each).map((chart) => ({ source, chart }))
         : []
     })
+  // Both sources' newest, the newest of all first.
+  const newest = newestOf(6)
+    .flat()
     .sort((a, b) => b.chart.createdAt.localeCompare(a.chart.createdAt))
   const loading = sources.some((source) => !libraries[source])
   return (
     <div className="space-y-8">
       {params.get('error') === 'sso' && <Notice>{t('home.signInFailed')}</Notice>}
       <h1 className="sr-only">{t('shell.home')}</h1>
-      <div className="gap-4 grid grid-cols-1 md:grid-cols-2">
-        {sources.map((source) => (
-          <SourceCard key={source} source={source} library={libraries[source]} />
-        ))}
+      <div className="gap-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <RecentWorks
+          works={inTurns(newestOf(10), 10, (work) => work.chart.createdAt)}
+          loading={loading}
+          failed={sources.every((source) => libraries[source] === 'failed')}
+        />
+        <CommunityActivity />
       </div>
       <You />
       <section className="space-y-4" aria-labelledby="newest-heading">

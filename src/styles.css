@@ -266,3 +266,74 @@
     transparent 56px 64px
   );
 }
+
+/* Home, the newest charts: a note for each, don for an official chart and ka for a fanmade
+   one (the note's button says which with data-accent). The chart shown is a roll that fills
+   while it is shown; the end of the filling is what moves on to the next. */
+.note-lane .note {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.4;
+  transition:
+    width 300ms var(--ease-emphasized),
+    opacity 200ms;
+}
+.dark .note-lane .note {
+  background: var(--primary-container);
+}
+.note-lane button:hover .note,
+.note-lane button:focus-visible .note {
+  opacity: 1;
+}
+.note-lane button:focus-visible .note {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.note-lane [aria-current='true'] .note {
+  width: 2.75rem;
+  opacity: 1;
+  background: color-mix(in srgb, var(--primary) 28%, transparent);
+}
+.dark .note-lane [aria-current='true'] .note {
+  background: color-mix(in srgb, var(--primary-container) 30%, transparent);
+}
+.note-roll {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--primary);
+  transform-origin: left;
+  animation: note-roll 7s linear forwards;
+}
+.dark .note-roll {
+  background: var(--primary-container);
+}
+@keyframes note-roll {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-lane .note {
+    transition: none;
+  }
+}
+
+/* Home, the community's activity: rows come in and go out under a soft edge. */
+.activity-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 0.75rem,
+    #000 calc(100% - 2rem),
+    transparent
+  );
+}
