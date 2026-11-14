@@ -2,10 +2,12 @@
 
 Status: published for the first time on 2026-11-14, this repository and then OurTaikoNetWeb,
 both by their workflows. The container runs on the server at `127.0.0.1:8096` on a database
-imported once from the three old ones, and serves the website. **It is not reachable from
-outside yet**: there is no DNS record, certificate or server block for `net.ourtaiko.org`. It
-has no account center application either, so nobody can sign in, and it keeps files locally,
-so covers and audio answer 503 (see "Files before the switch"). `rollback.yml` has not been run.
+imported once from the three old ones, and serves the website. Since the same day it is
+public at <https://net.ourtaiko.org> as a preview beside the three old sites. **It has no
+account center application yet, so nobody can sign in** (the sign-in link comes back to the
+front page), its data is the one import and does not follow the old sites, and it keeps files
+locally, so covers and audio answer 503 (see "Files before the switch"). `rollback.yml` has
+not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -101,8 +103,11 @@ Each step touches production and is done with the owner's go-ahead.
 4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, owned by
    `ourtaiko-ci`; the container reads `web/` as user 10001. `/etc/ourtaiko-net/docker`, root
    only. **Done on 2026-11-14.**
-5. **Proxy.** A server block for `net.ourtaiko.org` with its certificate, including
-   `net.locations.conf`.
+5. **Proxy.** In 1Panel, a reverse proxy website for `net.ourtaiko.org` to
+   `http://127.0.0.1:8096` with a Let's Encrypt certificate; then `net.locations.conf` is
+   installed as `/opt/1panel/www/sites/net.ourtaiko.org/proxy/root.conf` in place of the file
+   1Panel wrote (kept beside it as `root.conf.before-net-locations`), and nginx reloaded
+   (`nginx -t`, `nginx -s reload` in the OpenResty container). **Done on 2026-11-14.**
 6. **Release** this repository, then OurTaikoNetWeb. **Done on 2026-11-14**, before steps 3 and 5.
 
 ## Files before the switch
