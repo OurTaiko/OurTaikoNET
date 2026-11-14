@@ -2,7 +2,7 @@
 
 The website of OurTaiko at `net.ourtaiko.org`: one app for both song sources. Its backend is the `OurTaikoNet` repository.
 
-Status: the two song sources' pages and the players' pages run in one app, against a local backend. Not deployed.
+Status: the two song sources' pages and the players' pages run in one app, against a local backend. Not deployed; how it will be is in "Releasing" below.
 
 ## How it is put together
 
@@ -27,9 +27,20 @@ pnpm test         # unit tests
 pnpm lint && pnpm format:check && pnpm build
 ```
 
+## Releasing
+
+`pnpm build` writes the site to `dist/`. The backend serves it: its `WEB_DIR` is a directory of
+this build, and every address that is not the API's and not a file gets `index.html`.
+
+A push to `main` runs `.github/workflows/deploy.yml`: lint, formatting, tests, build, then the
+build is uploaded and `deploy/publish.sh` makes it the current one on the server
+(`/opt/ourtaiko-net/web/current`, a link to `web/releases/<commit>`). Nothing restarts. The
+scripts and styles of the build before it, which pages already open still ask for, are kept
+beside the new ones for two weeks. `rollback.yml` points the link back at one of the five builds
+the server keeps. Written and tried on a developer's machine; not yet run in GitHub Actions or
+on the server. The server side is described in the backend's `deploy/README.md`.
+
 ## Not here yet
 
-- The players' pages keep the look they had on the old site (their own header, font and components), not the song pages' look.
 - The browser chart editor's build (431 MB in the old Fanmade site's `public/edit`): where it is to be hosted is undecided, so the editor page has nothing to load.
 - The old sites' browser tests (Playwright).
-- How the built site is served and deployed.

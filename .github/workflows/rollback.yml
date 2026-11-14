@@ -1,0 +1,61 @@
+name: Roll back OurTaikoNetWeb
+
+# Makes an earlier build of the website the current one again. The server keeps the five
+# newest builds; for an older one, run the deploy workflow on that commit instead.
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Full commit SHA of a build still on the server
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: net-web-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check the requested revision
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: |
+          if [[ ! "$REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::revision must be a full commit SHA"
+            exit 1
+          fi
+
+      - name: Check out main for the publish script
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare the publish script from main
+        run: |
+          {
+            printf "bash -se <<'NET_WEB_PUBLISH_SCRIPT'\n"
+            cat deploy/publish.sh
+            printf '\nNET_WEB_PUBLISH_SCRIPT\n'
+          } > "$RUNNER_TEMP/publish-net-web.sh"
+
+      - name: Switch back over SSH
+        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        env:
+          DEPLOY_REVISION: ${{ inputs.revision }}
+          DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          version: '1.8.1'
+          command_timeout: 10m
+          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH
+          script_path: ${{ runner.temp }}/publish-net-web.sh
