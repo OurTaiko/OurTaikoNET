@@ -27,7 +27,7 @@ services:
       - /opt/ourtaiko-net/web:/srv/web:ro
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=1g']
-    security_opt: [no-new-privileges:true]
+    security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
     healthcheck:
       test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:8080/readyz']
