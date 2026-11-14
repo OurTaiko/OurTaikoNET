@@ -110,7 +110,7 @@ export function Shell({
     }
   }, [collapsed])
 
-  const songsOf = (source: SourceId): Item[] => [
+  const songs: Item[] = [
     {
       key: 'browse',
       href: `/${source}/`,
@@ -137,7 +137,6 @@ export function Shell({
         ]
       : []),
   ]
-  const songs = songsOf(source)
   const players: Item[] = [
     {
       key: 'players',
@@ -346,16 +345,17 @@ export function Shell({
     </ShellLink>
   )
   // The route beside the name: which section this page is in and which page of it, each a
-  // menu of the others. The two sources are sections of their own here, so the first menu
-  // also changes source.
+  // menu of the others. The sections are the menu's groups; which source the songs are of is
+  // a setting (the switch in the menu), not a place, so it is no step of the route.
   const sections: { key: string; label: string; items: Item[] }[] = [
-    ...sources.map(({ id }) => ({ key: id, label: t(`shell.${id}`), items: songsOf(id) })),
+    { key: 'songs', label: t('shell.songs'), items: songs },
     { key: 'players', label: t('shell.players'), items: players },
     ...(you.length ? [{ key: 'you', label: t('shell.you'), items: you }] : []),
   ]
   const found = sections.find((section) => section.items.some(lit))
-  // A page of a source that is no item of the menu (signing in, the account) is still in it.
-  const section = found ?? sections.find((candidate) => candidate.key === area)
+  // A page of a source that is no item of the menu (signing in, the account) is still among
+  // the songs.
+  const section = found ?? (area ? sections[0] : undefined)
   const page = found?.items.find(lit)
   const route = section && (
     <nav
