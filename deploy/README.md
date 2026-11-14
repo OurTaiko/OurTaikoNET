@@ -38,11 +38,25 @@ Variables); until then a push runs the tests and stops. The same holds for OurTa
 which stops after its build.
 
 Secrets: the server's address is the organization's `SERVER_ADDR`. Each of the two
-repositories has `DEPLOY_USER`, `DEPLOY_FINGERPRINT` (the server's SSH host key) and
-`DEPLOY_KEY`, a private key whose public half is in the deploy user's `authorized_keys`: signing
-in is by key only. Optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. This repository also
+repositories has `DEPLOY_USER` (`ourtaiko-ci`), `DEPLOY_FINGERPRINT` (the server's SSH host key)
+and `DEPLOY_KEY`, a private key whose public half is in that user's `authorized_keys`: signing in
+is by key only. Optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. This repository also
 needs the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`, which
 are given to selected repositories: add it to them.
+
+## The account the workflows sign in as
+
+`ourtaiko-ci` on the server (`deploy/server/create-ci-user.sh`, run on 2026-11-14) is used by
+nothing else. It has no password and one key, which forwards nothing; it owns
+`/opt/ourtaiko-net`; it cannot read the settings files; and it may run as root only the docker
+commands `publish.sh` runs, on images named `ourtaiko-net` and the one Compose file
+(`/etc/sudoers.d/ourtaiko-ci`). The private key exists only as the `DEPLOY_KEY` secret of the two
+repositories: to replace it, make a new pair, put the new public half in the account's
+`authorized_keys` and set the secret again.
+
+This narrows what a leaked key can do, but not to nothing: the Compose file that says what the
+container may do comes from this repository with every release, so whoever can push to `main`,
+or holds the key, can still start a container of their choosing on the server.
 
 ## Trying the image on your own machine
 
@@ -81,8 +95,8 @@ Each step touches production and is done with the owner's go-ahead.
    and the three `LEGACY_*_HOST` are added later; see `api.env.example`. **Done on 2026-11-14.**
 3. **Account center.** Register one Application for `net.ourtaiko.org` and put its client and
    service credentials in `api.env`.
-4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, owned by the
-   deploy user; the container reads `web/` as user 10001. `/etc/ourtaiko-net/docker`, root
+4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, owned by
+   `ourtaiko-ci`; the container reads `web/` as user 10001. `/etc/ourtaiko-net/docker`, root
    only. **Done on 2026-11-14.**
 5. **Proxy.** A server block for `net.ourtaiko.org` with its certificate, including
    `net.locations.conf`.
