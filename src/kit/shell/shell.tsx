@@ -53,7 +53,7 @@ type Item = {
   href: string
   label: string
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>
-  /** Addresses that light the item besides its own; all start with the item's area. */
+  /** Addresses that light the item besides its own. */
   also?: string[]
   /** An address under href that is another item's. */
   except?: string
@@ -151,16 +151,6 @@ export function Shell({
       icon: PlaylistIcon,
     },
     { key: 'dans', href: `/${source}/dans`, label: t('shell.dans'), icon: MedalIcon },
-    ...(canUpload(source)
-      ? [
-          {
-            key: 'charts',
-            href: `/${source}/me/charts`,
-            label: t('shell.charts'),
-            icon: FolderIcon,
-          },
-        ]
-      : []),
   ]
   const players: Item[] = [
     {
@@ -187,6 +177,17 @@ export function Shell({
           label: t('shell.notifications'),
           icon: BellIcon,
         },
+        // What is yours of the source the menu is turned to: your charts, then your playlists.
+        ...(canUpload(source)
+          ? [
+              {
+                key: 'charts',
+                href: `/${source}/me/charts`,
+                label: t('shell.charts'),
+                icon: FolderIcon,
+              },
+            ]
+          : []),
         {
           key: 'myPlaylists',
           href: `/${source}/me/playlists`,
@@ -417,11 +418,12 @@ export function Shell({
     {
       ...songs[0],
       label: t('shell.songs'),
-      also: [`/${source}/charts`, `/${source}/dans`, `/${source}/me/charts`],
+      also: [`/${source}/charts`, `/${source}/dans`],
     },
     songs[1],
     { ...players[0], label: t('shell.players') },
-    ...(user ? [{ ...you[0], label: t('shell.you') }] : []),
+    // Your charts are under You in the menu, so they light You here.
+    ...(user ? [{ ...you[0], label: t('shell.you'), also: [`/${source}/me/charts`] }] : []),
   ]
 
   return (
