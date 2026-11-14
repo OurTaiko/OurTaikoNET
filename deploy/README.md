@@ -220,10 +220,13 @@ Still there, on purpose:
   every released game before 2026-11-14 asks the old addresses.
 - The roles `ourtaiko_viewer` and `ourtaiko_database_editor`: the console's accounts, in use.
 - `/usr/local/libexec/ourtaiko-fanmade-backup`: the account center's daily backup runs it.
-- `/etc/ourtaiko-{fanmade,database,profile}`: the old settings. The storage keys in them are
-  the ones this server signs with (its own copy is in `storage.env`); the two IAM users they
-  belong to must stay.
+- The two IAM users of the old Fanmade and Database sites: this server signs with their keys
+  (`FANMADE_AWS_*`, `OFFICIAL_AWS_*` in `storage.env`, now the only copy on the server).
+- The old sites' backups under `/var/backups/ourtaiko-*`, the last dumps among them.
 
-**Do not publish Fanmade, Database or OurTaikoProfile again.** Their workflows would now fail
-at the server (their folders are gone), and must stay that way: a running old container would
-delete files by a database that no longer changes.
+Also removed on 2026-11-14: the old settings `/etc/ourtaiko-{fanmade,database,profile}`
+(after the storage keys in them were found equal to this server's own), and the unit
+`ourtaiko-fanmade.service` from before the sites ran in containers.
+
+The repositories Fanmade, Database, OurTaikoProfile and OurTaikoSiteKit are archived on GitHub
+(2026-11-14), so their workflows cannot run and nothing can publish them again.
