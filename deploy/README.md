@@ -1,15 +1,15 @@
 # Deploying OurTaikoNet
 
-Status: published for the first time on 2026-11-14, this repository and then OurTaikoNetWeb,
-both by their workflows. The container runs on the server at `127.0.0.1:8096` on a database
-imported once from the three old ones, and serves the website. Since the same day it is
-public at <https://net.ourtaiko.org> as a preview beside the three old sites, and has its
-Application in the account center (`OurTaikoNet`), so players can sign in. **What is done on
-the preview is not kept**: its data is the one import, does not follow the old sites, and is
-replaced by the next import. It reads the old sites' files over their public address and
-cannot change them, so nothing can be uploaded to it (see "Files before the switch"). Nobody
-is the site's administrator until the role is given in the account center's admin (Client
-roles). `rollback.yml` has not been run.
+Status: **in production since the switch on 2026-11-14, 04:06 UTC.** The one container
+`ourtaiko-net` (`127.0.0.1:8096`) answers <https://net.ourtaiko.org> and the three old host
+names: `fanmade.ourtaiko.org`, `database.ourtaiko.org` and `profile.ourtaiko.org` get their
+old APIs from it and have their pages redirected to the new site (`internal/legacy`). Its
+database `ourtaiko_net` is the only one written; files are in the bucket the old sites used,
+each source signing with its old site's key. The three old containers are stopped, not
+removed, and their databases are as they were at the switch: see "Going back". A push to
+`main` of this repository or OurTaikoNetWeb publishes to production. Nobody is the site's
+administrator until the role is given in the account center's admin (Client roles), and
+`rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -136,20 +136,48 @@ a file the old site has since deleted answers 403 from the public address.
 
 `STORAGE_BACKEND=local` (the first days of the preview) serves no files at all.
 
-## The switch
+## The switch (done on 2026-11-14)
 
-In one maintenance window, after the proof (PLAN.md, section 5):
+What was done, in order; the scripts ran on the server from `/tmp` and are described here
+because they are not needed again.
 
-1. Stop the three old containers. Released games queue their uploads and retry.
-2. Back up the old databases; run `db/import.sh` a last time; it must finish clean.
-3. Set the three `LEGACY_*_HOST` in `api.env`, set `storage.env` to `s3` with the real bucket,
-   prefixes and credentials, and recreate the container.
-4. In the server blocks of `fanmade.ourtaiko.org`, `database.ourtaiko.org` and
-   `profile.ourtaiko.org`, replace what they proxy to with `net.locations.conf`. From then on
-   their APIs are answered as before and their pages are redirected to the new site.
-5. Smoke test: sign in on the website, an upload, a released game from start to score.
+Before the window, with the old sites still serving:
+1. The three `LEGACY_*_HOST` were set in `api.env` (they matter only to a request that reaches
+   the container under one of those names) and the import was repeated.
+2. `tools/compare-answers.py` asked the old sites and this server the same questions on the
+   server itself (old `127.0.0.1:8080`, `8081`, `8093`; new `127.0.0.1:8096` by old host name
+   and by new address). Fanmade: 347 charts, 1644 questions, the differences were `coverHash`
+   added to the game's lists (on purpose) and one avatar missed once. Official: 150 charts one
+   by one and every list, 1285 questions, `sso.service` (on purpose: the game asks the account
+   center for a session of the service the catalogue names) and one nickname missed once.
+   Players: 564 questions; links now lead to the new site, and the official source is called
+   `official` where the old players' site said `database`.
 
-Going back within the agreed window: restore the old proxy rules and start the old containers,
-which were stopped with their databases untouched. Anything written on the new site since the
-switch is lost unless it is copied back. After the window the old containers and, after a last
-dump, the old databases are removed.
+The window, 04:05:34 to 04:06:05 UTC:
+3. `docker stop` of `ourtaiko-fanmade`, `ourtaiko-database`, `ourtaiko-profile`.
+4. `deploy/server/import.sh` a last time: 55 tables, check passed, 47,034 rows.
+5. `storage.env` set to `s3`: the bucket and region of the old sites, each source's prefix and
+   public address, and for each source the access key its old site used
+   (`FANMADE_AWS_*`, `OFFICIAL_AWS_*`); the container recreated.
+6. `net.locations.conf` installed as the proxy file of the three old sites
+   (`fanmade…/proxy/root.conf`, `database…/database.conf`, `profile…/proxy/root.conf`), each
+   old file kept beside it as `<name>.before-net`; `nginx -t`, reload.
+
+Afterwards: a last backup of each old database by its own timer's service, and the daily
+backup of `ourtaiko_net` (`deploy/server/install-backup.sh`, `cmd/backup`; 04:30 Asia/Tokyo,
+30 days kept, uploaded under `net/backups/postgresql/` of the private bucket).
+
+Not done by anyone yet: a released game from sign-in to a score; an upload on the website; a
+restore drill of an `ourtaiko_net` backup.
+
+## Going back
+
+While the old containers and databases still exist: restore the three `.before-net` proxy
+files and reload nginx, set `storage.env` back to `STORAGE_BACKEND=public` (kept as
+`storage.env.before-switch`) and recreate this container so that it stops writing files, then
+`docker start ourtaiko-fanmade ourtaiko-database ourtaiko-profile`. Everything written here
+since the switch (scores, uploads, comments, new players) is then missing on the old sites
+unless it is copied back, and files this server has deleted or renamed since are gone for
+them. **Do not publish Fanmade, Database or OurTaikoProfile again**: their workflows would
+start the old containers beside this one, and their background work would delete files by
+databases that no longer change.
