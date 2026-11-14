@@ -1,6 +1,6 @@
 # The OurTaikoNet server: the API of net.ourtaiko.org and of the three old addresses. The
-# website (OurTaikoNetWeb) is not in the image; the server serves it from WEB_DIR, where its
-# own releases are put (deploy/README.md).
+# website (web/) is not in the image; the server serves it from WEB_DIR, where its own
+# releases are put (deploy/README.md).
 
 # TJAParser's command-line tool: the game's own parser, which reads every uploaded chart's
 # blocks, hashes them and lists the notes the difficulty constants are computed from. Pin a tag

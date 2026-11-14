@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import cases from '../../contracts/validation.json'
+import cases from '../../../contracts/validation.json'
 import { maxMovie, parseTja, prepareTja, validateMovie, ValidationError } from './tja'
 
 describe('shared TJA upload contract', () => {

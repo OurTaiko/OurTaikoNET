@@ -1,13 +1,21 @@
 name: Roll back OurTaikoNet
 
-# Republishes an earlier image from ourtaiko-private (archived by deploy.yml). The database
-# is not rolled back: an older image runs on the current schema only if nothing it needs has
-# changed since. The website is rolled back on its own, from OurTaikoNetWeb.
+# Puts an earlier release of one part back. The backend: republishes an image from
+# ourtaiko-private (archived by deploy.yml); the database is not rolled back, so an older
+# image runs on the current schema only if nothing it needs has changed since. The website:
+# points the server back at one of the five builds it keeps; for an older one, run the deploy
+# workflow on that commit instead. Builds published before the website moved into this
+# repository are named by OurTaikoNetWeb's commits.
 on:
   workflow_dispatch:
     inputs:
+      part:
+        description: What to roll back
+        type: choice
+        options: [backend, website]
+        required: true
       revision:
-        description: Full commit SHA of a previously published image
+        description: Full commit SHA of a previous release of that part
         required: true
 
 permissions:
@@ -18,8 +26,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  rollback:
-    if: github.ref == 'refs/heads/main'
+  backend:
+    if: github.ref == 'refs/heads/main' && inputs.part == 'backend'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -95,3 +103,46 @@ jobs:
           command_timeout: 30m
           envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_IMAGE_SHA256
           script_path: ${{ runner.temp }}/publish-net.sh
+
+  website:
+    if: github.ref == 'refs/heads/main' && inputs.part == 'website'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check the requested revision
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: |
+          if [[ ! "$REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::revision must be a full commit SHA"
+            exit 1
+          fi
+
+      - name: Check out main for the publish script
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare the publish script from main
+        run: |
+          {
+            printf "bash -se <<'NET_WEB_PUBLISH_SCRIPT'\n"
+            cat deploy/publish-web.sh
+            printf '\nNET_WEB_PUBLISH_SCRIPT\n'
+          } > "$RUNNER_TEMP/publish-net-web.sh"
+
+      - name: Switch back over SSH
+        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        env:
+          DEPLOY_REVISION: ${{ inputs.revision }}
+          DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
+        with:
+          host: ${{ secrets.SERVER_ADDR }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          version: '1.8.1'
+          command_timeout: 10m
+          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH
+          script_path: ${{ runner.temp }}/publish-net-web.sh

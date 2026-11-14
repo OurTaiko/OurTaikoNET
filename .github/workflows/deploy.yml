@@ -1,8 +1,8 @@
 name: Deploy OurTaikoNet
 
-# Tests the commit, builds its image, keeps the image for rollback and publishes it. The
-# website is released on its own, from OurTaikoNetWeb; release the backend first when a
-# change needs both.
+# Tests what a push changed and publishes it. The backend is an image, kept in ourtaiko-private
+# for rollback; the website (web/) is a build the backend serves from the server's disk. A push
+# that changes both publishes the backend first and the website only after it.
 on:
   push:
     branches: [main]
@@ -17,7 +17,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.parts.outputs.backend }}
+      website: ${{ steps.parts.outputs.website }}
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: See which parts the push changed
+        id: parts
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # A run started by hand, or a push whose previous commit is not known, does both.
+          backend=true website=true
+          if [[ "$EVENT" == push && "$BEFORE" =~ ^[0-9a-f]{40}$ && "$BEFORE" != 0000000000000000000000000000000000000000 ]] \
+            && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            backend=false website=false
+            while IFS= read -r file; do
+              case "$file" in
+                *.md | .github/workflows/rollback.yml) ;;
+                contracts/* | .github/workflows/deploy.yml) backend=true website=true ;;
+                web/* | deploy/publish-web.sh) website=true ;;
+                *) backend=true ;;
+              esac
+            done < <(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "website=$website" >> "$GITHUB_OUTPUT"
+          echo "Backend: $backend, website: $website"
+
+  test-backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
@@ -49,11 +88,71 @@ jobs:
           -e DATABASE_TEST_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres
           ourtaiko-net-test
 
-  deploy:
-    needs: test
-    # Publishing is switched on per repository (Settings > Variables: DEPLOY_ENABLED=true),
-    # once the server is ready for it. Until then a push only runs the tests.
-    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+  test-website:
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm from package.json
+        uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
+        with:
+          package_json_file: web/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package the build
+        run: |
+          test -f dist/index.html
+          tar -C dist -czf web.tar.gz .
+
+      # The tested build is the one deploy-website publishes.
+      - name: Keep the build for publishing
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website
+          path: web/web.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy-backend:
+    needs: [changes, test-backend, test-website]
+    # Publishing is switched on per repository (Settings > Variables: DEPLOY_ENABLED=true).
+    # Until then a push only runs the tests. Nothing is published unless every test that ran
+    # passed.
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+      && needs.changes.outputs.backend == 'true'
+      && needs.test-backend.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.test-website.result)
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -142,3 +241,85 @@ jobs:
           command_timeout: 30m
           envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_IMAGE_SHA256
           script_path: ${{ runner.temp }}/publish-net.sh
+
+  deploy-website:
+    needs: [changes, test-backend, test-website, deploy-backend]
+    # After the backend, when the push changed both: the website may call what it just got.
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+      && needs.changes.outputs.website == 'true'
+      && needs.test-website.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.test-backend.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.deploy-backend.result)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Get the tested build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: website
+
+      - name: Check the build
+        id: web
+        run: |
+          digest=$(sha256sum web.tar.gz)
+          echo "sha256=${digest%% *}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate deployment secrets
+        env:
+          SERVER_ADDR: ${{ secrets.SERVER_ADDR }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_FINGERPRINT: ${{ secrets.DEPLOY_FINGERPRINT }}
+        run: |
+          # SERVER_ADDR is the organization's; the rest are this repository's.
+          for name in SERVER_ADDR DEPLOY_USER DEPLOY_KEY DEPLOY_FINGERPRINT; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing required secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Upload the build
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
+        with:
+          version: '1.8.1'
+          host: ${{ secrets.SERVER_ADDR }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          source: web.tar.gz
+          target: ${{ secrets.DEPLOY_BASE_PATH || '/opt/ourtaiko-net' }}/incoming-web/${{ github.sha }}
+          command_timeout: 10m
+
+      - name: Prepare the publish script from this commit
+        # Explicitly use Bash regardless of the SSH user's default shell.
+        run: |
+          {
+            printf "bash -se <<'NET_WEB_PUBLISH_SCRIPT'\n"
+            cat deploy/publish-web.sh
+            printf '\nNET_WEB_PUBLISH_SCRIPT\n'
+          } > "$RUNNER_TEMP/publish-net-web.sh"
+
+      - name: Publish over SSH
+        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        env:
+          DEPLOY_REVISION: ${{ github.sha }}
+          DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
+          DEPLOY_WEB_SHA256: ${{ steps.web.outputs.sha256 }}
+        with:
+          host: ${{ secrets.SERVER_ADDR }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          version: '1.8.1'
+          command_timeout: 10m
+          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_WEB_SHA256
+          script_path: ${{ runner.temp }}/publish-net-web.sh

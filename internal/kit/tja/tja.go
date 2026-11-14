@@ -1,7 +1,8 @@
 // Package tja is the upload gate both chart sites share: it checks a TJA's headers and
-// structure (contracts/validation.json holds the cases), then reads its blocks through
-// TJAParser as the game does. It accepts what official charts contain: single and double
-// blocks in one file, scoring headers, and repeated or unknown headers.
+// structure (the repository's contracts/validation.json holds the cases, which the website
+// runs too), then reads its blocks through TJAParser as the game does. It accepts what
+// official charts contain: single and double blocks in one file, scoring headers, and
+// repeated or unknown headers.
 package tja
 
 import (

@@ -17,8 +17,8 @@ services:
       STORAGE_DIR: /tmp/staging
       # STORAGE_BACKEND comes from storage.env: `public` (read-only) until the switch (see
       # deploy/README.md, "Files before the switch"), `s3` from then on.
-      # The website's current release (OurTaikoNetWeb puts releases beside each other and
-      # points `current` at one).
+      # The website's current release (deploy/publish-web.sh puts releases beside each other
+      # and points `current` at one).
       WEB_DIR: /srv/web/current
     # On this server 8080 is Fanmade's, 8081 Database's, 8090 the account center's, 8093
     # Profile's and 8094-8095 another site's.

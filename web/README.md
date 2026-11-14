@@ -1,8 +1,8 @@
-# OurTaikoNetWeb
+# The OurTaikoNet website
 
-The website of OurTaiko at `net.ourtaiko.org`: one app for both song sources. Its backend is the `OurTaikoNet` repository.
+The website of OurTaiko at `net.ourtaiko.org`: one app for both song sources and the players' pages. Its backend is the rest of this repository. Until 2026-11-14 this was a repository of its own, OurTaikoNetWeb; its history is kept here with the same commit hashes.
 
-Status: the two song sources' pages and the players' pages run in one app, against a local backend. Not deployed; how it will be is in "Releasing" below.
+Status: in production since 2026-11-14; see "Releasing" below.
 
 ## How it is put together
 
@@ -14,7 +14,7 @@ The site has three areas, told apart by how the address starts: the two song sou
 | `src/sources/fanmade`, `src/sources/official` | Each source's own parts: its chart card and search, upload form, metadata editor, text. From the two old sites' `web/src`. Loaded only on that source's pages |
 | `src/players` | The pages about players, whichever source they play: scores on both, titles, dan badges, nameplate, and for the site's administrator the manage panel (user groups). From OurTaikoProfile's `web/src` |
 | `src/TJARenderer` | The chart renderer, another project's source kept as it came |
-| `contracts/validation.json` | Upload rules shared with the backend, which has the same file |
+| `../contracts/validation.json` | Upload rules the backend runs too: one file for both, at the repository's root |
 
 The API of a source is under `/api/v1/sources/<source>/`. Signing in is the whole site's: `/api/v1/auth/…`.
 
@@ -32,13 +32,14 @@ pnpm lint && pnpm format:check && pnpm build
 `pnpm build` writes the site to `dist/`. The backend serves it: its `WEB_DIR` is a directory of
 this build, and every address that is not the API's and not a file gets `index.html`.
 
-A push to `main` runs `.github/workflows/deploy.yml`: lint, formatting, tests, build, then the
-build is uploaded and `deploy/publish.sh` makes it the current one on the server
-(`/opt/ourtaiko-net/web/current`, a link to `web/releases/<commit>`). Nothing restarts. The
-scripts and styles of the build before it, which pages already open still ask for, are kept
-beside the new ones for two weeks. `rollback.yml` points the link back at one of the five builds
-the server keeps. Written and tried on a developer's machine; not yet run in GitHub Actions or
-on the server. The server side is described in the backend's `deploy/README.md`.
+A push to `main` that changes anything here runs the repository's
+`.github/workflows/deploy.yml` for the website: lint, formatting, tests, build, then the tested
+build is uploaded and `../deploy/publish-web.sh` makes it the current one on the server
+(`/opt/ourtaiko-net/web/current`, a link to `web/releases/<commit>`). Nothing restarts. When
+the same push changes the backend too, the backend is published first. The scripts and styles
+of the build before, which pages already open still ask for, are kept beside the new ones for
+two weeks. `rollback.yml`, with the part `website`, points the link back at one of the five
+builds the server keeps. See the repository's `deploy/README.md`.
 
 ## Not here yet
 

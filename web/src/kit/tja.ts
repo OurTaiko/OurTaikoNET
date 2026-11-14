@@ -1,6 +1,6 @@
 // The browser's copy of the upload gate (the Go package tja): the same header and structure
-// rules, checked before a file goes up; ../../contracts/validation.json holds the cases both
-// run. The server then reads the blocks through TJAParser, which the browser cannot.
+// rules, checked before a file goes up; the repository's contracts/validation.json holds the
+// cases both run. The server then reads the blocks through TJAParser, which the browser cannot.
 import { t } from './i18n'
 import { parseTjaCourse } from './courses'
 import { normalizeTja } from './tja-encoding'

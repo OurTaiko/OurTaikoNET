@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs the backend for local development: http://127.0.0.1:8090, configured by .env (see
-# README, "Local development"). The website is the other repository, OurTaikoNetWeb:
-# `pnpm dev` there serves http://127.0.0.1:5173 and passes /api on to this server.
+# README, "Local development"). The website is web/: `pnpm dev` there serves
+# http://127.0.0.1:5173 and passes /api on to this server.
 #
 # Starts the local PostgreSQL first when it is not running and its data directory is where
 # Homebrew puts it (PGDATA_DIR to say otherwise).

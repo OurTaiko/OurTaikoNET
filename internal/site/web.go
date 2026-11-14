@@ -10,7 +10,7 @@ import (
 
 // Web serves the website in front of the API.
 //
-// The website is OurTaikoNetWeb, built to a directory of files: index.html, and under
+// The website is web/ in this repository, built to a directory of files: index.html, and under
 // assets/ the scripts and styles it names, each with a hash of its content in its file name.
 // It is one page that draws every address itself, so an address that is no file gets
 // index.html. dir is read on every request: a new release is put beside the old one and the

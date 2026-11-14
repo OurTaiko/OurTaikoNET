@@ -9,18 +9,20 @@ each source signing with its old site's key. The three old containers, their ima
 their deploy folders were removed on 2026-11-14, 07:30 UTC: there is no going back to them.
 Their databases were dropped on 2026-11-14, 08:57 UTC, after every row of them was found in
 `ourtaiko_net`; a last dump of each is kept. A push to
-`main` of this repository or OurTaikoNetWeb publishes to production. Nobody is the site's
+`main` of this repository publishes to production. Nobody is the site's
 administrator until the role is given in the account center's admin (Client roles), and
 `rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
-well (`internal/legacy`). The website is the other repository, OurTaikoNetWeb: its builds are
-put in a directory on the server and this container serves the current one.
+well (`internal/legacy`). The website is `web/` in this repository: its builds are put in a
+directory on the server and this container serves the current one. Until 2026-11-14 the
+website was a repository of its own, OurTaikoNetWeb (now archived); its history is kept here,
+under `web/`, with the same commit hashes.
 
 ```
 /opt/ourtaiko-net/
-  compose.production.yml     put here by every release of this repository
+  compose.production.yml     put here by every release of the backend
   incoming/<commit>/         an uploaded image, removed once published
   incoming-web/<commit>/     an uploaded website build, removed once published
   web/releases/<commit>/     website builds, the five newest
@@ -31,31 +33,40 @@ put in a directory on the server and this container serves the current one.
 
 ## A release
 
-Push to `main`. `.github/workflows/deploy.yml` runs every test in the Dockerfile's `test` stage
-against a throwaway PostgreSQL 18, builds the image, keeps it in `ourtaiko-private`
-(`net/images/<commit>.tar.gz`), uploads it and runs `deploy/publish.sh` on the server, which
-loads it, replaces the container and waits for `/readyz`.
+Push to `main`. `.github/workflows/deploy.yml` first looks at which part the push changed:
+anything under `web/` (and `deploy/publish-web.sh`) is the website, everything else but
+Markdown is the backend, and `contracts/` and the workflow itself are both. A run started by
+hand does both. Then, for each part changed:
 
-The website is released the same way from its own repository; that changes a link on the
-server and restarts nothing. When a change needs both, release this repository first.
+- **Backend.** Every test in the Dockerfile's `test` stage against a throwaway PostgreSQL 18;
+  the image is built, kept in `ourtaiko-private` (`net/images/<commit>.tar.gz`) and uploaded,
+  and `deploy/publish.sh` on the server loads it, replaces the container and waits for
+  `/readyz`.
+- **Website.** Lint, formatting, unit tests and the build in `web/`; the tested build is
+  uploaded and `deploy/publish-web.sh` makes it the current one
+  (`web/releases/<commit>`). That changes a link on the server and restarts nothing.
 
-`rollback.yml` republishes an archived image by commit. It does not touch the database. A
-release that changes the schema applies the change as it starts (`db/README.md`, "Changing the
-schema"), and an image from before that change refuses the newer database: to go back past
-one, delete its row from `net.schema_migrations` first (the older program does not mind the
-columns it does not know).
+Nothing is published unless every test that ran passed. When a push changes both, the backend
+is published first and the website only after it succeeded.
+
+`rollback.yml` puts back one part, chosen when it is started. The backend: an archived image
+by commit. It does not touch the database. A release that changes the schema applies the
+change as it starts (`db/README.md`, "Changing the schema"), and an image from before that
+change refuses the newer database: to go back past one, delete its row from
+`net.schema_migrations` first (the older program does not mind the columns it does not
+know). The website: one of the five builds the server keeps, by commit; builds published
+before the website moved into this repository are named by OurTaikoNetWeb's commits.
 
 Publishing happens only while the repository variable `DEPLOY_ENABLED` is `true` (Settings >
-Variables); otherwise a push runs the tests and stops. The same holds for OurTaikoNetWeb,
-which stops after its build. Both are `true` since 2026-11-14: **a push to `main` of either
-repository publishes to the server.**
+Variables); otherwise a push runs the tests and stops. It is `true` since 2026-11-14: **a push
+to `main` publishes to the server.**
 
-Secrets: the server's address is the organization's `SERVER_ADDR`. Each of the two
-repositories has `DEPLOY_USER` (`ourtaiko-ci`), `DEPLOY_FINGERPRINT` (the server's SSH host key)
-and `DEPLOY_KEY`, a private key whose public half is in that user's `authorized_keys`: signing in
-is by key only. Optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. This repository also
-needs the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`, which
-are given to selected repositories; this one was added on 2026-11-14.
+Secrets: the server's address is the organization's `SERVER_ADDR`. The repository has
+`DEPLOY_USER` (`ourtaiko-ci`), `DEPLOY_FINGERPRINT` (the server's SSH host key) and
+`DEPLOY_KEY`, a private key whose public half is in that user's `authorized_keys`: signing in is
+by key only. Optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. It also needs the organization's
+`PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`, which are given to selected
+repositories; this one was added on 2026-11-14.
 
 ## The account the workflows sign in as
 
@@ -63,9 +74,9 @@ are given to selected repositories; this one was added on 2026-11-14.
 nothing else. It has no password and one key, which forwards nothing; it owns
 `/opt/ourtaiko-net`; it cannot read the settings files; and it may run as root only the docker
 commands `publish.sh` runs, on images named `ourtaiko-net` and the one Compose file
-(`/etc/sudoers.d/ourtaiko-ci`). The private key exists only as the `DEPLOY_KEY` secret of the two
-repositories: to replace it, make a new pair, put the new public half in the account's
-`authorized_keys` and set the secret again.
+(`/etc/sudoers.d/ourtaiko-ci`). The private key exists only as the `DEPLOY_KEY` secret of this
+repository (and of the archived OurTaikoNetWeb): to replace it, make a new pair, put the new
+public half in the account's `authorized_keys` and set the secret again.
 
 This narrows what a leaked key can do, but not to nothing: the Compose file that says what the
 container may do comes from this repository with every release, so whoever can push to `main`,
@@ -79,7 +90,7 @@ docker run --rm -p 127.0.0.1:8091:8080 \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=1g --cap-drop ALL \
   -e DATABASE_URL='postgres://<you>@host.docker.internal:5432/ourtaiko_net_dev?sslmode=disable' \
   -e APP_ORIGIN=http://127.0.0.1:8091 -e STORAGE_DIR=/tmp/staging \
-  -e WEB_DIR=/srv/web -v <OurTaikoNetWeb>/dist:/srv/web:ro \
+  -e WEB_DIR=/srv/web -v "$PWD/web/dist":/srv/web:ro \
   ourtaiko-net:local
 ```
 
@@ -118,7 +129,8 @@ Each step touches production and is done with the owner's go-ahead.
    installed as `/opt/1panel/www/sites/net.ourtaiko.org/proxy/root.conf` in place of the file
    1Panel wrote (kept beside it as `root.conf.before-net-locations`), and nginx reloaded
    (`nginx -t`, `nginx -s reload` in the OpenResty container). **Done on 2026-11-14.**
-6. **Release** this repository, then OurTaikoNetWeb. **Done on 2026-11-14**, before steps 3 and 5.
+6. **Release** the backend, then the website (then still OurTaikoNetWeb). **Done on 2026-11-14**,
+   before steps 3 and 5.
 
 ## Files before the switch
 

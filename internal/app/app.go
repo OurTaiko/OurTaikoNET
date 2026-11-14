@@ -59,7 +59,7 @@ type Config struct {
 	// Empty: <Origin>/fanmade and <Origin>/official.
 	FanmadeSite, OfficialSite string
 
-	// WebDir is where the built website is (OurTaikoNetWeb's dist), served for every address
+	// WebDir is where the built website is (web/'s dist), served for every address
 	// that is not the API's. Empty: the API alone, as in development.
 	WebDir string
 
