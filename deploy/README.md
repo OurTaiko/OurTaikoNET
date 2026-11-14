@@ -37,9 +37,12 @@ Publishing is off until the repository variable `DEPLOY_ENABLED` is `true` (Sett
 Variables); until then a push runs the tests and stops. The same holds for OurTaikoNetWeb,
 which stops after its build.
 
-The repository needs the secrets Fanmade's has: `DEPLOY_HOST`, `DEPLOY_USER`,
-`DEPLOY_PASSWORD`, `DEPLOY_FINGERPRINT` (and optionally `DEPLOY_PORT`, `DEPLOY_BASE_PATH`), and
-the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`.
+Secrets: the server's address is the organization's `SERVER_ADDR`. Each of the two
+repositories has `DEPLOY_USER`, `DEPLOY_FINGERPRINT` (the server's SSH host key), and to sign in
+either `DEPLOY_KEY` (a private key whose public half is in the deploy user's `authorized_keys`)
+or `DEPLOY_PASSWORD`; optionally `DEPLOY_PORT` and `DEPLOY_BASE_PATH`. This repository also
+needs the organization's `PRIVATE_AWS_ACCESS_KEY_ID` and `PRIVATE_AWS_SECRET_ACCESS_KEY`, which
+are given to selected repositories: add it to them.
 
 ## Trying the image on your own machine
 
