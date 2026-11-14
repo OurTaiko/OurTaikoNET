@@ -69,27 +69,35 @@ jobs:
       - name: Validate deployment secrets
         if: vars.DEPLOY_ENABLED == 'true'
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SERVER_ADDR: ${{ secrets.SERVER_ADDR }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
           DEPLOY_FINGERPRINT: ${{ secrets.DEPLOY_FINGERPRINT }}
         run: |
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PASSWORD DEPLOY_FINGERPRINT; do
+          # SERVER_ADDR is the organization's; the rest are this repository's.
+          for name in SERVER_ADDR DEPLOY_USER DEPLOY_FINGERPRINT; do
             if [[ -z "${!name}" ]]; then
-              echo "::error::Missing required repository secret: $name"
+              echo "::error::Missing required secret: $name"
               exit 1
             fi
           done
+          # Signing in takes a key or a password.
+          if [[ -z "$DEPLOY_KEY" && -z "$DEPLOY_PASSWORD" ]]; then
+            echo "::error::Set DEPLOY_KEY (a private key) or DEPLOY_PASSWORD"
+            exit 1
+          fi
 
       - name: Upload the build
         if: vars.DEPLOY_ENABLED == 'true'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           version: '1.8.1'
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
+          key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           source: web.tar.gz
           target: ${{ secrets.DEPLOY_BASE_PATH || '/opt/ourtaiko-net' }}/incoming-web/${{ github.sha }}
@@ -113,10 +121,11 @@ jobs:
           DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
           DEPLOY_WEB_SHA256: ${{ steps.web.outputs.sha256 }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
+          key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           version: '1.8.1'
           command_timeout: 10m
