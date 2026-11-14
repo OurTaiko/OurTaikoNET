@@ -4,6 +4,7 @@
 // /api/v1/sources/official/charts. What comes after the source is, for now, the API the
 // source's old site had; the two are being merged into one. Everything else under /api/v1/
 // is about players, whichever source they play: titles, nameplates, all their scores.
+// /api/v1/game/sources is what the game loads from every source, in one answer (game.go).
 package site
 
 import (
@@ -38,6 +39,7 @@ func Handler(sources []Source, players http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/v1/sources", func(w http.ResponseWriter, r *http.Request) {
 		web.Respond(w, 200, map[string]any{"sources": list})
 	})
+	mux.HandleFunc("GET /api/v1/game/sources", gameSources(sources))
 	mux.HandleFunc("/api/v1/sources/{source}/{rest...}", func(w http.ResponseWriter, r *http.Request) {
 		api, ok := byID[r.PathValue("source")]
 		if !ok {
