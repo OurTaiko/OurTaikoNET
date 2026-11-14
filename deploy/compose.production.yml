@@ -24,15 +24,15 @@ services:
       # proxy passes /ourtaiko.multiplay.v1.MultiEnso/ on to it (deploy/net.multiplay.conf).
       # The game is told to dial MULTIPLAY_PUBLIC_URL, by default APP_ORIGIN.
       #
-      # OFF until the server is ready for it (deploy/README.md, "Multi-Enso (gRPC)"): to
-      # switch it on, uncomment the next line and use the second `ports` line below instead
-      # of the first. A port that is taken on the server stops the container from starting.
-      # MULTIPLAY_LISTEN_ADDR: 0.0.0.0:8081
+      # On since 2026-11-14 (deploy/README.md, "Multi-Enso (gRPC)"). To switch it off, comment
+      # the next line out: the site then answers 404 at /api/v1/game/multiplay and the game
+      # does not try. The second port may stay mapped.
+      MULTIPLAY_LISTEN_ADDR: 0.0.0.0:8081
     # On this server 8080 is Fanmade's, 8081 Database's, 8090 the account center's, 8093
-    # Profile's and 8094-8095 another site's. 8096 is the API and the website; 8097 is meant
-    # for Multi-Enso and has not been checked to be free.
-    ports: ['127.0.0.1:8096:8080']
-    # ports: ['127.0.0.1:8096:8080', '127.0.0.1:8097:8081']
+    # Profile's and 8094-8095 another site's. 8096 is the API and the website; 8097 is
+    # Multi-Enso (nothing else listened there on 2026-11-14). A port that is taken on the
+    # server stops the container from starting.
+    ports: ['127.0.0.1:8096:8080', '127.0.0.1:8097:8081']
     volumes:
       - /opt/ourtaiko-net/web:/srv/web:ro
     read_only: true

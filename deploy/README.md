@@ -134,13 +134,13 @@ Each step touches production and is done with the owner's go-ahead.
 
 ## Multi-Enso (gRPC)
 
-**Not installed on the server yet, and switched off.** The repository holds everything for
-it; what follows is what has to be done, each step with the owner's go-ahead. While it is
-off the site answers `404 MULTIPLAY_UNAVAILABLE` at `/api/v1/game/multiplay` and the game
-says online rooms are not available.
+**On since 2026-11-14.** The steps below were done that day, in the order 2, 3, 1, 4, and
+are kept for a server set up anew. Where the service is off the site answers
+`404 MULTIPLAY_UNAVAILABLE` at `/api/v1/game/multiplay` and the game says online rooms are
+not available.
 
 Multi-Enso (the game's online rooms, `internal/multiplay`; root `README.md`, "Multi-Enso") is
-a gRPC service inside the same container. Switched on, `compose.production.yml` sets
+a gRPC service inside the same container. `compose.production.yml` sets
 `MULTIPLAY_LISTEN_ADDR=0.0.0.0:8081`, so the container listens there in clear text (h2c), and
 maps it to `127.0.0.1:8097` on the server. The game is told to dial `MULTIPLAY_PUBLIC_URL`,
 by default `APP_ORIGIN`: `https://net.ourtaiko.org`, port 443, where the proxy ends TLS and
@@ -155,8 +155,8 @@ stay one location for the panel to read it.
 
 1. **Switch it on and release the backend.** Check first that nothing on the server listens
    on 8097 (`ss -ltn 'sport = :8097'`): a port that is taken stops the container from
-   starting, and the site with it. Then, in `compose.production.yml`, uncomment
-   `MULTIPLAY_LISTEN_ADDR` and use the `ports` line that maps 8097, and push to `main`.
+   starting, and the site with it. Then, in `compose.production.yml`, set
+   `MULTIPLAY_LISTEN_ADDR` and map 8097 in `ports`, and push to `main`.
    Afterwards `docker port ourtaiko-net` shows `8081/tcp -> 127.0.0.1:8097`, the log says
    `Multi-Enso (gRPC, h2c) listening on …`, and
    `curl https://net.ourtaiko.org/api/v1/game/multiplay` answers
@@ -166,15 +166,17 @@ stay one location for the panel to read it.
 2. **HTTP/2.** gRPC is HTTP/2: the 443 listener of the site `net.ourtaiko.org` must have it
    on (`http2 on;`, or `listen 443 ssl http2;`, in the site's server block).
    `curl -sI --http2 https://net.ourtaiko.org/healthz` must begin with `HTTP/2 200`. Without
-   it the website works and the game cannot connect. (Another site on this server that has a
-   gRPC service already had `http2 on;` when that was installed; this one was not looked at.)
+   it the website works and the game cannot connect. (On 2026-11-14 the site's
+   `/opt/1panel/www/conf.d/net.ourtaiko.org.conf` already had `http2 on;`.)
 3. **The location.** Look at the site's server block first
    (`/opt/1panel/www/sites/net.ourtaiko.org/…`, in the panel "configuration file"): it
    should include every file of the site's `proxy/` folder (`include …/proxy/*.conf;`).
    Copy `deploy/net.multiplay.conf` there as `proxy/multiplay.conf`, beside `root.conf`;
    if the block includes `root.conf` by name only, add a line that includes the new file.
    Then `nginx -t` and `nginx -s reload` in the OpenResty container, as for
-   `net.locations.conf`. The three old host names do not need the location.
+   `net.locations.conf`. The three old host names do not need the location. (On 2026-11-14
+   the block included `proxy/*.conf`, and the file is there as `proxy/multiplay.conf`. It is
+   a copy: a change to `deploy/net.multiplay.conf` has to be copied again by hand.)
 4. **Check from outside**, with [grpcurl](https://github.com/fullstorydev/grpcurl) from a
    checkout of this repository (the service has no reflection, so it is given the protocol):
 
