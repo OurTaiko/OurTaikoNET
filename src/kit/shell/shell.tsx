@@ -6,7 +6,7 @@
 // players, titles), at the top. The frame's links are whole addresses; one that stays in the
 // area it is shown in is a router link, any other is a plain link, which the root follows by
 // swapping the area in place.
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
@@ -62,6 +62,10 @@ type Item = {
   external?: boolean
 }
 
+// How far the menu is scrolled. The frame is drawn anew each time the area changes (see
+// src/root.tsx); the menu of the new one starts where the last one was left.
+let menuScroll = 0
+
 const signInAddress = () =>
   `/api/v1/auth/sso/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`
 
@@ -103,6 +107,26 @@ export function Shell({
   })
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [pathname])
+  const menuBox = useRef<HTMLElement>(null)
+  // When the player last moved the menu themselves: only then is a scroll theirs to remember.
+  const menuTouched = useRef(0)
+  const touchMenu = () => {
+    menuTouched.current = Date.now()
+  }
+  useLayoutEffect(() => {
+    const box = menuBox.current
+    if (!box) return
+    const restore = () => {
+      box.scrollTop = menuScroll
+    }
+    restore()
+    // The menu grows once the session is known (the player's own items), and until then it
+    // may be too short to scroll that far: put it back again as it grows.
+    if (typeof ResizeObserver === 'undefined' || !box.firstElementChild) return
+    const watcher = new ResizeObserver(restore)
+    watcher.observe(box.firstElementChild)
+    return () => watcher.disconnect()
+  }, [])
   useEffect(() => {
     try {
       localStorage.setItem('ourtaiko-net-menu', collapsed ? 'collapsed' : 'open')
@@ -453,6 +477,17 @@ export function Shell({
         <div className="flex items-start gap-6">
           {/* The menu, on screens wide enough to keep it beside the page. */}
           <aside
+            ref={menuBox}
+            onWheel={touchMenu}
+            onTouchMove={touchMenu}
+            onPointerDown={touchMenu}
+            onKeyDown={touchMenu}
+            onScroll={(event) => {
+              // A scroll the browser made itself (the menu was too short for a moment) is
+              // not the player's, and must not replace where they left it.
+              if (Date.now() - menuTouched.current < 1500)
+                menuScroll = event.currentTarget.scrollTop
+            }}
             className={cn(
               'hidden lg:block top-[5.5rem] sticky max-h-[calc(100svh-6.5rem)] overflow-y-auto -m-1 p-1 rounded-[28px] shrink-0',
               collapsed ? 'w-[4.25rem]' : 'w-[16.5rem]',
