@@ -47,5 +47,7 @@ COPY --from=build /out/ourtaiko-net /usr/local/bin/ourtaiko-net
 COPY --from=tjaparser /out/tjaparser /usr/local/bin/tjaparser
 USER 10001:10001
 ENV LISTEN_ADDR=0.0.0.0:8080 STORAGE_DIR=/data/files
-EXPOSE 8080
+# 8080: the API and the website. 8081: Multi-Enso, the game's online rooms (gRPC in clear
+# text), where MULTIPLAY_LISTEN_ADDR says so; off without it.
+EXPOSE 8080 8081
 ENTRYPOINT ["ourtaiko-net"]

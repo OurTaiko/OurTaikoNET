@@ -132,6 +132,70 @@ Each step touches production and is done with the owner's go-ahead.
 6. **Release** the backend, then the website (then still OurTaikoNetWeb). **Done on 2026-11-14**,
    before steps 3 and 5.
 
+## Multi-Enso (gRPC)
+
+**Not installed on the server yet, and switched off.** The repository holds everything for
+it; what follows is what has to be done, each step with the owner's go-ahead. While it is
+off the site answers `404 MULTIPLAY_UNAVAILABLE` at `/api/v1/game/multiplay` and the game
+says online rooms are not available.
+
+Multi-Enso (the game's online rooms, `internal/multiplay`; root `README.md`, "Multi-Enso") is
+a gRPC service inside the same container. Switched on, `compose.production.yml` sets
+`MULTIPLAY_LISTEN_ADDR=0.0.0.0:8081`, so the container listens there in clear text (h2c), and
+maps it to `127.0.0.1:8097` on the server. The game is told to dial `MULTIPLAY_PUBLIC_URL`,
+by default `APP_ORIGIN`: `https://net.ourtaiko.org`, port 443, where the proxy ends TLS and
+passes the one path of the service on:
+
+```
+location ^~ /ourtaiko.multiplay.v1.MultiEnso/ { grpc_pass grpc://127.0.0.1:8097; … }
+```
+
+That location is `deploy/net.multiplay.conf`, a file of its own: `net.locations.conf` has to
+stay one location for the panel to read it.
+
+1. **Switch it on and release the backend.** Check first that nothing on the server listens
+   on 8097 (`ss -ltn 'sport = :8097'`): a port that is taken stops the container from
+   starting, and the site with it. Then, in `compose.production.yml`, uncomment
+   `MULTIPLAY_LISTEN_ADDR` and use the `ports` line that maps 8097, and push to `main`.
+   Afterwards `docker port ourtaiko-net` shows `8081/tcp -> 127.0.0.1:8097`, the log says
+   `Multi-Enso (gRPC, h2c) listening on …`, and
+   `curl https://net.ourtaiko.org/api/v1/game/multiplay` answers
+   `{"url":"https://net.ourtaiko.org","protocol":1,"maxMembers":5}`. From here on the game
+   tries to connect, so do steps 2 and 3 right after (or before: they do no harm while the
+   port is closed).
+2. **HTTP/2.** gRPC is HTTP/2: the 443 listener of the site `net.ourtaiko.org` must have it
+   on (`http2 on;`, or `listen 443 ssl http2;`, in the site's server block).
+   `curl -sI --http2 https://net.ourtaiko.org/healthz` must begin with `HTTP/2 200`. Without
+   it the website works and the game cannot connect. (Another site on this server that has a
+   gRPC service already had `http2 on;` when that was installed; this one was not looked at.)
+3. **The location.** Look at the site's server block first
+   (`/opt/1panel/www/sites/net.ourtaiko.org/…`, in the panel "configuration file"): it
+   should include every file of the site's `proxy/` folder (`include …/proxy/*.conf;`).
+   Copy `deploy/net.multiplay.conf` there as `proxy/multiplay.conf`, beside `root.conf`;
+   if the block includes `root.conf` by name only, add a line that includes the new file.
+   Then `nginx -t` and `nginx -s reload` in the OpenResty container, as for
+   `net.locations.conf`. The three old host names do not need the location.
+4. **Check from outside**, with [grpcurl](https://github.com/fullstorydev/grpcurl) from a
+   checkout of this repository (the service has no reflection, so it is given the protocol):
+
+   ```sh
+   grpcurl -import-path proto -proto ourtaiko/multiplay/v1/multiplay.proto \
+     -d '{"join":{"quick_match":{}}}' net.ourtaiko.org:443 ourtaiko.multiplay.v1.MultiEnso/Connect
+   ```
+
+   Without a session it must answer `Code: Unauthenticated`, `Message: AUTH_REQUIRED`. With
+   a made-up one (`-H 'authorization: Bearer <64 hex digits>'`) it must answer the same after
+   a moment: the container asked the account center. `Unavailable` `AUTH_UNAVAILABLE` there
+   means it could not. Any other answer (an unexpected HTTP status or content type, say)
+   means the request went to the website's location: step 3 is not in effect. The same
+   check without grpcurl: `go run ./tools/multiplay-smoke -do probe -site https://net.ourtaiko.org`.
+
+Rooms are in memory, so every release of the backend closes them: players in a room are told
+`ROOM_CLOSED` as the old container stops. `MULTIPLAY_PUBLIC_URL` and `MULTIPLAY_MIN_PLAYERS`
+may be set in `api.env`; neither is needed. To switch the service off again, comment
+`MULTIPLAY_LISTEN_ADDR` out in the Compose file: the site then answers
+`404 MULTIPLAY_UNAVAILABLE` and the game does not try.
+
 ## Files before the switch
 
 Until the switch the database here is a copy of the old ones, refreshed by the import, while

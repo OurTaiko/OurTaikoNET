@@ -5,6 +5,7 @@
 // source's old site had; the two are being merged into one. Everything else under /api/v1/
 // is about players, whichever source they play: titles, nameplates, all their scores.
 // /api/v1/game/sources is what the game loads from every source, in one answer (game.go).
+// /api/v1/game/multiplay is where the game finds the online rooms (multiplay.go).
 package site
 
 import (
@@ -22,8 +23,12 @@ type Source struct {
 }
 
 // Handler serves the sources in the order given, and players' own routes from players
-// (nil: there are none).
-func Handler(sources []Source, players http.Handler) http.Handler {
+// (nil: there are none). Options add what a site may have besides.
+func Handler(sources []Source, players http.Handler, opts ...Option) http.Handler {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 	type listed struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
@@ -40,6 +45,7 @@ func Handler(sources []Source, players http.Handler) http.Handler {
 		web.Respond(w, 200, map[string]any{"sources": list})
 	})
 	mux.HandleFunc("GET /api/v1/game/sources", gameSources(sources))
+	mux.HandleFunc("GET /api/v1/game/multiplay", gameMultiplay(o.multiplay))
 	mux.HandleFunc("/api/v1/sources/{source}/{rest...}", func(w http.ResponseWriter, r *http.Request) {
 		api, ok := byID[r.PathValue("source")]
 		if !ok {

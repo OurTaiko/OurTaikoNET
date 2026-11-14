@@ -1,0 +1,310 @@
+// Multi-Enso (マルチ演奏): OurTaikoPlay's online rooms, served by OurTaikoNet.
+//
+// One bidirectional stream per player. The first ClientMessage must be `join`; the server answers
+// with `welcome` and then a `room` snapshot every time anything in the room changes. The stream
+// ends when the player leaves or the room closes.
+//
+// Authentication: gRPC metadata `authorization: Bearer <game session>`, the 64-hex game session the
+// game sends to /api/v1/game/* (traded for the player's account at the account center).
+//
+// Flow of one round (times are the server's defaults):
+//   LOBBY        members gather (max 5). The host locks the members once there are 2 or more; a
+//                public room locks by itself 30 s after it has 2 members, or at once when full.
+//   SONG_SELECT  90 s. Each player picks a song of one of the site's sources with the course they
+//                would play, or leaves the song to chance (おまかせ).
+//   SONG_DRAW    4 s. The song is drawn at random from the picks (おまかせ: any playable song).
+//   COURSE       15 s. Each player picks one of the drawn song's courses, then is ready. A player
+//                who picks nothing plays the course they asked for when the song has it, else the
+//                nearest one.
+//   LOADING      up to 90 s. Each player downloads the song and loads the play, then `loaded`.
+//                Players not loaded in time sit the round out.
+//   PLAYING      `start_play` is sent once every player is loaded. Players stream `status`; the
+//                server sends everyone's statuses 4 times a second.
+//   RESULT       once every player has finished (or 30 s after the first one did). The result
+//                stays in the room snapshot; the room goes back to LOBBY with the same members.
+//
+// Each player's own score is uploaded by the game as after any play; the room only ranks what the
+// players report.
+syntax = "proto3";
+
+package ourtaiko.multiplay.v1;
+
+option csharp_namespace = "OurTaiko.Multi.Proto";
+option go_package = "ourtaiko.dev/net/internal/multiplay/multiplaypb";
+
+service MultiEnso {
+  rpc Connect(stream ClientMessage) returns (stream ServerMessage);
+}
+
+/* ---------------- client → server ---------------- */
+
+message ClientMessage {
+  oneof kind {
+    Join join = 1;
+    Leave leave = 2;
+    LockMembers lock_members = 3;
+    OpenRoom open_room = 4;
+    PickSong pick_song = 5;
+    PickCourse pick_course = 6;
+    SetReady set_ready = 7;
+    Loaded loaded = 8;
+    PlayerStatus status = 9;
+    FinishPlay finish = 10;
+    SendStamp stamp = 11;
+    Ping ping = 12;
+    Kick kick = 13;
+  }
+}
+
+message Join {
+  oneof target {
+    // A public room that is waiting, or a new one.
+    QuickMatch quick_match = 1;
+    // A new room that only its 5-digit number can join.
+    CreatePrivate create_private = 2;
+    // Join a room by its 5-digit number. Also how a dropped player comes back to its room.
+    string room_code = 3;
+  }
+  // Protocol version the client speaks (currently 1).
+  int32 protocol = 4;
+}
+
+message QuickMatch {}
+message CreatePrivate {}
+message Leave {}
+// Host only, LOBBY only: the members are settled and the round begins.
+message LockMembers {}
+// Host only: turns a private room into a public one. Cannot be undone.
+message OpenRoom {}
+// Host only, LOBBY only.
+message Kick {
+  string user_id = 1;
+}
+
+message PickSong {
+  // The site's source the song is in ("fanmade", "official") and the chart's id (32 hex).
+  // Both empty: おまかせ.
+  string source = 1;
+  string chart_id = 2;
+  // The course the player would play (Easy, Normal, Hard, Oni, Edit), also with おまかせ.
+  string course = 3;
+}
+
+message PickCourse {
+  // One of the drawn song's `courses`.
+  string course = 1;
+}
+
+// Ready in COURSE.
+message SetReady {
+  bool ready = 1;
+}
+
+message Loaded {
+  // False when the song could not be downloaded or loaded; the player sits the round out.
+  bool ok = 1;
+  string error = 2;
+}
+
+// What a player shows the others during the play. Send it when it changes, at most ~5 times a second.
+message PlayerStatus {
+  int32 score = 1;
+  int32 combo = 2;
+  int32 max_combo = 3;
+  // 良, 可, 不可.
+  int32 good = 4;
+  int32 ok = 5;
+  int32 bad = 6;
+  // 連打 hits.
+  int32 drumroll = 7;
+  // The soul gauge, 0 (empty) to 10000 (full).
+  int32 gauge = 8;
+  // Chart time of the player's play, in milliseconds.
+  int32 music_time_ms = 9;
+}
+
+message FinishPlay {
+  PlayerStatus final = 1;
+  // The soul gauge reached the course's clear line.
+  bool cleared = 2;
+}
+
+message SendStamp {
+  int32 stamp_id = 1;
+}
+
+message Ping {
+  int64 client_time_ms = 1;
+}
+
+/* ---------------- server → client ---------------- */
+
+message ServerMessage {
+  oneof kind {
+    Welcome welcome = 1;
+    Room room = 2;
+    StartPlay start_play = 3;
+    PlayStatuses statuses = 4;
+    StampSent stamp = 5;
+    Pong pong = 6;
+    Notice notice = 7;
+    Closed closed = 8;
+  }
+}
+
+message Welcome {
+  string user_id = 1;
+  string nickname = 2;
+  int32 protocol = 3;
+}
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  LOBBY = 1;
+  SONG_SELECT = 2;
+  SONG_DRAW = 3;
+  COURSE = 4;
+  LOADING = 5;
+  PLAYING = 6;
+  RESULT = 7;
+}
+
+message Room {
+  string code = 1;
+  bool public = 2;
+  Phase phase = 3;
+  // The phase's deadline and the server's clock when this snapshot was made, both Unix ms; the
+  // countdown is deadline_ms - server_time_ms (0 when the phase has no deadline).
+  int64 deadline_ms = 4;
+  int64 server_time_ms = 5;
+  string host_id = 6;
+  repeated Member members = 7;
+  int32 max_members = 8;
+  // Counts rounds, so a client can tell a new round from the last one.
+  int32 round = 9;
+  // From SONG_DRAW on: the drawn song and who picked it (empty: おまかせ).
+  Song song = 10;
+  string song_picked_by = 11;
+  // The last round's result, while the room is in RESULT or back in LOBBY after it.
+  PlayResult result = 12;
+  // Fewest players a round needs.
+  int32 min_players = 13;
+}
+
+message Member {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  // Joined order; also the place shown in the play.
+  int32 slot = 4;
+  bool connected = 5;
+  // SONG_SELECT: has picked (what was picked stays hidden until the draw).
+  bool picked = 6;
+  // From the draw on: what the player picked (both empty: おまかせ).
+  string picked_source = 7;
+  string picked_chart_id = 8;
+  // From the draw on: the course this player plays.
+  string course = 9;
+  bool ready = 10;
+  bool loaded = 11;
+  // In the current round (false for a player dropped while loading).
+  bool playing = 12;
+  bool finished = 13;
+}
+
+message Song {
+  string source = 1;
+  string chart_id = 2;
+  string title = 3;
+  string subtitle = 4;
+  // The song's courses, easiest first.
+  repeated Course courses = 5;
+  // The chart as the source's API describes it (GET /api/v1/sources/<source>/charts/<id>), UTF-8
+  // JSON: the game reads it as it reads that answer, so it needs no request of its own.
+  bytes chart_json = 6;
+}
+
+message Course {
+  // Easy, Normal, Hard, Oni or Edit.
+  string course = 1;
+  int32 level = 2;
+}
+
+message StartPlay {
+  int32 round = 1;
+}
+
+message MemberStatus {
+  string user_id = 1;
+  PlayerStatus status = 2;
+  bool connected = 3;
+  bool finished = 4;
+}
+
+message PlayStatuses {
+  repeated MemberStatus members = 1;
+}
+
+enum Award {
+  AWARD_UNSPECIFIED = 0;
+  NO_AWARD = 1;
+  // The top score.
+  MVP = 2;
+  // The top score, at least 30 % ahead of the second.
+  SUPER_STAR = 3;
+}
+
+message PlayerResult {
+  string user_id = 1;
+  string nickname = 2;
+  string course = 3;
+  int32 level = 4;
+  PlayerStatus status = 5;
+  // 1-based, by score.
+  int32 rank = 6;
+  Award award = 7;
+  bool cleared = 8;
+  // Left or lost connection before finishing; its last status is shown.
+  bool disconnected = 9;
+  // No 不可.
+  bool full_combo = 10;
+  // Only 良.
+  bool all_good = 11;
+  int32 slot = 12;
+  // The player's avatar as the room last knew it (empty: none), so a result still shows it once
+  // the player has left.
+  string avatar_url = 13;
+}
+
+message PlayResult {
+  int32 round = 1;
+  int64 team_score = 2;
+  repeated PlayerResult players = 3;
+  // The song that was played.
+  string source = 4;
+  string chart_id = 5;
+  string title = 6;
+}
+
+message StampSent {
+  string user_id = 1;
+  int32 stamp_id = 2;
+}
+
+message Pong {
+  int64 client_time_ms = 1;
+  int64 server_time_ms = 2;
+}
+
+// Something the player should be told, e.g. a refused action. The stream stays open. `code` is
+// what the game shows in the player's language; `message` is for logs.
+message Notice {
+  string code = 1;
+  string message = 2;
+}
+
+// The server ends the stream after this.
+message Closed {
+  string code = 1;
+  string message = 2;
+}

@@ -87,7 +87,7 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	rows, err := tx.Query(r.Context(), chartSelect+` WHERE `+playableChart+` AND c.category_flags<>0 ORDER BY c.created_at DESC,c.id DESC`)
+	rows, err := tx.Query(r.Context(), chartSelect+` WHERE `+gameChart+` ORDER BY c.created_at DESC,c.id DESC`)
 	if err != nil {
 		internal(w, err)
 		return

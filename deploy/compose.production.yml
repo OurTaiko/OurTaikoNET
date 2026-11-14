@@ -20,9 +20,19 @@ services:
       # The website's current release (deploy/publish-web.sh puts releases beside each other
       # and points `current` at one).
       WEB_DIR: /srv/web/current
+      # Multi-Enso, the game's online rooms: gRPC in clear text on a port of its own. The
+      # proxy passes /ourtaiko.multiplay.v1.MultiEnso/ on to it (deploy/net.multiplay.conf).
+      # The game is told to dial MULTIPLAY_PUBLIC_URL, by default APP_ORIGIN.
+      #
+      # OFF until the server is ready for it (deploy/README.md, "Multi-Enso (gRPC)"): to
+      # switch it on, uncomment the next line and use the second `ports` line below instead
+      # of the first. A port that is taken on the server stops the container from starting.
+      # MULTIPLAY_LISTEN_ADDR: 0.0.0.0:8081
     # On this server 8080 is Fanmade's, 8081 Database's, 8090 the account center's, 8093
-    # Profile's and 8094-8095 another site's.
+    # Profile's and 8094-8095 another site's. 8096 is the API and the website; 8097 is meant
+    # for Multi-Enso and has not been checked to be free.
     ports: ['127.0.0.1:8096:8080']
+    # ports: ['127.0.0.1:8096:8080', '127.0.0.1:8097:8081']
     volumes:
       - /opt/ourtaiko-net/web:/srv/web:ro
     read_only: true

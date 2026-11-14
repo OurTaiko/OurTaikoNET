@@ -17,6 +17,6 @@ fi
 for tool in ffmpeg ffprobe cwebp; do
   command -v "$tool" >/dev/null || { echo "test.sh: $tool is not on PATH" >&2; exit 1; }
 done
-test -z "$(gofmt -l cmd db internal)" || { echo "test.sh: gofmt would change:" >&2; gofmt -l cmd db internal >&2; exit 1; }
+test -z "$(gofmt -l cmd db internal tools)" || { echo "test.sh: gofmt would change:" >&2; gofmt -l cmd db internal tools >&2; exit 1; }
 go vet ./...
 go test -count=1 ./... "$@"

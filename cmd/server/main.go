@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -100,6 +101,14 @@ func main() {
 	if cfg.TrustedProxies, err = web.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		log.Fatal(err)
 	}
+	// Multi-Enso, the game's online rooms: a gRPC service on its own port. Off without
+	// MULTIPLAY_LISTEN_ADDR.
+	cfg.Multiplay = app.Multiplay{ListenAddr: os.Getenv("MULTIPLAY_LISTEN_ADDR"), PublicURL: strings.TrimRight(os.Getenv("MULTIPLAY_PUBLIC_URL"), "/")}
+	if raw := os.Getenv("MULTIPLAY_MIN_PLAYERS"); raw != "" {
+		if cfg.Multiplay.MinPlayers, err = strconv.Atoi(raw); err != nil || cfg.Multiplay.MinPlayers < 1 {
+			log.Fatal("MULTIPLAY_MIN_PLAYERS must be a number from 1 up")
+		}
+	}
 	devUser := os.Getenv("DEV_USER_ID")
 	if os.Getenv("SSO_ISSUER") != "" {
 		if devUser != "" {
@@ -112,6 +121,10 @@ func main() {
 	} else if devUser != "" {
 		if !validUserID(devUser) || !loopback(listen) {
 			log.Fatal("DEV_USER_ID needs a 32-character lowercase hexadecimal ID and a loopback LISTEN_ADDR")
+		}
+		// The development game session opens Multi-Enso as well.
+		if cfg.Multiplay.ListenAddr != "" && !loopback(cfg.Multiplay.ListenAddr) {
+			log.Fatal("DEV_USER_ID needs a loopback MULTIPLAY_LISTEN_ADDR")
 		}
 		cfg.DevUserID = devUser
 		log.Printf("development sign-in enabled for user %s; never use this outside local development", devUser)
@@ -160,6 +173,9 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+	// The rooms first: their players are told the room is closed, which takes a moment, while
+	// requests in flight may take the whole of what Shutdown allows.
+	a.StopRooms()
 	shutdown, cancelShutdown := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelShutdown()
 	srv.Shutdown(shutdown)
