@@ -26,3 +26,28 @@ func TestPublicURL(t *testing.T) {
 		t.Fatal(got, err)
 	}
 }
+
+// Each store may sign with its own key; half a key is a mistake in the settings.
+func TestAStoreSignsWithItsOwnKey(t *testing.T) {
+	ctx := t.Context()
+	if _, err := NewS3As(ctx, "bucket", "ap-northeast-1", "fanmade", "AKIAEXAMPLE", ""); err == nil {
+		t.Fatal("accepted a key without its secret")
+	}
+	a, err := NewS3As(ctx, "bucket", "ap-northeast-1", "fanmade", "AKIAFANMADE", "secret-one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewS3As(ctx, "bucket", "ap-northeast-1", "database", "AKIAOFFICIAL", "secret-two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for store, want := range map[*S3]string{a: "AKIAFANMADE", b: "AKIAOFFICIAL"} {
+		got, err := store.Client.Options().Credentials.Retrieve(ctx)
+		if err != nil || got.AccessKeyID != want {
+			t.Fatal(got.AccessKeyID, err)
+		}
+		if store.ReadOnly() {
+			t.Fatal("a store with a key is not read-only")
+		}
+	}
+}

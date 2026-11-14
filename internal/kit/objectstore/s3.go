@@ -16,6 +16,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 )
@@ -29,11 +30,25 @@ type S3 struct {
 }
 
 func NewS3(ctx context.Context, bucket, region, prefix string) (*S3, error) {
+	return NewS3As(ctx, bucket, region, prefix, "", "")
+}
+
+// NewS3As is NewS3 signing with one access key instead of what the environment gives. Two
+// prefixes of one bucket can each have a key that is allowed that prefix and nothing else;
+// a server that keeps files under both then gives each store its own.
+func NewS3As(ctx context.Context, bucket, region, prefix, accessKey, secret string) (*S3, error) {
 	prefix = strings.TrimSuffix(prefix, "/")
 	if bucket == "" || region == "" || !ValidKey(prefix) {
 		return nil, errors.New("S3 bucket, region and nonempty object prefix required")
 	}
-	cfg, e := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	if (accessKey == "") != (secret == "") {
+		return nil, errors.New("an S3 access key and its secret are given together")
+	}
+	options := []func(*config.LoadOptions) error{config.WithRegion(region)}
+	if accessKey != "" {
+		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secret, "")))
+	}
+	cfg, e := config.LoadDefaultConfig(ctx, options...)
 	if e != nil {
 		return nil, e
 	}

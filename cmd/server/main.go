@@ -57,7 +57,10 @@ func objects(source, storage string) (objectstore.Store, error) {
 	case "s3":
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		store, err := objectstore.NewS3(ctx, os.Getenv("S3_BUCKET"), os.Getenv("AWS_REGION"), os.Getenv(prefix+"_S3_PREFIX"))
+		// A source may have its own access key (FANMADE_AWS_ACCESS_KEY_ID and
+		// FANMADE_AWS_SECRET_ACCESS_KEY, and the same two for OFFICIAL): the keys the two old
+		// sites used are each allowed their own prefix only. Without them, the environment's.
+		store, err := objectstore.NewS3As(ctx, os.Getenv("S3_BUCKET"), os.Getenv("AWS_REGION"), os.Getenv(prefix+"_S3_PREFIX"), os.Getenv(prefix+"_AWS_ACCESS_KEY_ID"), os.Getenv(prefix+"_AWS_SECRET_ACCESS_KEY"))
 		if err != nil {
 			return nil, err
 		}
