@@ -22,6 +22,13 @@ const referencedFile = `(EXISTS(SELECT 1 FROM charts c WHERE c.tja_file=r.id OR 
 
 func (s *Server) remoteStorage() bool { _, ok := s.Config.Objects.(*objectstore.S3); return ok }
 
+// ReadOnlyFiles reports a file store that is only read: this server then stores, moves and
+// deletes nothing, and the background work that does must not be started.
+func (s *Server) ReadOnlyFiles() bool {
+	remote, ok := s.Config.Objects.(*objectstore.S3)
+	return ok && remote.ReadOnly()
+}
+
 // fileExtension is the stored form: lowercase, without the dot.
 func fileExtension(name string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))

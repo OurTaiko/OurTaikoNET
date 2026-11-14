@@ -15,7 +15,7 @@ services:
     environment:
       LISTEN_ADDR: 0.0.0.0:8080
       STORAGE_DIR: /tmp/staging
-      # STORAGE_BACKEND comes from storage.env: `local` until the switch (see
+      # STORAGE_BACKEND comes from storage.env: `public` (read-only) until the switch (see
       # deploy/README.md, "Files before the switch"), `s3` from then on.
       # The website's current release (OurTaikoNetWeb puts releases beside each other and
       # points `current` at one).

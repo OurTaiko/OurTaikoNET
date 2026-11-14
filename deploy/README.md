@@ -6,9 +6,10 @@ imported once from the three old ones, and serves the website. Since the same da
 public at <https://net.ourtaiko.org> as a preview beside the three old sites, and has its
 Application in the account center (`OurTaikoNet`), so players can sign in. **What is done on
 the preview is not kept**: its data is the one import, does not follow the old sites, and is
-replaced by the next import. It keeps files locally, so covers and audio answer 503 (see
-"Files before the switch"). Nobody is the site's administrator until the role is given in the
-account center's admin (Client roles). `rollback.yml` has not been run.
+replaced by the next import. It reads the old sites' files over their public address and
+cannot change them, so nothing can be uploaded to it (see "Files before the switch"). Nobody
+is the site's administrator until the role is given in the account center's admin (Client
+roles). `rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -121,11 +122,19 @@ deletes the files its database says nothing refers to any more, moves files to n
 writes previews. Run on a copy that is hours old, with the right to write where the old sites
 keep their files, it would delete or move files the old sites still use.
 
-So before the switch the container gets no credentials for the files at all:
-`STORAGE_BACKEND=local` in `storage.env`. Covers, audio and chart files are then not served on
-the preview (the pages show their placeholders), and nothing can be uploaded. To see files on
-the preview without that risk it needs either credentials that can only read, or a way to turn
-the background jobs off; neither exists yet.
+So before the switch the container gets no credentials for the files at all. `storage.env`
+says `STORAGE_BACKEND=public`, with each source's prefix and the public address of that prefix
+(`FANMADE_S3_PREFIX`, `FANMADE_S3_PUBLIC_BASE_URL`, and the same two for `OFFICIAL`): the old
+sites' files are read over the address everyone reads them at, and cannot be written, moved or
+deleted, because nothing here could sign such a request. In that mode the server starts none
+of the background work above and answers the routes that store a file with 503
+`FILES_READ_ONLY`.
+
+What the preview then shows is the old sites' files as its copy of the database names them: a
+chart uploaded or replaced there since the last import is missing or shows its old files, and
+a file the old site has since deleted answers 403 from the public address.
+
+`STORAGE_BACKEND=local` (the first days of the preview) serves no files at all.
 
 ## The switch
 

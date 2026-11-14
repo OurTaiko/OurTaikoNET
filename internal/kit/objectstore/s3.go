@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -20,9 +21,11 @@ import (
 )
 
 type S3 struct {
+	// Client is nil in a store that only reads over the public address (NewPublic).
 	Client         *s3.Client
 	Bucket, Prefix string
 	publicBaseURL  string
+	http           *http.Client
 }
 
 func NewS3(ctx context.Context, bucket, region, prefix string) (*S3, error) {
@@ -43,6 +46,9 @@ func (s *S3) key(key string) (*string, error) {
 	return aws.String(s.Prefix + key), nil
 }
 func (s *S3) Put(ctx context.Context, key string, body io.ReadSeeker, size int64, media, digest string) error {
+	if s.Client == nil {
+		return ErrReadOnly
+	}
 	k, e := s.key(key)
 	if e != nil {
 		return e
@@ -63,6 +69,9 @@ func AlreadyStored(err error) bool {
 	return errors.As(err, &api) && api.ErrorCode() == "PreconditionFailed"
 }
 func (s *S3) Delete(ctx context.Context, key string) error {
+	if s.Client == nil {
+		return ErrReadOnly
+	}
 	k, e := s.key(key)
 	if e != nil {
 		return e
@@ -71,6 +80,9 @@ func (s *S3) Delete(ctx context.Context, key string) error {
 	return e
 }
 func (s *S3) Open(ctx context.Context, key string) (Object, error) {
+	if s.Client == nil {
+		return s.openPublic(ctx, key)
+	}
 	k, e := s.key(key)
 	if e != nil {
 		return nil, e
@@ -99,6 +111,8 @@ type remoteObject struct {
 	modified  time.Time
 	body      io.ReadCloser
 	closed    bool
+	// fetch, when set, reads from a position on instead of the bucket (NewPublic).
+	fetch func(pos int64) (io.ReadCloser, error)
 }
 
 func (f *remoteObject) Size() int64        { return f.size }
@@ -144,6 +158,13 @@ func (f *remoteObject) Read(p []byte) (int, error) {
 	if f.pos >= f.size {
 		return 0, io.EOF
 	}
+	if f.body == nil && f.fetch != nil {
+		body, e := f.fetch(f.pos)
+		if e != nil {
+			return 0, e
+		}
+		f.body = body
+	}
 	if f.body == nil {
 		o, e := f.store.Client.GetObject(f.ctx, &s3.GetObjectInput{Bucket: aws.String(f.store.Bucket), Key: f.key, Range: aws.String(fmt.Sprintf("bytes=%d-", f.pos)), IfMatch: f.etag})
 		if e != nil {
@@ -156,6 +177,9 @@ func (f *remoteObject) Read(p []byte) (int, error) {
 	return n, e
 }
 func (s *S3) Sign(ctx context.Context, key, method, name, media string, lifetime time.Duration) (string, error) {
+	if s.Client == nil {
+		return "", errors.New("a read-only file store signs no links")
+	}
 	k, e := s.key(key)
 	if e != nil {
 		return "", e

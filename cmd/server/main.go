@@ -46,8 +46,9 @@ func validUserID(id string) bool {
 	return err == nil && len(b) == 16 && strings.ToLower(id) == id
 }
 
-// objects is one source's file store: a folder of STORAGE_DIR, or its own prefix of the
-// shared bucket.
+// objects is one source's file store: a folder of STORAGE_DIR, its own prefix of the shared
+// bucket, or (public) that prefix read over its public address and never written: what a
+// preview running beside the site that owns the files is given.
 func objects(source, storage string) (objectstore.Store, error) {
 	prefix := strings.ToUpper(source)
 	switch os.Getenv("STORAGE_BACKEND") {
@@ -61,8 +62,10 @@ func objects(source, storage string) (objectstore.Store, error) {
 			return nil, err
 		}
 		return store, store.SetPublicBaseURL(os.Getenv(prefix + "_S3_PUBLIC_BASE_URL"))
+	case "public":
+		return objectstore.NewPublic(os.Getenv(prefix+"_S3_PREFIX"), os.Getenv(prefix+"_S3_PUBLIC_BASE_URL"))
 	default:
-		return nil, errors.New("STORAGE_BACKEND must be local or s3")
+		return nil, errors.New("STORAGE_BACKEND must be local, s3 or public")
 	}
 }
 

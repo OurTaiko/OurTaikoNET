@@ -99,6 +99,19 @@ var answers = web.Problems{Extra: map[string]any{"validationVersion": tja.Versio
 // The names this package calls them by.
 var problem, internal, decode, decodeLimit = answers.Problem, answers.Internal, answers.Decode, answers.DecodeLimit
 
+// storing is in front of the routes that put a file in the store. A server whose store is
+// only read (a preview beside the site that owns the files) says so at once, before a
+// player has sent a whole chart.
+func (s *Server) storing(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.ReadOnlyFiles() {
+			problem(w, http.StatusServiceUnavailable, "FILES_READ_ONLY", "预览站不保存文件，请到正式站上传")
+			return
+		}
+		next(w, r)
+	}
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { web.Respond(w, 200, map[string]bool{"ok": true}) })
@@ -124,14 +137,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/me", s.me)
 	mux.HandleFunc("GET /api/v1/me/charts", s.mine)
 	mux.HandleFunc("GET /api/v1/charts", s.list)
-	mux.HandleFunc("POST /api/v1/charts", s.upload)
+	mux.HandleFunc("POST /api/v1/charts", s.storing(s.upload))
 	mux.HandleFunc("GET /api/v1/charts/{id}", s.detail)
 	mux.HandleFunc("PATCH /api/v1/charts/{id}", s.editMetadata)
 	mux.HandleFunc("DELETE /api/v1/charts/{id}", s.remove)
 	mux.HandleFunc("GET /api/v1/charts/{id}/cover", s.getCover)
-	mux.HandleFunc("PUT /api/v1/charts/{id}/cover", s.replaceCover)
-	mux.HandleFunc("PUT /api/v1/charts/{id}/movie", s.replaceMovie)
-	mux.HandleFunc("PUT /api/v1/charts/{id}/files", s.replaceFiles)
+	mux.HandleFunc("PUT /api/v1/charts/{id}/cover", s.storing(s.replaceCover))
+	mux.HandleFunc("PUT /api/v1/charts/{id}/movie", s.storing(s.replaceMovie))
+	mux.HandleFunc("PUT /api/v1/charts/{id}/files", s.storing(s.replaceFiles))
 	mux.HandleFunc("POST /api/v1/charts/{id}/files/preview", s.previewReplacement)
 	mux.HandleFunc("GET /api/v1/charts/{id}/tja", s.downloadTJA)
 	mux.HandleFunc("GET /api/v1/charts/{id}/audio", s.streamAudio)
@@ -194,7 +207,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/playlists/{id}", s.editPlaylist)
 	mux.HandleFunc("DELETE /api/v1/playlists/{id}", s.deletePlaylist)
 	mux.HandleFunc("GET /api/v1/playlists/{id}/cover", s.getPlaylistCover)
-	mux.HandleFunc("PUT /api/v1/playlists/{id}/cover", s.replacePlaylistCover)
+	mux.HandleFunc("PUT /api/v1/playlists/{id}/cover", s.storing(s.replacePlaylistCover))
 	mux.HandleFunc("DELETE /api/v1/playlists/{id}/cover", s.removePlaylistCover)
 	mux.HandleFunc("PUT /api/v1/playlists/{id}/items/{chart}", s.addPlaylistItem)
 	mux.HandleFunc("DELETE /api/v1/playlists/{id}/items/{chart}", s.removePlaylistItem)

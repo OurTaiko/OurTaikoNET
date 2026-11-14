@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/netip"
 	"path/filepath"
@@ -221,15 +222,26 @@ func (a *App) Start(ctx context.Context) error {
 	if err := errors.Join(a.Fanmade.FailInterruptedUploads(ctx), a.Official.FailInterruptedUploads(ctx)); err != nil {
 		return err
 	}
-	go a.Fanmade.RunFileCleanup(ctx)
-	go a.Fanmade.RunPreviewBackfill(ctx)
-	go a.Fanmade.RunFileRekey(ctx)
+	// Deleting replaced files, renaming them and writing missing preview clips is the work of
+	// the server that owns the files. One that only reads them goes by a copy of the database
+	// that falls behind, and must do none of it.
+	if a.Fanmade.ReadOnlyFiles() {
+		log.Print("fanmade files are read-only: no file cleanup, rekey or preview backfill")
+	} else {
+		go a.Fanmade.RunFileCleanup(ctx)
+		go a.Fanmade.RunPreviewBackfill(ctx)
+		go a.Fanmade.RunFileRekey(ctx)
+	}
+	if a.Official.ReadOnlyFiles() {
+		log.Print("official files are read-only: no file cleanup or preview backfill")
+	} else {
+		go a.Official.RunFileCleanup(ctx)
+		go a.Official.RunPreviewBackfill(ctx)
+	}
 	go a.Fanmade.RunDifficultyConstants(ctx)
 	go a.Fanmade.RunNotificationPrune(ctx)
-	go a.Official.RunFileCleanup(ctx)
 	go a.Official.RunNotificationPrune(ctx)
 	go a.Official.RunDifficultyConstants(ctx)
-	go a.Official.RunPreviewBackfill(ctx)
 	return nil
 }
 
