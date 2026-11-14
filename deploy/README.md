@@ -3,11 +3,12 @@
 Status: published for the first time on 2026-11-14, this repository and then OurTaikoNetWeb,
 both by their workflows. The container runs on the server at `127.0.0.1:8096` on a database
 imported once from the three old ones, and serves the website. Since the same day it is
-public at <https://net.ourtaiko.org> as a preview beside the three old sites. **It has no
-account center application yet, so nobody can sign in** (the sign-in link comes back to the
-front page), its data is the one import and does not follow the old sites, and it keeps files
-locally, so covers and audio answer 503 (see "Files before the switch"). `rollback.yml` has
-not been run.
+public at <https://net.ourtaiko.org> as a preview beside the three old sites, and has its
+Application in the account center (`OurTaikoNet`), so players can sign in. **What is done on
+the preview is not kept**: its data is the one import, does not follow the old sites, and is
+replaced by the next import. It keeps files locally, so covers and audio answer 503 (see
+"Files before the switch"). Nobody is the site's administrator until the role is given in the
+account center's admin (Client roles). `rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
@@ -98,8 +99,10 @@ Each step touches production and is done with the owner's go-ahead.
    origin, secure cookies, the proxy's address) and `storage.env` (`STORAGE_BACKEND=local`: the
    preview stays away from the old sites' files, next section). The account center's values
    and the three `LEGACY_*_HOST` are added later; see `api.env.example`. **Done on 2026-11-14.**
-3. **Account center.** Register one Application for `net.ourtaiko.org` and put its client and
-   service credentials in `api.env`.
+3. **Account center.** `deploy/server/register-application.sh` registers the Application
+   `OurTaikoNet` (website sign-in, token lookup, profiles, game sessions and account-token
+   exchange) and appends its credentials and a session key to `api.env`; then the container is
+   recreated. **Done on 2026-11-14**, after step 6.
 4. **Directories.** `/opt/ourtaiko-net/{incoming,incoming-web,web/releases}`, owned by
    `ourtaiko-ci`; the container reads `web/` as user 10001. `/etc/ourtaiko-net/docker`, root
    only. **Done on 2026-11-14.**
