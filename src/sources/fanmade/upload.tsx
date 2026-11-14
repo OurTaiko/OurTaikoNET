@@ -494,7 +494,7 @@ export function UploadPage({
         <form
           onSubmit={submit}
           noValidate
-          className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>aside]:space-y-3 lg:[&>aside]:sticky lg:[&>aside]:top-4 [&>div]:space-y-6"
+          className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>aside]:space-y-3 lg:[&>aside]:sticky lg:[&>aside]:top-24 [&>div]:space-y-6"
         >
           <div className="min-w-0">
             <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>

@@ -229,14 +229,7 @@ export function HomePage() {
   return (
     <div className="space-y-8">
       {params.get('error') === 'sso' && <Notice>{t('home.signInFailed')}</Notice>}
-      <header className="space-y-3">
-        <p className="font-semibold text-muted-foreground text-sm">{t('home.kicker')}</p>
-        <h1 className="font-extrabold text-4xl sm:text-6xl leading-[1.08] tracking-tight">
-          {t('home.headingStart')}
-          <span className="mark">{t('home.headingMark')}</span>
-        </h1>
-        <p className="max-w-2xl text-muted-foreground sm:text-lg">{t('home.lead')}</p>
-      </header>
+      <h1 className="sr-only">{t('shell.home')}</h1>
       <div className="gap-4 grid grid-cols-1 md:grid-cols-2">
         {sources.map((source) => (
           <SourceCard key={source} source={source} library={libraries[source]} />

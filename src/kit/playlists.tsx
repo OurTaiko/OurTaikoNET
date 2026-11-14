@@ -550,7 +550,7 @@ export function PlaylistPage() {
     <section className="space-y-6" aria-labelledby="playlist-heading">
       {back}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
+        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24">
           <div className="flex aspect-square w-44 items-center justify-center overflow-hidden rounded-[28px] bg-secondary text-secondary-foreground shadow-elev-1 sm:w-56 lg:w-full">
             {source && failedCover !== source ? (
               <img

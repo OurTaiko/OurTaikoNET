@@ -943,7 +943,7 @@
     "dans": "段位道场",
     "charts": "我的谱面",
     "players": "玩家",
-    "directory": "玩家",
+    "directory": "玩家列表",
     "titles": "称号",
     "you": "我",
     "myPage": "我的主页",
@@ -968,6 +968,9 @@
     "accent": "强调色",
     "accentNote": "用于首页和玩家页面；歌曲页面跟随曲源的颜色。",
     "don": "咚（红）",
-    "ka": "咔（青）"
+    "ka": "咔（青）",
+    "route": "当前位置",
+    "section": "栏目",
+    "page": "页面"
   }
 }

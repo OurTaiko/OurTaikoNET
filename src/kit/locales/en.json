@@ -954,7 +954,7 @@
     "dans": "Dan courses",
     "charts": "My charts",
     "players": "Players",
-    "directory": "Players",
+    "directory": "All players",
     "titles": "Titles",
     "you": "You",
     "myPage": "My page",
@@ -979,6 +979,9 @@
     "accent": "Accent colour",
     "accentNote": "On Home and the player pages. Song pages wear their source's colour.",
     "don": "Don (red)",
-    "ka": "Ka (teal)"
+    "ka": "Ka (teal)",
+    "route": "Where you are",
+    "section": "Section",
+    "page": "Page"
   }
 }

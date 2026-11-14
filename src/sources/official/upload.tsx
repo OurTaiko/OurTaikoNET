@@ -842,7 +842,7 @@ export function UploadPage({
             )}
           </div>
           {/* Sending it stays in view while the form scrolls. */}
-          <aside className="space-y-4 rounded-[28px] bg-card p-5 shadow-elev-1 lg:sticky lg:top-4">
+          <aside className="space-y-4 rounded-[28px] bg-card p-5 shadow-elev-1 lg:sticky lg:top-24">
             {busy && (
               <div className="space-y-2" role="status">
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -11,6 +11,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import {
+  CaretDownIcon,
   CompassIcon,
   FolderIcon,
   GameControllerIcon,
@@ -22,7 +23,6 @@ import {
   MedalIcon,
   PlaylistIcon,
   ShieldStarIcon,
-  SidebarSimpleIcon,
   SignInIcon,
   SignOutIcon,
   TagIcon,
@@ -36,6 +36,13 @@ import { sources, type SourceId } from '../source'
 import { ThemeToggle } from '../theme'
 import { UserAvatar } from '../components/user-avatar'
 import { Button } from '../components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import { rememberedSource, rememberSource, useSiteRoles } from './site'
 
 export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
@@ -103,7 +110,7 @@ export function Shell({
     }
   }, [collapsed])
 
-  const songs: Item[] = [
+  const songsOf = (source: SourceId): Item[] => [
     {
       key: 'browse',
       href: `/${source}/`,
@@ -130,6 +137,7 @@ export function Shell({
         ]
       : []),
   ]
+  const songs = songsOf(source)
   const players: Item[] = [
     {
       key: 'players',
@@ -332,10 +340,51 @@ export function Shell({
     <ShellLink
       href="/"
       base={base}
-      className="rounded-full outline-none font-extrabold text-primary text-xl tracking-tight focus-visible:ring-3 focus-visible:ring-ring/40"
+      className="rounded-full outline-none font-extrabold text-primary text-xl tracking-tight focus-visible:ring-3 focus-visible:ring-ring/40 shrink-0"
     >
-      OurTaiko
+      OurTaikoNET
     </ShellLink>
+  )
+  // The route beside the name: which section this page is in and which page of it, each a
+  // menu of the others. The two sources are sections of their own here, so the first menu
+  // also changes source.
+  const sections: { key: string; label: string; items: Item[] }[] = [
+    ...sources.map(({ id }) => ({ key: id, label: t(`shell.${id}`), items: songsOf(id) })),
+    { key: 'players', label: t('shell.players'), items: players },
+    ...(you.length ? [{ key: 'you', label: t('shell.you'), items: you }] : []),
+  ]
+  const found = sections.find((section) => section.items.some(lit))
+  // A page of a source that is no item of the menu (signing in, the account) is still in it.
+  const section = found ?? sections.find((candidate) => candidate.key === area)
+  const page = found?.items.find(lit)
+  const route = section && (
+    <nav
+      aria-label={t('shell.route')}
+      data-testid="route"
+      className="hidden md:flex items-center gap-1 min-w-0 text-sm"
+    >
+      <span aria-hidden="true" className="px-1 text-muted-foreground/60 text-lg">
+        /
+      </span>
+      <Crumb
+        label={t('shell.section')}
+        value={section.key}
+        options={sections.map(({ key, label, items }) => ({ key, label, href: items[0].href }))}
+        muted={!!page}
+      />
+      {page && (
+        <>
+          <span aria-hidden="true" className="px-1 text-muted-foreground/60 text-lg">
+            /
+          </span>
+          <Crumb
+            label={t('shell.page')}
+            value={page.key}
+            options={section.items.map(({ key, label, href }) => ({ key, label, href }))}
+          />
+        </>
+      )}
+    </nav>
   )
   const bar: Item[] = [
     home,
@@ -346,75 +395,71 @@ export function Shell({
       also: [`/${source}/charts`, `/${source}/dans`, `/${source}/me/charts`],
     },
     songs[1],
-    players[0],
+    { ...players[0], label: t('shell.players') },
     ...(user ? [{ ...you[0], label: t('shell.you') }] : []),
   ]
 
   return (
     <div className="isolate relative bg-background min-h-svh text-foreground">
       <Backdrop />
-      <div className="flex items-start gap-6 mx-auto p-3 sm:p-4 max-w-[92rem]">
-        {/* The menu, on screens wide enough to keep it beside the page. */}
-        <aside
-          className={cn(
-            'hidden lg:flex top-4 sticky flex-col gap-3 max-h-[calc(100svh-2rem)] shrink-0',
-            collapsed ? 'w-[3.75rem]' : 'w-64',
-          )}
-        >
-          <div
-            className={cn(
-              'flex items-center bg-card shadow-elev-1 rounded-full h-14 shrink-0',
-              collapsed ? 'justify-center' : 'gap-1 pr-5 pl-1.5 self-start',
-            )}
-          >
+      <div className="flex flex-col gap-4 sm:gap-5 mx-auto p-3 sm:p-4 max-w-[92rem]">
+        {/* The top row stays in reach while the page scrolls: the name with the route, the
+            search, and the tools. */}
+        <div className="top-3 sm:top-4 z-30 sticky flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 bg-card shadow-elev-1 pr-4 pl-1.5 rounded-full min-w-0 h-14">
             <Button
               variant="ghost"
               size="icon"
+              className="max-lg:hidden"
               aria-label={collapsed ? t('shell.expandMenu') : t('shell.collapseMenu')}
               aria-expanded={!collapsed}
               onClick={() => setCollapsed(!collapsed)}
             >
-              <SidebarSimpleIcon className="size-5" aria-hidden="true" />
+              <ListIcon className="size-5" aria-hidden="true" />
             </Button>
-            {!collapsed && brand}
-          </div>
-          <div className="overflow-y-auto -m-1 p-1 rounded-[28px] min-h-0">{menu(collapsed)}</div>
-        </aside>
-
-        <div className="flex flex-col flex-1 gap-6 min-w-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="lg:hidden flex items-center gap-1 bg-card shadow-elev-1 pr-4 pl-1.5 rounded-full h-14 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('shell.openMenu')}
-                aria-expanded={open}
-                onClick={() => setOpen(true)}
-              >
-                <ListIcon className="size-5" aria-hidden="true" />
-              </Button>
-              {brand}
-            </div>
-            <form
-              action={`/${source}/`}
-              role="search"
-              className="hidden sm:flex flex-1 items-center gap-2.5 bg-card shadow-elev-1 ml-auto px-5 rounded-full max-w-sm h-14 text-muted-foreground focus-within:ring-3 focus-within:ring-ring/30"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              aria-label={t('shell.openMenu')}
+              aria-expanded={open}
+              onClick={() => setOpen(true)}
             >
-              <MagnifyingGlassIcon className="size-5 shrink-0" aria-hidden="true" />
-              <input
-                type="search"
-                name="q"
-                aria-label={t('shell.search')}
-                placeholder={t('shell.search')}
-                className="flex-1 bg-transparent outline-none min-w-0 text-foreground text-sm placeholder:text-muted-foreground"
-              />
-            </form>
-            <div className="flex items-center bg-card shadow-elev-1 ml-auto sm:ml-0 px-1.5 rounded-full h-14 shrink-0">
-              {bell}
-              <ThemeToggle />
-            </div>
+              <ListIcon className="size-5" aria-hidden="true" />
+            </Button>
+            {brand}
+            {route}
           </div>
-          <main id="main" className="space-y-6 pb-24 lg:pb-8 w-full min-w-0">
+          <form
+            action={`/${source}/`}
+            role="search"
+            className="hidden sm:flex flex-1 items-center gap-2.5 bg-card shadow-elev-1 ml-auto px-5 rounded-full max-w-sm h-14 text-muted-foreground focus-within:ring-3 focus-within:ring-ring/30"
+          >
+            <MagnifyingGlassIcon className="size-5 shrink-0" aria-hidden="true" />
+            <input
+              type="search"
+              name="q"
+              aria-label={t('shell.search')}
+              placeholder={t('shell.search')}
+              className="flex-1 bg-transparent outline-none min-w-0 text-foreground text-sm placeholder:text-muted-foreground"
+            />
+          </form>
+          <div className="flex items-center bg-card shadow-elev-1 ml-auto sm:ml-0 px-1.5 rounded-full h-14 shrink-0">
+            {bell}
+            <ThemeToggle />
+          </div>
+        </div>
+        <div className="flex items-start gap-6">
+          {/* The menu, on screens wide enough to keep it beside the page. */}
+          <aside
+            className={cn(
+              'hidden lg:block top-[5.5rem] sticky max-h-[calc(100svh-6.5rem)] overflow-y-auto -m-1 p-1 rounded-[28px] shrink-0',
+              collapsed ? 'w-[4.25rem]' : 'w-[16.5rem]',
+            )}
+          >
+            {menu(collapsed)}
+          </aside>
+          <main id="main" className="flex-1 space-y-6 pb-24 lg:pb-8 min-w-0">
             {children}
           </main>
         </div>
@@ -475,6 +520,66 @@ export function Shell({
         ))}
       </nav>
     </div>
+  )
+}
+
+/**
+ * One step of the route: its name, and under it the other places at the same level.
+ * Choosing one goes there.
+ */
+function Crumb({
+  label,
+  value,
+  options,
+  muted = false,
+}: {
+  label: string
+  value: string
+  options: { key: string; label: string; href: string }[]
+  muted?: boolean
+}) {
+  const current = options.find((option) => option.key === value)
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`${label}: ${current?.label ?? ''}`}
+            className={cn(
+              'group/crumb inline-flex items-center gap-1 rounded-full outline-none min-w-0 h-9 pr-1 pl-2 font-semibold focus-visible:ring-3 focus-visible:ring-ring/40 hover:bg-accent transition-colors',
+              muted ? 'text-muted-foreground' : 'text-foreground',
+            )}
+          />
+        }
+      >
+        <span className="truncate">{current?.label}</span>
+        <CaretDownIcon
+          className="size-4 shrink-0 transition-transform group-aria-expanded/crumb:rotate-180"
+          aria-hidden="true"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={10} className="p-1.5 rounded-[20px] min-w-48">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(key) => {
+            const next = options.find((option) => option.key === key)
+            if (next && next.key !== value) visit(next.href)
+          }}
+        >
+          {options.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.key}
+              value={option.key}
+              // The one this page is under is lit, with its tick in front.
+              className="data-checked:bg-secondary pr-5 pl-11 rounded-[14px] h-11 data-checked:font-semibold text-[0.9375rem] data-checked:text-secondary-foreground [&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto [&>[data-slot=dropdown-menu-radio-item-indicator]]:left-3.5"
+            >
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
