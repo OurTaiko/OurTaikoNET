@@ -17,7 +17,7 @@ One container, `ourtaiko-net`, on the server that runs the three old sites, besi
 the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
 well (`internal/legacy`). The website is `web/` in this repository: its builds are put in a
 directory on the server and this container serves the current one. Until 2026-11-14 the
-website was a repository of its own, OurTaikoNetWeb (now archived); its history is kept here,
+website was a repository of its own, OurTaikoNetWeb (to be archived); its history is kept here,
 under `web/`, with the same commit hashes.
 
 ```
@@ -75,7 +75,7 @@ nothing else. It has no password and one key, which forwards nothing; it owns
 `/opt/ourtaiko-net`; it cannot read the settings files; and it may run as root only the docker
 commands `publish.sh` runs, on images named `ourtaiko-net` and the one Compose file
 (`/etc/sudoers.d/ourtaiko-ci`). The private key exists only as the `DEPLOY_KEY` secret of this
-repository (and of the archived OurTaikoNetWeb): to replace it, make a new pair, put the new
+repository (and of the old OurTaikoNetWeb): to replace it, make a new pair, put the new
 public half in the account's `authorized_keys` and set the secret again.
 
 This narrows what a leaked key can do, but not to nothing: the Compose file that says what the
