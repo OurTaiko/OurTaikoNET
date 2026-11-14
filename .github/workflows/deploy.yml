@@ -54,7 +54,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Publishing is switched on per repository (Settings > Variables: DEPLOY_ENABLED=true),
+      # once the server is ready for it. Until then a push stops here, checked and built.
+
       - name: Package the build
+        if: vars.DEPLOY_ENABLED == 'true'
         id: web
         run: |
           test -f dist/index.html
@@ -63,6 +67,7 @@ jobs:
           echo "sha256=${digest%% *}" >> "$GITHUB_OUTPUT"
 
       - name: Validate deployment secrets
+        if: vars.DEPLOY_ENABLED == 'true'
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -77,6 +82,7 @@ jobs:
           done
 
       - name: Upload the build
+        if: vars.DEPLOY_ENABLED == 'true'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           version: '1.8.1'
@@ -90,6 +96,7 @@ jobs:
           command_timeout: 10m
 
       - name: Prepare the publish script from this commit
+        if: vars.DEPLOY_ENABLED == 'true'
         # Explicitly use Bash regardless of the SSH user's default shell.
         run: |
           {
@@ -99,6 +106,7 @@ jobs:
           } > "$RUNNER_TEMP/publish-net-web.sh"
 
       - name: Publish over SSH
+        if: vars.DEPLOY_ENABLED == 'true'
         uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
         env:
           DEPLOY_REVISION: ${{ github.sha }}
