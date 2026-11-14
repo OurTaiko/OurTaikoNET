@@ -65,7 +65,6 @@ jobs:
           host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
           key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           source: net-image.tar.gz,compose.production.yml
@@ -90,7 +89,6 @@ jobs:
           host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
           key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           version: '1.8.1'
