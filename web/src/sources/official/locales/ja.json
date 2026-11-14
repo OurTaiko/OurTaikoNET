@@ -1,0 +1,83 @@
+{
+  "messages": {
+    "songRegistered": "曲を登録しました",
+    "chartFilesUploaded": "譜面ファイルをアップロードしました",
+    "publicChartCount": "アップロードした譜面",
+    "firstLogin": "初回ログイン",
+    "noPublishedChartsYet": "アップロードした譜面はまだありません",
+    "memberNamesUnavailable": "ニックネームを取得できません。譜面とスコアの統計は表示されます。",
+    "userPublishedCharts": "このユーザーがアップロードした譜面",
+    "metadataTab_translations": "翻訳名",
+    "myCharts": "アップロードした譜面",
+    "publishChart": "譜面をアップロード",
+    "noChartsYet": "データベースにまだ譜面がありません",
+    "createdAt": "追加日時",
+    "chartsNav": "譜面を探す"
+  },
+  "common": {
+    "siteTitle": "OurTaikoNET · 公式"
+  },
+  "upload": {
+    "replacement_other": "「{{previous}}」を「{{title}}」に置き換えます（譜面ブロック {{count}} 個）。"
+  },
+  "errors": {
+    "METADATA_LOCKED": "譜面ファイルがある場合、BPM は TJA に従うためここでは変更できません。",
+    "CHART_FILES_MISSING": "この曲にはまだ譜面ファイルがありません。"
+  },
+  "db": {
+    "upload": "譜面をアップロード",
+    "searchPlaceholder": "曲名、訳名、Nijiiro ID、公式 ID で検索",
+    "orderLatest": "新着順",
+    "orderNijiiro": "Nijiiro ID 順",
+    "orderTitle": "曲名順",
+    "orderLevel": "★順",
+    "orderBpm": "BPM 順",
+    "orderUpdated": "最近の変更",
+    "filterNijiiro": "Nijiiro ID",
+    "nijiiroAny": "Nijiiro ID の有無を問わない",
+    "nijiiroYes": "Nijiiro ID あり",
+    "nijiiroNo": "Nijiiro ID なし",
+    "nijiiroIdWithValue": "Nijiiro ID {{id}}",
+    "none": "なし",
+    "record": "データベース記録",
+    "files": "ファイル",
+    "audio": "音源",
+    "notes": "備考",
+    "uploadUnavailable": "アップロードできません",
+    "uploadNeedsPermission": "譜面をアップロードできるのは管理者だけです。",
+    "uploadTitle": "公式譜面をアップロード",
+    "uploadFiles": "ファイルを選択",
+    "uploadWaveHint": "TJA の WAVE は選択した音源のファイル名と一致している必要があります。保存後、WAVE は音源のハッシュ名に書き換えられます。",
+    "uploadChartFilesText": "この曲の TJA と対応する音源を選択します。保存後は曲名、サブタイトル、BPM、難易度が TJA に従い、以前の入力は置き換えられます。",
+    "replaceWaveHint": "現在の音源をそのまま使う場合、TJA の WAVE は任意で構いません。保存後は音源のハッシュ名に書き換えられます。",
+    "filterFiles": "ファイル",
+    "filesAny": "ファイルの有無を問わない",
+    "filesYes": "ファイルあり",
+    "uploadMode": "アップロード方法",
+    "uploadModeFiles": "TJA と音源をアップロード",
+    "uploadModeSong": "曲だけ登録",
+    "songOnlyText": "譜面ファイルがなくても曲を先に登録できます。曲名と分かっている情報を入力し、TJA と音源は後で曲のページからアップロードしてください。登録だけの曲はゲームには表示されません。",
+    "songInformation": "曲の情報",
+    "songTitle": "曲名",
+    "songSubtitle": "サブタイトル",
+    "songFieldsHint": "曲名は必須です。サブタイトルと BPM は空欄にできます。ファイルをアップロードすると、これらは TJA に従います。",
+    "songFieldsInvalid": "曲名は空にできません。BPM は正の数か空欄にしてください。",
+    "registerSong": "曲を登録",
+    "identifierHint": "どちらの ID も省略できます。Nijiiro ID は正の整数、公式 ID は英数字、ドット、アンダースコア、ハイフンのみです。",
+    "identifierInvalid": "Nijiiro ID は正の整数、公式 ID は英数字、ドット、アンダースコア、ハイフンのみ、最大 64 文字です。",
+    "translations": "曲名とサブタイトルの訳",
+    "translatedTitle": "曲名",
+    "translatedSubtitle": "サブタイトル",
+    "tjaConverted": "{{encoding}} と判定しました。UTF-8 に変換してアップロードします。"
+  },
+  "categories": {
+    "namco": "ナムコオリジナル",
+    "pop": "ポップス",
+    "game": "ゲームミュージック",
+    "anime": "アニメ",
+    "vocaloid": "ボーカロイド",
+    "variety": "バラエティ",
+    "kids": "キッズ",
+    "classics": "クラシック"
+  }
+}

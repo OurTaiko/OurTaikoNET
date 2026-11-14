@@ -1,0 +1,83 @@
+{
+  "messages": {
+    "songRegistered": "乐曲已登记",
+    "chartFilesUploaded": "谱面文件已上传",
+    "publicChartCount": "上传的谱面",
+    "firstLogin": "首次登录",
+    "noPublishedChartsYet": "还没有上传谱面",
+    "memberNamesUnavailable": "昵称暂时无法获取，谱面与成绩统计仍可查看。",
+    "userPublishedCharts": "该用户上传的谱面",
+    "metadataTab_translations": "译名",
+    "myCharts": "我的上传",
+    "publishChart": "上传谱面",
+    "noChartsYet": "数据库里还没有谱面",
+    "createdAt": "收录时间",
+    "chartsNav": "浏览谱面"
+  },
+  "common": {
+    "siteTitle": "OurTaikoNET · 官方"
+  },
+  "upload": {
+    "replacement_other": "「{{previous}}」将替换为「{{title}}」，包含 {{count}} 个谱面块。"
+  },
+  "errors": {
+    "METADATA_LOCKED": "有谱面文件时，BPM 来自 TJA，不能在此修改。",
+    "CHART_FILES_MISSING": "该乐曲尚未上传谱面文件。"
+  },
+  "db": {
+    "upload": "上传谱面",
+    "searchPlaceholder": "搜索曲名、译名、Nijiiro ID 或官方 ID",
+    "orderLatest": "最新收录",
+    "orderNijiiro": "按 Nijiiro ID",
+    "orderTitle": "按曲名",
+    "orderLevel": "按星级",
+    "orderBpm": "按 BPM",
+    "orderUpdated": "最近更改",
+    "filterNijiiro": "Nijiiro ID",
+    "nijiiroAny": "不限 Nijiiro ID",
+    "nijiiroYes": "有 Nijiiro ID",
+    "nijiiroNo": "无 Nijiiro ID",
+    "nijiiroIdWithValue": "Nijiiro ID {{id}}",
+    "none": "无",
+    "record": "数据库记录",
+    "files": "文件",
+    "audio": "音频",
+    "notes": "备注",
+    "uploadUnavailable": "无法上传",
+    "uploadNeedsPermission": "只有管理员可以上传官方谱面。",
+    "uploadTitle": "上传官方谱面",
+    "uploadFiles": "选择文件",
+    "uploadWaveHint": "TJA 的 WAVE 必须与所选音频的文件名一致；入库后 WAVE 会改为音频的哈希文件名。",
+    "uploadChartFilesText": "选择这首乐曲的 TJA 与对应音频。入库后曲名、副标题、BPM 和难度都以 TJA 为准，之前填写的内容会被覆盖。",
+    "replaceWaveHint": "沿用当前音频时，TJA 的 WAVE 可以任意填写，入库后会改为音频的哈希文件名。",
+    "filterFiles": "文件",
+    "filesAny": "不限文件",
+    "filesYes": "已有文件",
+    "uploadMode": "上传方式",
+    "uploadModeFiles": "上传 TJA 与音频",
+    "uploadModeSong": "仅登记乐曲",
+    "songOnlyText": "没有谱面文件也可以先登记乐曲：填写曲名和已知的信息，之后在乐曲页面补传 TJA 与音频。登记的乐曲不会出现在游戏里。",
+    "songInformation": "乐曲信息",
+    "songTitle": "曲名",
+    "songSubtitle": "副标题",
+    "songFieldsHint": "曲名必填；副标题和 BPM 可以留空。上传文件后这些信息将以 TJA 为准。",
+    "songFieldsInvalid": "曲名不能为空；BPM 必须为正数或留空。",
+    "registerSong": "登记乐曲",
+    "identifierHint": "两个标识都可以留空。Nijiiro ID 为正整数；官方 ID 只能包含字母、数字、点、下划线和连字符。",
+    "identifierInvalid": "Nijiiro ID 必须为正整数；官方 ID 只能包含字母、数字、点、下划线和连字符，最长 64 个字符。",
+    "translations": "曲名与副标题译名",
+    "translatedTitle": "曲名",
+    "translatedSubtitle": "副标题",
+    "tjaConverted": "已自动识别为 {{encoding}}，上传时转为 UTF-8。"
+  },
+  "categories": {
+    "namco": "南梦宫原创",
+    "pop": "流行音乐",
+    "game": "游戏音乐",
+    "anime": "动画",
+    "vocaloid": "VOCALOID",
+    "variety": "综合",
+    "kids": "儿童",
+    "classics": "古典"
+  }
+}

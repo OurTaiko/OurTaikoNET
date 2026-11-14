@@ -1,0 +1,339 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/roboto-flex';
+
+@custom-variant dark (&:is(.dark *));
+
+/* The site's one look: Material 3 Expressive, after Moesekai (pjsk.moe). Rounded panels that
+   float on a tinted page, pill controls, tonal fills, soft shadows.
+
+   Colour is "Don and Ka": one set of neutral surfaces and one accent that follows the song
+   source. The official source wears Don, the red centre hit; Fanmade wears Ka, the teal rim
+   hit; pages that belong to no source (home, players) wear Don.
+
+   Page code uses the roles below (bg-card, text-muted-foreground, bg-secondary, …), never a
+   literal colour, except for the fixed ones: difficulties, categories and nameplate bands. */
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans:
+    'Roboto Flex Variable', Roboto, 'PingFang SC', 'Hiragino Sans', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  /* The accent: filled buttons, links, the marker under a heading's key word. */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  /* The accent at full strength, for the one loudest thing on a page (a floating action). */
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  /* The accent, soft: the chosen item of a menu, a chosen chip, tonal buttons. */
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  /* Wells inside a card, one step and two steps down from it. */
+  --color-surface-low: var(--surface-low);
+  --color-surface-high: var(--surface-high);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--card);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--secondary);
+  --color-sidebar-accent-foreground: var(--secondary-foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+  /* Names from the look before this one, kept for the code that still says them. */
+  --color-outline: var(--border);
+  --color-drop: var(--border);
+  --color-cream: var(--muted);
+  --color-don: var(--don);
+  --color-ka: var(--ka);
+  --color-link: var(--primary);
+
+  /* Shape: 7 a badge, 14 a field, 20 a card, 28 a panel, full a pill. */
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.43);
+  --radius-2xl: calc(var(--radius) * 1.72);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.3);
+
+  /* Lift: a hairline edge, a tight contact shadow and a soft one pulled in below. */
+  --shadow-elev-1:
+    0 0 0 1px var(--shadow-edge), 0 1px 2px 0 rgb(var(--shadow-ink) / 0.06),
+    0 4px 12px -4px rgb(var(--shadow-ink) / 0.16);
+  --shadow-elev-2:
+    0 0 0 1px var(--shadow-edge), 0 2px 4px -1px rgb(var(--shadow-ink) / 0.08),
+    0 10px 22px -8px rgb(var(--shadow-ink) / 0.22);
+  --shadow-elev-3:
+    0 0 0 1px var(--shadow-edge), 0 4px 8px -2px rgb(var(--shadow-ink) / 0.1),
+    0 16px 32px -10px rgb(var(--shadow-ink) / 0.24);
+  --shadow-press: var(--shadow-elev-1);
+  --shadow-press-hover: var(--shadow-elev-2);
+  --shadow-drop: var(--shadow-elev-1);
+  --shadow-drop-hover: var(--shadow-elev-2);
+
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(0.38, 1.21, 0.22, 1);
+}
+
+:root {
+  --don: #f65040;
+  --ka: #68d0d7;
+  --radius: 0.875rem;
+
+  --background: #f6f4f1;
+  --foreground: #1c1b1a;
+  --card: #ffffff;
+  --card-foreground: #1c1b1a;
+  --popover: #ffffff;
+  --popover-foreground: #1c1b1a;
+  --surface-low: #faf8f6;
+  --surface-high: #e8e5e1;
+  --muted: #f0eeeb;
+  --muted-foreground: #5a544f;
+  --accent: #ece9e5;
+  --accent-foreground: #1c1b1a;
+  --destructive: #ba1a1a;
+  --border: #dedad4;
+  --input: #c4bdb5;
+  --shadow-edge: rgb(28 27 26 / 0.05);
+  --shadow-ink: 28 27 26;
+
+  /* Don. */
+  --primary: #b3261a;
+  --primary-foreground: #ffffff;
+  --primary-container: #f65040;
+  --on-primary-container: #2a0a06;
+  --secondary: #ffe2dc;
+  --secondary-foreground: #7d150c;
+  --ring: #b3261a;
+
+  --chart-1: #f65040;
+  --chart-2: #68d0d7;
+  --chart-3: #f3b13c;
+  --chart-4: #a38bd6;
+  --chart-5: #8fae6b;
+
+  /* Names from the look before this one. */
+  --brand: var(--primary);
+  --hero: var(--primary);
+  --link: var(--primary);
+  --cream: var(--muted);
+  --outline: var(--border);
+  --drop: var(--border);
+}
+
+/* Ka: Fanmade's pages, and the pages of no source for a player who chose it (data-tone is
+   set by src/kit/accent.ts, and before the first paint by index.html). */
+:root[data-tone='ka'] {
+  --primary: #006970;
+  --primary-container: #68d0d7;
+  --on-primary-container: #062a2d;
+  --secondary: #d3f1f3;
+  --secondary-foreground: #004f55;
+  --ring: #006970;
+}
+
+.dark {
+  --background: #141312;
+  --foreground: #ece6e0;
+  --card: #1f1d1c;
+  --card-foreground: #ece6e0;
+  --popover: #262423;
+  --popover-foreground: #ece6e0;
+  --surface-low: #1a1918;
+  --surface-high: #302d2b;
+  --muted: #252321;
+  --muted-foreground: #cfc7bf;
+  --accent: #302d2b;
+  --accent-foreground: #ece6e0;
+  --destructive: #ffb4ab;
+  --border: #3d3936;
+  --input: #5a544f;
+  --shadow-edge: rgb(255 255 255 / 0.07);
+  --shadow-ink: 0 0 0;
+
+  --primary: #ffb4a8;
+  --primary-foreground: #690003;
+  --secondary: #5c1f17;
+  --secondary-foreground: #ffdad4;
+  --ring: #ffb4a8;
+}
+
+.dark[data-tone='ka'] {
+  --primary: #6fdbe3;
+  --primary-foreground: #00363b;
+  --secondary: #1f4f54;
+  --secondary-foreground: #b9f0f4;
+  --ring: #6fdbe3;
+}
+
+/* One source's accent on a part of a page that shows both (Home, the player directory). */
+[data-accent='official'] {
+  --primary: #b3261a;
+  --primary-container: #f65040;
+  --on-primary-container: #2a0a06;
+  --secondary: #ffe2dc;
+  --secondary-foreground: #7d150c;
+  --ring: #b3261a;
+}
+[data-accent='fanmade'] {
+  --primary: #006970;
+  --primary-container: #68d0d7;
+  --on-primary-container: #062a2d;
+  --secondary: #d3f1f3;
+  --secondary-foreground: #004f55;
+  --ring: #006970;
+}
+.dark [data-accent='official'] {
+  --primary: #ffb4a8;
+  --primary-foreground: #690003;
+  --secondary: #5c1f17;
+  --secondary-foreground: #ffdad4;
+  --ring: #ffb4a8;
+}
+.dark [data-accent='fanmade'] {
+  --primary: #6fdbe3;
+  --primary-foreground: #00363b;
+  --secondary: #1f4f54;
+  --secondary-foreground: #b9f0f4;
+  --ring: #6fdbe3;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Song tiles: as many columns as fit. */
+.song-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 26rem) {
+  .song-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+/* The marker under the word of a page heading that says what the page is. */
+/* The don/ka stripe: the drum's two hits, used sparingly as a divider. */
+.drum-stripe {
+  height: 6px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--don) 0 24px,
+    transparent 24px 32px,
+    var(--ka) 32px 56px,
+    transparent 56px 64px
+  );
+}
+
+/* Home, the newest charts: a note for each, don for an official chart and ka for a fanmade
+   one (the note's button says which with data-accent). The chart shown is a roll that fills
+   while it is shown; the end of the filling is what moves on to the next. */
+.note-lane .note {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.4;
+  transition:
+    width 300ms var(--ease-emphasized),
+    opacity 200ms;
+}
+.dark .note-lane .note {
+  background: var(--primary-container);
+}
+.note-lane button:hover .note,
+.note-lane button:focus-visible .note {
+  opacity: 1;
+}
+.note-lane button:focus-visible .note {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.note-lane [aria-current='true'] .note {
+  width: 2.75rem;
+  opacity: 1;
+  background: color-mix(in srgb, var(--primary) 28%, transparent);
+}
+.dark .note-lane [aria-current='true'] .note {
+  background: color-mix(in srgb, var(--primary-container) 30%, transparent);
+}
+.note-roll {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--primary);
+  transform-origin: left;
+  animation: note-roll 7s linear forwards;
+}
+.dark .note-roll {
+  background: var(--primary-container);
+}
+@keyframes note-roll {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-lane .note {
+    transition: none;
+  }
+}
+
+/* Home, the community's activity: rows come in and go out under a soft edge. */
+.activity-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 0.75rem,
+    #000 calc(100% - 2rem),
+    transparent
+  );
+}
