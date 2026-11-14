@@ -2063,8 +2063,11 @@ type PlayerResult struct {
 	// No 不可.
 	FullCombo bool `protobuf:"varint,10,opt,name=full_combo,json=fullCombo,proto3" json:"full_combo,omitempty"`
 	// Only 良.
-	AllGood       bool  `protobuf:"varint,11,opt,name=all_good,json=allGood,proto3" json:"all_good,omitempty"`
-	Slot          int32 `protobuf:"varint,12,opt,name=slot,proto3" json:"slot,omitempty"`
+	AllGood bool  `protobuf:"varint,11,opt,name=all_good,json=allGood,proto3" json:"all_good,omitempty"`
+	Slot    int32 `protobuf:"varint,12,opt,name=slot,proto3" json:"slot,omitempty"`
+	// The player's avatar as the room last knew it (empty: none), so a result still shows it once
+	// the player has left.
+	AvatarUrl     string `protobuf:"bytes,13,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2181,6 +2184,13 @@ func (x *PlayerResult) GetSlot() int32 {
 		return x.Slot
 	}
 	return 0
+}
+
+func (x *PlayerResult) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
 }
 
 type PlayResult struct {
@@ -2615,7 +2625,7 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	"\tconnected\x18\x03 \x01(\bR\tconnected\x12\x1a\n" +
 	"\bfinished\x18\x04 \x01(\bR\bfinished\"M\n" +
 	"\fPlayStatuses\x12=\n" +
-	"\amembers\x18\x01 \x03(\v2#.ourtaiko.multiplay.v1.MemberStatusR\amembers\"\x82\x03\n" +
+	"\amembers\x18\x01 \x03(\v2#.ourtaiko.multiplay.v1.MemberStatusR\amembers\"\xa1\x03\n" +
 	"\fPlayerResult\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\bnickname\x18\x02 \x01(\tR\bnickname\x12\x16\n" +
@@ -2630,7 +2640,9 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	"full_combo\x18\n" +
 	" \x01(\bR\tfullCombo\x12\x19\n" +
 	"\ball_good\x18\v \x01(\bR\aallGood\x12\x12\n" +
-	"\x04slot\x18\f \x01(\x05R\x04slot\"\xc9\x01\n" +
+	"\x04slot\x18\f \x01(\x05R\x04slot\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\r \x01(\tR\tavatarUrl\"\xc9\x01\n" +
 	"\n" +
 	"PlayResult\x12\x14\n" +
 	"\x05round\x18\x01 \x01(\x05R\x05round\x12\x1d\n" +

@@ -846,7 +846,7 @@ func (r *Room) finishRound() {
 	for _, m := range r.members {
 		if m.playing {
 			players = append(players, played{
-				userID: m.UserID, nickname: m.Nickname, slot: m.slot, course: m.course, level: r.song.level(m.course),
+				userID: m.UserID, nickname: m.Nickname, avatarURL: m.AvatarURL, slot: m.slot, course: m.course, level: r.song.level(m.course),
 				status: m.status, cleared: m.cleared, disconnected: !m.finished,
 			})
 		}

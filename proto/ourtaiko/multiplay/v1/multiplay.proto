@@ -271,6 +271,9 @@ message PlayerResult {
   // Only 良.
   bool all_good = 11;
   int32 slot = 12;
+  // The player's avatar as the room last knew it (empty: none), so a result still shows it once
+  // the player has left.
+  string avatar_url = 13;
 }
 
 message PlayResult {

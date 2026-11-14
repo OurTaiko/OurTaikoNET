@@ -30,6 +30,7 @@ func sanitizeStatus(s *pb.PlayerStatus) *pb.PlayerStatus {
 // played is one player of a round, as the result ranks them.
 type played struct {
 	userID, nickname string
+	avatarURL        string
 	slot             int32
 	course           string
 	level            int32
@@ -86,7 +87,7 @@ func rankResults(players []played, round int32, song *Song) *pb.PlayResult {
 		fullCombo := !p.disconnected && s.GetBad() == 0 && s.GetGood()+s.GetOk() > 0
 		result.TeamScore += int64(s.GetScore())
 		result.Players = append(result.Players, &pb.PlayerResult{
-			UserId: p.userID, Nickname: p.nickname, Course: p.course, Level: p.level, Status: s,
+			UserId: p.userID, Nickname: p.nickname, AvatarUrl: p.avatarURL, Course: p.course, Level: p.level, Status: s,
 			Rank: int32(i + 1), Award: award, Cleared: p.cleared && !p.disconnected, Disconnected: p.disconnected,
 			FullCombo: fullCombo, AllGood: fullCombo && s.GetOk() == 0, Slot: p.slot,
 		})

@@ -893,7 +893,7 @@ func TestFullRoundOfTwo(t *testing.T) {
 		t.Fatalf("result: %v", result)
 	}
 	p1, p2 := result.Players[0], result.Players[1]
-	if p1.UserId != uid(1) || p1.Nickname != "P1" || p1.Rank != 1 || p1.Award != pb.Award_SUPER_STAR || p1.Course != "Oni" || p1.Level != 9 || p1.Slot != 0 ||
+	if p1.UserId != uid(1) || p1.Nickname != "P1" || p1.AvatarUrl != player(1).AvatarURL || p1.Rank != 1 || p1.Award != pb.Award_SUPER_STAR || p1.Course != "Oni" || p1.Level != 9 || p1.Slot != 0 ||
 		!p1.Cleared || p1.Disconnected || !p1.FullCombo || !p1.AllGood || p1.Status.Score != 900_000 || p1.Status.Drumroll != 40 {
 		t.Fatalf("first: %v", p1)
 	}
