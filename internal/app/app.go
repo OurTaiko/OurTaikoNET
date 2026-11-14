@@ -28,8 +28,9 @@ import (
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
 
-// SchemaVersion is the version of ourtaiko_net this program works with.
-const SchemaVersion = 1
+// SchemaVersion is the version of ourtaiko_net this program works with: the baseline and
+// every change in db/migrations. New brings an older database up to it.
+var SchemaVersion = db.Version()
 
 // SessionCookie is the one cookie of the site. A session is the same row to all three parts,
 // so with one name signing in once (at /api/v1/auth/…, the players' part) signs in everywhere.
@@ -78,6 +79,9 @@ type App struct {
 	pools   []*pgxpool.Pool
 	legacy  legacy.Hosts
 	webDir  string
+	// sso is the account center's client when there is one; Start refreshes its copy of
+	// players' profiles.
+	sso *account.Client
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -95,6 +99,14 @@ func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Reque
 // schema this program was built for; see Init.
 func New(ctx context.Context, cfg Config) (*App, error) {
 	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir}
+	// A release that changes the schema carries the change and applies it as it starts.
+	applied, err := netdb.Migrate(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	for _, version := range applied {
+		log.Printf("database schema brought to version %d", version)
+	}
 	open := func(source string) (*pgxpool.Pool, error) {
 		pool, err := netdb.Open(ctx, cfg.DatabaseURL, source)
 		if err == nil {
@@ -126,6 +138,11 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		return nil, err
 	}
 	a.pools = append(a.pools, shared)
+	// Names and avatars are shown from the site's own copy (internal/account, profiles.go).
+	if cfg.SSO != nil {
+		cfg.SSO.KeepProfiles(shared)
+		a.sso = cfg.SSO
+	}
 
 	// What each part's code calls an administrator is, here, a member of that part's user
 	// group. The account center's administrator manages the site and is in no group for it.
@@ -238,6 +255,9 @@ func (a *App) Start(ctx context.Context) error {
 		go a.Official.RunFileCleanup(ctx)
 		go a.Official.RunPreviewBackfill(ctx)
 	}
+	if a.sso != nil {
+		go a.sso.RunProfileRefresh(ctx)
+	}
 	go a.Fanmade.RunDifficultyConstants(ctx)
 	go a.Fanmade.RunNotificationPrune(ctx)
 	go a.Official.RunNotificationPrune(ctx)
@@ -268,6 +288,9 @@ func Init(ctx context.Context, url string) error {
 	if tables != 0 {
 		return errors.New("the database is not empty")
 	}
-	_, err = conn.PgConn().Exec(ctx, db.Baseline).ReadAll()
+	if _, err = conn.PgConn().Exec(ctx, db.Baseline).ReadAll(); err != nil {
+		return err
+	}
+	_, err = netdb.Migrate(ctx, url)
 	return err
 }

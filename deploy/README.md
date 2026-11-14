@@ -37,7 +37,11 @@ loads it, replaces the container and waits for `/readyz`.
 The website is released the same way from its own repository; that changes a link on the
 server and restarts nothing. When a change needs both, release this repository first.
 
-`rollback.yml` republishes an archived image by commit. It does not touch the database.
+`rollback.yml` republishes an archived image by commit. It does not touch the database. A
+release that changes the schema applies the change as it starts (`db/README.md`, "Changing the
+schema"), and an image from before that change refuses the newer database: to go back past
+one, delete its row from `net.schema_migrations` first (the older program does not mind the
+columns it does not know).
 
 Publishing happens only while the repository variable `DEPLOY_ENABLED` is `true` (Settings >
 Variables); otherwise a push runs the tests and stops. The same holds for OurTaikoNetWeb,

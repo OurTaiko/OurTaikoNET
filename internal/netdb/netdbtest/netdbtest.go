@@ -96,7 +96,17 @@ func withDatabase(admin, name string) string {
 
 // ensureTemplate makes the template database for the current baseline if it is not there.
 func ensureTemplate(ctx context.Context, conn *pgx.Conn, admin string) (string, error) {
-	sum := sha256.Sum256([]byte(db.Baseline))
+	// The template is the baseline with every later change applied; another set of changes is
+	// another template.
+	changes, err := db.Migrations()
+	if err != nil {
+		return "", err
+	}
+	text := db.Baseline
+	for _, m := range changes {
+		text += "\x00" + m.SQL
+	}
+	sum := sha256.Sum256([]byte(text))
 	name := "otn_template_" + hex.EncodeToString(sum[:6])
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", templateLock); err != nil {
 		return "", err
@@ -124,6 +134,9 @@ func ensureTemplate(ctx context.Context, conn *pgx.Conn, admin string) (string, 
 	build.Close(ctx)
 	if err != nil {
 		return "", fmt.Errorf("baseline: %w", err)
+	}
+	if _, err = netdb.Migrate(ctx, withDatabase(admin, name)); err != nil {
+		return "", err
 	}
 	if _, err = conn.Exec(ctx, "ALTER DATABASE "+name+" IS_TEMPLATE true"); err != nil {
 		return "", err

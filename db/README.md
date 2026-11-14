@@ -8,7 +8,7 @@ One PostgreSQL database, `ourtaiko_net` (PostgreSQL 18), made from the databases
 |---|---|
 | `fanmade` | Everything Fanmade's database had except users and sign-in |
 | `official` | The same tables from OurTaiko Database |
-| `net` | `users` (with each player's groups), `group_changes`, `sessions`, `oidc_flows`, Profile's `titles`, `awards`, `user_titles`, `user_dans`, `nameplates`, and the parents `scores` and `dan_attempts` |
+| `net` | `users` (with each player's groups, and a copy of the nickname and avatar the account center publishes), `group_changes`, `sessions`, `oidc_flows`, Profile's `titles`, `awards`, `user_titles`, `user_dans`, `nameplates`, and the parents `scores` and `dan_attempts` |
 
 Rules, all checked by `check.sql`:
 
@@ -30,6 +30,12 @@ Rules, all checked by `check.sql`:
 | `check.sql` | The structural rules above, and every foreign key by query |
 | `test/behaviour.sql` | What the database must do once it holds data |
 | `dev/` | Test rows and the local test run |
+
+## Changing the schema
+
+The baseline is version 1 and is not edited any more: the database it describes is in production. A change is a file `migrations/<version>_<name>.sql`, versions counting on from 2 without gaps. The server applies the changes a database lacks as it starts, each in a transaction of its own and recorded in `net.schema_migrations` (`internal/netdb`, `Migrate`), so a release that needs a change carries it. It refuses a database newer than itself. Tests run on the baseline with every change applied.
+
+A change runs as the application's role, which owns the tables, while the previous release may still be answering: write changes the release before can live with (add a column with a default; do not rename or drop what it reads).
 
 ## Where the baseline comes from
 

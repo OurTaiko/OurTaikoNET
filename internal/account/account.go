@@ -23,6 +23,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 )
 
@@ -41,7 +42,12 @@ type Client struct {
 	cipher   cipher.AEAD
 	mu       sync.Mutex
 	provider *oidc.Provider
+	// kept is where the copy of players' profiles is (KeepProfiles); nil: no copy is kept.
+	kept *pgxpool.Pool
 }
+
+// errUnreachable is the account center not answering at all, as opposed to answering no.
+var errUnreachable = errors.New("SSO connection failed")
 
 // Error is an answer of the account center other than success.
 type Error struct{ Status int }
@@ -177,7 +183,7 @@ func (c *Client) Call(ctx context.Context, path string, in, out any) error {
 	req.Header.Set("X-Service-Key", c.Config.ServiceKey)
 	res, e := c.HTTP.Do(req)
 	if e != nil {
-		return errors.New("SSO connection failed")
+		return errUnreachable
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -196,7 +202,7 @@ func (c *Client) Identity(ctx context.Context, kind, token string) (User, error)
 	var result struct {
 		User User `json:"user"`
 	}
-	e := c.Call(ctx, kind+"/introspect", map[string]string{"accessToken": token}, &result)
+	e := c.callAgain(ctx, kind+"/introspect", map[string]string{"accessToken": token}, &result)
 	var remote *Error
 	if errors.As(e, &remote) && remote.Status == 401 {
 		return User{}, pgx.ErrNoRows
@@ -205,6 +211,9 @@ func (c *Client) Identity(ctx context.Context, kind, token string) (User, error)
 		return User{}, errors.New("invalid SSO subject")
 	}
 	result.User.AvatarURL = c.AvatarURL(result.User)
+	if e == nil {
+		c.remember(ctx, result.User)
+	}
 	return result.User, e
 }
 
@@ -234,23 +243,6 @@ type PublicProfile struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
-func (c *Client) Profiles(ctx context.Context, ids []string) (map[string]PublicProfile, error) {
-	names := map[string]PublicProfile{}
-	for len(ids) > 0 {
-		n := min(len(ids), 100)
-		var res struct {
-			Users []User `json:"users"`
-		}
-		if e := c.Call(ctx, "users/lookup", map[string]any{"userIds": ids[:n]}, &res); e != nil {
-			return nil, e
-		}
-		for _, u := range res.Users {
-			names[u.ID] = PublicProfile{Nickname: u.Nickname, AvatarURL: c.AvatarURL(u)}
-		}
-		ids = ids[n:]
-	}
-	return names, nil
-}
 func (c *Client) Search(ctx context.Context, q string) ([]string, error) {
 	ids := []string{}
 	after := ""

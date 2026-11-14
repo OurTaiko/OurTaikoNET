@@ -152,6 +152,34 @@ func TestNewRefusesADatabaseOfAnotherVersion(t *testing.T) {
 	}
 }
 
+// A release that changes the schema brings the database along as it starts: a database one
+// change behind is given that change, once.
+func TestNewBringsAnOlderDatabaseUpToDate(t *testing.T) {
+	ctx := context.Background()
+	pool, url := netdbtest.NewURL(t, "fanmade")
+	if _, err := pool.Exec(ctx, `ALTER TABLE net.users DROP COLUMN nickname, DROP COLUMN avatar_url, DROP COLUMN profile_checked_at`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM net.schema_migrations WHERE version>1`); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Close()
+	}
+	var version, columns int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT max(version) FROM net.schema_migrations),
+ (SELECT count(*) FROM information_schema.columns WHERE table_schema='net' AND table_name='users' AND column_name IN ('nickname','avatar_url','profile_checked_at'))`).Scan(&version, &columns); err != nil {
+		t.Fatal(err)
+	}
+	if version != SchemaVersion || SchemaVersion < 2 || columns != 3 {
+		t.Fatal(version, SchemaVersion, columns)
+	}
+}
+
 // The players' part reads both sources' scores and the sources ask it for awards, all inside
 // one program; from outside, the award route does not exist.
 func TestPlayersAcrossSources(t *testing.T) {
