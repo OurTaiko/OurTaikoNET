@@ -237,12 +237,9 @@ export function HomePage() {
       </div>
       <You />
       <section className="space-y-4" aria-labelledby="newest-heading">
-        <div className="flex flex-wrap items-baseline gap-x-3">
-          <h2 id="newest-heading" className="font-extrabold text-2xl tracking-tight">
-            {t('home.newest')}
-          </h2>
-          <p className="text-muted-foreground text-sm">{t('home.newestFrom')}</p>
-        </div>
+        <h2 id="newest-heading" className="font-extrabold text-2xl tracking-tight">
+          {t('home.newest')}
+        </h2>
         <div className={cn('song-grid', loading && 'opacity-80')}>
           {newest.map(({ source, chart }) => (
             <SongTile key={`${source}/${chart.id}`} source={source} chart={chart} tag />

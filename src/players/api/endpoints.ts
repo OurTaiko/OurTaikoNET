@@ -18,7 +18,7 @@ export const endpoints = {
   adminGrants: `${API_ROOT}/admin/grants`,
   // The manage panel: user groups.
   groups: `${API_ROOT}/admin/groups`,
-  groupMembers: (ids: string[] = []) =>
-    `${API_ROOT}/admin/users${ids.length ? `?ids=${ids.join(',')}` : ''}`,
+  groupMembers: `${API_ROOT}/admin/users`,
+  findPlayers: (text: string) => `${API_ROOT}/admin/users?q=${encodeURIComponent(text)}`,
   userGroups: (id: string) => `${API_ROOT}/admin/users/${encodeURIComponent(id)}/groups`,
 }

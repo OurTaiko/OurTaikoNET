@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate } from 'react-router-dom'
 import { api, jsonRequest } from '@players/api/client'
@@ -16,10 +15,41 @@ import {
 import { Checkbox } from '@sitekit/components/ui/checkbox'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
+import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 
-const playerId = /^[0-9a-f]{32}$/
+// A player by the name people know them by: avatar, nickname, and the login name when that
+// is how they were found. The id is in the link and nowhere on the page.
+function Player({ member }: { member: GroupMember }) {
+  const { t } = useTranslation()
+  const nickname = member.nickname || t('manage.unnamed')
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <UserAvatar nickname={nickname} avatarUrl={member.avatarUrl} className="size-9 shrink-0" />
+      <span className="min-w-0">
+        <Link className="block truncate font-semibold underline" to={`/players/${member.id}`}>
+          {nickname}
+        </Link>
+        {member.username && (
+          <span className="block truncate text-xs text-muted-foreground">@{member.username}</span>
+        )}
+      </span>
+    </span>
+  )
+}
+
+function GroupNames({ names }: { names: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {names.map((name) => (
+        <span key={name} className="rounded-full border px-2 py-0.5 font-mono text-xs">
+          {name}
+        </span>
+      ))}
+    </span>
+  )
+}
 
 // The manage panel: which user groups each player is in. Only the site's administrator (the
 // account center's administrator of this site) sees it. A group lets its members use what is
@@ -32,15 +62,17 @@ export function ManagePage() {
   const [groups, setGroups] = useState<Group[]>([])
   const [members, setMembers] = useState<GroupMember[]>([])
   // The player whose groups are being set, and the boxes ticked for them.
-  const [editing, setEditing] = useState<{ id: string; groups: string[] } | null>(null)
+  const [editing, setEditing] = useState<{ member: GroupMember; groups: string[] } | null>(null)
+  // What is typed in the search box, and the players the last finished search of it found.
   const [lookup, setLookup] = useState('')
+  const [found, setFound] = useState<{ text: string; users: GroupMember[] } | null>(null)
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const reload = useCallback(async () => {
     const [catalog, listed] = await Promise.all([
       api<{ groups: Group[] }>(endpoints.groups),
-      api<{ users: GroupMember[] }>(endpoints.groupMembers()),
+      api<{ users: GroupMember[] }>(endpoints.groupMembers),
     ])
     setGroups(catalog.groups)
     setMembers(listed.users)
@@ -50,37 +82,45 @@ export function ManagePage() {
     reload().catch((e: Error) => setMessage({ kind: 'error', text: e.message }))
   }, [allowed, reload])
 
+  // Searching as the administrator types, a moment after they stop; an answer to an earlier
+  // text is dropped.
+  const text = lookup.trim()
+  useEffect(() => {
+    if (!allowed || !text) return
+    let dropped = false
+    const timer = window.setTimeout(() => {
+      api<{ users: GroupMember[] }>(endpoints.findPlayers(text))
+        .then((answer) => {
+          if (!dropped) setFound({ text, users: answer.users })
+        })
+        .catch((e: Error) => {
+          if (!dropped) setMessage({ kind: 'error', text: e.message })
+        })
+    }, 250)
+    return () => {
+      dropped = true
+      window.clearTimeout(timer)
+    }
+  }, [allowed, text])
+  const results = found && found.text === text ? found.users : null
+
   if (session.loading) return null
   if (!allowed) return <Navigate to="/" replace />
 
-  const find = async (event: FormEvent) => {
-    event.preventDefault()
-    const id = lookup.trim().toLowerCase()
-    setMessage(null)
-    if (!playerId.test(id)) {
-      setMessage({ kind: 'error', text: t('manage.idInvalid') })
-      return
-    }
-    try {
-      const found = await api<{ users: GroupMember[] }>(endpoints.groupMembers([id]))
-      setEditing({ id, groups: found.users[0]?.groups ?? [] })
-    } catch (e) {
-      setMessage({ kind: 'error', text: (e as Error).message })
-    }
-  }
   const save = async () => {
     if (!editing) return
     setBusy(true)
     setMessage(null)
     try {
       await api(
-        endpoints.userGroups(editing.id),
+        endpoints.userGroups(editing.member.id),
         jsonRequest('PUT', { groups: editing.groups }, session.csrfToken),
       )
       await reload()
       setMessage({ kind: 'info', text: t('manage.saved') })
       setEditing(null)
       setLookup('')
+      setFound(null)
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -110,29 +150,48 @@ export function ManagePage() {
           <CardDescription>{t('manage.setLead')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <form className="flex flex-wrap items-end gap-3" onSubmit={find}>
-            <div className="min-w-64 flex-1 space-y-1.5">
-              <Label htmlFor="manage-player">{t('manage.playerId')}</Label>
-              <Input
-                id="manage-player"
-                value={lookup}
-                onChange={(e) => setLookup(e.target.value)}
-                placeholder="0123456789abcdef0123456789abcdef"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </div>
-            <Button type="submit" variant="outline">
-              {t('manage.find')}
-            </Button>
-          </form>
+          <div className="space-y-1.5">
+            <Label htmlFor="manage-player">{t('manage.search')}</Label>
+            <Input
+              id="manage-player"
+              type="search"
+              value={lookup}
+              onChange={(e) => setLookup(e.target.value)}
+              placeholder={t('manage.searchPlaceholder')}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          {text && results && results.length === 0 && (
+            <p className="text-sm text-muted-foreground" data-testid="manage-no-match">
+              {t('manage.noMatch')}
+            </p>
+          )}
+          {text && results && results.length > 0 && (
+            <ul className="divide-y rounded-2xl border px-4" data-testid="manage-found">
+              {results.map((member) => (
+                <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="min-w-0 flex-1">
+                    <Player member={member} />
+                  </span>
+                  <GroupNames names={member.groups} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setMessage(null)
+                      setEditing({ member, groups: member.groups })
+                    }}
+                  >
+                    {t('manage.choose')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           {editing && (
             <div className="space-y-4 rounded-2xl border p-4" data-testid="manage-editing">
-              <p className="text-sm">
-                <Link className="font-mono underline" to={`/players/${editing.id}`}>
-                  {editing.id}
-                </Link>
-              </p>
+              <Player member={editing.member} />
               <div className="space-y-3">
                 {groups.map((group) => (
                   <div key={group.name} className="flex items-start gap-3">
@@ -175,25 +234,16 @@ export function ManagePage() {
             <ul className="divide-y" data-testid="manage-members">
               {members.map((member) => (
                 <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <Link className="font-mono text-sm underline" to={`/players/${member.id}`}>
-                    {member.id}
-                  </Link>
-                  <span className="flex flex-1 flex-wrap gap-1.5">
-                    {member.groups.map((name) => (
-                      <span
-                        key={name}
-                        className="rounded-full border px-2 py-0.5 font-mono text-xs"
-                      >
-                        {name}
-                      </span>
-                    ))}
+                  <span className="min-w-0 flex-1">
+                    <Player member={member} />
                   </span>
+                  <GroupNames names={member.groups} />
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => {
                       setMessage(null)
-                      setEditing({ id: member.id, groups: member.groups })
+                      setEditing({ member, groups: member.groups })
                     }}
                   >
                     {t('manage.change')}

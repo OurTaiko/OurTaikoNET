@@ -13,7 +13,16 @@ export type User = {
   groups: string[]
 }
 export type Group = { name: string; bit: number; about: string }
-export type GroupMember = { id: string; groups: string[]; bits: number }
+// A player as the manage panel lists them. username is the account center's login name and
+// is there only when the player was found by typing it.
+export type GroupMember = {
+  id: string
+  username?: string
+  nickname: string
+  avatarUrl: string
+  groups: string[]
+  bits: number
+}
 export type Session = { user: User | null; csrfToken: string }
 
 export type TitleStyle = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'

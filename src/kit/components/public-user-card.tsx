@@ -38,10 +38,6 @@ export function PublicUserCard({
         />
         <h2 className="min-w-0 break-words text-lg font-extrabold">{nickname}</h2>
       </div>
-      <p className="break-all font-mono text-xs leading-relaxed text-muted-foreground">
-        <span className="mr-2">ID</span>
-        {user.id}
-      </p>
       <dl className="grid grid-cols-2 gap-4 border-y py-5">
         <div>
           <dt className="text-sm text-muted-foreground">{t('messages.publicChartCount')}</dt>
