@@ -1,0 +1,141 @@
+name: Deploy OurTaikoNet
+
+# Tests the commit, builds its image, keeps the image for rollback and publishes it. The
+# website is released on its own, from OurTaikoNetWeb; release the backend first when a
+# change needs both.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Do not interrupt an in-progress server publish when another commit arrives.
+concurrency:
+  group: net-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      # A throwaway server for the tests: each test makes and drops its own database.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # The Dockerfile's test stage has Go and the tools the release image has (tjaparser,
+      # ffmpeg, cwebp), so the suite runs as the server will run the code.
+      - name: Build the test image
+        run: docker build --target test -t ourtaiko-net-test .
+
+      - name: Run every test
+        run: >-
+          docker run --rm --network host
+          -e DATABASE_TEST_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres
+          ourtaiko-net-test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build the image
+        run: docker build --label org.opencontainers.image.revision=${{ github.sha }} -t ourtaiko-net:${{ github.sha }} .
+
+      - name: Package the image
+        id: image
+        run: |
+          docker save ourtaiko-net:${{ github.sha }} | gzip -1 > net-image.tar.gz
+          digest=$(sha256sum net-image.tar.gz)
+          echo "sha256=${digest%% *}" >> "$GITHUB_OUTPUT"
+          # Sent beside the image, so the server needs no checkout of this repository.
+          cp deploy/compose.production.yml compose.production.yml
+
+      - name: Get AWS credentials for ourtaiko-private
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          # The shared IAM user for ourtaiko-private (organization secrets).
+          aws-access-key-id: ${{ secrets.PRIVATE_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PRIVATE_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      # Every published image stays here for rollback.yml; the server keeps only the
+      # running one.
+      - name: Archive the image in ourtaiko-private
+        run: >-
+          aws s3 cp net-image.tar.gz "s3://ourtaiko-private/net/images/${{ github.sha }}.tar.gz"
+          --metadata "sha256=${{ steps.image.outputs.sha256 }}" --only-show-errors
+
+      - name: Validate deployment secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_FINGERPRINT: ${{ secrets.DEPLOY_FINGERPRINT }}
+        run: |
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PASSWORD DEPLOY_FINGERPRINT; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing required repository secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Upload the image and the Compose file
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
+        with:
+          version: '1.8.1'
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          source: net-image.tar.gz,compose.production.yml
+          target: ${{ secrets.DEPLOY_BASE_PATH || '/opt/ourtaiko-net' }}/incoming/${{ github.sha }}
+          command_timeout: 15m
+
+      - name: Prepare the publish script from this commit
+        # Explicitly use Bash regardless of the SSH user's default shell.
+        run: |
+          {
+            printf "bash -se <<'NET_PUBLISH_SCRIPT'\n"
+            cat deploy/publish.sh
+            printf '\nNET_PUBLISH_SCRIPT\n'
+          } > "$RUNNER_TEMP/publish-net.sh"
+
+      - name: Publish over SSH
+        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        env:
+          DEPLOY_REVISION: ${{ github.sha }}
+          DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
+          DEPLOY_IMAGE_SHA256: ${{ steps.image.outputs.sha256 }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          version: '1.8.1'
+          command_timeout: 30m
+          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_IMAGE_SHA256
+          script_path: ${{ runner.temp }}/publish-net.sh

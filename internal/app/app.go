@@ -57,6 +57,10 @@ type Config struct {
 	// Empty: <Origin>/fanmade and <Origin>/official.
 	FanmadeSite, OfficialSite string
 
+	// WebDir is where the built website is (OurTaikoNetWeb's dist), served for every address
+	// that is not the API's. Empty: the API alone, as in development.
+	WebDir string
+
 	// The host names of the three old sites. Their APIs are answered as those sites answered,
 	// and their pages are sent to the same pages under Origin (package legacy). Empty: that
 	// old address is not served.
@@ -72,6 +76,7 @@ type App struct {
 	Players *profile.Server
 	pools   []*pgxpool.Pool
 	legacy  legacy.Hosts
+	webDir  string
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -88,7 +93,7 @@ func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Reque
 // New connects to the database and builds both sources. The database must already hold the
 // schema this program was built for; see Init.
 func New(ctx context.Context, cfg Config) (*App, error) {
-	a := &App{legacy: legacy.Hosts{}}
+	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir}
 	open := func(source string) (*pgxpool.Pool, error) {
 		pool, err := netdb.Open(ctx, cfg.DatabaseURL, source)
 		if err == nil {
@@ -197,7 +202,17 @@ func (a *App) Handler() http.Handler {
 		{ID: "fanmade", Name: "OurTaiko Fanmade", API: a.Fanmade.Handler()},
 		{ID: "official", Name: "OurTaiko Database", API: a.Official.Handler()},
 	}, a.Players.Handler())
-	return legacy.Handler(a.legacy, current)
+	// Both sources and the players' part read one database, so one readiness check speaks
+	// for the site.
+	ready := a.Fanmade.Handler()
+	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/readyz" {
+			ready.ServeHTTP(w, r)
+			return
+		}
+		current.ServeHTTP(w, r)
+	})
+	return legacy.Handler(a.legacy, site.Web(a.webDir, api))
 }
 
 // Start fails the uploads a restart interrupted and runs each source's background work until

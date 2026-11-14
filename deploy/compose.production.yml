@@ -1,0 +1,41 @@
+# The one OurTaikoNet container on the production server. The publish script puts this file
+# at /opt/ourtaiko-net/compose.production.yml with every release.
+name: ourtaiko-net
+services:
+  net:
+    image: ourtaiko-net:release
+    container_name: ourtaiko-net
+    restart: unless-stopped
+    env_file:
+      # Kept on the server only; deploy/api.env.example lists what goes in them.
+      - path: /etc/ourtaiko-net/docker/api.env
+        format: raw
+      - path: /etc/ourtaiko-net/docker/storage.env
+        format: raw
+    environment:
+      LISTEN_ADDR: 0.0.0.0:8080
+      STORAGE_DIR: /tmp/staging
+      STORAGE_BACKEND: s3
+      # The website's current release (OurTaikoNetWeb puts releases beside each other and
+      # points `current` at one).
+      WEB_DIR: /srv/web/current
+    # 8080 is Fanmade's on this server until the switch.
+    ports: ['127.0.0.1:8090:8080']
+    volumes:
+      - /opt/ourtaiko-net/web:/srv/web:ro
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=1g']
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:8080/readyz']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [shared]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+networks:
+  shared: {external: true, name: ourtaiko-shared}

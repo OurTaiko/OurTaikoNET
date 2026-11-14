@@ -86,6 +86,7 @@ func main() {
 	cfg := app.Config{
 		DatabaseURL: url, Origin: env("APP_ORIGIN", "http://127.0.0.1:5173"), StorageDir: storage,
 		CookieSecure:      env("COOKIE_SECURE", "false") == "true",
+		WebDir:            os.Getenv("WEB_DIR"),
 		LegacyFanmadeHost: os.Getenv("LEGACY_FANMADE_HOST"), LegacyOfficialHost: os.Getenv("LEGACY_OFFICIAL_HOST"), LegacyProfileHost: os.Getenv("LEGACY_PROFILE_HOST"),
 		FanmadeSite: strings.TrimRight(os.Getenv("FANMADE_SITE"), "/"), OfficialSite: strings.TrimRight(os.Getenv("OFFICIAL_SITE"), "/"),
 	}

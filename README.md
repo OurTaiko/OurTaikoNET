@@ -2,16 +2,17 @@
 
 The one backend and website of OurTaiko at `net.ourtaiko.org`. It is being built to replace three services (OurTaiko Fanmade, OurTaiko Database and OurTaikoProfile) with one service on one database. Those three stay untouched until this one is shown to work.
 
-Status: the database layer and a first backend exist and pass their tests locally. On a copy of production data the import matches table for table, and the two sources and the players' pages answer every public question as the three old sites do. Nothing is deployed, and there is no website here: the React frontend will be a repository of its own.
+Status: the database layer and a first backend exist and pass their tests locally. On a copy of production data the import matches table for table, and the two sources and the players' pages answer every public question as the three old sites do. Nothing is deployed yet; how it will be is in [deploy/README.md](deploy/README.md). The website is a repository of its own, OurTaikoNetWeb: this server serves its build (`WEB_DIR`) in front of the API.
 
 | Part | State |
 |---|---|
 | `db/` | One database, `ourtaiko_net`, built from the three old ones; importer; tests |
 | Backend (Go, this repository) | One program on the one database. `internal/songs` serves a song source, and the program runs it twice: once for Fanmade and once for the official source (`sources.go` holds what each has of its own). `internal/profile` serves the players' pages. `internal/signin` is the website's sign-in and sessions, which all of them use |
-| `internal/site` | The new address: each source under `/api/v1/sources/<source>/`, players' routes (titles, nameplates, all their scores) under `/api/v1/` |
+| `internal/site` | The new address: each source under `/api/v1/sources/<source>/`, players' routes (titles, nameplates, all their scores) under `/api/v1/`, and the website's build (`WEB_DIR`) for every other address |
 | `internal/legacy` | The old host names: their APIs answered as the old sites answered, their pages sent to the same pages of the new site. The only place that knows about them |
 | `internal/groups` | User groups, one bit each on a player's row: who may do the work each part reserves for its managers. The account center only says who the site's administrator is; the administrator assigns groups under `/api/v1/admin/` |
 | `internal/inproc` | The one call the parts still make over HTTP inside the program: the sources reading the title catalog. A stage: it is to become a direct call |
+| `Dockerfile`, `deploy/`, `.github/workflows/` | The image, how it is published to the server and rolled back; see `deploy/README.md` |
 | Website | Not started; separate repository |
 
 ## Running
