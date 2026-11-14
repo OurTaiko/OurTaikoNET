@@ -175,6 +175,24 @@ backup of `ourtaiko_net` (`deploy/server/install-backup.sh`, `cmd/backup`; 04:30
 Not done by anyone yet: a released game from sign-in to a score; an upload on the website; a
 restore drill of an `ourtaiko_net` backup.
 
+## The database console
+
+CloudBeaver (<https://postgre.ourtaiko.org>, `/opt/ourtaiko-cloudbeaver`) has two connections
+to `ourtaiko_net`, with the two accounts it already used for the old databases
+(`deploy/server/grant-console-access.sql`, run once on 2026-11-14):
+
+- **OurTaikoNET (read only)**, as `ourtaiko_viewer`: reads all three schemas. Its queries name
+  the schema (`fanmade.charts`, `official.charts`, `net.users`).
+- **OurTaikoNET official songs (read-write)**, as `ourtaiko_database_editor`: reads all three,
+  writes the schema `official` only, and cannot change the schema. A name without a schema is
+  the official source's.
+
+Both give up a transaction left open for five minutes, so a forgotten one cannot hold a lock
+against a migration. An edit made there goes around the server: the database's own triggers
+still apply (replacing a chart's file queues the old one for deletion), the server's checks do
+not. The connections named "old database (frozen …)" are to the databases nothing reads any
+more.
+
 ## What is left of the old sites
 
 Removed on 2026-11-14: the containers `ourtaiko-fanmade`, `ourtaiko-database` and
