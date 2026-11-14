@@ -5,8 +5,9 @@ Status: **in production since the switch on 2026-11-14, 04:06 UTC.** The one con
 names: `fanmade.ourtaiko.org`, `database.ourtaiko.org` and `profile.ourtaiko.org` get their
 old APIs from it and have their pages redirected to the new site (`internal/legacy`). Its
 database `ourtaiko_net` is the only one written; files are in the bucket the old sites used,
-each source signing with its old site's key. The three old containers are stopped, not
-removed, and their databases are as they were at the switch: see "Going back". A push to
+each source signing with its old site's key. The three old containers, their images and
+their deploy folders were removed on 2026-11-14, 07:30 UTC: there is no going back to them.
+Their databases are still there, unused, as they were at the switch. A push to
 `main` of this repository or OurTaikoNetWeb publishes to production. Nobody is the site's
 administrator until the role is given in the account center's admin (Client roles), and
 `rollback.yml` has not been run.
@@ -174,14 +175,24 @@ backup of `ourtaiko_net` (`deploy/server/install-backup.sh`, `cmd/backup`; 04:30
 Not done by anyone yet: a released game from sign-in to a score; an upload on the website; a
 restore drill of an `ourtaiko_net` backup.
 
-## Going back
+## What is left of the old sites
 
-While the old containers and databases still exist: restore the three `.before-net` proxy
-files and reload nginx, set `storage.env` back to `STORAGE_BACKEND=public` (kept as
-`storage.env.before-switch`) and recreate this container so that it stops writing files, then
-`docker start ourtaiko-fanmade ourtaiko-database ourtaiko-profile`. Everything written here
-since the switch (scores, uploads, comments, new players) is then missing on the old sites
-unless it is copied back, and files this server has deleted or renamed since are gone for
-them. **Do not publish Fanmade, Database or OurTaikoProfile again**: their workflows would
-start the old containers beside this one, and their background work would delete files by
-databases that no longer change.
+Removed on 2026-11-14: the containers `ourtaiko-fanmade`, `ourtaiko-database` and
+`ourtaiko-profile`, their images, `/opt/ourtaiko-{fanmade,database,profile}` and the daily
+backup timers of their databases. The switch cannot be undone any more.
+
+Still there, on purpose:
+
+- The three old host names, their 1Panel sites and certificates, and `LEGACY_*_HOST` here:
+  every released game before 2026-11-14 asks the old addresses.
+- The databases `ourtaiko_fanmade`, `ourtaiko_database` and `ourtaiko_profile`, unused, and
+  the last dump of each from the switch (locally under `/var/backups/ourtaiko-*`, and in the
+  private bucket). Nothing backs them up any more, and nothing deletes those dumps.
+- `/usr/local/libexec/ourtaiko-fanmade-backup`: the account center's daily backup runs it.
+- `/etc/ourtaiko-{fanmade,database,profile}`: the old settings. The storage keys in them are
+  the ones this server signs with (its own copy is in `storage.env`); the two IAM users they
+  belong to must stay.
+
+**Do not publish Fanmade, Database or OurTaikoProfile again.** Their workflows would now fail
+at the server (their folders are gone), and must stay that way: a running old container would
+delete files by a database that no longer changes.
