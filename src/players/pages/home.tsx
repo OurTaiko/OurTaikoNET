@@ -9,7 +9,6 @@ import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { useRememberedSource } from '@sitekit/shell/site'
 import type { SourceId } from '@sitekit/source'
-import { cn } from '@sitekit/lib/utils'
 import { endpoints } from '@players/api/endpoints'
 import type { PublicProfile } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
@@ -18,7 +17,7 @@ import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
 import { CommunityActivity } from '@players/components/community-activity'
 import { RecentWorks } from '@players/components/recent-works'
-import { SongTile, sourceApi, sources } from '@players/components/song-tile'
+import { sourceApi, sources } from '@players/components/song-tile'
 
 type Library = { total: number; items: ChartBase[] }
 
@@ -132,18 +131,13 @@ export function HomePage() {
   const { t } = useTranslation()
   const [params] = useSearchParams()
   const libraries = useLibraries()
-  // Each source's newest, as many as `each`.
-  const newestOf = (each: number) =>
-    sources.map((source) => {
-      const library = libraries[source]
-      return library && library !== 'failed'
-        ? library.items.slice(0, each).map((chart) => ({ source, chart }))
-        : []
-    })
-  // Both sources' newest, the newest of all first.
-  const newest = newestOf(6)
-    .flat()
-    .sort((a, b) => b.chart.createdAt.localeCompare(a.chart.createdAt))
+  // Each source's ten newest.
+  const newest = sources.map((source) => {
+    const library = libraries[source]
+    return library && library !== 'failed'
+      ? library.items.slice(0, 10).map((chart) => ({ source, chart }))
+      : []
+  })
   const loading = sources.some((source) => !libraries[source])
   return (
     <div className="space-y-8">
@@ -151,27 +145,13 @@ export function HomePage() {
       <h1 className="sr-only">{t('shell.home')}</h1>
       <div className="gap-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         <RecentWorks
-          works={inTurns(newestOf(10), 10, (work) => work.chart.createdAt)}
+          works={inTurns(newest, 10, (work) => work.chart.createdAt)}
           loading={loading}
           failed={sources.every((source) => libraries[source] === 'failed')}
         />
         <CommunityActivity />
       </div>
       <You />
-      <section className="space-y-4" aria-labelledby="newest-heading">
-        <h2 id="newest-heading" className="font-extrabold text-2xl tracking-tight">
-          {t('home.newest')}
-        </h2>
-        <div className={cn('song-grid', loading && 'opacity-80')}>
-          {newest.map(({ source, chart }) => (
-            <SongTile key={`${source}/${chart.id}`} source={source} chart={chart} tag />
-          ))}
-          {loading &&
-            [0, 1, 2, 3, 4, 5].map((tile) => (
-              <Skeleton key={tile} className="rounded-[20px] aspect-3/4" />
-            ))}
-        </div>
-      </section>
     </div>
   )
 }
