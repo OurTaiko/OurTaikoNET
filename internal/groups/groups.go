@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -106,10 +107,17 @@ func Of(ctx context.Context, db Querier, user string) (Set, error) {
 }
 
 // Member is a player and their groups.
+// Member is a player and their groups, with the name and avatar the site keeps of them so
+// that the manage panel shows people and not ids. Username is the account center's login
+// name; the site keeps no copy of it, so it is there only when the account center was asked
+// for a player by that name.
 type Member struct {
-	ID     string   `json:"id"`
-	Groups []string `json:"groups"`
-	Bits   Set      `json:"bits"`
+	ID        string   `json:"id"`
+	Username  string   `json:"username,omitempty"`
+	Nickname  string   `json:"nickname"`
+	AvatarURL string   `json:"avatarUrl"`
+	Groups    []string `json:"groups"`
+	Bits      Set      `json:"bits"`
 }
 
 // Give sets a player's groups to exactly set, on behalf of by, and records the change. The
@@ -142,28 +150,17 @@ func Give(ctx context.Context, tx pgx.Tx, user string, set Set, by string) (befo
 func Members(ctx context.Context, db interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }, ids []string) ([]Member, error) {
-	sql, args := `SELECT id,groups FROM net.users WHERE groups<>0 ORDER BY id`, []any{}
+	sql, args := `SELECT id,groups,nickname,avatar_url FROM net.users WHERE groups<>0 ORDER BY id`, []any{}
 	if len(ids) > 0 {
-		sql, args = `SELECT id,groups FROM net.users WHERE id=ANY($1) ORDER BY id`, []any{ids}
+		sql, args = `SELECT id,groups,nickname,avatar_url FROM net.users WHERE id=ANY($1) ORDER BY id`, []any{ids}
 	}
-	rows, err := db.Query(ctx, sql, args...)
+	members, err := scanMembers(db.Query(ctx, sql, args...))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	members := []Member{}
 	seen := map[string]bool{}
-	for rows.Next() {
-		var id string
-		var bits int64
-		if err = rows.Scan(&id, &bits); err != nil {
-			return nil, err
-		}
-		seen[id] = true
-		members = append(members, Member{ID: id, Groups: Set(bits).Names(), Bits: Set(bits) & Known()})
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
+	for _, m := range members {
+		seen[m.ID] = true
 	}
 	for _, id := range ids {
 		if !seen[id] {
@@ -173,4 +170,33 @@ func Members(ctx context.Context, db interface {
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
 	return members, nil
+}
+
+// Find lists the players whose nickname, as the site keeps it, contains text, whatever their
+// case: one whose nickname is exactly text first, then whoever was active last. At most limit.
+func Find(ctx context.Context, db interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}, text string, limit int) ([]Member, error) {
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(text) + "%"
+	return scanMembers(db.Query(ctx, `SELECT id,groups,nickname,avatar_url FROM net.users
+ WHERE nickname ILIKE $1 ESCAPE '\'
+ ORDER BY lower(nickname)=lower($2) DESC, last_active_at DESC NULLS LAST, id LIMIT $3`, pattern, text, limit))
+}
+
+func scanMembers(rows pgx.Rows, err error) ([]Member, error) {
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	members := []Member{}
+	for rows.Next() {
+		var m Member
+		var bits int64
+		if err = rows.Scan(&m.ID, &bits, &m.Nickname, &m.AvatarURL); err != nil {
+			return nil, err
+		}
+		m.Groups, m.Bits = Set(bits).Names(), Set(bits)&Known()
+		members = append(members, m)
+	}
+	return members, rows.Err()
 }

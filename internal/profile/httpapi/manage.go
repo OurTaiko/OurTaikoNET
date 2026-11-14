@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"ourtaiko.dev/net/internal/account"
@@ -21,10 +23,21 @@ func (s *Server) groupCatalog(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"groups": groups.All()})
 }
 
-// groupMembers is GET /api/v1/admin/users: the players who are in any group, or with
-// ?ids=a,b (at most 100) those players and their groups, whether they have any or not.
+// A login name as the account center accepts one in a question.
+var loginName = regexp.MustCompile(`^\S{1,24}$`)
+
+// How many players a search answers with.
+const foundPlayers = 20
+
+// groupMembers is GET /api/v1/admin/users: the players who are in any group; with
+// ?ids=a,b (at most 100) those players and their groups, whether they have any or not; with
+// ?q=text the players text finds, and their groups.
 func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
+		return
+	}
+	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
+		s.findPlayers(w, r, q)
 		return
 	}
 	ids := []string{}
@@ -44,6 +57,54 @@ func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.Respond(w, 200, map[string]any{"users": members})
+}
+
+// findPlayers answers a search of the manage panel. text finds, in this order: the player
+// whose login name it is, exactly (asked of the account center, so also someone who has never
+// been here and can be given groups ahead of time); the player whose id it is; and the
+// players whose nickname contains it.
+func (s *Server) findPlayers(w http.ResponseWriter, r *http.Request, text string) {
+	if len(text) > 100 {
+		problem(w, 400, "QUERY_INVALID", "搜索内容过长")
+		return
+	}
+	ctx := r.Context()
+	found := []groups.Member{}
+	if s.Config.SSO != nil && loginName.MatchString(text) {
+		// Without the account center the nicknames the site keeps are still searched.
+		if u, ok, err := s.Config.SSO.ByUsername(ctx, text); err != nil {
+			log.Printf("manage: asking the account center for a login name: %v", err)
+		} else if ok {
+			known, err := groups.Members(ctx, s.DB, []string{u.ID})
+			if err != nil {
+				internal(w, err)
+				return
+			}
+			known[0].Username, known[0].Nickname, known[0].AvatarURL = u.Username, u.Nickname, u.AvatarURL
+			found = append(found, known[0])
+		}
+	}
+	if account.ValidSubject(text) {
+		known, err := groups.Members(ctx, s.DB, []string{text})
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		found = append(found, known...)
+	}
+	named, err := groups.Find(ctx, s.DB, text, foundPlayers)
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	users, seen := []groups.Member{}, map[string]bool{}
+	for _, m := range append(found, named...) {
+		if !seen[m.ID] && len(users) < foundPlayers {
+			seen[m.ID] = true
+			users = append(users, m)
+		}
+	}
+	web.Respond(w, 200, map[string]any{"users": users})
 }
 
 // giveGroups is PUT /api/v1/admin/users/{id}/groups with {"groups": ["OFFICIAL_MANAGER", …]}:

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -330,12 +331,15 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 // accountCenter stands in for the account center's internal API: the access token
 // "tok:<player id>" is that player's, until it is revoked; "adm:<player id>" is the same for
 // someone the account center calls this site's administrator.
+const newcomer = "cccccccccccccccccccccccccccccc33"
+
 func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 	t.Helper()
 	revoked = &sync.Map{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			AccessToken string `json:"accessToken"`
+			AccessToken string   `json:"accessToken"`
+			Usernames   []string `json:"usernames"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		id, ok := strings.CutPrefix(body.AccessToken, "tok:")
@@ -350,6 +354,13 @@ func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 		case r.URL.Path == "/internal/v1/web/revoke":
 			revoked.Store(body.AccessToken, true)
 			w.Write([]byte(`{"ok":true}`))
+		case r.URL.Path == "/internal/v1/users/lookup-by-username":
+			// One account exists that has never been to the site: Newcomer1.
+			users := []map[string]any{}
+			if len(body.Usernames) == 1 && body.Usernames[0] == "Newcomer1" {
+				users = append(users, map[string]any{"id": newcomer, "username": "Newcomer1", "nickname": "新来的", "avatarUrl": ""})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"users": users})
 		case r.URL.Path == "/internal/v1/web/introspect" && ok && !gone:
 			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": id, "username": "player", "nickname": "Player", "isAdmin": admin, "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
 		default:
@@ -481,6 +492,100 @@ func wholeSite(t *testing.T) (*App, http.Handler, *pgxpool.Pool) {
 	}
 	t.Cleanup(a.Close)
 	return a, a.Handler(), pool
+}
+
+// The manage panel finds a player by what an administrator can remember: part of a nickname,
+// or a login name in full. An id still works.
+func TestTheAdministratorFindsPlayersByName(t *testing.T) {
+	a, h, pool := wholeSite(t)
+	ctx := context.Background()
+	boss, drummer, master, percent := strings.Repeat("a", 31)+"1", strings.Repeat("b", 31)+"2", strings.Repeat("d", 31)+"4", strings.Repeat("e", 31)+"5"
+	if _, err := pool.Exec(ctx, `INSERT INTO net.users(id,nickname,avatar_url,groups,last_active_at,profile_checked_at) VALUES
+ ($1,'太鼓小将','https://cdn.example/a.webp',1,now(),now()),($2,'Taiko_Master','',0,now()-interval '1 day',now()),($3,'taiko 100%','',0,NULL,now())`, drummer, master, percent); err != nil {
+		t.Fatal(err)
+	}
+	cookie, _, err := a.Players.OpenSession(ctx, boss, "adm:"+boss, "refresh", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	type found struct {
+		ID        string   `json:"id"`
+		Username  string   `json:"username"`
+		Nickname  string   `json:"nickname"`
+		AvatarURL string   `json:"avatarUrl"`
+		Groups    []string `json:"groups"`
+	}
+	find := func(session, query string) (int, []found) {
+		t.Helper()
+		r := httptest.NewRequest("GET", "/api/v1/admin/users?"+query, nil)
+		r.Host = "net.ourtaiko.org"
+		if session != "" {
+			r.AddCookie(&http.Cookie{Name: SessionCookie, Value: session})
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		var out struct {
+			Users []found `json:"users"`
+		}
+		if rec.Code == 200 {
+			if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Users == nil {
+				t.Fatalf("%s: %s", query, rec.Body.String())
+			}
+		}
+		return rec.Code, out.Users
+	}
+	ids := func(users []found) string {
+		out := []string{}
+		for _, u := range users {
+			out = append(out, u.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	for _, c := range []struct{ about, text, want string }{
+		{"part of a nickname", "小将", drummer},
+		{"whatever its case", "TAIKO_m", master},
+		{"an underscore is an underscore", "Taiko-Master", ""},
+		{"and not any character", "Taiko_Maste_", ""},
+		{"a percent sign is a percent sign", "%", percent},
+		{"several, the one active last first", "taiko", master + "," + percent},
+		{"an id", master, master},
+		{"a login name in full, of someone who has never been here", "Newcomer1", newcomer},
+		{"not part of a login name", "Newcomer", ""},
+		{"nor in another case", "newcomer1", ""},
+		{"nothing", "nobody-by-this-name", ""},
+	} {
+		status, users := find(cookie, "q="+url.QueryEscape(c.text))
+		if status != 200 || ids(users) != c.want {
+			t.Errorf("%s (%q): %d %+v", c.about, c.text, status, users)
+		}
+	}
+	// What the panel shows of each: the name and avatar kept here, their groups, and the login
+	// name only when that is what was typed.
+	if _, users := find(cookie, "q="+url.QueryEscape("小将")); len(users) != 1 || users[0].Nickname != "太鼓小将" || users[0].AvatarURL != "https://cdn.example/a.webp" ||
+		users[0].Username != "" || strings.Join(users[0].Groups, ",") != "OFFICIAL_MANAGER" {
+		t.Errorf("found by nickname: %+v", users)
+	}
+	if _, users := find(cookie, "q=Newcomer1"); len(users) != 1 || users[0].Username != "Newcomer1" || users[0].Nickname != "新来的" || len(users[0].Groups) != 0 {
+		t.Errorf("found by login name: %+v", users)
+	}
+	// The list of members names them too.
+	if status, users := find(cookie, ""); status != 200 || len(users) != 1 || users[0].ID != drummer || users[0].Nickname != "太鼓小将" {
+		t.Errorf("members: %d %+v", status, users)
+	}
+	if status, _ := find(cookie, "q="+strings.Repeat("x", 101)); status != 400 {
+		t.Error("a search of 101 characters:", status)
+	}
+	// Only the administrator searches.
+	other, _, err := a.Players.OpenSession(ctx, drummer, "tok:"+drummer, "refresh", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := find(other, "q=taiko"); status != 403 {
+		t.Error("a player searched:", status)
+	}
+	if status, _ := find("", "q=taiko"); status != 401 {
+		t.Error("nobody searched:", status)
+	}
 }
 
 // The account center's administrator manages the site and is in no group; what a part's code
