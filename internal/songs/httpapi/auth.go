@@ -65,21 +65,14 @@ func (s *Server) gameSession(r *http.Request) (session, error) {
 	if !ok || len(token) != 64 {
 		return v, pgx.ErrNoRows
 	}
-	if s.Config.SSO == nil {
-		if s.Config.DevUserID == "" || token != s.devGameToken() {
-			return v, pgx.ErrNoRows
-		}
-		v.User = devUser(s.Config.DevUserID)
-	} else {
-		u, e := s.Config.SSO.Identity(r.Context(), "game", token)
-		if e == nil {
-			u, e = s.manages(r.Context(), u)
-		}
-		if e != nil {
-			return v, e
-		}
-		v.User = u
+	u, e := s.GameIdentity(r.Context(), token)
+	if e == nil && s.Config.SSO != nil {
+		u, e = s.manages(r.Context(), u)
 	}
+	if e != nil {
+		return v, e
+	}
+	v.User = u
 	return v, signin.RecordActivity(r.Context(), s.DB, v.User.ID, false)
 }
 func (s *Server) required(w http.ResponseWriter, r *http.Request, csrf bool) (session, bool) {

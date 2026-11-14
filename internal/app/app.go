@@ -22,6 +22,7 @@ import (
 	"ourtaiko.dev/net/internal/inproc"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/legacy"
+	"ourtaiko.dev/net/internal/multiplay"
 	"ourtaiko.dev/net/internal/netdb"
 	profile "ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/site"
@@ -67,6 +68,9 @@ type Config struct {
 	// and their pages are sent to the same pages under Origin (package legacy). Empty: that
 	// old address is not served.
 	LegacyFanmadeHost, LegacyOfficialHost, LegacyProfileHost string
+
+	// Multiplay is Multi-Enso, the game's online rooms (multiplay.go). Off by default.
+	Multiplay Multiplay
 }
 
 // App is the running service.
@@ -82,6 +86,11 @@ type App struct {
 	// sso is the account center's client when there is one; Start refreshes its copy of
 	// players' profiles.
 	sso *account.Client
+	// rooms is Multi-Enso when it is on, listening at roomsAddr once Start ran; roomsSite is
+	// what the game is told about it.
+	rooms     *multiplay.Server
+	roomsAddr string
+	roomsSite site.Multiplay
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -211,15 +220,35 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	if cfg.LegacyProfileHost != "" {
 		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.Players.Handler()), Page: legacy.Players(cfg.Origin)}
 	}
+	if cfg.Multiplay.ListenAddr != "" {
+		timings := multiplay.DefaultTimings
+		if cfg.Multiplay.MinPlayers != 0 {
+			timings.MinPlayers = cfg.Multiplay.MinPlayers
+		}
+		if timings.MinPlayers < 1 || timings.MinPlayers > timings.MaxMembers {
+			a.Close()
+			return nil, fmt.Errorf("a Multi-Enso round needs between 1 and %d players, not %d", timings.MaxMembers, timings.MinPlayers)
+		}
+		a.rooms = multiplay.NewServer(multiplay.ServerConfig{Catalog: newRoomSongs(a.Fanmade, a.Official), Authenticate: gamePlayer(a.Fanmade), Timings: timings})
+		a.roomsAddr = cfg.Multiplay.ListenAddr
+		a.roomsSite = site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
+		if a.roomsSite.URL == "" {
+			a.roomsSite.URL = cfg.Origin
+		}
+	}
 	return a, nil
 }
 
 // Handler serves the new address, and the old ones for the hosts configured.
 func (a *App) Handler() http.Handler {
+	var options []site.Option
+	if a.rooms != nil {
+		options = append(options, site.WithMultiplay(a.roomsSite))
+	}
 	current := site.Handler([]site.Source{
 		{ID: "fanmade", Name: "OurTaiko Fanmade", API: a.Fanmade.Handler()},
 		{ID: "official", Name: "OurTaiko Database", API: a.Official.Handler()},
-	}, a.Players.Handler())
+	}, a.Players.Handler(), options...)
 	// Both sources and the players' part read one database, so one readiness check speaks
 	// for the site.
 	ready := a.Fanmade.Handler()
@@ -234,9 +263,12 @@ func (a *App) Handler() http.Handler {
 }
 
 // Start fails the uploads a restart interrupted and runs each source's background work until
-// ctx ends.
+// ctx ends. With Multi-Enso on, its gRPC service starts listening; StopRooms ends it.
 func (a *App) Start(ctx context.Context) error {
 	if err := errors.Join(a.Fanmade.FailInterruptedUploads(ctx), a.Official.FailInterruptedUploads(ctx)); err != nil {
+		return err
+	}
+	if err := a.startRooms(); err != nil {
 		return err
 	}
 	// Deleting replaced files, renaming them and writing missing preview clips is the work of
@@ -265,8 +297,39 @@ func (a *App) Start(ctx context.Context) error {
 	return nil
 }
 
-// Close releases the database connections.
+// startRooms makes Multi-Enso listen, when it is on. A port that cannot be had is a
+// deployment error, found as the program starts.
+func (a *App) startRooms() error {
+	if a.rooms == nil {
+		return nil
+	}
+	if err := a.rooms.Start(a.roomsAddr); err != nil {
+		return fmt.Errorf("Multi-Enso cannot listen on %s: %w", a.roomsAddr, err)
+	}
+	log.Printf("Multi-Enso (gRPC, h2c) listening on %s; the game is told to dial %s", a.rooms.Addr(), a.roomsSite.URL)
+	return nil
+}
+
+// RoomsAddr is the address Multi-Enso listens on once Start ran; empty when it is off.
+func (a *App) RoomsAddr() string {
+	if a.rooms == nil || a.rooms.Addr() == nil {
+		return ""
+	}
+	return a.rooms.Addr().String()
+}
+
+// StopRooms ends Multi-Enso: every room is closed, its players are told (ROOM_CLOSED), and
+// the gRPC service stops. Rooms are in memory, so a restart ends them either way; this says
+// so to the players. It does nothing when the service is off or already stopped.
+func (a *App) StopRooms() {
+	if a.rooms != nil {
+		a.rooms.Stop()
+	}
+}
+
+// Close ends Multi-Enso and releases the database connections.
 func (a *App) Close() {
+	a.StopRooms()
 	for _, p := range a.pools {
 		p.Close()
 	}
