@@ -42,6 +42,10 @@ type Server struct {
 	Config Config
 	mu     sync.Mutex
 	limits map[string]window
+	// The site's latest activity as last read (activity.go).
+	feedMu sync.Mutex
+	feed   []Activity
+	feedAt time.Time
 }
 type window struct {
 	since time.Time
@@ -88,6 +92,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/me/titles/{id}", s.deleteOwnTitle)
 	mux.HandleFunc("GET /api/v1/sources", s.sources)
 	mux.HandleFunc("GET /api/v1/titles", s.titleCatalog)
+	mux.HandleFunc("GET /api/v1/activity", s.activity)
 	mux.HandleFunc("GET /api/v1/users/{id}", s.userProfile)
 	mux.HandleFunc("GET /api/v1/users/{id}/nameplate", s.userNameplate)
 	mux.HandleFunc("GET /api/v1/nameplates", s.nameplates)
