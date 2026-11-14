@@ -357,7 +357,7 @@ func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 		case r.URL.Path == "/internal/v1/users/lookup-by-username":
 			// One account exists that has never been to the site: Newcomer1.
 			users := []map[string]any{}
-			if len(body.Usernames) == 1 && body.Usernames[0] == "Newcomer1" {
+			if len(body.Usernames) == 1 && strings.EqualFold(body.Usernames[0], "Newcomer1") {
 				users = append(users, map[string]any{"id": newcomer, "username": "Newcomer1", "nickname": "新来的", "avatarUrl": ""})
 			}
 			json.NewEncoder(w).Encode(map[string]any{"users": users})
@@ -495,7 +495,7 @@ func wholeSite(t *testing.T) (*App, http.Handler, *pgxpool.Pool) {
 }
 
 // The manage panel finds a player by what an administrator can remember: part of a nickname,
-// or a login name in full. An id still works.
+// or a login name in full, in any case. An id still works.
 func TestTheAdministratorFindsPlayersByName(t *testing.T) {
 	a, h, pool := wholeSite(t)
 	ctx := context.Background()
@@ -551,7 +551,7 @@ func TestTheAdministratorFindsPlayersByName(t *testing.T) {
 		{"an id", master, master},
 		{"a login name in full, of someone who has never been here", "Newcomer1", newcomer},
 		{"not part of a login name", "Newcomer", ""},
-		{"nor in another case", "newcomer1", ""},
+		{"in any case", "newcomer1", newcomer},
 		{"nothing", "nobody-by-this-name", ""},
 	} {
 		status, users := find(cookie, "q="+url.QueryEscape(c.text))

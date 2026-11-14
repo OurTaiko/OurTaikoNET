@@ -243,9 +243,10 @@ type PublicProfile struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
-// ByUsername is the player who signs in with exactly this login name, and whether there is
-// one. The account center tells a login name only to who already has it: this is the one way
-// a name leads to a player, and the site keeps no copy of login names.
+// ByUsername is the player who signs in with this login name, whole and in any case, and
+// whether there is one; the answer has the name as its owner wrote it. The account center
+// tells a login name only to who already has it: this is the one way a name leads to a
+// player, and the site keeps no copy of login names.
 func (c *Client) ByUsername(ctx context.Context, name string) (User, bool, error) {
 	var res struct {
 		Users []User `json:"users"`
@@ -254,7 +255,7 @@ func (c *Client) ByUsername(ctx context.Context, name string) (User, bool, error
 		return User{}, false, e
 	}
 	for _, u := range res.Users {
-		if u.Username == name && ValidSubject(u.ID) {
+		if strings.EqualFold(u.Username, name) && ValidSubject(u.ID) {
 			u.AvatarURL = c.AvatarURL(u)
 			return u, true, nil
 		}

@@ -60,8 +60,8 @@ func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // findPlayers answers a search of the manage panel. text finds, in this order: the player
-// whose login name it is, exactly (asked of the account center, so also someone who has never
-// been here and can be given groups ahead of time); the player whose id it is; and the
+// whose login name it is, whole and in any case (asked of the account center, so also someone
+// who has never been here and can be given groups ahead of time); the player whose id it is; and the
 // players whose nickname contains it.
 func (s *Server) findPlayers(w http.ResponseWriter, r *http.Request, text string) {
 	if len(text) > 100 {
