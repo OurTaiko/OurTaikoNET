@@ -7,6 +7,10 @@ export const endpoints = {
     `${API_ROOT}/auth/sso/login?returnTo=${encodeURIComponent(returnTo)}`,
   account: (page: 'profile' | 'register') => `${API_ROOT}/auth/account/${page}`,
   nameplate: `${API_ROOT}/me/nameplate`,
+  // The 3D Don: the costume catalog, one's own look (GET/PUT), anyone's.
+  donCatalog: `${API_ROOT}/don/catalog`,
+  myDon: `${API_ROOT}/me/don`,
+  userDon: (id: string) => `${API_ROOT}/users/${id}/don`,
   titles: `${API_ROOT}/titles`,
   // What players have just done on either source, for the home page.
   activity: `${API_ROOT}/activity`,

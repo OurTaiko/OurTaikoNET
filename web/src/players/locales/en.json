@@ -71,7 +71,8 @@
       "charts": "Charts",
       "playlists": "Playlists",
       "comments": "Comments",
-      "overview": "Overview"
+      "overview": "Overview",
+      "don": "Don"
     },
     "stats": {
       "plays": "plays",
@@ -253,5 +254,42 @@
     "membersHeading": "Players in a group",
     "nobody": "Nobody is in a group yet.",
     "change": "Change"
+  },
+  "don": {
+    "motion": "Motion",
+    "dress": "Dress up",
+    "about": "The Don OurTaikoPlay shows for you on its screens. Pick a whole costume, or a head and a body, a puchichara and the colours, then save.",
+    "wear": "What to wear",
+    "costume": "Costume",
+    "parts": "Head and body",
+    "kinds": {
+      "cos": "Costume",
+      "head": "Head",
+      "body": "Body",
+      "puchi": "Puchichara"
+    },
+    "noPuchi": "None",
+    "colors": "Colours",
+    "defaultColors": "Default colours",
+    "color": {
+      "body": "Body",
+      "face": "Face",
+      "rim": "Rim"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "undo": "Undo changes",
+    "saved": "Saved. The game puts it on the next time you sign in.",
+    "headAndBody": "{{head}} + {{body}}",
+    "withPuchi": "{{wears}}, with {{puchi}}",
+    "motions": {
+      "Normal": "Idle",
+      "Combo": "Combo",
+      "Sabi": "GOGO",
+      "SelectLoop": "Song select",
+      "EntryLoop": "Entry",
+      "FullCombo": "Full combo",
+      "Miss": "Miss"
+    }
   }
 }

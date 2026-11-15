@@ -16,6 +16,8 @@
     "reload": "다시 불러오기",
     "loadingTjaFromServer": "서버에서 TJA 불러오는 중…",
     "loadingChartPreview": "채보 미리 보기 불러오는 중…",
+    "loadingDon": "동 불러오는 중…",
+    "failedToLoadDon": "동을 불러오지 못했습니다",
     "retry": "다시 시도",
     "loadingLeaderboard": "순위표 불러오는 중…",
     "thisDifficultyUsesADoubleChart": "이 난이도는 DOUBLE 채보입니다",

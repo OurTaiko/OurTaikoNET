@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -53,7 +53,19 @@ import {
 import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
 
-const tabs = ['overview', 'scores', 'charts', 'playlists', 'dans', 'titles', 'comments'] as const
+// The Don tab draws with three.js: loaded when it is opened, not with every page.
+const DonTab = lazy(() => import('@players/pages/user-don').then((m) => ({ default: m.DonTab })))
+
+const tabs = [
+  'overview',
+  'don',
+  'scores',
+  'charts',
+  'playlists',
+  'dans',
+  'titles',
+  'comments',
+] as const
 
 export function UserPage() {
   const { t } = useTranslation()
@@ -106,10 +118,11 @@ export function UserPage() {
       </Card>
       <SourceStats profiles={works} />
       <Tabs value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
-        {/* Seven tabs are wider than a phone: the row scrolls sideways there. */}
+        {/* Eight tabs are wider than a phone: the row scrolls sideways there. */}
         <div className="-m-1 p-1 max-w-full overflow-x-auto">
           <TabsList aria-label={t('profile.sections')}>
             <TabsTrigger value="overview">{t('profile.tabs.overview')}</TabsTrigger>
+            <TabsTrigger value="don">{t('profile.tabs.don')}</TabsTrigger>
             <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
             <TabsTrigger value="charts">
               {t('profile.tabs.charts')}
@@ -129,6 +142,11 @@ export function UserPage() {
         </div>
         <TabsContent value="overview">
           <OverviewTab id={id} plate={plate} onOpen={open} />
+        </TabsContent>
+        <TabsContent value="don">
+          <Suspense fallback={<Skeleton className="h-[480px] w-full rounded-3xl" />}>
+            <DonTab id={id} mine={mine} />
+          </Suspense>
         </TabsContent>
         <TabsContent value="scores">
           <ScoresTab id={id} profile={profile} />

@@ -71,7 +71,8 @@
       "charts": "谱面",
       "playlists": "歌单",
       "comments": "评论",
-      "overview": "概览"
+      "overview": "概览",
+      "don": "咚酱"
     },
     "stats": {
       "plays": "游玩记录",
@@ -253,5 +254,42 @@
     "membersHeading": "已有用户组的玩家",
     "nobody": "还没有人属于任何用户组。",
     "change": "修改"
+  },
+  "don": {
+    "motion": "动作",
+    "dress": "换装",
+    "about": "这是 OurTaikoPlay 画面上属于你的咚酱。选一套服装，或者头和身体，再选小伙伴和颜色，然后保存。",
+    "wear": "穿什么",
+    "costume": "整套服装",
+    "parts": "头＋身体",
+    "kinds": {
+      "cos": "服装",
+      "head": "头",
+      "body": "身体",
+      "puchi": "小伙伴"
+    },
+    "noPuchi": "不要",
+    "colors": "颜色",
+    "defaultColors": "默认颜色",
+    "color": {
+      "body": "身体",
+      "face": "脸",
+      "rim": "边"
+    },
+    "save": "保存",
+    "saving": "正在保存…",
+    "undo": "撤销修改",
+    "saved": "已保存。下次在游戏里登录时就会换上。",
+    "headAndBody": "{{head}}＋{{body}}",
+    "withPuchi": "{{wears}}，带着{{puchi}}",
+    "motions": {
+      "Normal": "平常",
+      "Combo": "连击",
+      "Sabi": "GOGO",
+      "SelectLoop": "选曲",
+      "EntryLoop": "入场",
+      "FullCombo": "全连",
+      "Miss": "失误"
+    }
   }
 }

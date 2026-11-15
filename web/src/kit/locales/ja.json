@@ -16,6 +16,8 @@
     "reload": "再読み込み",
     "loadingTjaFromServer": "サーバーから TJA を読み込み中…",
     "loadingChartPreview": "譜面プレビューを読み込み中…",
+    "loadingDon": "どんを読み込み中…",
+    "failedToLoadDon": "どんを読み込めませんでした",
     "retry": "再試行",
     "loadingLeaderboard": "ランキングを読み込み中…",
     "thisDifficultyUsesADoubleChart": "この難易度は DOUBLE 譜面です",

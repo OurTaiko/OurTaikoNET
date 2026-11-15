@@ -16,6 +16,8 @@
     "reload": "重新加载",
     "loadingTjaFromServer": "正在从服务器读取 TJA…",
     "loadingChartPreview": "正在加载谱面预览…",
+    "loadingDon": "正在加载咚酱…",
+    "failedToLoadDon": "咚酱加载失败",
     "retry": "重试",
     "loadingLeaderboard": "正在加载排行榜…",
     "thisDifficultyUsesADoubleChart": "此难度为 DOUBLE 谱面",

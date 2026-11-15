@@ -16,6 +16,8 @@
     "reload": "Reload",
     "loadingTjaFromServer": "Loading TJA from server…",
     "loadingChartPreview": "Loading chart preview…",
+    "loadingDon": "Loading Don…",
+    "failedToLoadDon": "Failed to load Don",
     "retry": "Retry",
     "loadingLeaderboard": "Loading leaderboard…",
     "thisDifficultyUsesADoubleChart": "This difficulty uses a DOUBLE chart",

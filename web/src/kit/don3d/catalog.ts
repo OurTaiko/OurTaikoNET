@@ -1,0 +1,77 @@
+// The 3dchara folder's catalog.json (written by tools/3dchara/catalog.py): every file with its
+// path, size and SHA-256, so a file is asked for as "<path>?v=<first 12 of the hash>".
+
+export type DonCatalogFile = { path: string; size: number; sha256: string }
+
+export type DonCatalogItem = {
+  id: number
+  name: Partial<Record<string, string>>
+  file: DonCatalogFile
+  icon?: DonCatalogFile
+}
+
+export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi'
+
+export type DonCatalog = {
+  version: number
+  base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
+  defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
+  items: Record<DonPartKind, DonCatalogItem[]>
+}
+
+// How a Don looks, as the API gives it: a whole costume, or a head and a body; the puchichara
+// beside it (0: none); the body, face and rim colours (null: 1P's).
+export type DonLook = {
+  costume: boolean
+  cos: number
+  head: number
+  body: number
+  puchi: number
+  colors: [string, string, string] | null
+}
+
+export function catalogUrl(baseUrl: string, file: DonCatalogFile): string {
+  const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
+  return base + file.path + '?v=' + file.sha256.slice(0, 12)
+}
+
+export function catalogItem(
+  catalog: DonCatalog,
+  kind: DonPartKind,
+  id: number,
+): DonCatalogItem | undefined {
+  return catalog.items[kind]?.find((item) => item.id === id)
+}
+
+// One model file a look wears, and whether its face plate is brought to the standard size.
+export type DonLookPart = {
+  kind: 'cos' | 'head' | 'body'
+  item: DonCatalogItem
+  normalizeFace: boolean
+}
+
+export type ResolvedDonLook = {
+  parts: DonLookPart[]
+  puchi: DonCatalogItem | null
+  colors: [string, string, string]
+}
+
+// What a look draws: the costume, or the body then the head (head with the face plate always
+// normalised); an id the catalog does not have falls back to 0, puchichara 0 (or a missing one) is
+// none, and no colours are 1P's.
+export function resolveDonLook(catalog: DonCatalog, look: DonLook): ResolvedDonLook {
+  const pick = (kind: 'cos' | 'head' | 'body', id: number) =>
+    catalogItem(catalog, kind, id) ?? catalogItem(catalog, kind, 0)
+  const parts: DonLookPart[] = []
+  const add = (kind: 'cos' | 'head' | 'body', id: number, normalizeFace: boolean) => {
+    const item = pick(kind, id)
+    if (item) parts.push({ kind, item, normalizeFace })
+  }
+  if (look.costume) add('cos', look.cos, false)
+  else {
+    add('body', look.body, false)
+    add('head', look.head, true)
+  }
+  const puchi = look.puchi > 0 ? (catalogItem(catalog, 'puchi', look.puchi) ?? null) : null
+  return { parts, puchi, colors: look.colors ?? catalog.defaultColors.p1 }
+}
