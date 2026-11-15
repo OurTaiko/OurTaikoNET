@@ -14,7 +14,8 @@ import type { Dans, HeldTitle, Nameplate as Plate, ScorePage } from '@players/ap
 import { Crown } from '@players/components/crown'
 import { TitleBand } from '@players/components/nameplate'
 import { SongTile, SourceTag, sourceApi, sources } from '@players/components/song-tile'
-import { danName, danRings, danText, verdictKey } from '@players/dan'
+import { danName, verdictKey } from '@players/dan'
+import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
 import { Notice } from '@players/notice'
 
@@ -212,15 +213,12 @@ function DanRanks({ id, onMore }: { id: string; onMore: () => void }) {
         <div className="space-y-3">
           {highest && (
             <div className="flex items-center gap-3 bg-muted p-3 rounded-[14px]">
-              <span
-                className={cn(
-                  'flex justify-center items-center w-[4.5rem] h-10 font-black text-lg tracking-tight shrink-0',
-                  danRings[highest.combo] ?? danRings[0],
-                  danText(highest.gold),
-                )}
-              >
-                {danName(highest.index)}
-              </span>
+              <DanEmblem
+                index={highest.index}
+                gold={highest.gold}
+                combo={highest.combo}
+                label={danName(highest.index)}
+              />
               <div className="min-w-0">
                 <p className="text-muted-foreground text-xs">{t('profile.overview.highest')}</p>
                 <p className="font-semibold text-sm truncate">

@@ -40,7 +40,8 @@ import {
 } from '@sitekit/components/ui/table'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
-import { danName, danRings, danText, offeredDans, titleName, verdictKey } from '@players/dan'
+import { danName, offeredDans, titleName, verdictKey } from '@players/dan'
+import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
 import {
   ChartsTab,
@@ -562,14 +563,21 @@ function DansTab({ id }: { id: string }) {
                 <li
                   key={name}
                   title={badge ? t(verdictKey(badge.verdict)) : t('dans.notYet')}
-                  className={cn(
-                    'flex h-10 items-center justify-center text-sm font-bold',
-                    !badge && 'rounded-[50%] border-2 border-dashed text-muted-foreground/60',
-                    badge && danRings[badge.combo],
-                    badge && danText(badge.gold),
-                  )}
+                  className="flex h-10 items-center justify-center"
                 >
-                  {name}
+                  {badge ? (
+                    <DanEmblem
+                      index={index}
+                      gold={badge.gold}
+                      combo={badge.combo}
+                      label={name}
+                      className="h-full"
+                    />
+                  ) : (
+                    <span className="flex h-full aspect-[72/40] items-center justify-center rounded-[50%] border-2 border-dashed text-sm font-bold text-muted-foreground/60">
+                      {name}
+                    </span>
+                  )}
                 </li>
               )
             })}

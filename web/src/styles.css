@@ -337,3 +337,65 @@
     transparent
   );
 }
+
+/* The rainbow title band (kit/components/nameplate-art): frame_top_rainbow's 6 frames, 50 ms each,
+   looping every 300 ms, each drawn over the one before (the game's NameplateRainbow.anim). The
+   band shows frame n, the layer under it frame n - 1 (none under frame 0). Still on frame 0 when
+   motion is reduced, as the original skin draws it. */
+.nameplate-rainbow {
+  animation: nameplate-rainbow 300ms step-end infinite;
+}
+.nameplate-rainbow-under {
+  animation: nameplate-rainbow-under 300ms step-end infinite;
+}
+@keyframes nameplate-rainbow {
+  0% {
+    background-position-y: 0%;
+  }
+  16.667% {
+    background-position-y: 20%;
+  }
+  33.333% {
+    background-position-y: 40%;
+  }
+  50% {
+    background-position-y: 60%;
+  }
+  66.667% {
+    background-position-y: 80%;
+  }
+  83.333% {
+    background-position-y: 100%;
+  }
+}
+@keyframes nameplate-rainbow-under {
+  0% {
+    opacity: 0;
+    background-position-y: 0%;
+  }
+  16.667% {
+    opacity: 1;
+    background-position-y: 0%;
+  }
+  33.333% {
+    background-position-y: 20%;
+  }
+  50% {
+    background-position-y: 40%;
+  }
+  66.667% {
+    background-position-y: 60%;
+  }
+  83.333% {
+    background-position-y: 80%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nameplate-rainbow,
+  .nameplate-rainbow-under {
+    animation: none;
+  }
+  .nameplate-rainbow-under {
+    opacity: 0;
+  }
+}

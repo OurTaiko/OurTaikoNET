@@ -3,9 +3,7 @@ import { SITE_API_ROOT } from '../api/config'
 import { PLAYERS_BASE } from '../source'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
-import ringSilver from '../assets/dan-ring-silver.png'
-import ringGold from '../assets/dan-ring-gold.png'
-import ringRainbow from '../assets/dan-ring-rainbow.png'
+import { DanEmblem, TitleBandArt } from './nameplate-art'
 
 // The title and 段位 a player wears (the players' pages keep them), drawn next to
 // their name. Lookups for the names on a page are gathered into one request.
@@ -47,21 +45,6 @@ const danNames = [
   '超人',
   '達人',
 ]
-const bands: Record<Style, string> = {
-  wood: 'bg-linear-to-b from-[#a8743f] to-[#6e4420]',
-  teal: 'bg-linear-to-b from-[#3fb6b2] to-[#1d6f73]',
-  wood2: 'bg-linear-to-b from-[#d6a46a] to-[#9a6430]',
-  purple: 'bg-linear-to-b from-[#9b6ad6] to-[#5b2f93]',
-  gold: 'bg-linear-to-b from-[#f7d774] to-[#b8860b]',
-  rainbow: 'bg-[linear-gradient(90deg,#ff5f6d,#ffc371,#fff66d,#6dff9c,#5fc8ff,#a06dff)]',
-}
-
-// The 段位 emblem's ring follows the pass's combo like a song's crown (the game's 銀粋 / 金粋 /
-// 虹粋 art); its text the pass line.
-const rings = [ringSilver, ringGold, ringRainbow].map(
-  (url) => `bg-[url(${url})] bg-contain bg-center bg-no-repeat`,
-)
-
 const plates = new Map<string, Promise<Plate | null>>()
 let waiting: { id: string; resolve: (plate: Plate | null) => void }[] = []
 
@@ -110,27 +93,20 @@ export function ProfilePlate({ userId, className }: { userId: string; className?
   return (
     <span className={cn('inline-flex max-w-full items-center gap-1 align-middle', className)}>
       {plate.dan && (
-        <span
-          className={cn(
-            'inline-flex h-5 w-9 shrink-0 items-center justify-center text-[0.65rem] leading-none font-bold [text-shadow:0_1px_1px_rgb(0_0_0/0.7)]',
-            rings[plate.dan.combo ?? 0],
-            plate.dan.gold
-              ? 'text-[#ffd84a] [-webkit-text-stroke:0.4px_#5a3d00]'
-              : 'text-white [-webkit-text-stroke:0.4px_#222]',
-          )}
-        >
-          {danNames[plate.dan.index]}
-        </span>
+        <DanEmblem
+          index={plate.dan.index}
+          gold={plate.dan.gold}
+          combo={plate.dan.combo ?? 0}
+          label={danNames[plate.dan.index] ?? ''}
+          className="h-5"
+        />
       )}
       {plate.title && (
-        <span
-          className={cn(
-            'truncate rounded px-1.5 py-0.5 text-[0.7rem] leading-none font-bold text-white [text-shadow:0_1px_1px_rgb(0_0_0/0.6)]',
-            bands[plate.title.style] ?? bands.wood,
-          )}
-        >
-          {plate.title.nameTranslations?.[language] || plate.title.name}
-        </span>
+        <TitleBandArt
+          style={plate.title.style}
+          name={plate.title.nameTranslations?.[language] || plate.title.name}
+          className="h-5"
+        />
       )}
     </span>
   )

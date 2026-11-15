@@ -56,6 +56,12 @@ OurTaikoPlay draws each player's 3D Don (its Chara3D, ported from YataiDON). The
 - **The website.** Each player's page has a Don tab (`web/src/players/pages/user-don.tsx`, loaded on demand): a live 3D preview for everyone, and for the player themself icon lists of costumes, heads, bodies and puchichara, the three colours, and Save. The preview is `web/src/kit/don3d` (`@sitekit/don3d`), the game's Chara3D ported to three.js; `web/dev/don3d.html` (not in the build; `pnpm dev`, then `/dev/don3d.html?grid=1`) draws the game's preview shots for comparing with the game.
 - `PUT /api/v1/me/don` (session and CSRF) with a look: every number must be in the catalog, also the ones not worn now (so switching between a costume and a head and body keeps both), colours `#RRGGBB` (stored upper case) or null; 422 `DON_LOOK_INVALID`; answers as GET.
 
+## The nameplate art
+
+The website draws nameplates, title bands and 段位 emblems from the game's own art, unchanged: OurTaikoPlay's `Assets/OurTaiko/Art/global/nameplate` (the Nijiiro skin's `global/nameplate`, plus the game's 段位 rings and rank texts) is in the public bucket under `nameplate/` (`https://distrib.ourtaiko.org/nameplate/`), listed by `nameplate/catalog.json` (`{"version":1,"files":{"shadow","outline","bands","rainbow","danBackground","danRing{Silver,Gold,Rainbow}","danText","danTextGold","badge1p","badge2p":{"path","size","sha256"}}}`). `tools/nameplate/publish.sh <the game's nameplate folder>` writes the catalog and uploads (files first, catalog last, then clears `/nameplate/*` on CloudFront). The backend does not read it.
+
+`web/src/kit/components/nameplate-art.tsx` reads the catalog straight from the bucket (CORS `*`) once per page load and asks for each file with `?v=<hash>`. `NameplateArt` stacks the layers where the game's `NameplateView` puts them on the 408x96 canvas (cropped to the art, x 42–371, y 10–91) and scales with its width; the title and name are text, centred and squeezed into the game's boxes. `TitleBandArt` is the band alone and `DanEmblem` the ring with the rank. The rainbow band cycles its 6 frames every 300 ms like the game (still when motion is reduced). If the catalog cannot be read, the text still shows without the art.
+
 ## Local development
 
 The backend and the website run side by side on this machine:
