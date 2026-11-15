@@ -37,6 +37,11 @@ type member struct {
 	// lastStamp is when the player last sent a stamp; stamped is false until the first.
 	lastStamp time.Time
 	stamped   bool
+	// protocol is the version the player's game speaks; away, from a play's start, that the
+	// player has not come back to the room's screen (never set below protocol 2, whose games
+	// do not say when they are back).
+	protocol int32
+	away     bool
 }
 
 // Room is one room. Its exported methods are what players ask of it; each takes the manager's
@@ -136,7 +141,7 @@ func (r *Room) acceptsQuickMatch() bool {
 
 // join adds a player, or gives a member that dropped (or connects again from elsewhere) its
 // place back.
-func (r *Room) join(player Player, conn Conn) error {
+func (r *Room) join(player Player, conn Conn, protocol int32) error {
 	if r.closed {
 		return refuse("ROOM_CLOSED", "The room was closed")
 	}
@@ -147,8 +152,12 @@ func (r *Room) join(player Player, conn Conn) error {
 		existing.dropTimer.cancel()
 		existing.dropTimer = nil
 		existing.conn = conn
+		// Where the player is has not changed with the connection: away stays as it was,
+		// unless the game that came back cannot say when it returns.
+		existing.protocol = protocol
+		existing.away = existing.away && protocol >= 2
+		r.maybeStartFull()
 		existing.Nickname, existing.AvatarURL = player.Nickname, player.AvatarURL
-		r.updateLobbyCountdown()
 		r.changed()
 		return nil
 	}
@@ -158,15 +167,12 @@ func (r *Room) join(player Player, conn Conn) error {
 	if r.full() {
 		return refuse("ROOM_FULL", "The room is full")
 	}
-	r.members = append(r.members, &member{Player: player, slot: r.nextSlot, conn: conn, status: &pb.PlayerStatus{}})
+	r.members = append(r.members, &member{Player: player, slot: r.nextSlot, conn: conn, status: &pb.PlayerStatus{}, protocol: protocol})
 	r.nextSlot++
 	if r.hostID == "" {
 		r.hostID = player.UserID
 	}
-	r.updateLobbyCountdown()
-	if r.public && r.full() {
-		r.startSongSelect()
-	}
+	r.maybeStartFull()
 	r.changed()
 	return nil
 }
@@ -188,7 +194,6 @@ func (r *Room) Disconnected(userID string, conn Conn) {
 		}
 	})
 	r.changed()
-	r.updateLobbyCountdown()
 	r.afterPresenceChange()
 }
 
@@ -283,7 +288,6 @@ func (r *Room) removeMember(m *member) {
 		}
 		r.hostID = next.UserID
 	}
-	r.updateLobbyCountdown()
 	r.changed()
 	r.afterPresenceChange()
 }
@@ -368,12 +372,13 @@ func (r *Room) OpenRoom(userID string) error {
 		return nil
 	}
 	r.public = true
-	r.updateLobbyCountdown()
 	r.changed()
 	return nil
 }
 
-// LockMembers settles the members and begins a round. Host only, LOBBY only.
+// LockMembers begins a round with the members who are in the room. Host only, LOBBY only.
+// Those still at their own result screen after the last round are left behind: they are
+// taken out of the room (LEFT_BEHIND).
 func (r *Room) LockMembers(userID string) error {
 	r.m.mu.Lock()
 	defer r.m.unlock()
@@ -383,28 +388,64 @@ func (r *Room) LockMembers(userID string) error {
 	if r.phase != pb.Phase_LOBBY {
 		return refuse("BAD_PHASE", "A round cannot begin now")
 	}
-	if r.present() < r.t().MinPlayers {
-		return refuse("NOT_ENOUGH_PLAYERS", fmt.Sprintf("A round needs at least %d players", r.t().MinPlayers))
+	// Whoever presses start is at the room's screen, whether or not `returned` has come yet.
+	if host := r.find(userID); host.away {
+		host.away = false
+		r.changed()
+	}
+	if r.inRoom() < r.t().MinPlayers {
+		return refuse("NOT_ENOUGH_PLAYERS", fmt.Sprintf("A round needs at least %d players in the room", r.t().MinPlayers))
+	}
+	for _, m := range append([]*member(nil), r.members...) {
+		if !m.away {
+			continue
+		}
+		conn := m.conn
+		m.conn = nil
+		r.drop(m)
+		if conn != nil {
+			conn.Close("LEFT_BEHIND", "The next round began before you were back in the room")
+		}
 	}
 	r.startSongSelect()
 	return nil
 }
 
-// updateLobbyCountdown runs the countdown of a public lobby while enough members are
-// connected, and stops it when they are not.
-func (r *Room) updateLobbyCountdown() {
-	if r.phase != pb.Phase_LOBBY {
-		return
-	}
-	if r.public && r.present() >= r.t().MinPlayers {
-		if r.phaseTimer == nil {
-			r.setPhaseTimer(r.t().LobbyCountdown, r.startSongSelect)
-			r.changed()
+// inRoom counts the members who are at the room's screen: connected, and not away at a play
+// or its result.
+func (r *Room) inRoom() int {
+	n := 0
+	for _, m := range r.members {
+		if m.conn != nil && !m.away {
+			n++
 		}
-	} else if r.phaseTimer != nil {
-		r.clearPhaseTimer()
-		r.changed()
 	}
+	return n
+}
+
+// maybeStartFull begins a round by itself once the room is full and every member is in it.
+// Besides the host's start this is the only way a round begins.
+func (r *Room) maybeStartFull() {
+	if r.phase == pb.Phase_LOBBY && !r.closed && r.full() && r.inRoom() == len(r.members) {
+		r.startSongSelect()
+	}
+}
+
+// Returned says the player is back at the room's screen after a play.
+func (r *Room) Returned(userID string) error {
+	r.m.mu.Lock()
+	defer r.m.unlock()
+	m, err := r.member(userID)
+	if err != nil {
+		return err
+	}
+	if !m.away {
+		return nil
+	}
+	m.away = false
+	r.changed()
+	r.maybeStartFull()
+	return nil
 }
 
 /* ---------- phases ---------- */
@@ -446,7 +487,6 @@ func (r *Room) backToLobby(code, message string) {
 	if r.closed {
 		return
 	}
-	r.updateLobbyCountdown()
 	if code != "" {
 		r.notice(code, message)
 	}
@@ -534,8 +574,10 @@ func (r *Room) maybeEndSongSelect() {
 	}
 }
 
-// drawSong draws one of the connected members' picks. A pick that is a song is the round's
-// song at once; for おまかせ the catalog is asked for any song, without the mutex held.
+// drawSong settles the round's song. A song somebody picked always goes before chance: one
+// of the connected members' songs is drawn, each with the same chance, and おまかせ only
+// says "whatever the others pick". Only when nobody picked a song is the catalog asked for
+// any song, without the mutex held.
 func (r *Room) drawSong() {
 	if r.phase != pb.Phase_SONG_SELECT || r.drawing {
 		return
@@ -543,19 +585,21 @@ func (r *Room) drawSong() {
 	r.drawing = true
 	r.clearPhaseTimer()
 	r.changed()
-	var candidates []*member
+	var songs []*member
 	for _, m := range r.members {
-		if m.conn != nil {
-			// Whoever picked nothing leaves it to chance.
-			m.picked = true
-			candidates = append(candidates, m)
+		if m.conn == nil {
+			continue
+		}
+		// Whoever picked nothing leaves it to chance.
+		m.picked = true
+		if m.pick != nil {
+			songs = append(songs, m)
 		}
 	}
-	if len(candidates) > 0 {
-		if winner := candidates[r.m.deps.Intn(len(candidates))]; winner.pick != nil {
-			r.drawn(winner.pick, winner.UserID)
-			return
-		}
+	if len(songs) > 0 {
+		winner := songs[r.m.deps.Intn(len(songs))]
+		r.drawn(winner.pick, winner.UserID)
+		return
 	}
 	mgr, round := r.m, r.round
 	mgr.deps.Go(func() {
@@ -735,6 +779,8 @@ func (r *Room) startPlay() {
 	for _, m := range r.members {
 		if m.playing {
 			m.lastCourse = m.course
+			// At the play, and at their own result screen after it, until the game says so.
+			m.away = m.protocol >= 2
 			if m.conn != nil {
 				m.conn.Send(start)
 			}
@@ -863,7 +909,7 @@ func (r *Room) finishRound() {
 	}
 	r.setPhaseTimer(r.t().Result, func() {
 		r.setPhase(pb.Phase_LOBBY)
-		r.updateLobbyCountdown()
+		r.maybeStartFull()
 	})
 }
 
@@ -933,6 +979,7 @@ func (r *Room) snapshot() *pb.Room {
 		out := &pb.Member{
 			UserId: m.UserID, Nickname: m.Nickname, AvatarUrl: m.AvatarURL, Slot: m.slot, Connected: m.conn != nil,
 			Picked: m.picked, Course: m.course, Ready: m.ready, Loaded: m.loaded, Playing: m.playing, Finished: m.finished,
+			Away: m.away,
 		}
 		if reveal && m.pick != nil {
 			out.PickedSource, out.PickedChartId = m.pick.Source, m.pick.ChartID

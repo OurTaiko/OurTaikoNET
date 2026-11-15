@@ -236,11 +236,13 @@ func (c *client) notice(code string) {
 
 // Client messages.
 func joinQuick() *pb.ClientMessage {
-	return &pb.ClientMessage{Kind: &pb.ClientMessage_Join{Join: &pb.Join{Target: &pb.Join_QuickMatch{QuickMatch: &pb.QuickMatch{}}, Protocol: 1}}}
+	return &pb.ClientMessage{Kind: &pb.ClientMessage_Join{Join: &pb.Join{Target: &pb.Join_QuickMatch{QuickMatch: &pb.QuickMatch{}}, Protocol: Protocol}}}
 }
 func joinPrivate() *pb.ClientMessage {
-	return &pb.ClientMessage{Kind: &pb.ClientMessage_Join{Join: &pb.Join{Target: &pb.Join_CreatePrivate{CreatePrivate: &pb.CreatePrivate{}}, Protocol: 1}}}
+	return &pb.ClientMessage{Kind: &pb.ClientMessage_Join{Join: &pb.Join{Target: &pb.Join_CreatePrivate{CreatePrivate: &pb.CreatePrivate{}}, Protocol: Protocol}}}
 }
+
+// joinCode is the join of a game that says no version: an older one.
 func joinCode(code string) *pb.ClientMessage {
 	return &pb.ClientMessage{Kind: &pb.ClientMessage_Join{Join: &pb.Join{Target: &pb.Join_RoomCode{RoomCode: code}}}}
 }
@@ -274,6 +276,9 @@ func stamp(id int32) *pb.ClientMessage {
 }
 func ping(at int64) *pb.ClientMessage {
 	return &pb.ClientMessage{Kind: &pb.ClientMessage_Ping{Ping: &pb.Ping{ClientTimeMs: at}}}
+}
+func returned() *pb.ClientMessage {
+	return &pb.ClientMessage{Kind: &pb.ClientMessage_Returned{Returned: &pb.Returned{}}}
 }
 func leave() *pb.ClientMessage {
 	return &pb.ClientMessage{Kind: &pb.ClientMessage_Leave{Leave: &pb.Leave{}}}
@@ -382,7 +387,7 @@ func TestWholeRoundBetweenTwoPlayers(t *testing.T) {
 	a.send(joinPrivate())
 	// Welcome first, then the room.
 	first := a.next("the first message", func(*pb.ServerMessage) bool { return true })
-	if w := first.GetWelcome(); w == nil || w.UserId != alice.UserID || w.Nickname != "Alice" || w.Protocol != 1 {
+	if w := first.GetWelcome(); w == nil || w.UserId != alice.UserID || w.Nickname != "Alice" || w.Protocol != Protocol {
 		t.Fatalf("the first message: %v", first)
 	}
 	lobby := a.phase(pb.Phase_LOBBY)
@@ -415,26 +420,16 @@ func TestWholeRoundBetweenTwoPlayers(t *testing.T) {
 	}
 	b.send(pickSong(&Song{Source: "fanmade", ChartID: strings.Repeat("f", 32)}, "Oni"))
 	b.notice("CHART_NOT_FOUND")
-	// Alice picks Alpha on Normal, Bob leaves it to chance on Hard: either way the draw has
-	// both courses, as Beta, what chance draws here, has neither.
+	// Alice picks Alpha on Normal, Bob leaves it to chance on Hard: a song that was picked
+	// goes before chance, so it is Alpha, on the course each asked for.
 	a.send(pickSong(songA, "Normal"))
 	b.send(pickSong(nil, "Hard"))
 	draw := b.phase(pb.Phase_SONG_DRAW)
-	if draw.Song == nil || len(draw.Song.ChartJson) == 0 {
+	if draw.Song == nil || len(draw.Song.ChartJson) == 0 || draw.Song.ChartId != songA.ChartID {
 		t.Fatalf("draw: %v", draw)
 	}
-	switch draw.Song.ChartId {
-	case songA.ChartID:
-		if draw.SongPickedBy != alice.UserID || draw.Members[0].Course != "Normal" || draw.Members[1].Course != "Hard" {
-			t.Fatalf("draw of Alpha: %v", draw)
-		}
-	case songB.ChartID:
-		// Beta has Oni and Edit: nothing easier than Normal or Hard, so the nearest harder.
-		if draw.SongPickedBy != "" || draw.Members[0].Course != "Oni" || draw.Members[1].Course != "Oni" {
-			t.Fatalf("draw of Beta: %v", draw)
-		}
-	default:
-		t.Fatalf("drew %v", draw.Song)
+	if draw.SongPickedBy != alice.UserID || draw.Members[0].Course != "Normal" || draw.Members[1].Course != "Hard" {
+		t.Fatalf("draw of Alpha: %v", draw)
 	}
 	if draw.Members[0].PickedChartId != songA.ChartID || draw.Members[1].PickedChartId != "" {
 		t.Fatalf("picks: %v", draw.Members)
@@ -494,6 +489,13 @@ func TestWholeRoundBetweenTwoPlayers(t *testing.T) {
 	if back.Result.GetRound() != 1 || len(back.Members) != 2 {
 		t.Fatalf("back in the lobby: %v", back)
 	}
+	// Alice's game says when it is back at the room's screen and has not yet; Bob's is an
+	// older one, which is never away.
+	if !back.Members[0].Away || back.Members[1].Away {
+		t.Fatalf("who is away: %v", back)
+	}
+	a.send(returned())
+	b.room("the lobby with Alice back", func(r *pb.Room) bool { return r.Phase == pb.Phase_LOBBY && !r.Members[0].Away })
 
 	b.send(leave())
 	b.closedWith("LEFT")
@@ -519,7 +521,7 @@ func TestQuickMatchAndKickOverTheWire(t *testing.T) {
 	b := connect(t, s, bobToken)
 	b.send(joinQuick())
 	with := b.room("the room with two members", func(r *pb.Room) bool { return len(r.Members) == 2 })
-	if with.Code != lobby.Code || with.DeadlineMs == 0 {
+	if with.Code != lobby.Code || with.DeadlineMs != 0 {
 		t.Fatalf("quick match: %v", with)
 	}
 	b.send(kick(alice.UserID))
@@ -612,6 +614,45 @@ func TestDroppedPlayerLosesThePlaceAfterTheGracePeriod(t *testing.T) {
 		t.Fatalf("the stream ended with %v", err)
 	}
 	a.room("the room without Bob", func(r *pb.Room) bool { return len(r.Members) == 1 })
+}
+
+func TestSilentPlayerIsTakenForGone(t *testing.T) {
+	s := startServer(t, func(cfg *ServerConfig) { cfg.SilenceTimeout = 400 * time.Millisecond })
+	a, b, code := roomOfTwo(t, s)
+	// Alice pings as the game does. Nothing comes from Bob, whose connection stays open: a
+	// phone that lost its signal.
+	for i := int64(1); i <= 16; i++ {
+		a.send(ping(i))
+		time.Sleep(50 * time.Millisecond)
+	}
+	b.refusedWith(codes.DeadlineExceeded, "SILENT")
+	a.room("Bob shown as disconnected", func(r *pb.Room) bool { return len(r.Members) == 2 && !r.Members[1].Connected })
+	// Alice was heard from all along.
+	a.next("the last pong", func(m *pb.ServerMessage) bool { return m.GetPong().GetClientTimeMs() == 16 })
+	// The place is kept as after any drop: a game that is there after all joins again.
+	back := connect(t, s, bobToken)
+	back.send(joinCode(code))
+	if r := back.phase(pb.Phase_LOBBY); len(r.Members) != 2 || r.Members[1].Slot != 1 || !r.Members[1].Connected {
+		t.Fatalf("the room on coming back: %v", r)
+	}
+}
+
+func TestAnyMessageBreaksTheSilence(t *testing.T) {
+	s := startServer(t, func(cfg *ServerConfig) { cfg.SilenceTimeout = 400 * time.Millisecond })
+	a, b, code := roomOfTwo(t, s)
+	// Neither pings; each sends something else, well inside the limit, for three times as long.
+	for i := 0; i < 24; i++ {
+		a.send(stamp(1))
+		b.send(playStatus(&pb.PlayerStatus{Score: int32(i)}))
+		time.Sleep(50 * time.Millisecond)
+	}
+	a.send(ping(7))
+	a.next("pong", func(m *pb.ServerMessage) bool { return m.GetPong().GetClientTimeMs() == 7 })
+	b.send(ping(8))
+	b.next("pong", func(m *pb.ServerMessage) bool { return m.GetPong().GetClientTimeMs() == 8 })
+	if room := s.Manager().Room(code); room == nil || !room.Has(alice.UserID) || !room.Has(bob.UserID) {
+		t.Fatal("a player who kept sending lost the place")
+	}
 }
 
 func TestStoppingTheServerClosesTheRooms(t *testing.T) {

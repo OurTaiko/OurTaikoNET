@@ -27,9 +27,17 @@ import (
 	pb "ourtaiko.dev/net/internal/multiplay/multiplaypb"
 )
 
-// Protocol is the version of the protocol this server speaks. A client that asks for a newer
-// one is told to wait for the server (Closed UPDATE_REQUIRED); an older client is served.
-const Protocol = 1
+// Protocol is the newest version of the protocol this server speaks. A client that asks for
+// a newer one is told to wait for the server (Closed UPDATE_REQUIRED); an older client is
+// served, down to MinProtocol.
+//
+//	2 (2026-11-15): `returned` and Member.away: after a play the room knows who is back at
+//	its screen. A full room begins its next round once everyone is; the host's start leaves
+//	those who are not behind (LEFT_BEHIND). A member that speaks 1 is never away.
+const (
+	Protocol    = 2
+	MinProtocol = 1
+)
 
 // StampCount is how many stamps there are: ids 0 to StampCount-1.
 const StampCount = 16
@@ -45,12 +53,10 @@ type Timings struct {
 	MaxMembers int
 	// MinPlayers is the fewest players a round needs.
 	MinPlayers int
-	// A public room locks its members by itself this long after it has MinPlayers.
-	LobbyCountdown time.Duration
-	SongSelect     time.Duration
-	SongDraw       time.Duration
-	Course         time.Duration
-	Loading        time.Duration
+	SongSelect time.Duration
+	SongDraw   time.Duration
+	Course     time.Duration
+	Loading    time.Duration
 	// A play ends for everyone this long after the first player finished.
 	FinishGrace time.Duration
 	Result      time.Duration
@@ -68,7 +74,6 @@ type Timings struct {
 var DefaultTimings = Timings{
 	MaxMembers:     5,
 	MinPlayers:     2,
-	LobbyCountdown: 30 * time.Second,
 	SongSelect:     90 * time.Second,
 	SongDraw:       4 * time.Second,
 	Course:         15 * time.Second,

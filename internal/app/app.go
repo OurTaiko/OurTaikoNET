@@ -231,7 +231,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		}
 		a.rooms = multiplay.NewServer(multiplay.ServerConfig{Catalog: newRoomSongs(a.Fanmade, a.Official), Authenticate: gamePlayer(a.Fanmade), Timings: timings})
 		a.roomsAddr = cfg.Multiplay.ListenAddr
-		a.roomsSite = site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
+		a.roomsSite = site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.MinProtocol, MaxProtocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
 		if a.roomsSite.URL == "" {
 			a.roomsSite.URL = cfg.Origin
 		}

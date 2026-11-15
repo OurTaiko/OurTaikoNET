@@ -10,15 +10,18 @@ import (
 // gRPC service on a port of its own, not part of this API. The game asks
 // GET /api/v1/game/multiplay before it connects:
 //
-//	{"url": "https://net.ourtaiko.org", "protocol": 1, "maxMembers": 5}
+//	{"url": "https://net.ourtaiko.org", "protocol": 1, "maxProtocol": 2, "maxMembers": 5}
 //
-// url is the address to dial (https: TLS, http: clear text), protocol the newest version
-// of the protocol the server speaks, maxMembers how many players a room holds. A server that
-// does not run the service answers 404 MULTIPLAY_UNAVAILABLE.
+// url is the address to dial (https: TLS, http: clear text). protocol is the oldest version
+// of the protocol a game may speak: a game that knows only older ones asks its player to
+// update. maxProtocol is the newest the server speaks: a game that knows newer ones joins
+// with this one. maxMembers is how many players a room holds. A server that does not run
+// the service answers 404 MULTIPLAY_UNAVAILABLE.
 type Multiplay struct {
-	URL        string `json:"url"`
-	Protocol   int    `json:"protocol"`
-	MaxMembers int    `json:"maxMembers"`
+	URL         string `json:"url"`
+	Protocol    int    `json:"protocol"`
+	MaxProtocol int    `json:"maxProtocol"`
+	MaxMembers  int    `json:"maxMembers"`
 }
 
 // Option is something a site may have besides its sources and players' routes.

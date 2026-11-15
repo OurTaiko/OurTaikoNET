@@ -232,6 +232,8 @@ type world struct {
 	m       *Manager
 	// draw is what the next draw among n picks returns (modulo n).
 	draw int
+	// protocol is the version the players that join speak (zero: 1).
+	protocol int32
 	// hold keeps what the rooms start in the background (Deps.Go) until settle is called;
 	// otherwise it runs as soon as the operation that started it is over.
 	hold    bool
@@ -316,6 +318,9 @@ func uid(n int) string { return player(n).UserID }
 func (w *world) join(n int, target JoinTarget) (*Room, *fakeConn) {
 	w.t.Helper()
 	conn := &fakeConn{}
+	if target.Protocol == 0 {
+		target.Protocol = w.protocol
+	}
 	room, err := w.m.Join(player(n), target, conn)
 	if err != nil {
 		w.t.Fatalf("player %d could not join: %v", n, err)

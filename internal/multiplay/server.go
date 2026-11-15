@@ -32,6 +32,11 @@ var ErrUnauthenticated = errors.New("game session refused")
 const (
 	// A stream that has not sent `join` after this long is ended.
 	defaultJoinTimeout = 15 * time.Second
+	// A stream nothing has come from for this long is taken for gone: the game pings every
+	// 15 s, so this is two pings missed and then some. A connection that dies without a word
+	// (no signal, a phone switched off) is not found any other way: the server's own HTTP/2
+	// pings only reach the reverse proxy.
+	defaultSilenceTimeout = 40 * time.Second
 	// Messages per second a client may send on average, and how many at once; statuses come
 	// about 5 times a second.
 	defaultMessageRate = 40
@@ -54,21 +59,23 @@ type ServerConfig struct {
 	Timings Timings
 	// Logf is where the server logs; nil is log.Printf.
 	Logf func(format string, args ...any)
-	// JoinTimeout and MessageRate replace the defaults; tests shorten them.
-	JoinTimeout time.Duration
-	MessageRate float64
+	// JoinTimeout, SilenceTimeout and MessageRate replace the defaults; tests shorten them.
+	JoinTimeout    time.Duration
+	SilenceTimeout time.Duration
+	MessageRate    float64
 }
 
 // Server is the Multi-Enso service and its rooms.
 type Server struct {
 	pb.UnimplementedMultiEnsoServer
-	manager      *Manager
-	authenticate Authenticator
-	logf         func(format string, args ...any)
-	joinTimeout  time.Duration
-	messageRate  float64
-	grpc         *grpc.Server
-	listener     net.Listener
+	manager        *Manager
+	authenticate   Authenticator
+	logf           func(format string, args ...any)
+	joinTimeout    time.Duration
+	silenceTimeout time.Duration
+	messageRate    float64
+	grpc           *grpc.Server
+	listener       net.Listener
 	// quit is closed when the server stops: streams that are in no room yet end.
 	quit     chan struct{}
 	stopOnce sync.Once
@@ -77,16 +84,20 @@ type Server struct {
 // NewServer makes the service; Start or Serve makes it listen.
 func NewServer(cfg ServerConfig) *Server {
 	manager := NewManager(Deps{Catalog: cfg.Catalog, Timings: cfg.Timings, Logf: cfg.Logf})
-	s := &Server{manager: manager, authenticate: cfg.Authenticate, logf: manager.deps.Logf, joinTimeout: cfg.JoinTimeout, messageRate: cfg.MessageRate, quit: make(chan struct{})}
+	s := &Server{manager: manager, authenticate: cfg.Authenticate, logf: manager.deps.Logf, joinTimeout: cfg.JoinTimeout, silenceTimeout: cfg.SilenceTimeout, messageRate: cfg.MessageRate, quit: make(chan struct{})}
 	if s.joinTimeout <= 0 {
 		s.joinTimeout = defaultJoinTimeout
+	}
+	if s.silenceTimeout <= 0 {
+		s.silenceTimeout = defaultSilenceTimeout
 	}
 	if s.messageRate <= 0 {
 		s.messageRate = defaultMessageRate
 	}
 	s.grpc = grpc.NewServer(
 		// Streams stay open for a whole session; pings keep NAT and proxies from dropping
-		// idle ones, and find the ones that are gone.
+		// idle ones. They end at the reverse proxy, so a player who is gone is found by
+		// the silence of their stream instead (defaultSilenceTimeout).
 		grpc.KeepaliveParams(keepalive.ServerParameters{Time: 30 * time.Second, Timeout: 10 * time.Second}),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: 10 * time.Second, PermitWithoutStream: true}),
 		grpc.MaxRecvMsgSize(maxMessageBytes),
@@ -174,6 +185,16 @@ type streamConn struct {
 	// The reader's own: who the stream belongs to and, once joined, the room.
 	player Player
 	room   *Room
+
+	// When the stream opened, and how long after that its last message came (the reader
+	// writes it, Connect reads it).
+	opened time.Time
+	heard  atomic.Int64
+}
+
+// silence is how long nothing has come from the player.
+func (c *streamConn) silence() time.Duration {
+	return time.Since(c.opened) - time.Duration(c.heard.Load())
 }
 
 func (c *streamConn) Send(m *pb.ServerMessage) {
@@ -265,7 +286,7 @@ func (s *Server) Connect(stream pb.MultiEnso_ConnectServer) error {
 		return status.Error(codes.Unavailable, "AUTH_UNAVAILABLE")
 	}
 
-	c := &streamConn{out: make(chan *pb.ServerMessage, sendQueue), overflow: make(chan struct{}), player: player}
+	c := &streamConn{out: make(chan *pb.ServerMessage, sendQueue), overflow: make(chan struct{}), player: player, opened: time.Now()}
 	// over: this function has returned or is about to; the writer sends nothing more.
 	var over atomic.Bool
 	defer func() {
@@ -301,6 +322,8 @@ func (s *Server) Connect(stream pb.MultiEnso_ConnectServer) error {
 
 	joinTimer := time.NewTimer(s.joinTimeout)
 	defer joinTimer.Stop()
+	silenceTimer := time.NewTimer(s.silenceTimeout)
+	defer silenceTimer.Stop()
 	quit := s.quit
 	for {
 		select {
@@ -330,6 +353,19 @@ func (s *Server) Connect(stream pb.MultiEnso_ConnectServer) error {
 					return status.Error(codes.DeadlineExceeded, "join was not sent")
 				}
 			}
+		case <-silenceTimer.C:
+			// Ending the stream is all there is to do: the reader then tells the room, which
+			// keeps the place for a while as after any drop, and a game that is there after
+			// all joins again.
+			left := s.silenceTimeout - c.silence()
+			if left <= 0 {
+				// A stream that is ending with `closed` is on its way out already.
+				if ended, _, _ := c.state(); !ended {
+					return status.Error(codes.DeadlineExceeded, "SILENT")
+				}
+				left = s.silenceTimeout
+			}
+			silenceTimer.Reset(left)
 		case <-quit:
 			// A player in a room is told by the room, which is closing. One in no room yet
 			// is not waited for.
@@ -358,6 +394,7 @@ func (s *Server) read(stream pb.MultiEnso_ConnectServer, c *streamConn, joined c
 		if err != nil {
 			return err
 		}
+		c.heard.Store(int64(time.Since(c.opened)))
 		if ended, _, _ := c.state(); ended {
 			continue
 		}
@@ -395,6 +432,7 @@ func (s *Server) join(c *streamConn, join *pb.Join) error {
 		c.Close("UPDATE_REQUIRED", "The server does not speak this version of the protocol yet")
 		return nil
 	}
+	target.Protocol = join.GetProtocol()
 	room, err := s.manager.Join(c.player, target, c)
 	var refused *Error
 	switch {
@@ -449,6 +487,8 @@ func (s *Server) handle(c *streamConn, message *pb.ClientMessage) {
 		err = room.Finish(user, m.Finish.GetFinal(), m.Finish.GetCleared())
 	case *pb.ClientMessage_Stamp:
 		err = room.Stamp(user, m.Stamp.GetStampId())
+	case *pb.ClientMessage_Returned:
+		err = room.Returned(user)
 	default:
 		err = refuse("BAD_REQUEST", "Unknown request")
 	}

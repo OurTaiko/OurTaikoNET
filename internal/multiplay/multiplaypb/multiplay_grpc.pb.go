@@ -8,11 +8,13 @@
 // game sends to /api/v1/game/* (traded for the player's account at the account center).
 //
 // Flow of one round (times are the server's defaults):
-//   LOBBY        members gather (max 5). The host locks the members once there are 2 or more; a
-//                public room locks by itself 30 s after it has 2 members, or at once when full.
+//   LOBBY        members gather (max 5). A round begins in one of two ways only: the host
+//                locks the members once 2 or more are in the room, or the room is full and
+//                every member is in it, when it begins by itself. There is no countdown.
 //   SONG_SELECT  90 s. Each player picks a song of one of the site's sources with the course they
 //                would play, or leaves the song to chance (おまかせ).
-//   SONG_DRAW    4 s. The song is drawn at random from the picks (おまかせ: any playable song).
+//   SONG_DRAW    4 s. The song is drawn at random from the songs that were picked; only when
+//                everyone left it to chance (おまかせ) is it any playable song.
 //   COURSE       15 s. Each player picks one of the drawn song's courses, then is ready. A player
 //                who picks nothing plays the course they asked for when the song has it, else the
 //                nearest one.
@@ -22,6 +24,13 @@
 //                server sends everyone's statuses 4 times a second.
 //   RESULT       once every player has finished (or 30 s after the first one did). The result
 //                stays in the room snapshot; the room goes back to LOBBY with the same members.
+//
+// "In the room" means connected and not `away`. After a play the players are at their own result
+// screens for a while: from the play's start each of them is `away` until their game says
+// `returned`, which it does once the room's screen is up again. A member who is away does not
+// count towards either way of beginning a round, and when the host locks the members those who
+// are still away are taken out of the room (`closed` LEFT_BEHIND). Members whose game speaks
+// protocol 1 are never away.
 //
 // Each player's own score is uploaded by the game as after any play; the room only ranks what the
 // players report.

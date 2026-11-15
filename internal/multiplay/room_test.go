@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
+	"slices"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ func TestQuickMatchStaysOutOfPrivateAndBusyRooms(t *testing.T) {
 		t.Fatal("quick match entered a private room")
 	}
 	_, _ = w.join(3, quick)
-	w.advance(w.m.Timings().LobbyCountdown)
+	w.must(pub.LockMembers(uid(2)))
 	w.phase(pub, pb.Phase_SONG_SELECT)
 	if again, _ := w.join(4, quick); again == pub || again == priv {
 		t.Fatal("quick match entered a room in a round")
@@ -78,12 +79,17 @@ func TestQuickMatchStaysOutOfPrivateAndBusyRooms(t *testing.T) {
 
 func TestPrivateRoomIsEnteredByItsNumberOnly(t *testing.T) {
 	w := newWorld(t, nil)
-	room, conns := w.private(5)
+	room, conns := w.private(4)
+	// Player 4's connection drops: the place is kept, so the room is full with the fifth,
+	// and stays in its lobby as not everyone is in it.
+	room.Disconnected(uid(4), conns[4])
+	w.done()
+	_, fifth := w.join(5, byCode(room.Code()))
 	if got := len(conns[1].room().Members); got != 5 {
 		t.Fatalf("%d members", got)
 	}
 	// Slots are the joined order.
-	for i, m := range conns[5].room().Members {
+	for i, m := range fifth.room().Members {
 		if m.Slot != int32(i) || m.UserId != uid(i+1) {
 			t.Fatalf("member %d: %v", i, m)
 		}
@@ -96,8 +102,6 @@ func TestPrivateRoomIsEnteredByItsNumberOnly(t *testing.T) {
 	w.refused(err, "BAD_ROOM_CODE")
 	_, err = w.m.Join(player(6), byCode("99999"), &fakeConn{})
 	w.refused(err, "ROOM_NOT_FOUND")
-	// A full private room does not start by itself.
-	w.advance(time.Hour)
 	w.phase(room, pb.Phase_LOBBY)
 }
 
@@ -109,40 +113,29 @@ func TestRoomInARoundIsBusy(t *testing.T) {
 	w.refused(err, "ROOM_BUSY")
 }
 
-func TestPublicRoomLocksItselfAfterTheCountdown(t *testing.T) {
-	w := newWorld(t, nil)
-	room, c1 := w.join(1, quick)
-	if c1.room().DeadlineMs != 0 {
-		t.Fatal("the countdown began with one player")
-	}
-	_, _ = w.join(2, quick)
-	want := w.clock.Now().Add(30 * time.Second).UnixMilli()
-	if got := c1.room().DeadlineMs; got != want {
-		t.Fatalf("deadline %d, want %d", got, want)
-	}
-	// A third player does not start it over.
-	w.advance(10 * time.Second)
-	_, _ = w.join(3, quick)
-	if got := c1.room().DeadlineMs; got != want {
-		t.Fatalf("deadline moved to %d", got)
-	}
-	w.advance(20*time.Second - time.Millisecond)
-	w.phase(room, pb.Phase_LOBBY)
-	w.advance(time.Millisecond)
-	w.phase(room, pb.Phase_SONG_SELECT)
-	if snap := c1.room(); snap.Round != 1 || snap.DeadlineMs != w.clock.Now().Add(90*time.Second).UnixMilli() {
-		t.Fatalf("snapshot: %v", snap)
+func TestALobbyHasNoCountdown(t *testing.T) {
+	// Neither kind of room begins a round by itself for having waited, however many players
+	// short of full it has: a public room's host starts it as a private room's does.
+	for name, target := range map[string]JoinTarget{"public": quick, "private": private} {
+		w := newWorld(t, nil)
+		room, c1 := w.join(1, target)
+		for i := 2; i <= 4; i++ {
+			w.join(i, byCode(room.Code()))
+		}
+		w.advance(time.Hour)
+		if snap := c1.room(); snap.Phase != pb.Phase_LOBBY || snap.DeadlineMs != 0 || len(snap.Members) != 4 {
+			t.Fatalf("%s: %v", name, snap)
+		}
+		w.must(room.LockMembers(uid(1)))
+		w.phase(room, pb.Phase_SONG_SELECT)
 	}
 }
 
-func TestCountdownStopsWhenTooFewArePresent(t *testing.T) {
+func TestADroppedPlayerOfALobbyIsNotKept(t *testing.T) {
 	w := newWorld(t, nil)
 	room, c1 := w.join(1, quick)
 	_, c2 := w.join(2, quick)
 	room.Disconnected(uid(2), c2)
-	if c1.room().DeadlineMs != 0 {
-		t.Fatal("the countdown runs with one player present")
-	}
 	w.advance(time.Hour)
 	w.phase(room, pb.Phase_LOBBY)
 	if len(c1.room().Members) != 1 {
@@ -150,7 +143,7 @@ func TestCountdownStopsWhenTooFewArePresent(t *testing.T) {
 	}
 }
 
-func TestPublicRoomLocksAtOnceWhenFull(t *testing.T) {
+func TestAFullRoomBeginsAtOnce(t *testing.T) {
 	w := newWorld(t, nil)
 	room, c1 := w.join(1, quick)
 	for i := 2; i <= 4; i++ {
@@ -169,19 +162,41 @@ func TestPublicRoomLocksAtOnceWhenFull(t *testing.T) {
 	}
 }
 
+func TestAFullPrivateRoomBeginsAtOnceToo(t *testing.T) {
+	w := newWorld(t, nil)
+	room, _ := w.private(4)
+	w.phase(room, pb.Phase_LOBBY)
+	w.join(5, byCode(room.Code()))
+	w.phase(room, pb.Phase_SONG_SELECT)
+}
+
+func TestAFullRoomWaitsForADroppedMember(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.private(4)
+	room.Disconnected(uid(4), conns[4])
+	w.done()
+	// Full, but one of the five is only a place that is being kept.
+	w.join(5, byCode(room.Code()))
+	w.phase(room, pb.Phase_LOBBY)
+	// The moment that player is back, everyone is in the room.
+	w.join(4, byCode(room.Code()))
+	w.phase(room, pb.Phase_SONG_SELECT)
+}
+
 func TestOpenRoomMakesAPrivateRoomPublic(t *testing.T) {
 	w := newWorld(t, nil)
 	room, conns := w.private(2)
 	w.refused(room.OpenRoom(uid(2)), "NOT_HOST")
 	w.must(room.OpenRoom(uid(1)))
-	if snap := conns[2].room(); !snap.Public || snap.DeadlineMs == 0 {
+	if snap := conns[2].room(); !snap.Public || snap.DeadlineMs != 0 {
 		t.Fatalf("snapshot: %v", snap)
 	}
 	if got, _ := w.join(3, quick); got != room {
 		t.Fatal("quick match did not find the opened room")
 	}
-	w.advance(w.m.Timings().LobbyCountdown)
-	w.phase(room, pb.Phase_SONG_SELECT)
+	// Being public does not begin a round.
+	w.advance(time.Hour)
+	w.phase(room, pb.Phase_LOBBY)
 }
 
 func TestHostPassesOnAndAnEmptyRoomCloses(t *testing.T) {
@@ -475,22 +490,341 @@ func TestOmakaseDrawsAnySong(t *testing.T) {
 	}
 }
 
+func TestASongSomebodyPickedGoesBeforeChance(t *testing.T) {
+	// Whatever the draw says, and however many leave it to chance.
+	for draw := 0; draw < 3; draw++ {
+		w := newWorld(t, nil)
+		room, conns := w.private(3)
+		w.must(room.LockMembers(uid(1)))
+		w.catalog.onRandom = func() { t.Error("the catalog was asked for any song") }
+		w.draw = draw
+		w.must(room.PickSong(uid(1), "", "", "Normal"))
+		w.must(room.PickSong(uid(2), songA.Source, songA.ChartID, "Hard"))
+		w.must(room.PickSong(uid(3), "", "", ""))
+		snap := conns[1].room()
+		if snap.Phase != pb.Phase_SONG_DRAW || snap.Song.ChartId != songA.ChartID || snap.SongPickedBy != uid(2) {
+			t.Fatalf("draw %d: %v", draw, snap)
+		}
+		// おまかせ still says which course: player 1 asked for Normal, player 3 for nothing.
+		if snap.Members[0].Course != "Normal" || snap.Members[1].Course != "Hard" || snap.Members[2].Course != "Oni" {
+			t.Fatalf("draw %d: members: %v", draw, snap.Members)
+		}
+	}
+}
+
+func TestTheDrawIsAmongTheSongsOnly(t *testing.T) {
+	// Two songs and one おまかせ: each song has the same chance, in the members' order.
+	for draw, want := range []*Song{songA, songC, songA} {
+		w := newWorld(t, nil)
+		room, conns := w.private(3)
+		w.must(room.LockMembers(uid(1)))
+		w.draw = draw
+		w.must(room.PickSong(uid(1), songA.Source, songA.ChartID, ""))
+		w.must(room.PickSong(uid(2), "", "", ""))
+		w.must(room.PickSong(uid(3), songC.Source, songC.ChartID, ""))
+		if snap := conns[1].room(); snap.Song.ChartId != want.ChartID || snap.SongPickedBy == uid(2) || snap.SongPickedBy == "" {
+			t.Fatalf("draw %d: %v", draw, snap)
+		}
+	}
+}
+
+func TestAPlayerWhoDidNotPickInTimeDoesNotBringChance(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.private(2)
+	w.must(room.LockMembers(uid(1)))
+	w.catalog.onRandom = func() { t.Error("the catalog was asked for any song") }
+	w.draw = 1
+	w.must(room.PickSong(uid(1), songA.Source, songA.ChartID, "Oni"))
+	// Player 2 never picks: when the time is up, player 1's song is the round's.
+	w.advance(w.m.Timings().SongSelect)
+	if snap := conns[2].room(); snap.Phase != pb.Phase_SONG_DRAW || snap.Song.ChartId != songA.ChartID || snap.SongPickedBy != uid(1) {
+		t.Fatalf("snapshot: %v", snap)
+	}
+}
+
 func TestOmakaseKeepsTheCourseAskedFor(t *testing.T) {
 	w := newWorld(t, nil)
 	room, conns := w.private(2)
 	w.must(room.LockMembers(uid(1)))
 	w.catalog.random = songA
-	// Player 2's おまかせ wins over player 1's song.
-	w.draw = 1
-	w.must(room.PickSong(uid(1), songB.Source, songB.ChartID, "Edit"))
+	// Both leave it to chance.
+	w.must(room.PickSong(uid(1), "", "", "Edit"))
 	w.must(room.PickSong(uid(2), "", "", "Normal"))
 	snap := conns[1].room()
 	if snap.Song.ChartId != songA.ChartID || snap.SongPickedBy != "" {
 		t.Fatalf("snapshot: %v", snap)
 	}
 	// Alpha has Normal; it has no Edit, so player 1 gets Oni.
-	if snap.Members[0].Course != "Oni" || snap.Members[1].Course != "Normal" || snap.Members[0].PickedChartId != songB.ChartID {
+	if snap.Members[0].Course != "Oni" || snap.Members[1].Course != "Normal" || snap.Members[0].PickedChartId != "" {
 		t.Fatalf("members: %v", snap.Members)
+	}
+}
+
+/* ---------- coming back to the room after a play ---------- */
+
+// played brings a private room of two to the result of its first round.
+func (w *world) played() (*Room, []*fakeConn) {
+	w.t.Helper()
+	room, conns := w.playing()
+	w.must(room.Finish(uid(1), nil, true))
+	w.must(room.Finish(uid(2), nil, true))
+	w.phase(room, pb.Phase_RESULT)
+	return room, conns
+}
+
+func away(room *pb.Room) (out []bool) {
+	for _, m := range room.Members {
+		out = append(out, m.Away)
+	}
+	return out
+}
+
+func TestWhoIsAwayIsShownUntilTheirGameSaysTheyAreBack(t *testing.T) {
+	w := newWorld(t, nil)
+	w.protocol = 2
+	room, conns := w.playing()
+	// From the play's start: everyone in it is away from the room's screen.
+	if snap := conns[1].room(); !slices.Equal(away(snap), []bool{true, true}) {
+		t.Fatalf("in the play: %v", snap)
+	}
+	w.must(room.Finish(uid(1), nil, true))
+	w.must(room.Finish(uid(2), nil, true))
+	if snap := conns[1].room(); snap.Phase != pb.Phase_RESULT || !slices.Equal(away(snap), []bool{true, true}) {
+		t.Fatalf("the result: %v", snap)
+	}
+	w.advance(w.m.Timings().Result)
+	// The host is back; player 2 is still looking at their own result.
+	w.must(room.Returned(uid(1)))
+	if snap := conns[2].room(); snap.Phase != pb.Phase_LOBBY || !slices.Equal(away(snap), []bool{false, true}) {
+		t.Fatalf("the host is back: %v", snap)
+	}
+	// Saying it again changes nothing.
+	n := conns[1].snapshots()
+	w.must(room.Returned(uid(1)))
+	if conns[1].snapshots() != n {
+		t.Fatal("a second `returned` was sent on as a change")
+	}
+	w.must(room.Returned(uid(2)))
+	if snap := conns[1].room(); !slices.Equal(away(snap), []bool{false, false}) {
+		t.Fatalf("everyone is back: %v", snap)
+	}
+	// However long it takes, nothing begins by itself, and nobody is taken out for it.
+	w.advance(time.Hour)
+	if snap := conns[1].room(); snap.Phase != pb.Phase_LOBBY || len(snap.Members) != 2 {
+		t.Fatalf("an hour later: %v", snap)
+	}
+}
+
+func TestTheHostCannotStartWithTooFewInTheRoom(t *testing.T) {
+	w := newWorld(t, nil)
+	w.protocol = 2
+	room, conns := w.played()
+	w.advance(w.m.Timings().Result)
+	w.must(room.Returned(uid(1)))
+	// Two members, but only the host is in the room: player 2 is at their result screen.
+	w.refused(room.LockMembers(uid(1)), "NOT_ENOUGH_PLAYERS")
+	if snap := conns[2].room(); snap.Phase != pb.Phase_LOBBY || len(snap.Members) != 2 || conns[2].closedCode() != "" {
+		t.Fatalf("a refused start took someone out: %v", snap)
+	}
+	w.must(room.Returned(uid(2)))
+	w.must(room.LockMembers(uid(1)))
+	w.phase(room, pb.Phase_SONG_SELECT)
+}
+
+// roundOfThree plays a round in a private room of three (protocol 2) to its result and on
+// to the lobby.
+func (w *world) roundOfThree() (*Room, []*fakeConn) {
+	w.t.Helper()
+	w.protocol = 2
+	room, conns := w.private(3)
+	w.must(room.LockMembers(uid(1)))
+	w.must(room.PickSong(uid(1), songA.Source, songA.ChartID, "Oni"))
+	w.must(room.PickSong(uid(2), "", "", ""))
+	w.must(room.PickSong(uid(3), "", "", ""))
+	w.advance(w.m.Timings().SongDraw)
+	for n := 1; n <= 3; n++ {
+		w.must(room.SetReady(uid(n), true))
+	}
+	for n := 1; n <= 3; n++ {
+		w.must(room.Loaded(uid(n), true))
+	}
+	for n := 1; n <= 3; n++ {
+		w.must(room.Finish(uid(n), nil, true))
+	}
+	w.phase(room, pb.Phase_RESULT)
+	w.advance(w.m.Timings().Result)
+	w.phase(room, pb.Phase_LOBBY)
+	return room, conns
+}
+
+func TestTheHostsStartLeavesBehindWhoeverIsNotBack(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.roundOfThree()
+	w.must(room.Returned(uid(1)))
+	w.must(room.Returned(uid(2)))
+	// Player 3 is still at their own result screen when the host starts.
+	w.must(room.LockMembers(uid(1)))
+	if conns[3].closedCode() != "LEFT_BEHIND" || room.Has(uid(3)) {
+		t.Fatalf("player 3: closed %q, in the room: %v", conns[3].closedCode(), room.Has(uid(3)))
+	}
+	snap := conns[1].room()
+	if snap.Phase != pb.Phase_SONG_SELECT || snap.Round != 2 || len(snap.Members) != 2 || !slices.Equal(away(snap), []bool{false, false}) {
+		t.Fatalf("the next round: %v", snap)
+	}
+	if conns[1].closedCode() != "" || conns[2].closedCode() != "" {
+		t.Fatal("a player who was back was taken out")
+	}
+	// The place is free: the player may come in again once the room is back in its lobby.
+	_, err := w.m.Join(player(3), byCode(room.Code()), &fakeConn{})
+	w.refused(err, "ROOM_BUSY")
+}
+
+func TestTheHostWhoStartsIsInTheRoom(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.roundOfThree()
+	// The host's start arrives before their game's `returned` does: pressing start is being
+	// at the room's screen.
+	w.must(room.Returned(uid(2)))
+	w.must(room.LockMembers(uid(1)))
+	if conns[1].closedCode() != "" || !room.Has(uid(1)) || conns[3].closedCode() != "LEFT_BEHIND" {
+		t.Fatalf("host closed %q, player 3 closed %q", conns[1].closedCode(), conns[3].closedCode())
+	}
+	w.phase(room, pb.Phase_SONG_SELECT)
+}
+
+func TestAPlaceKeptForAPlayerAtTheirResultIsLeftBehindToo(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.roundOfThree()
+	w.must(room.Returned(uid(1)))
+	w.must(room.Returned(uid(2)))
+	// Player 3's connection dropped at their result screen; the place is still being kept.
+	room.Disconnected(uid(3), conns[3])
+	w.done()
+	w.must(room.LockMembers(uid(1)))
+	if room.Has(uid(3)) || len(conns[1].room().Members) != 2 {
+		t.Fatal("the place of a player who was not back was kept into the next round")
+	}
+}
+
+func TestAPlayerWhoComesBackDuringThePlayIsInTheRoom(t *testing.T) {
+	w := newWorld(t, nil)
+	w.protocol = 2
+	room, conns := w.playing()
+	// Player 1 finishes early, looks at the result and is back in the room while 2 plays on.
+	w.must(room.Finish(uid(1), nil, true))
+	w.must(room.Returned(uid(1)))
+	w.must(room.Finish(uid(2), nil, true))
+	if snap := conns[1].room(); snap.Phase != pb.Phase_RESULT || !slices.Equal(away(snap), []bool{false, true}) {
+		t.Fatalf("the result: %v", snap)
+	}
+}
+
+// fullRoundOfFive plays a round in a full private room (protocol 2) to its result.
+func (w *world) fullRoundOfFive() (*Room, []*fakeConn) {
+	w.t.Helper()
+	w.protocol = 2
+	// Filling the room begins the round.
+	room, conns := w.private(5)
+	w.phase(room, pb.Phase_SONG_SELECT)
+	w.must(room.PickSong(uid(1), songA.Source, songA.ChartID, "Oni"))
+	for n := 2; n <= 5; n++ {
+		w.must(room.PickSong(uid(n), "", "", ""))
+	}
+	w.advance(w.m.Timings().SongDraw)
+	for n := 1; n <= 5; n++ {
+		w.must(room.SetReady(uid(n), true))
+	}
+	for n := 1; n <= 5; n++ {
+		w.must(room.Loaded(uid(n), true))
+	}
+	for n := 1; n <= 5; n++ {
+		w.must(room.Finish(uid(n), nil, true))
+	}
+	w.phase(room, pb.Phase_RESULT)
+	return room, conns
+}
+
+func TestAFullRoomBeginsItsNextRoundOnceEveryoneIsBack(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.fullRoundOfFive()
+	w.advance(w.m.Timings().Result)
+	for n := 1; n <= 4; n++ {
+		w.must(room.Returned(uid(n)))
+	}
+	// Full, but player 5 is at their result screen: that is not being in the room.
+	w.advance(time.Hour)
+	if snap := conns[1].room(); snap.Phase != pb.Phase_LOBBY || snap.Round != 1 {
+		t.Fatalf("four of five are back: %v", snap)
+	}
+	w.must(room.Returned(uid(5)))
+	if snap := conns[5].room(); snap.Phase != pb.Phase_SONG_SELECT || snap.Round != 2 || len(snap.Members) != 5 {
+		t.Fatalf("everyone is back: %v", snap)
+	}
+}
+
+func TestAFullRoomWhoseMembersAreAllBackBeforeTheLobbyBeginsThere(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.fullRoundOfFive()
+	// Everyone is back while the room still shows the result: the round begins when it is
+	// back in its lobby, not before.
+	for n := 1; n <= 5; n++ {
+		w.must(room.Returned(uid(n)))
+	}
+	w.phase(room, pb.Phase_RESULT)
+	w.advance(w.m.Timings().Result)
+	if snap := conns[1].room(); snap.Phase != pb.Phase_SONG_SELECT || snap.Round != 2 {
+		t.Fatalf("after the result: %v", snap)
+	}
+}
+
+func TestAGameOfProtocolOneIsNeverAway(t *testing.T) {
+	w := newWorld(t, nil)
+	// Player 1's game says when it is back; player 2's is an older one that cannot.
+	room, first := w.join(1, JoinTarget{Kind: CreatePrivate, Protocol: 2})
+	_, second := w.join(2, JoinTarget{Kind: ByCode, Code: room.Code(), Protocol: 1})
+	w.must(room.LockMembers(uid(1)))
+	w.must(room.PickSong(uid(1), songA.Source, songA.ChartID, "Oni"))
+	w.must(room.PickSong(uid(2), "", "", ""))
+	w.advance(w.m.Timings().SongDraw)
+	w.must(room.SetReady(uid(1), true))
+	w.must(room.SetReady(uid(2), true))
+	w.must(room.Loaded(uid(1), true))
+	w.must(room.Loaded(uid(2), true))
+	w.must(room.Finish(uid(1), nil, true))
+	w.must(room.Finish(uid(2), nil, true))
+	if snap := second.room(); snap.Phase != pb.Phase_RESULT || !slices.Equal(away(snap), []bool{true, false}) {
+		t.Fatalf("the result: %v", snap)
+	}
+	w.advance(w.m.Timings().Result)
+	// The older game counts as in the room, and is not left behind.
+	w.must(room.LockMembers(uid(1)))
+	if second.closedCode() != "" || first.room().Phase != pb.Phase_SONG_SELECT || len(first.room().Members) != 2 {
+		t.Fatalf("the older game: closed %q, room %v", second.closedCode(), first.room())
+	}
+}
+
+func TestAnOlderGameThatTakesThePlaceOverIsNotAway(t *testing.T) {
+	w := newWorld(t, nil)
+	w.protocol = 2
+	room, conns := w.played()
+	w.must(room.Returned(uid(1)))
+	// The same account comes in from a game that cannot say when it is back.
+	w.join(2, JoinTarget{Kind: ByCode, Code: room.Code(), Protocol: 1})
+	if snap := conns[1].room(); !slices.Equal(away(snap), []bool{false, false}) {
+		t.Fatalf("snapshot: %v", snap)
+	}
+}
+
+func TestOlderGamesAreNeverLeftBehind(t *testing.T) {
+	w := newWorld(t, nil)
+	room, conns := w.played()
+	if snap := conns[1].room(); !slices.Equal(away(snap), []bool{false, false}) {
+		t.Fatalf("the result: %v", snap)
+	}
+	w.advance(w.m.Timings().Result)
+	w.must(room.LockMembers(uid(1)))
+	if len(conns[1].room().Members) != 2 {
+		t.Fatal("an older game was left behind")
 	}
 }
 

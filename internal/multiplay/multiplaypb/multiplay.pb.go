@@ -8,11 +8,13 @@
 // game sends to /api/v1/game/* (traded for the player's account at the account center).
 //
 // Flow of one round (times are the server's defaults):
-//   LOBBY        members gather (max 5). The host locks the members once there are 2 or more; a
-//                public room locks by itself 30 s after it has 2 members, or at once when full.
+//   LOBBY        members gather (max 5). A round begins in one of two ways only: the host
+//                locks the members once 2 or more are in the room, or the room is full and
+//                every member is in it, when it begins by itself. There is no countdown.
 //   SONG_SELECT  90 s. Each player picks a song of one of the site's sources with the course they
 //                would play, or leaves the song to chance (おまかせ).
-//   SONG_DRAW    4 s. The song is drawn at random from the picks (おまかせ: any playable song).
+//   SONG_DRAW    4 s. The song is drawn at random from the songs that were picked; only when
+//                everyone left it to chance (おまかせ) is it any playable song.
 //   COURSE       15 s. Each player picks one of the drawn song's courses, then is ready. A player
 //                who picks nothing plays the course they asked for when the song has it, else the
 //                nearest one.
@@ -22,6 +24,13 @@
 //                server sends everyone's statuses 4 times a second.
 //   RESULT       once every player has finished (or 30 s after the first one did). The result
 //                stays in the room snapshot; the room goes back to LOBBY with the same members.
+//
+// "In the room" means connected and not `away`. After a play the players are at their own result
+// screens for a while: from the play's start each of them is `away` until their game says
+// `returned`, which it does once the room's screen is up again. A member who is away does not
+// count towards either way of beginning a round, and when the host locks the members those who
+// are still away are taken out of the room (`closed` LEFT_BEHIND). Members whose game speaks
+// protocol 1 are never away.
 //
 // Each player's own score is uploaded by the game as after any play; the room only ranks what the
 // players report.
@@ -184,6 +193,7 @@ type ClientMessage struct {
 	//	*ClientMessage_Stamp
 	//	*ClientMessage_Ping
 	//	*ClientMessage_Kick
+	//	*ClientMessage_Returned
 	Kind          isClientMessage_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -343,6 +353,15 @@ func (x *ClientMessage) GetKick() *Kick {
 	return nil
 }
 
+func (x *ClientMessage) GetReturned() *Returned {
+	if x != nil {
+		if x, ok := x.Kind.(*ClientMessage_Returned); ok {
+			return x.Returned
+		}
+	}
+	return nil
+}
+
 type isClientMessage_Kind interface {
 	isClientMessage_Kind()
 }
@@ -399,6 +418,10 @@ type ClientMessage_Kick struct {
 	Kick *Kick `protobuf:"bytes,13,opt,name=kick,proto3,oneof"`
 }
 
+type ClientMessage_Returned struct {
+	Returned *Returned `protobuf:"bytes,14,opt,name=returned,proto3,oneof"`
+}
+
 func (*ClientMessage_Join) isClientMessage_Kind() {}
 
 func (*ClientMessage_Leave) isClientMessage_Kind() {}
@@ -425,6 +448,8 @@ func (*ClientMessage_Ping) isClientMessage_Kind() {}
 
 func (*ClientMessage_Kick) isClientMessage_Kind() {}
 
+func (*ClientMessage_Returned) isClientMessage_Kind() {}
+
 type Join struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Target:
@@ -433,7 +458,7 @@ type Join struct {
 	//	*Join_CreatePrivate
 	//	*Join_RoomCode
 	Target isJoin_Target `protobuf_oneof:"target"`
-	// Protocol version the client speaks (currently 1).
+	// Protocol version the client speaks (currently 2; 1 has no `returned` and no `away`).
 	Protocol      int32 `protobuf:"varint,4,opt,name=protocol,proto3" json:"protocol,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -643,7 +668,8 @@ func (*Leave) Descriptor() ([]byte, []int) {
 	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{4}
 }
 
-// Host only, LOBBY only: the members are settled and the round begins.
+// Host only, LOBBY only: the round begins with the members who are in the room (2 or more);
+// those who are away are taken out of it.
 type LockMembers struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1222,6 +1248,44 @@ func (x *Ping) GetClientTimeMs() int64 {
 	return 0
 }
 
+// Protocol 2. The player is back at the room's screen after a play. Send it while the player's
+// own member is `away` and that screen is up; it may be sent again, and in any phase.
+type Returned struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Returned) Reset() {
+	*x = Returned{}
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Returned) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Returned) ProtoMessage() {}
+
+func (x *Returned) ProtoReflect() protoreflect.Message {
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Returned.ProtoReflect.Descriptor instead.
+func (*Returned) Descriptor() ([]byte, []int) {
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{16}
+}
+
 type ServerMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Kind:
@@ -1241,7 +1305,7 @@ type ServerMessage struct {
 
 func (x *ServerMessage) Reset() {
 	*x = ServerMessage{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[16]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1253,7 +1317,7 @@ func (x *ServerMessage) String() string {
 func (*ServerMessage) ProtoMessage() {}
 
 func (x *ServerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[16]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,7 +1330,7 @@ func (x *ServerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerMessage.ProtoReflect.Descriptor instead.
 func (*ServerMessage) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{16}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ServerMessage) GetKind() isServerMessage_Kind {
@@ -1411,7 +1475,7 @@ type Welcome struct {
 
 func (x *Welcome) Reset() {
 	*x = Welcome{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[17]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1423,7 +1487,7 @@ func (x *Welcome) String() string {
 func (*Welcome) ProtoMessage() {}
 
 func (x *Welcome) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[17]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1436,7 +1500,7 @@ func (x *Welcome) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Welcome.ProtoReflect.Descriptor instead.
 func (*Welcome) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{17}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Welcome) GetUserId() string {
@@ -1487,7 +1551,7 @@ type Room struct {
 
 func (x *Room) Reset() {
 	*x = Room{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[18]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1499,7 +1563,7 @@ func (x *Room) String() string {
 func (*Room) ProtoMessage() {}
 
 func (x *Room) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[18]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1512,7 +1576,7 @@ func (x *Room) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Room.ProtoReflect.Descriptor instead.
 func (*Room) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{18}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Room) GetCode() string {
@@ -1624,15 +1688,17 @@ type Member struct {
 	Ready  bool   `protobuf:"varint,10,opt,name=ready,proto3" json:"ready,omitempty"`
 	Loaded bool   `protobuf:"varint,11,opt,name=loaded,proto3" json:"loaded,omitempty"`
 	// In the current round (false for a player dropped while loading).
-	Playing       bool `protobuf:"varint,12,opt,name=playing,proto3" json:"playing,omitempty"`
-	Finished      bool `protobuf:"varint,13,opt,name=finished,proto3" json:"finished,omitempty"`
+	Playing  bool `protobuf:"varint,12,opt,name=playing,proto3" json:"playing,omitempty"`
+	Finished bool `protobuf:"varint,13,opt,name=finished,proto3" json:"finished,omitempty"`
+	// Has not come back to the room's screen since the last play began (protocol 2 members only).
+	Away          bool `protobuf:"varint,14,opt,name=away,proto3" json:"away,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Member) Reset() {
 	*x = Member{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[19]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1644,7 +1710,7 @@ func (x *Member) String() string {
 func (*Member) ProtoMessage() {}
 
 func (x *Member) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[19]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1657,7 +1723,7 @@ func (x *Member) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Member.ProtoReflect.Descriptor instead.
 func (*Member) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{19}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Member) GetUserId() string {
@@ -1751,6 +1817,13 @@ func (x *Member) GetFinished() bool {
 	return false
 }
 
+func (x *Member) GetAway() bool {
+	if x != nil {
+		return x.Away
+	}
+	return false
+}
+
 type Song struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Source   string                 `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
@@ -1768,7 +1841,7 @@ type Song struct {
 
 func (x *Song) Reset() {
 	*x = Song{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[20]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1780,7 +1853,7 @@ func (x *Song) String() string {
 func (*Song) ProtoMessage() {}
 
 func (x *Song) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[20]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1793,7 +1866,7 @@ func (x *Song) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Song.ProtoReflect.Descriptor instead.
 func (*Song) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{20}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Song) GetSource() string {
@@ -1849,7 +1922,7 @@ type Course struct {
 
 func (x *Course) Reset() {
 	*x = Course{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[21]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +1934,7 @@ func (x *Course) String() string {
 func (*Course) ProtoMessage() {}
 
 func (x *Course) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[21]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +1947,7 @@ func (x *Course) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Course.ProtoReflect.Descriptor instead.
 func (*Course) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{21}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Course) GetCourse() string {
@@ -1900,7 +1973,7 @@ type StartPlay struct {
 
 func (x *StartPlay) Reset() {
 	*x = StartPlay{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[22]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1912,7 +1985,7 @@ func (x *StartPlay) String() string {
 func (*StartPlay) ProtoMessage() {}
 
 func (x *StartPlay) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[22]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1925,7 +1998,7 @@ func (x *StartPlay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartPlay.ProtoReflect.Descriptor instead.
 func (*StartPlay) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{22}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *StartPlay) GetRound() int32 {
@@ -1947,7 +2020,7 @@ type MemberStatus struct {
 
 func (x *MemberStatus) Reset() {
 	*x = MemberStatus{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[23]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1959,7 +2032,7 @@ func (x *MemberStatus) String() string {
 func (*MemberStatus) ProtoMessage() {}
 
 func (x *MemberStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[23]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1972,7 +2045,7 @@ func (x *MemberStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemberStatus.ProtoReflect.Descriptor instead.
 func (*MemberStatus) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{23}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *MemberStatus) GetUserId() string {
@@ -2012,7 +2085,7 @@ type PlayStatuses struct {
 
 func (x *PlayStatuses) Reset() {
 	*x = PlayStatuses{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[24]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2024,7 +2097,7 @@ func (x *PlayStatuses) String() string {
 func (*PlayStatuses) ProtoMessage() {}
 
 func (x *PlayStatuses) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[24]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2037,7 +2110,7 @@ func (x *PlayStatuses) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayStatuses.ProtoReflect.Descriptor instead.
 func (*PlayStatuses) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{24}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *PlayStatuses) GetMembers() []*MemberStatus {
@@ -2074,7 +2147,7 @@ type PlayerResult struct {
 
 func (x *PlayerResult) Reset() {
 	*x = PlayerResult{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[25]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2086,7 +2159,7 @@ func (x *PlayerResult) String() string {
 func (*PlayerResult) ProtoMessage() {}
 
 func (x *PlayerResult) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[25]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2099,7 +2172,7 @@ func (x *PlayerResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerResult.ProtoReflect.Descriptor instead.
 func (*PlayerResult) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{25}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PlayerResult) GetUserId() string {
@@ -2208,7 +2281,7 @@ type PlayResult struct {
 
 func (x *PlayResult) Reset() {
 	*x = PlayResult{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[26]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2220,7 +2293,7 @@ func (x *PlayResult) String() string {
 func (*PlayResult) ProtoMessage() {}
 
 func (x *PlayResult) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[26]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2233,7 +2306,7 @@ func (x *PlayResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayResult.ProtoReflect.Descriptor instead.
 func (*PlayResult) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{26}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PlayResult) GetRound() int32 {
@@ -2288,7 +2361,7 @@ type StampSent struct {
 
 func (x *StampSent) Reset() {
 	*x = StampSent{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[27]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2300,7 +2373,7 @@ func (x *StampSent) String() string {
 func (*StampSent) ProtoMessage() {}
 
 func (x *StampSent) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[27]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2313,7 +2386,7 @@ func (x *StampSent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StampSent.ProtoReflect.Descriptor instead.
 func (*StampSent) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{27}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StampSent) GetUserId() string {
@@ -2340,7 +2413,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[28]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2352,7 +2425,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[28]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2365,7 +2438,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{28}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Pong) GetClientTimeMs() int64 {
@@ -2394,7 +2467,7 @@ type Notice struct {
 
 func (x *Notice) Reset() {
 	*x = Notice{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[29]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2406,7 +2479,7 @@ func (x *Notice) String() string {
 func (*Notice) ProtoMessage() {}
 
 func (x *Notice) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[29]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2419,7 +2492,7 @@ func (x *Notice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Notice.ProtoReflect.Descriptor instead.
 func (*Notice) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{29}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Notice) GetCode() string {
@@ -2447,7 +2520,7 @@ type Closed struct {
 
 func (x *Closed) Reset() {
 	*x = Closed{}
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[30]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2459,7 +2532,7 @@ func (x *Closed) String() string {
 func (*Closed) ProtoMessage() {}
 
 func (x *Closed) ProtoReflect() protoreflect.Message {
-	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[30]
+	mi := &file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2472,7 +2545,7 @@ func (x *Closed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Closed.ProtoReflect.Descriptor instead.
 func (*Closed) Descriptor() ([]byte, []int) {
-	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{30}
+	return file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Closed) GetCode() string {
@@ -2493,7 +2566,7 @@ var File_ourtaiko_multiplay_v1_multiplay_proto protoreflect.FileDescriptor
 
 const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	"\n" +
-	"%ourtaiko/multiplay/v1/multiplay.proto\x12\x15ourtaiko.multiplay.v1\"\xa4\x06\n" +
+	"%ourtaiko/multiplay/v1/multiplay.proto\x12\x15ourtaiko.multiplay.v1\"\xe3\x06\n" +
 	"\rClientMessage\x121\n" +
 	"\x04join\x18\x01 \x01(\v2\x1b.ourtaiko.multiplay.v1.JoinH\x00R\x04join\x124\n" +
 	"\x05leave\x18\x02 \x01(\v2\x1c.ourtaiko.multiplay.v1.LeaveH\x00R\x05leave\x12G\n" +
@@ -2509,7 +2582,8 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	" \x01(\v2!.ourtaiko.multiplay.v1.FinishPlayH\x00R\x06finish\x128\n" +
 	"\x05stamp\x18\v \x01(\v2 .ourtaiko.multiplay.v1.SendStampH\x00R\x05stamp\x121\n" +
 	"\x04ping\x18\f \x01(\v2\x1b.ourtaiko.multiplay.v1.PingH\x00R\x04ping\x121\n" +
-	"\x04kick\x18\r \x01(\v2\x1b.ourtaiko.multiplay.v1.KickH\x00R\x04kickB\x06\n" +
+	"\x04kick\x18\r \x01(\v2\x1b.ourtaiko.multiplay.v1.KickH\x00R\x04kick\x12=\n" +
+	"\breturned\x18\x0e \x01(\v2\x1f.ourtaiko.multiplay.v1.ReturnedH\x00R\breturnedB\x06\n" +
 	"\x04kind\"\xe0\x01\n" +
 	"\x04Join\x12D\n" +
 	"\vquick_match\x18\x01 \x01(\v2!.ourtaiko.multiplay.v1.QuickMatchH\x00R\n" +
@@ -2556,7 +2630,9 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	"\tSendStamp\x12\x19\n" +
 	"\bstamp_id\x18\x01 \x01(\x05R\astampId\",\n" +
 	"\x04Ping\x12$\n" +
-	"\x0eclient_time_ms\x18\x01 \x01(\x03R\fclientTimeMs\"\xeb\x03\n" +
+	"\x0eclient_time_ms\x18\x01 \x01(\x03R\fclientTimeMs\"\n" +
+	"\n" +
+	"\bReturned\"\xeb\x03\n" +
 	"\rServerMessage\x12:\n" +
 	"\awelcome\x18\x01 \x01(\v2\x1e.ourtaiko.multiplay.v1.WelcomeH\x00R\awelcome\x121\n" +
 	"\x04room\x18\x02 \x01(\v2\x1b.ourtaiko.multiplay.v1.RoomH\x00R\x04room\x12A\n" +
@@ -2589,7 +2665,7 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	"\x0esong_picked_by\x18\v \x01(\tR\fsongPickedBy\x129\n" +
 	"\x06result\x18\f \x01(\v2!.ourtaiko.multiplay.v1.PlayResultR\x06result\x12\x1f\n" +
 	"\vmin_players\x18\r \x01(\x05R\n" +
-	"minPlayers\"\xef\x02\n" +
+	"minPlayers\"\x83\x03\n" +
 	"\x06Member\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\bnickname\x18\x02 \x01(\tR\bnickname\x12\x1d\n" +
@@ -2605,7 +2681,8 @@ const file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc = "" +
 	" \x01(\bR\x05ready\x12\x16\n" +
 	"\x06loaded\x18\v \x01(\bR\x06loaded\x12\x18\n" +
 	"\aplaying\x18\f \x01(\bR\aplaying\x12\x1a\n" +
-	"\bfinished\x18\r \x01(\bR\bfinished\"\xc3\x01\n" +
+	"\bfinished\x18\r \x01(\bR\bfinished\x12\x12\n" +
+	"\x04away\x18\x0e \x01(\bR\x04away\"\xc3\x01\n" +
 	"\x04Song\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x19\n" +
 	"\bchart_id\x18\x02 \x01(\tR\achartId\x12\x14\n" +
@@ -2697,7 +2774,7 @@ func file_ourtaiko_multiplay_v1_multiplay_proto_rawDescGZIP() []byte {
 }
 
 var file_ourtaiko_multiplay_v1_multiplay_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_ourtaiko_multiplay_v1_multiplay_proto_goTypes = []any{
 	(Phase)(0),            // 0: ourtaiko.multiplay.v1.Phase
 	(Award)(0),            // 1: ourtaiko.multiplay.v1.Award
@@ -2717,21 +2794,22 @@ var file_ourtaiko_multiplay_v1_multiplay_proto_goTypes = []any{
 	(*FinishPlay)(nil),    // 15: ourtaiko.multiplay.v1.FinishPlay
 	(*SendStamp)(nil),     // 16: ourtaiko.multiplay.v1.SendStamp
 	(*Ping)(nil),          // 17: ourtaiko.multiplay.v1.Ping
-	(*ServerMessage)(nil), // 18: ourtaiko.multiplay.v1.ServerMessage
-	(*Welcome)(nil),       // 19: ourtaiko.multiplay.v1.Welcome
-	(*Room)(nil),          // 20: ourtaiko.multiplay.v1.Room
-	(*Member)(nil),        // 21: ourtaiko.multiplay.v1.Member
-	(*Song)(nil),          // 22: ourtaiko.multiplay.v1.Song
-	(*Course)(nil),        // 23: ourtaiko.multiplay.v1.Course
-	(*StartPlay)(nil),     // 24: ourtaiko.multiplay.v1.StartPlay
-	(*MemberStatus)(nil),  // 25: ourtaiko.multiplay.v1.MemberStatus
-	(*PlayStatuses)(nil),  // 26: ourtaiko.multiplay.v1.PlayStatuses
-	(*PlayerResult)(nil),  // 27: ourtaiko.multiplay.v1.PlayerResult
-	(*PlayResult)(nil),    // 28: ourtaiko.multiplay.v1.PlayResult
-	(*StampSent)(nil),     // 29: ourtaiko.multiplay.v1.StampSent
-	(*Pong)(nil),          // 30: ourtaiko.multiplay.v1.Pong
-	(*Notice)(nil),        // 31: ourtaiko.multiplay.v1.Notice
-	(*Closed)(nil),        // 32: ourtaiko.multiplay.v1.Closed
+	(*Returned)(nil),      // 18: ourtaiko.multiplay.v1.Returned
+	(*ServerMessage)(nil), // 19: ourtaiko.multiplay.v1.ServerMessage
+	(*Welcome)(nil),       // 20: ourtaiko.multiplay.v1.Welcome
+	(*Room)(nil),          // 21: ourtaiko.multiplay.v1.Room
+	(*Member)(nil),        // 22: ourtaiko.multiplay.v1.Member
+	(*Song)(nil),          // 23: ourtaiko.multiplay.v1.Song
+	(*Course)(nil),        // 24: ourtaiko.multiplay.v1.Course
+	(*StartPlay)(nil),     // 25: ourtaiko.multiplay.v1.StartPlay
+	(*MemberStatus)(nil),  // 26: ourtaiko.multiplay.v1.MemberStatus
+	(*PlayStatuses)(nil),  // 27: ourtaiko.multiplay.v1.PlayStatuses
+	(*PlayerResult)(nil),  // 28: ourtaiko.multiplay.v1.PlayerResult
+	(*PlayResult)(nil),    // 29: ourtaiko.multiplay.v1.PlayResult
+	(*StampSent)(nil),     // 30: ourtaiko.multiplay.v1.StampSent
+	(*Pong)(nil),          // 31: ourtaiko.multiplay.v1.Pong
+	(*Notice)(nil),        // 32: ourtaiko.multiplay.v1.Notice
+	(*Closed)(nil),        // 33: ourtaiko.multiplay.v1.Closed
 }
 var file_ourtaiko_multiplay_v1_multiplay_proto_depIdxs = []int32{
 	3,  // 0: ourtaiko.multiplay.v1.ClientMessage.join:type_name -> ourtaiko.multiplay.v1.Join
@@ -2747,34 +2825,35 @@ var file_ourtaiko_multiplay_v1_multiplay_proto_depIdxs = []int32{
 	16, // 10: ourtaiko.multiplay.v1.ClientMessage.stamp:type_name -> ourtaiko.multiplay.v1.SendStamp
 	17, // 11: ourtaiko.multiplay.v1.ClientMessage.ping:type_name -> ourtaiko.multiplay.v1.Ping
 	9,  // 12: ourtaiko.multiplay.v1.ClientMessage.kick:type_name -> ourtaiko.multiplay.v1.Kick
-	4,  // 13: ourtaiko.multiplay.v1.Join.quick_match:type_name -> ourtaiko.multiplay.v1.QuickMatch
-	5,  // 14: ourtaiko.multiplay.v1.Join.create_private:type_name -> ourtaiko.multiplay.v1.CreatePrivate
-	14, // 15: ourtaiko.multiplay.v1.FinishPlay.final:type_name -> ourtaiko.multiplay.v1.PlayerStatus
-	19, // 16: ourtaiko.multiplay.v1.ServerMessage.welcome:type_name -> ourtaiko.multiplay.v1.Welcome
-	20, // 17: ourtaiko.multiplay.v1.ServerMessage.room:type_name -> ourtaiko.multiplay.v1.Room
-	24, // 18: ourtaiko.multiplay.v1.ServerMessage.start_play:type_name -> ourtaiko.multiplay.v1.StartPlay
-	26, // 19: ourtaiko.multiplay.v1.ServerMessage.statuses:type_name -> ourtaiko.multiplay.v1.PlayStatuses
-	29, // 20: ourtaiko.multiplay.v1.ServerMessage.stamp:type_name -> ourtaiko.multiplay.v1.StampSent
-	30, // 21: ourtaiko.multiplay.v1.ServerMessage.pong:type_name -> ourtaiko.multiplay.v1.Pong
-	31, // 22: ourtaiko.multiplay.v1.ServerMessage.notice:type_name -> ourtaiko.multiplay.v1.Notice
-	32, // 23: ourtaiko.multiplay.v1.ServerMessage.closed:type_name -> ourtaiko.multiplay.v1.Closed
-	0,  // 24: ourtaiko.multiplay.v1.Room.phase:type_name -> ourtaiko.multiplay.v1.Phase
-	21, // 25: ourtaiko.multiplay.v1.Room.members:type_name -> ourtaiko.multiplay.v1.Member
-	22, // 26: ourtaiko.multiplay.v1.Room.song:type_name -> ourtaiko.multiplay.v1.Song
-	28, // 27: ourtaiko.multiplay.v1.Room.result:type_name -> ourtaiko.multiplay.v1.PlayResult
-	23, // 28: ourtaiko.multiplay.v1.Song.courses:type_name -> ourtaiko.multiplay.v1.Course
-	14, // 29: ourtaiko.multiplay.v1.MemberStatus.status:type_name -> ourtaiko.multiplay.v1.PlayerStatus
-	25, // 30: ourtaiko.multiplay.v1.PlayStatuses.members:type_name -> ourtaiko.multiplay.v1.MemberStatus
-	14, // 31: ourtaiko.multiplay.v1.PlayerResult.status:type_name -> ourtaiko.multiplay.v1.PlayerStatus
-	1,  // 32: ourtaiko.multiplay.v1.PlayerResult.award:type_name -> ourtaiko.multiplay.v1.Award
-	27, // 33: ourtaiko.multiplay.v1.PlayResult.players:type_name -> ourtaiko.multiplay.v1.PlayerResult
-	2,  // 34: ourtaiko.multiplay.v1.MultiEnso.Connect:input_type -> ourtaiko.multiplay.v1.ClientMessage
-	18, // 35: ourtaiko.multiplay.v1.MultiEnso.Connect:output_type -> ourtaiko.multiplay.v1.ServerMessage
-	35, // [35:36] is the sub-list for method output_type
-	34, // [34:35] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	18, // 13: ourtaiko.multiplay.v1.ClientMessage.returned:type_name -> ourtaiko.multiplay.v1.Returned
+	4,  // 14: ourtaiko.multiplay.v1.Join.quick_match:type_name -> ourtaiko.multiplay.v1.QuickMatch
+	5,  // 15: ourtaiko.multiplay.v1.Join.create_private:type_name -> ourtaiko.multiplay.v1.CreatePrivate
+	14, // 16: ourtaiko.multiplay.v1.FinishPlay.final:type_name -> ourtaiko.multiplay.v1.PlayerStatus
+	20, // 17: ourtaiko.multiplay.v1.ServerMessage.welcome:type_name -> ourtaiko.multiplay.v1.Welcome
+	21, // 18: ourtaiko.multiplay.v1.ServerMessage.room:type_name -> ourtaiko.multiplay.v1.Room
+	25, // 19: ourtaiko.multiplay.v1.ServerMessage.start_play:type_name -> ourtaiko.multiplay.v1.StartPlay
+	27, // 20: ourtaiko.multiplay.v1.ServerMessage.statuses:type_name -> ourtaiko.multiplay.v1.PlayStatuses
+	30, // 21: ourtaiko.multiplay.v1.ServerMessage.stamp:type_name -> ourtaiko.multiplay.v1.StampSent
+	31, // 22: ourtaiko.multiplay.v1.ServerMessage.pong:type_name -> ourtaiko.multiplay.v1.Pong
+	32, // 23: ourtaiko.multiplay.v1.ServerMessage.notice:type_name -> ourtaiko.multiplay.v1.Notice
+	33, // 24: ourtaiko.multiplay.v1.ServerMessage.closed:type_name -> ourtaiko.multiplay.v1.Closed
+	0,  // 25: ourtaiko.multiplay.v1.Room.phase:type_name -> ourtaiko.multiplay.v1.Phase
+	22, // 26: ourtaiko.multiplay.v1.Room.members:type_name -> ourtaiko.multiplay.v1.Member
+	23, // 27: ourtaiko.multiplay.v1.Room.song:type_name -> ourtaiko.multiplay.v1.Song
+	29, // 28: ourtaiko.multiplay.v1.Room.result:type_name -> ourtaiko.multiplay.v1.PlayResult
+	24, // 29: ourtaiko.multiplay.v1.Song.courses:type_name -> ourtaiko.multiplay.v1.Course
+	14, // 30: ourtaiko.multiplay.v1.MemberStatus.status:type_name -> ourtaiko.multiplay.v1.PlayerStatus
+	26, // 31: ourtaiko.multiplay.v1.PlayStatuses.members:type_name -> ourtaiko.multiplay.v1.MemberStatus
+	14, // 32: ourtaiko.multiplay.v1.PlayerResult.status:type_name -> ourtaiko.multiplay.v1.PlayerStatus
+	1,  // 33: ourtaiko.multiplay.v1.PlayerResult.award:type_name -> ourtaiko.multiplay.v1.Award
+	28, // 34: ourtaiko.multiplay.v1.PlayResult.players:type_name -> ourtaiko.multiplay.v1.PlayerResult
+	2,  // 35: ourtaiko.multiplay.v1.MultiEnso.Connect:input_type -> ourtaiko.multiplay.v1.ClientMessage
+	19, // 36: ourtaiko.multiplay.v1.MultiEnso.Connect:output_type -> ourtaiko.multiplay.v1.ServerMessage
+	36, // [36:37] is the sub-list for method output_type
+	35, // [35:36] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_ourtaiko_multiplay_v1_multiplay_proto_init() }
@@ -2796,13 +2875,14 @@ func file_ourtaiko_multiplay_v1_multiplay_proto_init() {
 		(*ClientMessage_Stamp)(nil),
 		(*ClientMessage_Ping)(nil),
 		(*ClientMessage_Kick)(nil),
+		(*ClientMessage_Returned)(nil),
 	}
 	file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[1].OneofWrappers = []any{
 		(*Join_QuickMatch)(nil),
 		(*Join_CreatePrivate)(nil),
 		(*Join_RoomCode)(nil),
 	}
-	file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[16].OneofWrappers = []any{
+	file_ourtaiko_multiplay_v1_multiplay_proto_msgTypes[17].OneofWrappers = []any{
 		(*ServerMessage_Welcome)(nil),
 		(*ServerMessage_Room)(nil),
 		(*ServerMessage_StartPlay)(nil),
@@ -2818,7 +2898,7 @@ func file_ourtaiko_multiplay_v1_multiplay_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc), len(file_ourtaiko_multiplay_v1_multiplay_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   31,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

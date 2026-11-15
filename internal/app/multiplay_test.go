@@ -68,7 +68,7 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 	}
 
 	// The game is told where the rooms are.
-	if status, body := get("/api/v1/game/multiplay"); status != 200 || body != `{"url":"http://127.0.0.1:50061","protocol":1,"maxMembers":5}` {
+	if status, body := get("/api/v1/game/multiplay"); status != 200 || body != `{"url":"http://127.0.0.1:50061","protocol":1,"maxProtocol":2,"maxMembers":5}` {
 		t.Fatalf("%d %s", status, body)
 	}
 
@@ -275,7 +275,7 @@ func TestMultiEnsoIsOffUnlessConfigured(t *testing.T) {
 	defer on.Close()
 	w = httptest.NewRecorder()
 	on.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxMembers":5}` {
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxProtocol":2,"maxMembers":5}` {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 	for _, players := range []int{-1, 6} {

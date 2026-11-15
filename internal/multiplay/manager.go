@@ -23,9 +23,11 @@ const (
 )
 
 // JoinTarget is the room a player asks for. Code is the room's number, with ByCode only.
+// Protocol is the version the player's game speaks (zero: 1).
 type JoinTarget struct {
-	Kind JoinKind
-	Code string
+	Kind     JoinKind
+	Code     string
+	Protocol int32
 }
 
 // Manager is all rooms of this server process. Its mutex guards itself and every room.
@@ -183,7 +185,7 @@ func (m *Manager) Join(player Player, target JoinTarget, conn Conn) (*Room, erro
 	default:
 		return nil, refuse("BAD_REQUEST", "join names no room")
 	}
-	if err := room.join(player, conn); err != nil {
+	if err := room.join(player, conn, target.Protocol); err != nil {
 		// A room opened for this player and refused to them is not left behind empty.
 		if len(room.members) == 0 {
 			room.close()

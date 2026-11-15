@@ -8,10 +8,10 @@ import (
 
 func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 	sources := []Source{{"fanmade", "OurTaiko Fanmade", echo("fanmade")}}
-	on := Handler(sources, echo("players"), WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxMembers: 5}))
+	on := Handler(sources, echo("players"), WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxProtocol: 2, MaxMembers: 5}))
 	w := httptest.NewRecorder()
 	on.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxMembers":5}` {
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxProtocol":2,"maxMembers":5}` {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 	if got := w.Header().Get("Content-Type"); got != "application/json; charset=utf-8" {
@@ -48,7 +48,7 @@ func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 		}
 	}
 	// What the released game loads is answered as before.
-	loads := Handler([]Source{{"fanmade", "OurTaiko Fanmade", &source{name: "fanmade"}}}, nil, WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxMembers: 5}))
+	loads := Handler([]Source{{"fanmade", "OurTaiko Fanmade", &source{name: "fanmade"}}}, nil, WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxProtocol: 2, MaxMembers: 5}))
 	w = httptest.NewRecorder()
 	loads.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/sources?parts=catalog", nil))
 	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"sources":[{"id":"fanmade","name":"OurTaiko Fanmade","catalog":{"from":"fanmade","route":"catalog"}}]}` {
