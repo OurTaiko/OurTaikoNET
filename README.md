@@ -45,6 +45,16 @@ OurTaikoPlay's online multiplayer (マルチ演奏). The protocol is [`proto/our
 
 The state machine (`room.go`, `manager.go`) does no I/O and is tested on a clock the tests move; `server.go` is the gRPC service around it, tested over a loopback connection.
 
+## The 3D Don
+
+OurTaikoPlay draws each player's 3D Don (its Chara3D, ported from YataiDON). The models are not in this repository or the game: they are in the public bucket under `3dchara/` (`https://distrib.ourtaiko.org/3dchara/`), listed by `3dchara/catalog.json`, which `tools/3dchara/catalog.py` writes for a local copy of that folder and `tools/3dchara/publish.sh` uploads (files first, catalog last). A new costume is a new file there (and its name in `names.json`).
+
+- **Catalog.** `{"version":1, "base":{"animations","face","faceAnimations"}, "defaultColors":{"p1","p2"}, "items":{"cos","head","body","puchi":[{"id","name":{"ja",…},"file":{"path","size","sha256"},"icon"?}]}}`; paths are relative to the catalog. The server reads it (`DON_CATALOG_URL`, default the bucket's) and keeps it 5 minutes; when a read fails the last good one stays.
+- **Data.** `net.don_looks (user_id, costume, cos_id, head_id, body_id, puchi_id, colors, updated_at)`, migration `0003_don_looks`. No row is the plain Don (costume 0); `colors` null is the seat's colours. (`feat/story`'s migration was also numbered 0003: whichever of the two is deployed second must be renumbered, since a database only runs versions above its newest.)
+- `GET /api/v1/don/catalog` → the catalog with `baseUrl`, the address its paths are relative to; 503 `DON_CATALOG_UNAVAILABLE` while it has never been read. Readable from any website.
+- `GET /api/v1/users/{id}/don` (the game, no session) and `GET /api/v1/me/don` (session) → `{"look":{"costume","cos","head","body","puchi","colors":["#RRGGBB"×3]|null},"files":[{"kind","id","url","size","sha256"}]}`: the files the look needs (the costume, or the body and the head, and the puchichara), with `?v=<hash>` in the address. Without a catalog `files` is empty.
+- `PUT /api/v1/me/don` (session and CSRF) with a look: every number must be in the catalog, also the ones not worn now (so switching between a costume and a head and body keeps both), colours `#RRGGBB` (stored upper case) or null; 422 `DON_LOOK_INVALID`; answers as GET.
+
 ## Local development
 
 The backend and the website run side by side on this machine:

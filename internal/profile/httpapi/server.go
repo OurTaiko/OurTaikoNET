@@ -36,6 +36,10 @@ type Config struct {
 	SessionCookie string
 	// The built website; nil serves only the API.
 	Site fs.FS
+	// Where the 3D Don's catalog is read (don.go); empty is DefaultDonCatalogURL. DonClient
+	// reads it (nil: http.DefaultClient; tests give their own).
+	DonCatalogURL string
+	DonClient     *http.Client
 }
 type Server struct {
 	DB     *pgxpool.Pool
@@ -46,6 +50,10 @@ type Server struct {
 	feedMu sync.Mutex
 	feed   []Activity
 	feedAt time.Time
+	// The 3D Don's catalog as last read (don.go).
+	donMu sync.Mutex
+	don   *donCatalog
+	donAt time.Time
 }
 type window struct {
 	since time.Time
@@ -95,6 +103,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/activity", s.activity)
 	mux.HandleFunc("GET /api/v1/users/{id}", s.userProfile)
 	mux.HandleFunc("GET /api/v1/users/{id}/nameplate", s.userNameplate)
+	mux.HandleFunc("GET /api/v1/users/{id}/don", s.userDon)
+	mux.HandleFunc("GET /api/v1/me/don", s.myDon)
+	mux.HandleFunc("PUT /api/v1/me/don", s.wearDon)
+	mux.HandleFunc("GET /api/v1/don/catalog", s.donCatalogAnswer)
 	mux.HandleFunc("GET /api/v1/nameplates", s.nameplates)
 	mux.HandleFunc("GET /api/v1/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/v1/users/{id}/titles", s.userTitles)

@@ -103,6 +103,7 @@ func main() {
 	}
 	// Multi-Enso, the game's online rooms: a gRPC service on its own port. Off without
 	// MULTIPLAY_LISTEN_ADDR.
+	cfg.DonCatalogURL = os.Getenv("DON_CATALOG_URL")
 	cfg.Multiplay = app.Multiplay{ListenAddr: os.Getenv("MULTIPLAY_LISTEN_ADDR"), PublicURL: strings.TrimRight(os.Getenv("MULTIPLAY_PUBLIC_URL"), "/")}
 	if raw := os.Getenv("MULTIPLAY_MIN_PLAYERS"); raw != "" {
 		if cfg.Multiplay.MinPlayers, err = strconv.Atoi(raw); err != nil || cfg.Multiplay.MinPlayers < 1 {
