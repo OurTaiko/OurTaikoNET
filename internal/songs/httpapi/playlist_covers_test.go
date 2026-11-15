@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"image"
-	_ "image/jpeg"
 	"image/png"
 	"mime/multipart"
 	"net/http"
@@ -17,8 +16,8 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// A playlist's cover: the website's image and the game's small JPEG are stored, served,
-// linked for the game, and deleted once nothing refers to them.
+// A playlist's cover: one WebP, stored, served, linked for the game as it is, and deleted
+// once nothing refers to it.
 func TestPlaylistCover(t *testing.T) { bothSources(t, testPlaylistCover) }
 
 func testPlaylistCover(t *testing.T, w interactionWorld) {
@@ -74,20 +73,14 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 		t.Fatal("cover without its hash", rec.Code)
 	}
 
-	// The game gets a small JPEG of the cover.
-	var gameKey, gameHash string
-	var gameSize int64
-	if e := s.DB.QueryRow(ctx, `SELECT r.storage_key,r.sha256,r.byte_size FROM playlists p JOIN chart_resources r ON r.id=p.game_cover_file WHERE p.id=$1`, p.ID).Scan(&gameKey, &gameHash, &gameSize); e != nil || gameKey != gameHash+".jpg" {
-		t.Fatal("game cover", gameKey, e)
+	// Only the WebP is stored: the game is given the same file.
+	var coverKey string
+	var coverSize, files int64
+	if e := s.DB.QueryRow(ctx, `SELECT r.storage_key,r.byte_size FROM playlists p JOIN chart_resources r ON r.id=p.cover_file WHERE p.id=$1`, p.ID).Scan(&coverKey, &coverSize); e != nil || coverKey != result.CoverHash+".webp" {
+		t.Fatal("stored cover", coverKey, e)
 	}
-	object, e := s.Config.Objects.Open(ctx, gameKey)
-	if e != nil {
-		t.Fatal(e)
-	}
-	format, kind, e := image.DecodeConfig(object)
-	object.Close()
-	if e != nil || kind != "jpeg" || format.Width != 40 || format.Height != 30 {
-		t.Fatal("game cover image", kind, format, e)
+	if e := s.DB.QueryRow(ctx, `SELECT count(*) FROM chart_resources WHERE extension IN ('webp','jpg')`).Scan(&files); e != nil || files != 1 {
+		t.Fatal("cover files", files, e)
 	}
 
 	// Its folder in the game lists songs of the catalog: with files and in a category. Song is
@@ -142,8 +135,8 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	}
 	// A bucket without a public address gets signed links.
 	direct := &Server{DB: s.DB, Config: Config{Source: s.source(), Objects: teststore.New(t), SSO: s.Config.SSO}}
-	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, gameKey) || link.HeadURL == "" ||
-		link.SHA256 != gameHash || link.Size != gameSize || link.ContentType != "image/jpeg" {
+	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, coverKey) || link.HeadURL == "" ||
+		link.SHA256 != result.CoverHash || link.Size != coverSize || link.ContentType != "image/webp" {
 		t.Fatalf("cover link %+v", link)
 	}
 
@@ -164,10 +157,7 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if rec := get("?v=" + result.CoverHash); rec.Code != 404 {
 		t.Fatal("removed cover served", rec.Code)
 	}
-	if _, e := s.Config.Objects.Open(ctx, gameKey); e == nil {
-		t.Fatal("game cover kept after its removal")
-	}
-	if rec := upload("owner", picture.Bytes()); rec.Code != 200 || covers() != 2 {
+	if rec := upload("owner", picture.Bytes()); rec.Code != 200 || covers() != 1 {
 		t.Fatal("cover again", rec.Code, covers())
 	}
 	if _, e := s.DB.Exec(ctx, `UPDATE charts SET cover_file=NULL WHERE id=$1`, w.song); e != nil {
@@ -175,15 +165,13 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	}
 	// The queue of replaced files leaves a cover alone while its playlist refers to it.
 	s.cleanupReplacedFiles()
-	if covers() != 2 {
+	if covers() != 1 {
 		t.Fatal("playlist cover deleted while referenced", covers())
 	}
 	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
 		t.Fatal("cover kept after its playlist", code, covers())
 	}
-	for _, key := range []string{result.CoverHash + ".webp", gameKey} {
-		if _, e := s.Config.Objects.Open(ctx, key); e == nil {
-			t.Fatal("cover object kept", key)
-		}
+	if _, e := s.Config.Objects.Open(ctx, coverKey); e == nil {
+		t.Fatal("cover object kept", coverKey)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
-	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -28,13 +27,13 @@ func (s *Server) getPlaylistCover(w http.ResponseWriter, r *http.Request) {
 	s.serveCover(w, r, digest, key)
 }
 
-// setPlaylistCover points a playlist at its website cover and the game's copy
-// of it, or at neither, and returns the files it pointed at before.
-func setPlaylistCover(r *http.Request, tx pgx.Tx, id string, file, gameFile *int64) ([]*int64, error) {
+// setPlaylistCover points a playlist at its cover, or at none, and returns the
+// file it pointed at before.
+func setPlaylistCover(r *http.Request, tx pgx.Tx, id string, file *int64) ([]*int64, error) {
 	var previous []*int64
-	e := tx.QueryRow(r.Context(), `SELECT ARRAY[cover_file,game_cover_file] FROM playlists WHERE id=$1`, id).Scan(&previous)
+	e := tx.QueryRow(r.Context(), `SELECT ARRAY[cover_file] FROM playlists WHERE id=$1`, id).Scan(&previous)
 	if e == nil {
-		_, e = tx.Exec(r.Context(), `UPDATE playlists SET cover_file=$2,game_cover_file=$3,updated_at=now() WHERE id=$1`, id, file, gameFile)
+		_, e = tx.Exec(r.Context(), `UPDATE playlists SET cover_file=$2,updated_at=now() WHERE id=$1`, id, file)
 	}
 	return previous, e
 }
@@ -55,11 +54,6 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	game, e := cover.GameImage(encoded)
-	if e != nil {
-		internal(w, e)
-		return
-	}
 	var previous []*int64
 	// Ownership is checked after encoding, under the playlist's lock.
 	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
@@ -67,11 +61,7 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return false, e
 		}
-		gameFile, e := s.storeGameCover(r.Context(), tx, game)
-		if e != nil {
-			return false, e
-		}
-		previous, e = setPlaylistCover(r, tx, id, &file, &gameFile)
+		previous, e = setPlaylistCover(r, tx, id, &file)
 		return true, e
 	})
 	if !ok {
@@ -89,7 +79,7 @@ func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
 	var previous []*int64
 	_, ok = s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
 		var e error
-		previous, e = setPlaylistCover(r, tx, id, nil, nil)
+		previous, e = setPlaylistCover(r, tx, id, nil)
 		return true, e
 	})
 	if !ok {

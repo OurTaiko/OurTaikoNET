@@ -219,7 +219,7 @@ func (s *Server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
 	var covers []*int64
 	e = pgx.ErrNoRows
 	if valid {
-		e = tx.QueryRow(ctx, `SELECT owner_id,name,is_public,ARRAY[cover_file,game_cover_file] FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &name, &public, &covers)
+		e = tx.QueryRow(ctx, `SELECT owner_id,name,is_public,ARRAY[cover_file] FROM playlists WHERE id=$1 FOR UPDATE`, id).Scan(&owner, &name, &public, &covers)
 	}
 	if errors.Is(e, pgx.ErrNoRows) || (e == nil && owner != u.User.ID && !public) {
 		problem(w, 404, "PLAYLIST_NOT_FOUND", "歌单不存在或未公开")

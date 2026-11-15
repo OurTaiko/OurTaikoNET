@@ -173,11 +173,6 @@ func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	return encodeCover(w, r, name, data)
 }
 
-// storeGameCover stores the copy of a playlist's cover that the game shows.
-func (s *Server) storeGameCover(ctx context.Context, tx pgx.Tx, data []byte) (int64, error) {
-	return s.storeImageAs(ctx, tx, "cover", data, cover.GameExtension, cover.GameMediaType)
-}
-
 // serveCover sends a cover image, or redirects to its CDN address.
 func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, digest, key string) {
 	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")

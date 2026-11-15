@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
-	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -20,11 +19,11 @@ type GamePlaylist struct {
 	Kind    string `json:"kind"`
 	OwnerID string `json:"ownerId,omitempty"`
 	Owner   string `json:"owner"`
-	// Cover is the JPEG for the folder; only servers with direct downloads
-	// (resourceDownloadVersion 1) provide it.
+	// Cover is the folder's picture, the WebP the website shows (the game decodes
+	// WebP); only servers with direct downloads (resourceDownloadVersion 1) provide it.
 	Cover    *resourceLink `json:"cover,omitempty"`
 	ChartIDs []string      `json:"chartIds"`
-	// The stored game cover, resolved to Cover after the snapshot.
+	// The stored cover, resolved to Cover after the snapshot.
 	coverKey, coverHash string
 	coverSize           int64
 }
@@ -40,7 +39,7 @@ func (s *Server) gamePlaylists(ctx context.Context, tx pgx.Tx, user *User) ([]Ga
 		rows, e := tx.Query(ctx, `SELECT p.id,p.name,p.category_flag,p.owner_id,p.owner_id=$1,COALESCE(gc.storage_key,''),COALESCE(gc.sha256,''),COALESCE(gc.byte_size,0),
  ARRAY(SELECT i.chart_id FROM playlist_items i JOIN charts c ON c.id=i.chart_id WHERE i.playlist_id=p.id AND `+systemChart+` ORDER BY i.position,i.added_at,i.chart_id)
  FROM playlists p LEFT JOIN playlist_favorites mine ON mine.playlist_id=p.id AND mine.user_id=$1
- LEFT JOIN chart_resources gc ON gc.id=p.game_cover_file
+ LEFT JOIN chart_resources gc ON gc.id=p.cover_file
  WHERE p.owner_id=$1 OR (mine.user_id IS NOT NULL AND p.is_public)
  ORDER BY p.owner_id<>$1,CASE WHEN p.owner_id=$1 THEN p.updated_at ELSE mine.favorited_at END DESC,p.id`, viewer)
 		if e != nil {
@@ -134,7 +133,7 @@ func (s *Server) gamePlaylistDetails(ctx context.Context, items []GamePlaylist) 
 			ids = append(ids, p.OwnerID)
 		}
 		if remote != nil && p.coverKey != "" {
-			link, e := directLink(ctx, remote, p.coverKey, "cover."+cover.GameExtension, cover.GameMediaType, p.coverHash, p.coverSize)
+			link, e := directLink(ctx, remote, p.coverKey, "cover.webp", "image/webp", p.coverHash, p.coverSize)
 			if e != nil {
 				return e
 			}
