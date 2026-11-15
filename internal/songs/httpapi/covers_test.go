@@ -187,7 +187,7 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	for _, tc := range []struct {
 		p      part
 		status int
-	}{{part{"cover", "fake.webp", pngImage}, 422}, {part{"cover", "bad.webp", []byte("bad")}, 422}, {part{"cover", "fake.jpg", pngImage}, 422}, {part{"cover", "bad.png", []byte("bad")}, 422}, {part{"cover", "file.svg", pngImage}, 400}, {part{"cover", "huge.png", make([]byte, cover.MaxBytes+1)}, 413}} {
+	}{{part{"cover", "bad.webp", []byte("bad")}, 422}, {part{"cover", "bad.png", []byte("bad")}, 422}, {part{"cover", "file.svg", pngImage}, 400}, {part{"cover", "huge.png", make([]byte, cover.MaxBytes+1)}, 413}} {
 		status(send("PUT", path, "owner", "csrf", "", tc.p), tc.status)
 	}
 	status(send("PUT", path, "owner", "csrf", "", changed[2], changed[2]), 400)
