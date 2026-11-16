@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
 import {
   ArrowBendUpLeftIcon,
   ArrowFatUpIcon,
-  BellIcon,
   BellSimpleIcon,
   ChatCircleIcon,
-  CheckIcon,
-  EnvelopeSimpleIcon,
+  GearSixIcon,
   ShieldWarningIcon,
   UploadSimpleIcon,
   XIcon,
@@ -22,13 +19,7 @@ import type { AppNotification, NotificationPage, NotificationSetting } from './a
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Skeleton } from './components/ui/skeleton'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { SourceTag } from './components/source-tag'
 import { UserAvatar } from './components/user-avatar'
 import { RelativeTime, commentPath, danCommentPath } from './comments'
@@ -41,10 +32,11 @@ import { visit } from './navigation'
 import { sources } from './source'
 import type { SourceId } from './source'
 
-// One inbox for the whole site. Each source keeps its own notices, so the bell and the inbox
-// ask both and put the answers together; a notice remembers which source it came from, and
-// everything done to it goes back to that source.
-type Sourced = AppNotification & { source: SourceId }
+// The site's own notices: one chat among the player's chats, 系统通知 (./chat-center). Each
+// source keeps its own notices, so the chat and its count ask both and put the answers
+// together; a notice remembers which source it came from, and everything done to it goes back
+// to that source.
+export type Sourced = AppNotification & { source: SourceId }
 const ids = sources.map((source) => source.id)
 const mine = (source: SourceId) => `${SITE_API_ROOT}/sources/${source}/me`
 const one = (n: Sourced) => `${mine(n.source)}/notifications/${encodeURIComponent(n.id)}`
@@ -57,19 +49,18 @@ const addresses = {
   respond: (n: Sourced) => `${one(n)}/respond`,
   settings: (source: SourceId) => `${mine(source)}/notification-settings`,
 }
-/** The inbox's page; it belongs to no source. */
-export const inboxPage = '/notifications'
 const when = (n: AppNotification) => Date.parse(n.createdAt)
 const newestFirst = (a: AppNotification, b: AppNotification) => when(b) - when(a)
 
 // Any change to read state anywhere refreshes the bell's count.
 const changedEvent = 'ourtaiko:notifications-changed'
-const announceChange = () => window.dispatchEvent(new Event(changedEvent))
+export const announceChange = () => window.dispatchEvent(new Event(changedEvent))
 
 /** Goes to a page of a source, or of none (''). */
-const useGo = () => (area: SourceId | '', path: string) => visit(`${area && `/${area}`}${path}`)
+export const useGo = () => (area: SourceId | '', path: string) =>
+  visit(`${area && `/${area}`}${path}`)
 
-function useNotificationText() {
+export function useNotificationText() {
   const { t, i18n } = useTranslation()
   return (n: AppNotification) => {
     const actor = n.actor?.nickname || t('messages.unknownMember')
@@ -130,7 +121,7 @@ function useNotificationText() {
 }
 
 /** The page a notice is about, inside its source; null when it has none. */
-function target(n: AppNotification) {
+export function target(n: AppNotification) {
   if (n.kind === 'chart_collaboration' && n.data.status === 'pending') return null
   if (n.chart && n.comment) return commentPath(n.chart.id, n.comment.id)
   if (n.chart) return `/charts/${encodeURIComponent(n.chart.id)}`
@@ -151,7 +142,7 @@ const kindIcons: Record<string, ReactNode> = {
   playlist_removed: <ShieldWarningIcon className="text-destructive" />,
 }
 
-function NotificationIcon({ n }: { n: AppNotification }) {
+export function NotificationIcon({ n }: { n: AppNotification }) {
   if (n.actor)
     return (
       <span className="relative shrink-0">
@@ -172,7 +163,7 @@ function NotificationIcon({ n }: { n: AppNotification }) {
   )
 }
 
-function NotificationContent({ n }: { n: Sourced }) {
+export function NotificationContent({ n }: { n: Sourced }) {
   const text = useNotificationText()
   return (
     <span className="min-w-0 flex-1 space-y-1">
@@ -190,24 +181,8 @@ function NotificationContent({ n }: { n: Sourced }) {
   )
 }
 
-function UnreadDot({ read }: { read: boolean }) {
-  const { t } = useTranslation()
-  return read ? (
-    <span className="size-2 shrink-0" aria-hidden="true" />
-  ) : (
-    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-link">
-      <span className="sr-only">{t('notificationCenter.unread')}</span>
-    </span>
-  )
-}
-
-const markRead = (n: Sourced, csrf: string) =>
-  n.read
-    ? Promise.resolve()
-    : api(addresses.one(n), jsonRequest('PATCH', { read: true }, csrf)).then(announceChange)
-
 /** Marks everything read, in each source. */
-const markAllRead = (csrf: string) =>
+export const markAllRead = (csrf: string) =>
   Promise.all(ids.map((source) => api(addresses.read(source), jsonRequest('POST', {}, csrf))))
 
 type Loaded = { items: Sourced[]; total: number; unread: number; more: boolean }
@@ -243,147 +218,6 @@ function merge(loaded: Loaded[]) {
     .flatMap((l) => l.items)
     .filter((n) => when(n) >= limit)
     .sort(newestFirst)
-}
-
-// The count last seen, so the bell of the next area shown starts from it and not from nothing.
-let lastCount = 0
-
-// The bell in the top bar: how many are unread, and a menu of the latest.
-export function NotificationBell() {
-  const { t } = useTranslation()
-  const { user, csrfToken } = useSession()
-  const location = useLocation()
-  const go = useGo()
-  const [count, setCountState] = useState(lastCount)
-  const setCount = useCallback((next: number) => {
-    lastCount = next
-    setCountState(next)
-  }, [])
-  const [recent, setRecent] = useState<Sourced[] | null>(null)
-  const refresh = useCallback(() => {
-    if (!user) return
-    // A source that does not answer counts for nothing; the other's count still shows.
-    void Promise.all(
-      ids.map((source) =>
-        api<{ count: number }>(addresses.unread(source))
-          .then((r) => r.count)
-          .catch(() => 0),
-      ),
-    ).then((counts) => setCount(counts.reduce((a, b) => a + b, 0)))
-  }, [user, setCount])
-  useEffect(() => {
-    if (!user) {
-      setCount(0)
-      return
-    }
-    refresh()
-    const timer = window.setInterval(refresh, 60000)
-    window.addEventListener('focus', refresh)
-    window.addEventListener(changedEvent, refresh)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', refresh)
-      window.removeEventListener(changedEvent, refresh)
-    }
-  }, [user, refresh, setCount, location.pathname])
-  if (!user) return null
-  const open = (n: Sourced) => {
-    void markRead(n, csrfToken).catch(() => {})
-    const to = target(n)
-    if (to) go(n.source, to)
-    else go('', inboxPage)
-  }
-  return (
-    <DropdownMenu
-      onOpenChange={(isOpen) => {
-        if (!isOpen) return
-        setRecent(null)
-        void Promise.all(ids.map((source) => loadSource(source, 'all', 1).catch(() => null))).then(
-          (answers) => {
-            const loaded = answers.flatMap((answer) => answer ?? [])
-            setRecent(
-              loaded
-                .flatMap((l) => l.items)
-                .sort(newestFirst)
-                .slice(0, 6),
-            )
-            if (loaded.length === ids.length) setCount(loaded.reduce((a, l) => a + l.unread, 0))
-          },
-        )
-      }}
-    >
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            data-testid="notification-bell"
-            aria-label={
-              count ? t('notificationCenter.bellUnread', { count }) : t('notificationCenter.title')
-            }
-          />
-        }
-      >
-        <BellIcon className="size-4" aria-hidden="true" />
-        {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums">
-            {count > 99 ? '99+' : count}
-          </span>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-1">
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <span className="text-sm font-semibold">{t('notificationCenter.title')}</span>
-          {count > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {t('notificationCenter.unreadCount', { count })}
-            </span>
-          )}
-        </div>
-        <DropdownMenuSeparator />
-        {recent === null ? (
-          <div className="space-y-2 p-2" role="status" aria-label={t('notificationCenter.loading')}>
-            <Skeleton className="h-12 rounded-xl" />
-            <Skeleton className="h-12 rounded-xl" />
-          </div>
-        ) : recent.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-            {t('notificationCenter.empty')}
-          </p>
-        ) : (
-          recent.map((n) => (
-            <DropdownMenuItem
-              key={`${n.source}/${n.id}`}
-              className="items-start gap-3 rounded-xl p-2"
-              onClick={() => open(n)}
-            >
-              <NotificationIcon n={n} />
-              <NotificationContent n={n} />
-              <UnreadDot read={n.read} />
-            </DropdownMenuItem>
-          ))
-        )}
-        <DropdownMenuSeparator />
-        {count > 0 && (
-          <DropdownMenuItem
-            onClick={() => {
-              void markAllRead(csrfToken)
-                .then(announceChange)
-                .catch(() => {})
-            }}
-          >
-            <CheckIcon />
-            {t('notificationCenter.markAllRead')}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => go('', inboxPage)}>
-          <BellSimpleIcon />
-          {t('notificationCenter.viewAll')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }
 
 const settingLabels = {
@@ -445,15 +279,7 @@ function NotificationSettings() {
     }
   }
   return (
-    <section
-      aria-labelledby="notification-settings-heading"
-      className="space-y-4 rounded-[20px] bg-card p-6 shadow-elev-1"
-    >
-      <div className="space-y-1">
-        <h2 id="notification-settings-heading" className="text-lg font-extrabold">
-          {t('notificationCenter.settingsTitle')}
-        </h2>
-      </div>
+    <div>
       {error ? (
         <Notice>{error}</Notice>
       ) : !items ? (
@@ -475,16 +301,120 @@ function NotificationSettings() {
           ))}
         </ul>
       )}
-    </section>
+    </div>
   )
 }
 
-export function NotificationsPage() {
+// The count last seen, so the next area's bell starts from it and not from nothing.
+let lastCount = 0
+const countListeners = new Set<(count: number) => void>()
+let countTimer = 0
+let countUsers = 0
+
+/** Asks both sources how many notices are unread; a source that does not answer counts none. */
+function refreshNoticeCount() {
+  void Promise.all(
+    ids.map((source) =>
+      api<{ count: number }>(addresses.unread(source))
+        .then((r) => r.count)
+        .catch(() => 0),
+    ),
+  ).then((counts) => {
+    lastCount = counts.reduce((a, b) => a + b, 0)
+    for (const listener of countListeners) listener(lastCount)
+  })
+}
+
+/**
+ * How many of the site's notices are unread, over both sources: read again every minute, when
+ * the window comes back, and whenever read state changes anywhere on the page.
+ */
+export function useNoticeCount() {
+  const { user } = useSession()
+  const [count, setCount] = useState(lastCount)
+  useEffect(() => {
+    if (!user) {
+      lastCount = 0
+      setCount(0)
+      return
+    }
+    countListeners.add(setCount)
+    if (countUsers++ === 0) {
+      refreshNoticeCount()
+      countTimer = window.setInterval(refreshNoticeCount, 60000)
+      window.addEventListener('focus', refreshNoticeCount)
+      window.addEventListener(changedEvent, refreshNoticeCount)
+    }
+    return () => {
+      countListeners.delete(setCount)
+      if (--countUsers === 0) {
+        window.clearInterval(countTimer)
+        window.removeEventListener('focus', refreshNoticeCount)
+        window.removeEventListener(changedEvent, refreshNoticeCount)
+      }
+    }
+  }, [user])
+  return user ? count : 0
+}
+
+/** The latest notice of either source; null when there is none, undefined when unknown. */
+export async function latestNotice(): Promise<Sourced | null | undefined> {
+  const answers = await Promise.all(
+    ids.map((source) => loadSource(source, 'all', 1).catch(() => null)),
+  )
+  const loaded = answers.flatMap((answer) => answer ?? [])
+  if (!loaded.length) return undefined
+  return loaded.flatMap((l) => l.items).sort(newestFirst)[0] ?? null
+}
+
+/** A notice in a line, for the list of chats. */
+export function NoticeLine({ n }: { n: AppNotification }) {
+  const text = useNotificationText()
+  return <>{text(n)}</>
+}
+
+/**
+ * Keeps a list that grows at both ends where the reader left it: older items put above keep
+ * the view still, and newer ones put below are followed while the reader is at the bottom.
+ * Call the returned function on scroll.
+ */
+export function useChatScroll(
+  ref: RefObject<HTMLElement | null>,
+  first: string | number | undefined,
+  count: number,
+) {
+  const fromBottom = useRef(0)
+  const lastFirst = useRef(first)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (!count) {
+      fromBottom.current = 0
+      lastFirst.current = undefined
+      return
+    }
+    const above = lastFirst.current !== undefined && first !== lastFirst.current
+    lastFirst.current = first
+    if (above || fromBottom.current < 48)
+      el.scrollTop = el.scrollHeight - el.clientHeight - (above ? fromBottom.current : 0)
+  }, [ref, first, count])
+  return () => {
+    const el = ref.current
+    if (el) fromBottom.current = el.scrollHeight - el.clientHeight - el.scrollTop
+  }
+}
+
+/**
+ * The site's own notices, shown as a chat: oldest at the top, the newest at the bottom.
+ * Opening it reads them all, as opening a chat does; those that were new are marked so while
+ * it stays open. Each source keeps its own notices; this asks both and puts them together.
+ */
+export function SystemChat({ header }: { header: ReactNode }) {
   const { t } = useTranslation()
-  const { user, csrfToken, loading } = useSession()
+  const { csrfToken } = useSession()
   const { notify } = useNotification()
   const go = useGo()
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const count = useNoticeCount()
   // How many pages of each source are loaded.
   const [depth, setDepth] = useState(1)
   const [data, setData] = useState<Loaded[] | null>(null)
@@ -492,44 +422,50 @@ export function NotificationsPage() {
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [responding, setResponding] = useState<string | null>(null)
+  const [settings, setSettings] = useState(false)
+  // Notices that were unread when they were first shown here.
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set())
+  const scroller = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!user) return
     const controller = new AbortController()
     setError('')
     setBusy(true)
     // What one source gives is shown even when the other does not answer.
-    Promise.allSettled(ids.map((source) => loadSource(source, filter, depth, controller.signal)))
+    Promise.allSettled(ids.map((source) => loadSource(source, 'all', depth, controller.signal)))
       .then((answers) => {
         if (controller.signal.aborted) return
         const failed = answers.find((answer) => answer.status === 'rejected')
         setError(failed ? (failed.reason as Error).message : '')
-        setData(answers.flatMap((answer) => (answer.status === 'fulfilled' ? answer.value : [])))
+        const loaded = answers.flatMap((answer) =>
+          answer.status === 'fulfilled' ? answer.value : [],
+        )
+        setData(loaded)
+        const unread = loaded.flatMap((l) => l.items).filter((n) => !n.read)
+        if (unread.length)
+          setFresh((seen) => new Set([...seen, ...unread.map((n) => `${n.source}/${n.id}`)]))
+        if (loaded.some((l) => l.unread))
+          void markAllRead(csrfToken)
+            .then(announceChange)
+            .catch(() => {})
       })
       .finally(() => !controller.signal.aborted && setBusy(false))
     return () => controller.abort()
-  }, [user, filter, depth, attempt])
-  // Refresh when another view (such as the bell menu) changes read state.
+  }, [depth, attempt, csrfToken])
+  // New notices arrive by the count: read them as they come.
+  const seenCount = useRef(count)
   useEffect(() => {
-    const reload = () => setAttempt((n) => n + 1)
-    window.addEventListener(changedEvent, reload)
-    return () => window.removeEventListener(changedEvent, reload)
-  }, [])
-  if (loading) return <p className="text-sm text-muted-foreground">{t('messages.connecting')}</p>
-  if (!user)
-    return (
-      <Notice kind="info" title={t('notificationCenter.title')}>
-        <a
-          href={`${SITE_API_ROOT}/auth/sso/login?returnTo=${encodeURIComponent(inboxPage)}`}
-          className="text-link hover:underline"
-        >
-          {t('notificationCenter.signIn')}
-        </a>
-      </Notice>
-    )
+    if (count > seenCount.current) setAttempt((n) => n + 1)
+    seenCount.current = count
+  }, [count])
+  const items = data ? merge(data).reverse() : []
+  const key = (n: Sourced) => `${n.source}/${n.id}`
+  const onScroll = useChatScroll(scroller, items[0] && key(items[0]), items.length)
+  const more = !!data?.some((l) => l.more)
   const run = async (request: Promise<unknown>) => {
     try {
       await request
       announceChange()
+      setAttempt((n) => n + 1)
     } catch (e) {
       notify((e as Error).message, 'error')
     }
@@ -542,59 +478,38 @@ export function NotificationsPage() {
       setResponding(null)
     }
   }
-  const items = data ? merge(data) : []
-  const unread = data?.reduce((total, l) => total + l.unread, 0) ?? 0
-  const more = !!data?.some((l) => l.more)
   return (
-    <section className="mx-auto grid max-w-5xl items-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <div className="min-w-0 space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-              {t('notificationCenter.title')}
-            </h1>
-            {data && (
-              <p className="text-sm text-muted-foreground">
-                {t('notificationCenter.unreadCount', { count: unread })}
-              </p>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            disabled={!unread}
-            onClick={() => void run(markAllRead(csrfToken))}
-          >
-            <CheckIcon />
-            {t('notificationCenter.markAllRead')}
-          </Button>
-        </div>
-        <div
-          role="tablist"
-          aria-label={t('notificationCenter.filter')}
-          className="inline-flex rounded-full bg-muted p-1"
+    <>
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        {header}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('notificationCenter.settingsTitle')}
+          title={t('notificationCenter.settingsTitle')}
+          onClick={() => setSettings(true)}
         >
-          {(['all', 'unread'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={filter === value}
-              className={cn(
-                'rounded-full px-4 py-1.5 text-sm transition-all duration-200 active:scale-[0.96] motion-reduce:transition-none',
-                filter === value
-                  ? 'bg-card font-bold text-secondary-foreground shadow-elev-1'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              onClick={() => {
-                setFilter(value)
-                setDepth(1)
-                setData(null)
-              }}
+          <GearSixIcon className="size-5" />
+        </Button>
+      </div>
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-5"
+        data-testid="inbox"
+      >
+        {more && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setDepth((n) => n + 1)}
             >
-              {value === 'all' ? t('notificationCenter.all') : t('notificationCenter.unread')}
-            </button>
-          ))}
-        </div>
+              {t('notificationCenter.more')}
+            </Button>
+          </div>
+        )}
         {error && (
           <div className="flex flex-col items-start gap-3">
             <Notice>{error}</Notice>
@@ -606,107 +521,42 @@ export function NotificationsPage() {
         {!data ? (
           !error && (
             <div className="space-y-3" role="status" aria-label={t('notificationCenter.loading')}>
-              <Skeleton className="h-20 rounded-[20px]" />
-              <Skeleton className="h-20 rounded-[20px]" />
+              <Skeleton className="h-20 w-3/4 rounded-[20px]" />
+              <Skeleton className="h-20 w-2/3 rounded-[20px]" />
             </div>
           )
         ) : items.length === 0 ? (
           !error && (
-            <p className="rounded-[20px] bg-muted py-12 text-center text-sm text-muted-foreground">
-              {filter === 'unread'
-                ? t('notificationCenter.noUnread')
-                : t('notificationCenter.empty')}
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              {t('notificationCenter.empty')}
             </p>
           )
         ) : (
-          <ul
-            className="divide-y overflow-hidden rounded-[20px] bg-card shadow-elev-1"
-            data-testid="inbox"
-          >
+          <ul className="space-y-3">
             {items.map((n) => {
               const to = target(n)
+              const isNew = fresh.has(key(n))
               return (
-                <li
-                  key={`${n.source}/${n.id}`}
-                  data-source={n.source}
-                  className={cn('flex flex-wrap items-start gap-3 p-4', !n.read && 'bg-link/5')}
-                >
-                  <UnreadDot read={n.read} />
-                  <button
-                    type="button"
-                    disabled={!to}
-                    className="flex min-w-0 flex-1 items-start gap-3 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
-                    onClick={() => {
-                      if (!to) return
-                      void markRead(n, csrfToken).catch(() => {})
-                      go(n.source, to)
-                    }}
+                <li key={key(n)} data-source={n.source} className="flex items-end gap-2">
+                  <div
+                    className={cn(
+                      'group/notice relative flex max-w-[min(36rem,92%)] flex-wrap items-start gap-2 rounded-[20px] rounded-bl-md bg-muted p-3',
+                      isNew && 'ring-2 ring-link/40',
+                    )}
                   >
-                    <NotificationIcon n={n} />
-                    <NotificationContent n={n} />
-                  </button>
-                  {n.kind === 'chart_collaboration' && (
-                    <div
-                      className="order-last flex w-full flex-wrap items-center gap-2 pl-5 text-sm"
-                      role="status"
+                    <button
+                      type="button"
+                      disabled={!to}
+                      className="flex min-w-0 flex-1 items-start gap-3 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                      onClick={() => to && go(n.source, to)}
                     >
-                      {n.data.status === 'pending' ? (
-                        <>
-                          <p className="w-full text-muted-foreground">
-                            {t('collaboration.permissions')}
-                          </p>
-                          <Button
-                            size="sm"
-                            disabled={responding !== null}
-                            onClick={() => void respond(n, true)}
-                          >
-                            {t('collaboration.accept')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={responding !== null}
-                            onClick={() => void respond(n, false)}
-                          >
-                            {t('collaboration.decline')}
-                          </Button>
-                        </>
-                      ) : (
-                        t(
-                          n.data.status === 'accepted'
-                            ? 'collaboration.accepted'
-                            : n.data.status === 'revoked'
-                              ? 'collaboration.revoked'
-                              : 'collaboration.declined',
-                        )
-                      )}
-                    </div>
-                  )}
-                  <div className="flex shrink-0 gap-1">
+                      <NotificationIcon n={n} />
+                      <NotificationContent n={n} />
+                    </button>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={
-                        n.read
-                          ? t('notificationCenter.markUnread')
-                          : t('notificationCenter.markRead')
-                      }
-                      title={
-                        n.read
-                          ? t('notificationCenter.markUnread')
-                          : t('notificationCenter.markRead')
-                      }
-                      onClick={() =>
-                        void run(
-                          api(addresses.one(n), jsonRequest('PATCH', { read: !n.read }, csrfToken)),
-                        )
-                      }
-                    >
-                      {n.read ? <EnvelopeSimpleIcon /> : <CheckIcon />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
+                      className="shrink-0 opacity-60 hover:opacity-100 focus-visible:opacity-100"
                       disabled={n.kind === 'chart_collaboration' && n.data.status === 'pending'}
                       aria-label={t('notificationCenter.dismiss')}
                       title={t('notificationCenter.dismiss')}
@@ -716,23 +566,66 @@ export function NotificationsPage() {
                     >
                       <XIcon />
                     </Button>
+                    {n.kind === 'chart_collaboration' && (
+                      <div
+                        className="flex w-full flex-wrap items-center gap-2 pl-12 text-sm"
+                        role="status"
+                      >
+                        {n.data.status === 'pending' ? (
+                          <>
+                            <p className="w-full text-muted-foreground">
+                              {t('collaboration.permissions')}
+                            </p>
+                            <Button
+                              size="sm"
+                              disabled={responding !== null}
+                              onClick={() => void respond(n, true)}
+                            >
+                              {t('collaboration.accept')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={responding !== null}
+                              onClick={() => void respond(n, false)}
+                            >
+                              {t('collaboration.decline')}
+                            </Button>
+                          </>
+                        ) : (
+                          t(
+                            n.data.status === 'accepted'
+                              ? 'collaboration.accepted'
+                              : n.data.status === 'revoked'
+                                ? 'collaboration.revoked'
+                                : 'collaboration.declined',
+                          )
+                        )}
+                      </div>
+                    )}
+                    {isNew && (
+                      <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-link">
+                        <span className="sr-only">{t('notificationCenter.unread')}</span>
+                      </span>
+                    )}
                   </div>
                 </li>
               )
             })}
           </ul>
         )}
-        {more && (
-          <div className="flex justify-center">
-            <Button variant="outline" disabled={busy} onClick={() => setDepth((n) => n + 1)}>
-              {t('notificationCenter.more')}
-            </Button>
-          </div>
-        )}
       </div>
-      <aside className="space-y-4">
-        <NotificationSettings />
-      </aside>
-    </section>
+      <p className="border-t px-4 py-3 text-center text-xs text-muted-foreground">
+        {t('chat.systemReadOnly')}
+      </p>
+      <Dialog open={settings} onOpenChange={setSettings}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('notificationCenter.settingsTitle')}</DialogTitle>
+          </DialogHeader>
+          <NotificationSettings />
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

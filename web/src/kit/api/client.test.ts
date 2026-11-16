@@ -34,6 +34,10 @@ it('preserves API retry information and non-JSON upload size errors', async () =
     )
     .mockResolvedValueOnce(new Response('Request Entity Too Large', { status: 413 }))
   vi.stubGlobal('fetch', fetch)
-  await expect(api(endpoints.charts)).rejects.toMatchObject({ message: '稍后重试', retryAfter: 12 })
-  await expect(api(endpoints.charts)).rejects.toEqual(new ApiError('文件超过上传大小限制'))
+  await expect(api(endpoints.charts)).rejects.toMatchObject({
+    message: '稍后重试',
+    retryAfter: 12,
+    status: 429,
+  })
+  await expect(api(endpoints.charts)).rejects.toEqual(new ApiError('文件超过上传大小限制', 0, 413))
 })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Notice } from '../notifications'
-import { NotificationBell } from '../notification-center'
+import { ChatBell } from '../chat-center'
 import { useSession } from '../session-context'
 import { FrameBell, useTellFrame } from '../shell/frame'
 import { useSite } from '../site'
@@ -28,7 +28,7 @@ export function Layout() {
     <>
       {session.user && (
         <FrameBell>
-          <NotificationBell />
+          <ChatBell />
         </FrameBell>
       )}
       {(session.error || error) && <Notice>{session.error || error}</Notice>}

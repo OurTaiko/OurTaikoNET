@@ -20,7 +20,7 @@ import {
   GameControllerIcon,
   GearSixIcon,
   HouseIcon,
-  BellIcon,
+  ChatsCircleIcon,
   IdentificationCardIcon,
   ListIcon,
   MagnifyingGlassIcon,
@@ -207,10 +207,10 @@ export function Frame({ children }: { children: ReactNode }) {
           icon: IdentificationCardIcon,
         },
         {
-          key: 'notifications',
-          href: '/notifications',
-          label: t('shell.notifications'),
-          icon: BellIcon,
+          key: 'chats',
+          href: '/chats',
+          label: t('shell.chats'),
+          icon: ChatsCircleIcon,
         },
         // What is yours of the source the menu is turned to: your charts, then your playlists.
         ...(canUpload(source)
@@ -549,8 +549,10 @@ export function Frame({ children }: { children: ReactNode }) {
     },
     songs[1],
     { ...players[0], label: t('shell.players') },
-    // Your charts are under You in the menu, so they light You here.
-    ...(user ? [{ ...you[0], label: t('shell.you'), also: [`/${source}/me/charts`] }] : []),
+    // Your charts and your messages are under You in the menu, so they light You here.
+    ...(user
+      ? [{ ...you[0], label: t('shell.you'), also: [`/${source}/me/charts`, '/chats'] }]
+      : []),
   ]
 
   return (

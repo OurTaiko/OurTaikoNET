@@ -944,7 +944,7 @@
     "you": "나",
     "myPage": "내 페이지",
     "myPlaylists": "내 플레이리스트",
-    "notifications": "알림",
+    "chats": "메시지",
     "manage": "사용자 그룹",
     "manageGroup": "관리",
     "visits": "방문 통계",
@@ -999,5 +999,33 @@
       "visits": "누적 조회 {{total}}회 · 오늘 조회 {{today}}회, 방문자 {{visitors}}명",
       "notice": "이 사이트는 플레이어 커뮤니티 프로젝트이며 반다이남코 엔터테인먼트와 관련이 없습니다. 「태고의 달인」 및 관련 자료의 권리는 해당 권리자에게 있습니다."
     }
+  },
+  "chat": {
+    "title": "메시지",
+    "buttonUnread_other": "메시지 (읽지 않음 {{count}}개)",
+    "loading": "메시지를 불러오는 중…",
+    "system": "알림",
+    "viewAll": "모든 메시지 보기",
+    "message": "메시지 보내기",
+    "signIn": "로그인하면 메시지를 볼 수 있습니다.",
+    "back": "메시지 목록으로",
+    "list": "채팅 목록",
+    "blocked": "차단됨",
+    "noChats": "아직 다른 플레이어와 채팅한 적이 없습니다. 플레이어 페이지에서 “메시지 보내기”를 눌러 시작하세요.",
+    "pick": "채팅을 선택하세요",
+    "more": "더 보기",
+    "profile": "페이지 열기",
+    "block": "차단",
+    "unblock": "차단 해제",
+    "older": "이전 메시지 보기",
+    "empty": "{{name}} 님에게 인사해 보세요.",
+    "read": "읽음",
+    "sent": "보냄",
+    "youBlocked": "이 플레이어를 차단했습니다. 서로 메시지를 보낼 수 없습니다.",
+    "cannotWrite": "이 플레이어에게 메시지를 보낼 수 없습니다.",
+    "placeholder": "메시지 입력",
+    "send": "보내기",
+    "youSaid": "나: {{text}}",
+    "systemReadOnly": "알림에는 답장할 수 없습니다."
   }
 }

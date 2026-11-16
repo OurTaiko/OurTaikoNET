@@ -944,7 +944,7 @@
     "you": "我",
     "myPage": "我的主页",
     "myPlaylists": "我的歌单",
-    "notifications": "通知",
+    "chats": "消息",
     "manage": "用户组",
     "manageGroup": "管理",
     "visits": "访问统计",
@@ -999,5 +999,33 @@
       "visits": "总浏览 {{total}} 次 · 今日 {{today}} 次浏览，{{visitors}} 位访客",
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     }
+  },
+  "chat": {
+    "title": "消息",
+    "buttonUnread_other": "消息（{{count}} 条未读）",
+    "loading": "正在加载消息…",
+    "system": "系统通知",
+    "viewAll": "查看全部消息",
+    "message": "发消息",
+    "signIn": "登录后查看消息。",
+    "back": "返回消息列表",
+    "list": "聊天列表",
+    "blocked": "已屏蔽",
+    "noChats": "还没有和其他玩家聊过。在玩家主页点「发消息」开始聊天。",
+    "pick": "选择一个聊天",
+    "more": "更多",
+    "profile": "查看主页",
+    "block": "屏蔽对方",
+    "unblock": "取消屏蔽",
+    "older": "显示更早的消息",
+    "empty": "和 {{name}} 打个招呼吧。",
+    "read": "已读",
+    "sent": "已发送",
+    "youBlocked": "你已屏蔽对方，双方都不能发消息。",
+    "cannotWrite": "无法向对方发送消息。",
+    "placeholder": "输入消息",
+    "send": "发送",
+    "youSaid": "我：{{text}}",
+    "systemReadOnly": "系统通知只能查看，不能回复。"
   }
 }

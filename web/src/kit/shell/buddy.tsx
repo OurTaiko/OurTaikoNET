@@ -31,6 +31,24 @@ export function useTellBuddy(
   }, [id, nickname, loading, source])
 }
 
+// Pages whose bottom right corner is theirs (an open chat's send button) put the Don away while
+// they are shown. It is only hidden, so it is as it was when it comes back.
+let hiders = 0
+const hideWatchers = new Set<() => void>()
+
+/** On a page that needs the corner the Don stands in: hides it while `hide` holds. */
+export function useHideBuddy(hide: boolean) {
+  useEffect(() => {
+    if (!hide) return
+    hiders++
+    hideWatchers.forEach((watcher) => watcher())
+    return () => {
+      hiders--
+      hideWatchers.forEach((watcher) => watcher())
+    }
+  }, [hide])
+}
+
 const DonBuddy = lazy(() => import('./don-buddy'))
 
 /** The Don, drawn once for the whole site; three.js comes only with a signed-in player. */
@@ -42,10 +60,19 @@ export function FrameBuddy() {
     },
     () => rider,
   )
+  const hidden = useSyncExternalStore(
+    (watcher) => {
+      hideWatchers.add(watcher)
+      return () => void hideWatchers.delete(watcher)
+    },
+    () => hiders > 0,
+  )
   if (!current) return null
   return (
-    <Suspense fallback={null}>
-      <DonBuddy user={current} source={current.source} />
-    </Suspense>
+    <div className={hidden ? 'hidden' : 'contents'}>
+      <Suspense fallback={null}>
+        <DonBuddy user={current} source={current.source} />
+      </Suspense>
+    </div>
   )
 }

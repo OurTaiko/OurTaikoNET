@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/chat"
 	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -63,6 +64,8 @@ type Server struct {
 	visit       visits.Summary
 	visitAt     time.Time
 	visitLimits map[string]window
+	// Who waits for news of their chats (chats.go).
+	chats *chat.Hub
 }
 type window struct {
 	since time.Time
@@ -70,7 +73,7 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}}
+	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
 }
 
 func (s *Server) sessionCookie() string {
@@ -120,6 +123,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/v1/users/{id}/titles", s.userTitles)
 	mux.HandleFunc("GET /api/v1/users/{id}/dans", s.userDans)
+	mux.HandleFunc("GET /api/v1/chats", s.listChats)
+	mux.HandleFunc("POST /api/v1/chats", s.openChat)
+	mux.HandleFunc("GET /api/v1/chats/unread", s.unreadChats)
+	mux.HandleFunc("GET /api/v1/chats/updates", s.chatUpdates)
+	mux.HandleFunc("GET /api/v1/chats/{id}", s.getChat)
+	mux.HandleFunc("GET /api/v1/chats/{id}/messages", s.chatMessages)
+	mux.HandleFunc("POST /api/v1/chats/{id}/messages", s.sendChatMessage)
+	mux.HandleFunc("POST /api/v1/chats/{id}/read", s.readChat)
+	mux.HandleFunc("PUT /api/v1/chats/{id}/block", s.blockChat)
 	mux.HandleFunc("POST /api/v1/visits", s.countVisit)
 	mux.HandleFunc("GET /api/v1/visits", s.visitSummary)
 	mux.HandleFunc("GET /api/v1/admin/visits", s.visitReport)
@@ -150,7 +162,9 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		// Showing a page is no write of the visitor's: it has a count of its own (visits.go).
-		if !service && ((r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login") && r.URL.Path != "/api/v1/visits" && !s.allow(r) {
+		// Nor is having read a chat, which a page says each time a message arrives (chats.go).
+		chatRead := strings.HasPrefix(r.URL.Path, "/api/v1/chats/") && strings.HasSuffix(r.URL.Path, "/read")
+		if !service && ((r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login") && r.URL.Path != "/api/v1/visits" && !chatRead && !s.allow(r) {
 			problem(w, 429, "RATE_LIMITED", "操作过于频繁，请稍后再试")
 			return
 		}

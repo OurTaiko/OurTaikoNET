@@ -27,6 +27,7 @@ import { ChoiceSelect } from '@players/components/choice-select'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Badge } from '@sitekit/components/ui/badge'
 import { Button } from '@sitekit/components/ui/button'
+import { MessageButton } from '@sitekit/chat-center'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
@@ -117,6 +118,7 @@ export function UserPage() {
               <Notice kind="info">{t('profile.accountCenterDown')}</Notice>
             )}
           </div>
+          <MessageButton userId={id} />
         </CardContent>
       </Card>
       <SourceStats profiles={works} />

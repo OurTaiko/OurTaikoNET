@@ -89,7 +89,7 @@ function App({
                     <Route path="charts/:id/edit" element={<ChartEditorPage />} />
                     <Route path="charts/:id" element={<Detail />} />
                     <Route path="charts/:id/comments/:commentId" element={<Detail />} />
-                    <Route path="notifications" element={<LeaveTo address="/notifications" />} />
+                    <Route path="notifications" element={<LeaveTo address="/chats/system" />} />
                     <Route path="login" element={<Auth key="login" />} />
                     <Route path="register" element={<Auth key="register" register />} />
                     <Route

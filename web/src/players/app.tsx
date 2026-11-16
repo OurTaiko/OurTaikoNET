@@ -1,10 +1,10 @@
 // The pages that belong to no song source: home, players (their scores on both sources, titles,
-// 段位 badges and nameplate), the title catalog, and for the site's administrator the manage
-// panel.
+// 段位 badges and nameplate), the title catalog, messages (chats with other players and the
+// site's notices), and for the site's administrator the manage panel.
 import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
-import { NotificationsPage } from '@sitekit/notification-center'
+import { ChatsPage } from '@sitekit/chat-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { SessionProvider } from '@sitekit/session'
 import { RouterBridge } from '@sitekit/navigation'
@@ -51,7 +51,10 @@ function App() {
                 <Route path="players/users/:id" element={<OldUserAddress />} />
                 <Route path="players/:id" element={<UserPage />} />
                 <Route path="titles" element={<TitlesPage />} />
-                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="chats" element={<ChatsPage />} />
+                <Route path="chats/:id" element={<ChatsPage />} />
+                {/* The notices were a page of their own; they are a chat now. */}
+                <Route path="notifications" element={<Navigate to="/chats/system" replace />} />
                 <Route path="manage">
                   <Route index element={<NotFound />} />
                   <Route path="titles" element={<AdminPage />} />
