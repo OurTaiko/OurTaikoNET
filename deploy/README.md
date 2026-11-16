@@ -198,6 +198,40 @@ may be set in `api.env`; neither is needed. To switch the service off again, com
 `MULTIPLAY_LISTEN_ADDR` out in the Compose file: the site then answers
 `404 MULTIPLAY_UNAVAILABLE` and the game does not try.
 
+## Mirror the Don and nameplate art to Alibaba Cloud OSS
+
+Stage the published catalogs and all objects they list with Python 3.11 or newer:
+
+```sh
+python3 -I tools/mirror-distrib.py /path/to/staging
+```
+
+Pass `3dchara` or `nameplate` after the staging directory to prepare only one collection.
+The tool downloads the catalog from `distrib.ourtaiko.org`, checks object byte lengths and
+SHA-256 hashes, and reuses matching local files on retry. It includes the Don base files and
+any catalog-listed icons used by the website. Each catalog is staged after its objects are
+verified. The staging directory can contain files left over from an earlier run. Use a fresh
+directory for an exact snapshot.
+
+1. Upload the staged objects at the same relative paths under `3dchara/` and `nameplate/` in
+   the destination bucket. Upload each `catalog.json` after its objects are reachable. Keep
+   the original bytes and use the appropriate content types.
+2. Serve the destination through an HTTPS CDN hostname. For a mainland China OSS origin, use
+   a CDN hostname eligible for mainland China acceleration. If the bucket is private, configure
+   CDN origin access. Use a short cache lifetime for `catalog.json` and include the `v` query
+   parameter in the cache key for asset requests so changed objects get a new cache entry.
+3. Fetch the mirrored catalogs and test an uncached model and icon with their versioned URLs.
+   Verify the response bytes against the catalog, then point `DON_CATALOG_URL` at the mirror's
+   `3dchara/catalog.json`. The API builds its Don asset URLs relative to this catalog. Check
+   the resulting API URLs and load an outfit on a game client with an empty asset cache.
+4. Already shipped game clients fetch `https://distrib.ourtaiko.org/nameplate/catalog.json`
+   directly. To move their nameplate traffic, keep that public URL and route its prefix to the
+   mirror. Using a different nameplate hostname requires a game build that requests it.
+
+Run staging and upload again after publishing new Don or nameplate art to the canonical bucket.
+To roll back Don downloads, restore the previous `DON_CATALOG_URL`. Chart downloads use the
+separate `FANMADE_S3_PUBLIC_BASE_URL` and `OFFICIAL_S3_PUBLIC_BASE_URL` settings.
+
 ## Files before the switch
 
 Until the switch the database here is a copy of the old ones, refreshed by the import, while
