@@ -220,10 +220,12 @@ directory for an exact snapshot.
    a CDN hostname eligible for mainland China acceleration. If the bucket is private, configure
    CDN origin access. Use a short cache lifetime for `catalog.json` and include the `v` query
    parameter in the cache key for asset requests so changed objects get a new cache entry.
+   Allow cross-origin GET requests from the website's origin for the browser's Don renderer.
 3. Fetch the mirrored catalogs and test an uncached model and icon with their versioned URLs.
    Verify the response bytes against the catalog, then point `DON_CATALOG_URL` at the mirror's
    `3dchara/catalog.json`. The API builds its Don asset URLs relative to this catalog. Check
-   the resulting API URLs and load an outfit on a game client with an empty asset cache.
+   the resulting API URLs, load an uncached outfit in the game, and check the website's Don
+   preview from the configured site origin.
 4. Already shipped game clients fetch `https://distrib.ourtaiko.org/nameplate/catalog.json`
    directly. To move their nameplate traffic, keep that public URL and route its prefix to the
    mirror. Using a different nameplate hostname requires a game build that requests it.
