@@ -85,6 +85,7 @@ type App struct {
 	pools   []*pgxpool.Pool
 	legacy  legacy.Hosts
 	webDir  string
+	origin  string
 	// sso is the account center's client when there is one; Start refreshes its copy of
 	// players' profiles.
 	sso *account.Client
@@ -109,7 +110,7 @@ func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Reque
 // New connects to the database and builds both sources. The database must already hold the
 // schema this program was built for; see Init.
 func New(ctx context.Context, cfg Config) (*App, error) {
-	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir}
+	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir, origin: cfg.Origin}
 	// A release that changes the schema carries the change and applies it as it starts.
 	applied, err := netdb.Migrate(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -261,7 +262,7 @@ func (a *App) Handler() http.Handler {
 		}
 		current.ServeHTTP(w, r)
 	})
-	return legacy.Handler(a.legacy, site.Web(a.webDir, api))
+	return legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, api))
 }
 
 // Start fails the uploads a restart interrupted and runs each source's background work until
