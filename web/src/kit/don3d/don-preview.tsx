@@ -63,10 +63,10 @@ export function DonPreview({
       setState({ loading: false, error: error instanceof Error ? error : new Error(String(error)) })
       return () => canvas.remove()
     }
-    const resize = () => {
-      const box = canvas.getBoundingClientRect()
-      created.resize(box.width, box.height, window.devicePixelRatio || 1)
-    }
+    // The layout size, not the drawn one: a scaled-down Don (the frame's, in its corner) keeps the
+    // resolution it has when shown at full size.
+    const resize = () =>
+      created.resize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1)
     resize()
     const observer = new ResizeObserver(resize)
     observer.observe(canvas)

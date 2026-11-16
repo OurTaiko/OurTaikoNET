@@ -14,6 +14,7 @@ import type { Dans, HeldTitle, Nameplate as Plate, ScorePage } from '@players/ap
 import { Crown } from '@players/components/crown'
 import { TitleBand } from '@players/components/nameplate'
 import { SongTile, SourceTag, sourceApi, sources } from '@players/components/song-tile'
+import { chartSources } from '@players/pages/user-works'
 import { danName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
@@ -245,7 +246,7 @@ function DanRanks({ id, onMore }: { id: string; onMore: () => void }) {
   )
 }
 
-/** The newest charts the player made, of both sources; nothing when they made none. */
+/** The newest charts the player uploaded (to Fanmade); nothing when they made none. */
 function Charts({ id, onMore }: { id: string; onMore: () => void }) {
   const { t } = useTranslation()
   const [charts, setCharts] = useState<{ source: SourceId; chart: ChartBase }[] | null>(null)
@@ -254,7 +255,7 @@ function Charts({ id, onMore }: { id: string; onMore: () => void }) {
     setCharts(null)
     // A source that does not answer leaves the other's charts showing.
     void Promise.all(
-      sources.map((source) =>
+      chartSources.map((source) =>
         api<ChartList>(`${sourceApi(source)}/charts?owner=${encodeURIComponent(id)}`, {
           signal: controller.signal,
         })

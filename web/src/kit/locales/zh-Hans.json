@@ -966,6 +966,15 @@
     "ka": "咔（青）",
     "route": "当前位置",
     "section": "栏目",
-    "page": "页面"
+    "page": "页面",
+    "buddy": {
+      "open": "打开我的名牌",
+      "close": "收起",
+      "title": "{{name}} 的名牌",
+      "ways": "去往",
+      "playlists": "我的歌单",
+      "page": "个人主页",
+      "charts": "我的谱面"
+    }
   }
 }

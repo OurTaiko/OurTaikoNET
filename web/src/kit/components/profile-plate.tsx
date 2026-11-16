@@ -13,12 +13,12 @@ export const PLAYERS_API = SITE_API_ROOT
 export const profilePage = (id: string) => `${PROFILE_URL}/${encodeURIComponent(id)}`
 
 type Style = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
-type Plate = {
+export type Plate = {
   title: { name: string; nameTranslations?: Record<string, string>; style: Style } | null
   dan: { index: number; gold: boolean; combo?: 0 | 1 | 2 } | null
 }
 
-const danNames = [
+export const danNames = [
   '初級',
   '十級',
   '九級',
@@ -78,16 +78,22 @@ function plateOf(id: string): Promise<Plate | null> {
   return plate
 }
 
-export function ProfilePlate({ userId, className }: { userId: string; className?: string }) {
-  const { i18n } = useTranslation()
-  const [plate, setPlate] = useState<Plate | null>(null)
+/** What a player wears (their title and 段位), read with the other names on the page; null meanwhile. */
+export function usePlate(userId: string): Plate | null {
+  const [plate, setPlate] = useState<{ id: string; plate: Plate | null } | null>(null)
   useEffect(() => {
     let current = true
-    void plateOf(userId).then((p) => current && setPlate(p))
+    void plateOf(userId).then((p) => current && setPlate({ id: userId, plate: p }))
     return () => {
       current = false
     }
   }, [userId])
+  return plate?.id === userId ? plate.plate : null
+}
+
+export function ProfilePlate({ userId, className }: { userId: string; className?: string }) {
+  const { i18n } = useTranslation()
+  const plate = usePlate(userId)
   if (!plate || (!plate.title && !plate.dan)) return null
   const language = i18n.resolvedLanguage === 'zh-Hans' ? 'zh-Hans' : (i18n.resolvedLanguage ?? '')
   return (

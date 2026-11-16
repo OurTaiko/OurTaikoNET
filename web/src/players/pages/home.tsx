@@ -1,17 +1,14 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { ChartBarIcon, IdentificationCardIcon, MedalIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import type { ChartBase, ChartList } from '@sitekit/api/types'
 import { supportsChart } from '@sitekit/courses'
 import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
-import { useRememberedSource } from '@sitekit/shell/site'
 import type { SourceId } from '@sitekit/source'
 import { endpoints } from '@players/api/endpoints'
-import type { PublicProfile } from '@players/api/types'
-import { Nameplate } from '@players/components/nameplate'
 import { newestOf } from '@players/newest'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
@@ -44,23 +41,10 @@ function useLibraries() {
   return libraries
 }
 
-// three.js comes with it: only once someone is signed in.
-const PlayerDon = lazy(() => import('@players/components/player-don'))
-
+// A guest is asked to sign in here; a player finds their plate and things in the frame's Don.
 function You() {
   const { t } = useTranslation()
   const session = useSession()
-  const id = session.user?.id
-  const source = useRememberedSource()
-  const [profile, setProfile] = useState<PublicProfile | null>(null)
-  useEffect(() => {
-    if (!id) return
-    const controller = new AbortController()
-    api<PublicProfile>(endpoints.user(id), { signal: controller.signal })
-      .then(setProfile)
-      .catch(() => undefined) // The plate is an extra here; the player's page reports what failed.
-    return () => controller.abort()
-  }, [id])
   if (session.loading) return <Skeleton className="rounded-[28px] w-full h-40" />
   if (!session.user) {
     const features = [
@@ -98,45 +82,7 @@ function You() {
       </section>
     )
   }
-  const user = session.user
-  return (
-    <section
-      aria-label={t('home.plate')}
-      className="flex sm:flex-row flex-col sm:items-center gap-6 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0"
-    >
-      <div className="flex-1 min-w-0">
-        {/* The player's Don stands at the plate's left, as on the game's song select. */}
-        <div className="flex items-end gap-1 min-w-0">
-          <Suspense fallback={<div className="w-24 sm:w-28 shrink-0 aspect-square" />}>
-            <PlayerDon userId={user.id} className="-mb-2 w-24 sm:w-28 shrink-0" />
-          </Suspense>
-          <Nameplate
-            className="flex-1 min-w-0"
-            plate={{
-              userId: user.id,
-              title: null,
-              dan: null,
-              showDan: false,
-              ...profile?.nameplate,
-              nickname: user.nickname,
-              avatarUrl: user.avatarUrl ?? '',
-            }}
-          />
-        </div>
-      </div>
-      <div className="flex sm:flex-col flex-wrap gap-2 shrink-0">
-        <Link className={buttonVariants()} to={`/players/${user.id}`}>
-          {t('home.openMyPage')}
-        </Link>
-        <a className={buttonVariants({ variant: 'secondary' })} href={`/${source}/me/playlists`}>
-          {t('home.myPlaylists')}
-        </a>
-        <a className={buttonVariants({ variant: 'secondary' })} href="/fanmade/me/charts">
-          {t('home.myCharts')}
-        </a>
-      </div>
-    </section>
-  )
+  return null
 }
 
 export function HomePage() {

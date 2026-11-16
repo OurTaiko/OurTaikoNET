@@ -977,6 +977,15 @@
     "ka": "Ka (teal)",
     "route": "Where you are",
     "section": "Section",
-    "page": "Page"
+    "page": "Page",
+    "buddy": {
+      "open": "Open my nameplate",
+      "close": "Close",
+      "title": "{{name}}'s nameplate",
+      "ways": "Go to",
+      "playlists": "My playlists",
+      "page": "My page",
+      "charts": "My charts"
+    }
   }
 }

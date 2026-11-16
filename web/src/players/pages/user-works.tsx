@@ -43,32 +43,33 @@ export function useSourceProfiles(id: string): SourceProfiles {
   return profiles.id === id ? profiles.of : {}
 }
 
-/** The numbers under a player's name: plays in each source, then what they made in both. */
+// Players upload their own charts to Fanmade only; Official's charts are the official ones.
+export const chartSources: SourceId[] = ['fanmade']
+
+/** The numbers under a player's name: their plays in both sources together, then what they made. */
 export function SourceStats({ profiles }: { profiles: SourceProfiles }) {
   const { t, i18n } = useTranslation()
   const locale = formatLocale(i18n.resolvedLanguage ?? 'zh-Hans')
   const loading = sources.some((source) => profiles[source] === undefined)
-  const sum = (field: 'chartCount' | 'commentCount' | 'karma') =>
-    sources.reduce((total, source) => total + (profiles[source]?.[field] ?? 0), 0)
-  const tiles: { key: string; source?: SourceId; value: number; label: string }[] = [
-    ...sources.map((source) => ({
-      key: `plays-${source}`,
-      source,
-      value: profiles[source]?.scoreCount ?? 0,
-      label: t('profile.stats.plays'),
-    })),
-    { key: 'charts', value: sum('chartCount'), label: t('profile.stats.charts') },
+  const sum = (field: 'scoreCount' | 'chartCount' | 'commentCount' | 'karma', of = sources) =>
+    of.reduce((total, source) => total + (profiles[source]?.[field] ?? 0), 0)
+  const tiles: { key: string; value: number; label: string }[] = [
+    { key: 'plays', value: sum('scoreCount'), label: t('profile.stats.plays') },
+    {
+      key: 'charts',
+      value: sum('chartCount', chartSources),
+      label: t('profile.stats.charts'),
+    },
     { key: 'comments', value: sum('commentCount'), label: t('profile.stats.comments') },
     { key: 'karma', value: sum('karma'), label: t('interactions.karma') },
   ]
   return (
-    <dl className="gap-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" data-testid="player-stats">
+    <dl className="gap-3 grid grid-cols-2 lg:grid-cols-4" data-testid="player-stats">
       {tiles.map((tile) => (
         <div
           key={tile.key}
           className="flex flex-col gap-1 bg-card shadow-elev-1 p-4 rounded-[20px] min-w-0"
         >
-          <div className="h-[1.375rem]">{tile.source && <SourceTag source={tile.source} />}</div>
           <dd className="font-extrabold text-3xl tabular-nums tracking-tight">
             {loading ? (
               <Skeleton className="rounded-md w-12 h-9" />
@@ -187,14 +188,16 @@ function SourceWorks<T extends { id: string }>({
   )
 }
 
-/** A list of a player's things in both sources, one part for each source that has any. */
+/** A list of a player's things in the sources (both by default), one part for each that has any. */
 function Works<T extends { id: string }>({
   address,
   layout,
   empty,
+  of = sources,
   children,
 }: {
   address: (source: SourceId) => string
+  of?: SourceId[]
   layout: string
   empty: string
   children: (source: SourceId, item: T) => ReactNode
@@ -202,7 +205,7 @@ function Works<T extends { id: string }>({
   const [totals, setTotals] = useState<Partial<Record<SourceId, number>>>({})
   return (
     <div className="space-y-8">
-      {sources.map((source) => (
+      {of.map((source) => (
         <SourceWorks<T>
           key={source}
           source={source}
@@ -217,7 +220,7 @@ function Works<T extends { id: string }>({
           {(item) => children(source, item)}
         </SourceWorks>
       ))}
-      {sources.every((source) => totals[source] === 0) && (
+      {of.every((source) => totals[source] === 0) && (
         <p className="py-10 text-muted-foreground text-sm text-center">{empty}</p>
       )}
     </div>
@@ -229,6 +232,7 @@ export function ChartsTab({ id }: { id: string }) {
   return (
     <Works<ChartBase>
       address={(source) => `${sourceApi(source)}/charts?owner=${encodeURIComponent(id)}`}
+      of={chartSources}
       layout="song-grid"
       empty={t('profile.noCharts')}
     >

@@ -6,7 +6,7 @@
 // players, titles), at the top. The frame's links are whole addresses; one that stays in the
 // area it is shown in is a router link, any other is a plain link, which the root follows by
 // swapping the area in place.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
@@ -45,6 +45,9 @@ import {
 } from '../components/ui/dropdown-menu'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
+
+// The signed-in player's Don in a corner of every page; three.js comes only with it.
+const DonBuddy = lazy(() => import('./don-buddy'))
 
 export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
 
@@ -556,6 +559,12 @@ export function Shell({
           </ShellLink>
         ))}
       </nav>
+
+      {!loading && user && (
+        <Suspense fallback={null}>
+          <DonBuddy user={user} source={source} />
+        </Suspense>
+      )}
     </div>
   )
 }

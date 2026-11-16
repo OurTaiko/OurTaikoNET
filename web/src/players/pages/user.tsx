@@ -21,6 +21,7 @@ import type {
   ScoreView,
 } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
+import { sources } from '@players/components/song-tile'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { UserAvatar } from '@sitekit/components/user-avatar'
@@ -49,6 +50,7 @@ import {
   PlaylistsTab,
   Seen,
   SourceStats,
+  chartSources,
   useSourceProfiles,
 } from '@players/pages/user-works'
 import { OverviewTab } from '@players/pages/user-overview'
@@ -77,8 +79,8 @@ export function UserPage() {
   const open = (name: string) =>
     setParams(name === 'overview' ? {} : { tab: name }, { replace: true })
   const works = useSourceProfiles(id)
-  const count = (field: 'chartCount' | 'playlistCount' | 'commentCount') =>
-    (works.fanmade?.[field] ?? 0) + (works.official?.[field] ?? 0)
+  const count = (field: 'chartCount' | 'playlistCount' | 'commentCount', of = sources) =>
+    of.reduce((total, source) => total + (works[source]?.[field] ?? 0), 0)
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [error, setError] = useState('')
   const mine = session.user?.id === id
@@ -127,7 +129,7 @@ export function UserPage() {
             <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
             <TabsTrigger value="charts">
               {t('profile.tabs.charts')}
-              <TabCount value={count('chartCount')} />
+              <TabCount value={count('chartCount', chartSources)} />
             </TabsTrigger>
             <TabsTrigger value="playlists">
               {t('profile.tabs.playlists')}
