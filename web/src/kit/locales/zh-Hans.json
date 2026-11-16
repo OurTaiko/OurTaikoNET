@@ -1041,5 +1041,15 @@
     "playlists": "玩家整理的太鼓谱面歌单，以及系统歌单。",
     "dans": "官方与社区制作的段位道场，可以在游戏中挑战。",
     "register": "注册"
+  },
+  "rewards": {
+    "heading": "获得了新奖励",
+    "title": "新称号",
+    "dan": "段位",
+    "fromCourse": "通过段位「{{course}}」获得",
+    "fromRule": "达成条件获得",
+    "fromAdmin": "管理员授予",
+    "wear": "去佩戴",
+    "gotIt": "知道了"
   }
 }

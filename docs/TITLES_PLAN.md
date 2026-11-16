@@ -27,18 +27,20 @@ The rules work, but nothing tells a player that they got a title or how far they
 
 ### 1.1 Rewards, told the same way for every request
 
+**Done on `feat/titles` (2026-11-16)**, as described below, with one change: the number is counted from `net.rewards` on every signed-in answer (an index on the unseen rows makes it one short index scan, usually of nothing), not kept on `net.users`. A counter there would have tied `users` to rewards and had to be kept right by every path that gives or marks; counting keeps the package to its own table. Revisit if the count shows up in the database's load. The README's "Rewards" says how it works.
+
 A reward can come from any request: a score, an upload, or any request of the game at all (`game_login` is judged where a request's activity is written). So no single answer can be where a client learns of it, and none is: not even the score's. There are no exceptions.
 
 - **The server keeps what was not seen yet.** A table of the site's own, `net.rewards (id, user_id, kind, data, created_at, seen_at)`, written in the same statement or transaction that gives the thing: a title from a rule, a 段位 course or an administrator; a 段位 badge; later, anything else given. It is one list for the website and the game.
 - **Every answer to a signed-in request carries a header**, `X-Pending-Rewards: <n>`, the number not seen yet. One middleware sets it for every route of both sources and of the players' part, file downloads included; no answer's body changes. Absent, or 0, means nothing to fetch.
 - **The client fetches when it sees more than 0**: `GET /api/v1/me/rewards` gives the ones not seen, oldest first, each with what is needed to show it (a title with its band). When it has shown them, `POST /api/v1/me/rewards/seen {"ids": […]}`; the header goes back to 0. The game does this on its result screen after a score as anywhere else: the score's answer comes back with the header like every other.
-- **The number must be cheap.** Not a count over the table on every request: keep it on `net.users` (incremented where a reward is written, decremented when marked seen), and read it with the player's activity, which is read on every signed-in request already.
+- **The number must be cheap.** (Planned as a counter on `net.users`; done as an indexed count instead, see above.)
 - A response lost to a timeout or a retry loses nothing: the next answer carries the header again.
 - The website's bell can show the same number, and the inbox can list the rewards; whether rewards and the sources' notifications become one inbox is to be decided when this is built.
 
 ### 1.2 The game
 
-OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the rewards (the title band on the result screen, a toast elsewhere) and marks them seen. A change in the game's repository, after 1.1.
+OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the rewards (the title band on the result screen, a toast elsewhere) and marks them seen. A change in the game's repository, after 1.1. The server's side is ready: the game reads the header on any answer and uses `GET /api/v1/game/rewards` and `POST /api/v1/game/rewards/seen` with its token.
 
 ### 1.3 and 1.4
 
@@ -91,7 +93,7 @@ No behaviour changes; goes with any release of the backend.
 
 ## Releasing `feat/titles`
 
-- It carries migration `0008_title_rules`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
+- It carries migrations `0008_title_rules` and `0009_rewards`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
 - Releasing the backend closes every Multi-Enso room.
 - `feat/story` has a migration numbered `0003`, which `main` has since used. Whichever of the two branches is merged second renumbers its migration (this branch already moved its own from 0006 to 0008 when it took in `main`).
 - After release, make the first rules by hand in `/manage/titles` and check the number the page reports for each against what is expected.
