@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChartBarIcon, IdentificationCardIcon, MedalIcon } from '@phosphor-icons/react'
@@ -43,6 +43,9 @@ function useLibraries() {
   }, [])
   return libraries
 }
+
+// three.js comes with it: only once someone is signed in.
+const PlayerDon = lazy(() => import('@players/components/player-don'))
 
 function You() {
   const { t } = useTranslation()
@@ -97,20 +100,29 @@ function You() {
   }
   const user = session.user
   return (
-    <section className="flex sm:flex-row flex-col sm:items-center gap-6 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0">
-      <div className="flex-1 space-y-3 min-w-0">
-        <h2 className="font-extrabold text-2xl tracking-tight">{t('home.plate')}</h2>
-        <Nameplate
-          plate={{
-            userId: user.id,
-            title: null,
-            dan: null,
-            showDan: false,
-            ...profile?.nameplate,
-            nickname: user.nickname,
-            avatarUrl: user.avatarUrl ?? '',
-          }}
-        />
+    <section
+      aria-label={t('home.plate')}
+      className="flex sm:flex-row flex-col sm:items-center gap-6 bg-card shadow-elev-1 p-6 rounded-[28px] min-w-0"
+    >
+      <div className="flex-1 min-w-0">
+        {/* The player's Don stands at the plate's left, as on the game's song select. */}
+        <div className="flex items-end gap-1 min-w-0">
+          <Suspense fallback={<div className="w-24 sm:w-28 shrink-0 aspect-square" />}>
+            <PlayerDon userId={user.id} className="-mb-2 w-24 sm:w-28 shrink-0" />
+          </Suspense>
+          <Nameplate
+            className="flex-1 min-w-0"
+            plate={{
+              userId: user.id,
+              title: null,
+              dan: null,
+              showDan: false,
+              ...profile?.nameplate,
+              nickname: user.nickname,
+              avatarUrl: user.avatarUrl ?? '',
+            }}
+          />
+        </div>
       </div>
       <div className="flex sm:flex-col flex-wrap gap-2 shrink-0">
         <Link className={buttonVariants()} to={`/players/${user.id}`}>

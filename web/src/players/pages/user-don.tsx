@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
+import { readDonCatalog, type Catalog } from '@players/don-catalog'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { Button } from '@sitekit/components/ui/button'
@@ -24,18 +25,7 @@ import {
   type DonPartKind,
 } from '@sitekit/don3d'
 
-type Catalog = DonCatalog & { baseUrl: string }
 type Answer = { look: DonLook }
-
-// The catalog is the same for every page: read once.
-let catalogRequest: Promise<Catalog> | null = null
-function readCatalog(): Promise<Catalog> {
-  catalogRequest ??= api<Catalog>(endpoints.donCatalog).catch((e: unknown) => {
-    catalogRequest = null
-    throw e
-  })
-  return catalogRequest
-}
 
 // The motions the preview offers, in the order they are shown.
 const motions = [
@@ -91,7 +81,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
     setDraft(null)
     setError('')
     Promise.all([
-      readCatalog(),
+      readDonCatalog(),
       api<Answer>(mine ? endpoints.myDon : endpoints.userDon(id), { signal: controller.signal }),
     ])
       .then(([c, answer]) => {
