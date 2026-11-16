@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { PLAYERS_API } from './components/profile-plate'
 import { normalizeLanguage } from './i18n'
-import { cn } from './lib/utils'
+import { TitleBandArt, type TitleStyle } from './components/nameplate-art'
 
 // The title catalog of OurTaikoProfile (profile.ourtaiko.org), which 段位 courses give titles
 // from. A course may give official titles (once it is official itself), its maker's own
 // community titles, and the community titles Profile's administrators keep (no maker).
 
-export type TitleStyle = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
+export type { TitleStyle }
 export type ProfileTitle = {
   id: string
   name: string
@@ -16,15 +16,6 @@ export type ProfileTitle = {
   style: TitleStyle
   official: boolean
   ownerId: string | null
-}
-
-const bands: Record<TitleStyle, string> = {
-  wood: 'bg-linear-to-b from-[#a8743f] to-[#6e4420]',
-  teal: 'bg-linear-to-b from-[#3fb6b2] to-[#1d6f73]',
-  wood2: 'bg-linear-to-b from-[#d6a46a] to-[#9a6430]',
-  purple: 'bg-linear-to-b from-[#9b6ad6] to-[#5b2f93]',
-  gold: 'bg-linear-to-b from-[#f7d774] to-[#b8860b]',
-  rainbow: 'bg-[linear-gradient(90deg,#ff5f6d,#ffc371,#fff66d,#6dff9c,#5fc8ff,#a06dff)]',
 }
 
 export const profileTitlesPage = '/titles'
@@ -74,7 +65,7 @@ export function titleText(title: ProfileTitle, language?: string) {
   return title.nameTranslations?.[normalizeLanguage(language)] || title.name
 }
 
-// The title as the nameplate's band shows it.
+// The title on its band, cut from the game's own band art (the public bucket's nameplate/).
 export function TitleBand({
   title,
   language,
@@ -85,14 +76,6 @@ export function TitleBand({
   className?: string
 }) {
   return (
-    <span
-      className={cn(
-        'inline-block max-w-full truncate rounded-md px-2.5 py-0.5 text-sm font-bold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]',
-        bands[title.style] ?? bands.wood,
-        className,
-      )}
-    >
-      {titleText(title, language)}
-    </span>
+    <TitleBandArt style={title.style} name={titleText(title, language)} className={className} />
   )
 }
