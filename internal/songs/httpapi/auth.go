@@ -105,3 +105,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	}
 	web.Respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
 }
+
+// Require is who a request is from, for routes outside this server (such as package rewards'):
+// the game by its token on a path under /api/v1/game/, the website by its session elsewhere.
+// It answers the request itself when nobody is signed in, or, with write, when a website's
+// request lacks its CSRF token.
+func (s *Server) Require(w http.ResponseWriter, r *http.Request, write bool) (string, bool) {
+	v, ok := s.required(w, r, write)
+	return v.User.ID, ok
+}

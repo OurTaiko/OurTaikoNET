@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/requester"
 	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -128,7 +129,8 @@ type activityWriter interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
-// RecordActivity notes that a player was just seen, and with login that they signed in. A
+// RecordActivity notes that a player was just seen, and with login that they signed in, and
+// tells the request who it is from (requester.Note): every authenticated request comes here. A
 // player not known to the site yet becomes known. Call only after authentication. Writes at
 // most once a minute for a player.
 //
@@ -137,6 +139,8 @@ type activityWriter interface {
 // none. Failing to give a title is logged and does not fail the request, so do not pass seen
 // with a transaction: an error would spoil it.
 func RecordActivity(ctx context.Context, db activityWriter, id string, login bool, seen string) error {
+	// Whatever runs around the handlers may want to know (package requester).
+	requester.Note(ctx, id)
 	tag, err := db.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at)
  VALUES($1,CASE WHEN $2 THEN now() ELSE NULL END,now())
  ON CONFLICT(id) DO UPDATE SET

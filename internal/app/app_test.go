@@ -331,6 +331,9 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 // accountCenter stands in for the account center's internal API: the access token
 // "tok:<player id>" is that player's, until it is revoked; "adm:<player id>" is the same for
 // someone the account center calls this site's administrator.
+// gameTokenPrefix and a player's id are that player's game token.
+var gameTokenPrefix = strings.Repeat("g", 32)
+
 const newcomer = "cccccccccccccccccccccccccccccc33"
 
 func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
@@ -361,6 +364,9 @@ func accountCenter(t *testing.T) (issuer string, revoked *sync.Map) {
 				users = append(users, map[string]any{"id": newcomer, "username": "Newcomer1", "nickname": "新来的", "avatarUrl": ""})
 			}
 			json.NewEncoder(w).Encode(map[string]any{"users": users})
+		case r.URL.Path == "/internal/v1/game/introspect" && strings.HasPrefix(body.AccessToken, gameTokenPrefix):
+			// A game's token is gameTokenPrefix and the player's id: 64 characters, as the game's are.
+			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": strings.TrimPrefix(body.AccessToken, gameTokenPrefix), "username": "player", "nickname": "Player", "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
 		case r.URL.Path == "/internal/v1/web/introspect" && ok && !gone:
 			json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": id, "username": "player", "nickname": "Player", "isAdmin": admin, "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
 		default:

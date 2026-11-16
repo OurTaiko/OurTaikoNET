@@ -25,6 +25,7 @@ import (
 	"ourtaiko.dev/net/internal/multiplay"
 	"ourtaiko.dev/net/internal/netdb"
 	profile "ourtaiko.dev/net/internal/profile/httpapi"
+	"ourtaiko.dev/net/internal/rewards"
 	"ourtaiko.dev/net/internal/site"
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
@@ -94,6 +95,8 @@ type App struct {
 	rooms     *multiplay.Server
 	roomsAddr string
 	roomsSite site.Multiplay
+	// rewards tells players what they were given (Handler).
+	rewards rewards.Store
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -171,6 +174,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	if officialSite == "" {
 		officialSite = cfg.Origin + "/official"
 	}
+	a.rewards = rewards.Store{DB: shared}
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		SessionCookie: SessionCookie, Groups: true, DonCatalogURL: cfg.DonCatalogURL,
@@ -255,14 +259,15 @@ func (a *App) Handler() http.Handler {
 	// Both sources and the players' part read one database, so one readiness check speaks
 	// for the site.
 	ready := a.Fanmade.Handler()
-	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/readyz" {
-			ready.ServeHTTP(w, r)
-			return
-		}
-		current.ServeHTTP(w, r)
-	})
-	return legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, api))
+	// What players were given (package rewards): the website asks with its session, the game
+	// with its token. Either source knows a game's token; the players' part knows the website.
+	routes := http.NewServeMux()
+	a.rewards.Routes(routes, "/api/v1/me/rewards", a.Players.Require)
+	a.rewards.Routes(routes, "/api/v1/game/rewards", a.Fanmade.Require)
+	routes.Handle("/readyz", ready)
+	routes.Handle("/", current)
+	// Every answer, the old domains' too, says how many rewards its player has not seen.
+	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
 }
 
 // Start fails the uploads a restart interrupted and runs each source's background work until
