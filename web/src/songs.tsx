@@ -9,6 +9,7 @@ import { Layout } from '@sitekit/components/layout'
 import { DanEditorPage, DanPage, DansPage } from '@sitekit/dans'
 import type { Language } from '@sitekit/i18n'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
+import { PageMeta } from '@sitekit/head'
 import { NotificationProvider } from '@sitekit/notifications'
 import { Auth, ChartManagerPage, Detail, Library } from '@sitekit/pages'
 import { MyPlaylistsPage, PlaylistPage, PlaylistsPage } from '@sitekit/playlists'
@@ -70,12 +71,28 @@ function App({
                     <Route index element={<Library />} />
                     <Route path="users" element={<LeaveTo address="/players" />} />
                     <Route path="users/:id" element={<LeaveToPlayer />} />
-                    <Route path="me/profile" element={<ProfilePage />} />
+                    <Route
+                      path="me/profile"
+                      element={
+                        <>
+                          <PageMeta title={t('messages.profile')} noindex />
+                          <ProfilePage />
+                        </>
+                      }
+                    />
                     <Route path="me/charts" element={<ChartManagerPage />} />
                     {/* Publishing and replacing files need a signed-in user. */}
                     <Route element={<RequireSignIn />}>
                       <Route path="me/charts/publish" element={<ChartManagerPage />} />
-                      <Route path="charts/:id/update" element={<UpdatePage />} />
+                      <Route
+                        path="charts/:id/update"
+                        element={
+                          <>
+                            <PageMeta title={t('messages.updateSongAndCharts')} noindex />
+                            <UpdatePage />
+                          </>
+                        }
+                      />
                     </Route>
                     <Route path="playlists" element={<PlaylistsPage />} />
                     <Route path="dans" element={<DansPage />} />
@@ -86,16 +103,25 @@ function App({
                     <Route path="playlists/:id" element={<PlaylistPage />} />
                     <Route path="me/playlists" element={<MyPlaylistsPage />} />
                     <Route path="upload" element={<Navigate to="/me/charts/publish" replace />} />
-                    <Route path="charts/:id/edit" element={<ChartEditorPage />} />
+                    <Route
+                      path="charts/:id/edit"
+                      element={
+                        <>
+                          <PageMeta title={t('editor.title')} noindex />
+                          <ChartEditorPage />
+                        </>
+                      }
+                    />
                     <Route path="charts/:id" element={<Detail />} />
                     <Route path="charts/:id/comments/:commentId" element={<Detail />} />
-                    <Route path="notifications" element={<LeaveTo address="/notifications" />} />
+                    <Route path="notifications" element={<LeaveTo address="/chats/system" />} />
                     <Route path="login" element={<Auth key="login" />} />
                     <Route path="register" element={<Auth key="register" register />} />
                     <Route
                       path="*"
                       element={
                         <div className="flex flex-col items-center justify-center gap-4 rounded-[20px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground">
+                          <PageMeta title={t('messages.pageNotFound')} noindex />
                           <h1 className="text-2xl font-extrabold sm:text-3xl">
                             {t('messages.pageNotFound')}
                           </h1>

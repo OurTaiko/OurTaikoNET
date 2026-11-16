@@ -52,6 +52,7 @@ import { cn } from './lib/utils'
 import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
+import { usePageMeta } from './head'
 
 // 段位 courses as OurTaikoPlay plays them (one to three songs with conditions). The game reads
 // them from this server; passing an official one gives a 段位 badge on OurTaikoProfile.
@@ -296,6 +297,7 @@ export function DansPage() {
       .catch((e: Error) => !controller.signal.aborted && setError(e.message))
     return () => controller.abort()
   }, [])
+  usePageMeta({ title: t('dans.heading'), description: t('meta.dans') })
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -343,6 +345,20 @@ export function DanPage() {
       .catch((e: Error) => !controller.signal.aborted && setError(e.message))
     return () => controller.abort()
   }, [id])
+  const metaTitle = dan ? danTitle(dan.title, i18n.resolvedLanguage) : undefined
+  usePageMeta({
+    title: metaTitle,
+    description: dan
+      ? t('meta.dan', {
+          title: metaTitle,
+          owner: dan.owner || t('dans.unknownOwner'),
+          // The songs by name, unless some are hidden: then only how many.
+          songs: dan.songs.some((s) => s.hidden)
+            ? t('playlists.songCount', { count: dan.songs.length })
+            : dan.songs.map((s) => s.title).join(' / '),
+        })
+      : undefined,
+  })
   if (error) return <Notice>{error}</Notice>
   if (!dan) return <p role="status">{t('dans.loading')}</p>
   const canEdit = session.user && (session.user.id === dan.ownerId || session.user.isAdmin)
@@ -732,6 +748,7 @@ export function DanEditorPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const profile = useProfileTitles()
+  usePageMeta({ title: t(id ? 'dans.editHeading' : 'dans.createHeading'), noindex: true })
   useEffect(() => {
     if (!id) return
     const controller = new AbortController()

@@ -5,3 +5,9 @@
 *.log
 deploy
 web
+# Kept for the test stage: internal/site's tests check its copies of the website's words.
+!web/index.html
+!web/src/kit/locales/zh-Hans.json
+!web/src/sources/fanmade/locales/zh-Hans.json
+!web/src/sources/official/locales/zh-Hans.json
+!web/src/players/locales/zh-Hans.json

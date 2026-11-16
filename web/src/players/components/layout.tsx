@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { FrameBell, useTellFrame } from '@sitekit/shell/frame'
-import { NotificationBell } from '@sitekit/notification-center'
+import { ChatBell } from '@sitekit/chat-center'
 import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
 
@@ -26,7 +26,7 @@ export function Layout() {
     <>
       {session.user && (
         <FrameBell>
-          <NotificationBell />
+          <ChatBell />
         </FrameBell>
       )}
       {(session.error || error) && <Notice>{session.error || error}</Notice>}

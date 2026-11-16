@@ -18,7 +18,8 @@ const testDonCatalog = `{"version":1,
           {"id":3,"name":{},"file":{"path":"head/3.glb","size":4,"sha256":"h3h3h3h3h3h3h3h3"}}],
   "body":[{"id":0,"name":{},"file":{"path":"body/0.glb","size":5,"sha256":"b0b0b0b0b0b0b0b0"}},
           {"id":4,"name":{},"file":{"path":"body/4.glb","size":6,"sha256":"b4b4b4b4b4b4b4b4"}}],
-  "puchi":[{"id":1,"name":{},"file":{"path":"puchi/1.png","size":7,"sha256":"p1p1p1p1p1p1p1p1"}}]}}`
+  "puchi":[{"id":1,"name":{},"file":{"path":"puchi/1.png","size":7,"sha256":"p1p1p1p1p1p1p1p1"}}],
+  "paint":[{"id":2,"name":{},"file":{"path":"paint/2.png","size":8,"sha256":"m2m2m2m2m2m2m2m2"}}]}}`
 
 func TestPlayersDressTheirDon(t *testing.T) {
 	var reads atomic.Int32
@@ -87,6 +88,22 @@ func TestPlayersDressTheirDon(t *testing.T) {
 	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"puchi":0,"colors":null}`, 200, &answer)
 	if answer.Look.Colors != nil || len(answer.Files) != 1 || answer.Files[0].Kind != "cos" || answer.Files[0].ID != 30 {
 		t.Fatalf("costume again %+v", answer)
+	}
+
+	// Makeup: a number in the catalog, its sheet one more file; left out it is none.
+	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":3}`, 422, nil)
+	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":2}`, 200, &answer)
+	if answer.Look.Paint != 2 || len(answer.Files) != 2 || answer.Files[1].Kind != "paint" ||
+		answer.Files[1].URL != base+"paint/2.png?v=m2m2m2m2m2m2" {
+		t.Fatalf("makeup %+v", answer)
+	}
+	c.json("GET", "/api/v1/users/"+player+"/don", "", 200, &answer)
+	if answer.Look.Paint != 2 || len(answer.Files) != 2 {
+		t.Fatalf("makeup read back %+v", answer)
+	}
+	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4}`, 200, &answer)
+	if answer.Look.Paint != 0 || len(answer.Files) != 1 {
+		t.Fatalf("makeup off %+v", answer)
 	}
 
 	// The catalog is read once and kept; when the bucket fails later the last good one stays.

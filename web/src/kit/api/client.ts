@@ -8,6 +8,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly retryAfter = 0,
+    /** The answer's HTTP status; 0 when there was none. */
+    public readonly status = 0,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -28,7 +30,11 @@ export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
     }
   })
   if (!response.ok)
-    throw new ApiError(apiErrorMessage(data), Number(response.headers.get('Retry-After')) || 0)
+    throw new ApiError(
+      apiErrorMessage(data),
+      Number(response.headers.get('Retry-After')) || 0,
+      response.status,
+    )
   return data as T
 }
 export function jsonRequest(method: string, body: unknown, csrf = ''): RequestInit {

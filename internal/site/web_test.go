@@ -27,7 +27,7 @@ func TestTheWebsiteIsServedInFrontOfTheAPI(t *testing.T) {
 	write(t, dir, "assets/app-abc123.js", "console.log(1)")
 	write(t, dir, "favicon.ico", "icon")
 	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "api "+r.Method+" "+r.URL.Path) })
-	h := Web(dir, api)
+	h := Web(dir, "", api)
 	for _, c := range []struct {
 		method, path string
 		code         int
@@ -69,7 +69,7 @@ func TestANewReleaseIsServedWithoutARestart(t *testing.T) {
 	if err := os.Symlink(filepath.Join("releases", "one"), current); err != nil {
 		t.Skip("no symbolic links here:", err)
 	}
-	h := Web(current, http.NotFoundHandler())
+	h := Web(current, "", http.NotFoundHandler())
 	get := func() string {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
@@ -94,7 +94,7 @@ func TestANewReleaseIsServedWithoutARestart(t *testing.T) {
 func TestWithoutAWebsiteThereIsOnlyTheAPI(t *testing.T) {
 	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "api") })
 	w := httptest.NewRecorder()
-	Web("", api).ServeHTTP(w, httptest.NewRequest("GET", "/fanmade/", nil))
+	Web("", "", api).ServeHTTP(w, httptest.NewRequest("GET", "/fanmade/", nil))
 	if w.Body.String() != "api" {
 		t.Fatal(w.Body.String())
 	}
@@ -102,7 +102,7 @@ func TestWithoutAWebsiteThereIsOnlyTheAPI(t *testing.T) {
 	empty := t.TempDir()
 	for _, address := range []string{"/fanmade/", "/", "/index.html"} {
 		w = httptest.NewRecorder()
-		Web(empty, api).ServeHTTP(w, httptest.NewRequest("GET", address, nil))
+		Web(empty, "", api).ServeHTTP(w, httptest.NewRequest("GET", address, nil))
 		if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "not installed") {
 			t.Fatal(address, w.Code, w.Body.String())
 		}
@@ -116,7 +116,7 @@ func TestTheManifestIsServedAsAManifest(t *testing.T) {
 	write(t, dir, "index.html", "<!doctype html>page")
 	write(t, dir, "site.webmanifest", `{"name":"OurTaikoNET"}`)
 	w := httptest.NewRecorder()
-	Web(dir, http.NotFoundHandler()).ServeHTTP(w, httptest.NewRequest("GET", "/site.webmanifest", nil))
+	Web(dir, "", http.NotFoundHandler()).ServeHTTP(w, httptest.NewRequest("GET", "/site.webmanifest", nil))
 	if got := w.Header().Get("Content-Type"); w.Code != 200 || got != "application/manifest+json" {
 		t.Fatal(w.Code, got)
 	}

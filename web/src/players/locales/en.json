@@ -272,17 +272,21 @@
   "don": {
     "motion": "Motion",
     "dress": "Dress up",
-    "about": "The Don OurTaikoPlay shows for you on its screens. Pick a whole costume, or a head and a body, a puchichara and the colours, then save.",
+    "tabs": {
+      "outfit": "Outfit"
+    },
     "wear": "What to wear",
     "costume": "Costume",
-    "parts": "Head and body",
+    "parts": "Mix and match",
     "kinds": {
       "cos": "Costume",
       "head": "Head",
       "body": "Body",
-      "puchi": "Puchichara"
+      "puchi": "Puchichara",
+      "paint": "Makeup"
     },
     "noPuchi": "None",
+    "noPaint": "None",
     "colors": "Colours",
     "defaultColors": "Default colours",
     "color": {
@@ -296,6 +300,7 @@
     "saved": "Saved. The game puts it on the next time you sign in.",
     "headAndBody": "{{head}} + {{body}}",
     "withPuchi": "{{wears}}, with {{puchi}}",
+    "withPaint": "{{wears}}, makeup {{paint}}",
     "motions": {
       "Normal": "Idle",
       "Combo": "Combo",

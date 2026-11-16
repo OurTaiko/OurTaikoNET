@@ -9,6 +9,8 @@ The folder:
     cos/<id>.glb               whole costumes
     head/<id>.glb, body/<id>.glb
     puchi/<id>.png             puchichara: two frames stacked top to bottom
+    paint/<id>.png             makeup: a face sheet like base/face.png, drawn instead of it on a
+                               face plate a third larger (YataiDON's Models/paint/paint_<id>000.png)
     icons/cos/<id>.png, icons/head/<id>.png, icons/body/<id>.png   (optional)
     names.json                 {"cos": {"12": {"ja": "...", "en": "...", "zh": "..."}}, ...} (optional)
 
@@ -24,7 +26,7 @@ import os
 import re
 import sys
 
-KINDS = {"cos": ".glb", "head": ".glb", "body": ".glb", "puchi": ".png"}
+KINDS = {"cos": ".glb", "head": ".glb", "body": ".glb", "puchi": ".png", "paint": ".png"}
 BASE = {"animations": "base/animations.glb", "face": "base/face.png", "faceAnimations": "base/face_animations.json"}
 # YataiDON chara_default_color_1/2 and the rim: 1P's Don, and 2P's with the two swapped.
 DEFAULT_COLORS = {"p1": ["#68BFC0", "#F94728", "#F9F0E1"], "p2": ["#F94728", "#68BFC0", "#F9F0E1"]}
@@ -55,8 +57,8 @@ def main(root):
                      if (m := re.fullmatch(r"(\d+)" + re.escape(ext), f)))
         listed = []
         for i in ids:
-            if kind == "puchi" and i == 0:
-                continue  # 0 is "no puchichara"
+            if kind in ("puchi", "paint") and i == 0:
+                continue  # 0 is "no puchichara", "no makeup"
             entry = {"id": i, "name": names.get(kind, {}).get(str(i), {}), "file": describe(root, f"{kind}/{i}{ext}")}
             icon = f"icons/{kind}/{i}.png"
             if os.path.exists(os.path.join(root, icon)):

@@ -14,6 +14,9 @@ describe('the Don tab', () => {
       ),
     ).toBe(true)
     expect(sameLook(look, { ...look, colors: ['#68BFC0', '#F94728', '#F9F0E1'] })).toBe(false)
+    // makeup: a look from before it existed has none
+    expect(sameLook(look, { ...look, paint: 0 })).toBe(true)
+    expect(sameLook(look, { ...look, paint: 2 })).toBe(false)
   })
 
   it('names an item in the reader’s language, else the cabinet’s Japanese, else its number', () => {

@@ -31,6 +31,8 @@ import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session-context'
 import { PlaylistSongSearchDialog } from './playlist-song-search'
+import { usePageMeta, type PageMetaProps } from './head'
+import type { TFunction } from 'i18next'
 import {
   usePlaylistText,
   playlistCoverSource,
@@ -207,6 +209,7 @@ export function PlaylistsPage() {
       .catch(() => {})
     return () => controller.abort()
   }, [session.user?.id])
+  usePageMeta({ title: t('playlists.plaza'), description: t('meta.playlists') })
   return (
     <section className="space-y-8" aria-labelledby="playlists-heading">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -256,6 +259,7 @@ export function PlaylistsPage() {
 
 export function MyPlaylistsPage() {
   const { t } = useTranslation()
+  usePageMeta({ title: t('playlists.mine'), noindex: true })
   const session = useSession()
   const navigate = useNavigate()
   const [data, setData] = useState<MyPlaylists | null>(null)
@@ -408,6 +412,28 @@ function PlaylistSongOrder({
   )
 }
 
+/** What a playlist's page says of it to search engines and link cards. */
+function playlistMeta(
+  playlist: Playlist,
+  text: { name: string; description: string },
+  t: TFunction,
+): PageMetaProps {
+  const songs = t('playlists.songCount', { count: playlist.chartCount })
+  const owner = playlist.owner?.nickname
+  return {
+    title: text.name,
+    description:
+      text.description.trim() ||
+      (owner
+        ? t('meta.playlistBy', { name: text.name, owner, songs })
+        : t('meta.playlist', { name: text.name, songs })),
+    image: playlistCoverSource(playlist),
+    type: 'music.playlist',
+    // A private playlist is its owner's alone.
+    noindex: !playlist.public && !playlist.system,
+  }
+}
+
 export function PlaylistPage() {
   const { id = '' } = useParams()
   const { t } = useTranslation()
@@ -439,6 +465,7 @@ export function PlaylistPage() {
       })
     return () => controller.abort()
   }, [id, userId])
+  usePageMeta(playlist ? playlistMeta(playlist, playlistText(playlist), t) : {})
   const back = (
     <Link
       to="/playlists"
