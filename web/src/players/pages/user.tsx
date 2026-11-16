@@ -56,6 +56,7 @@ import {
 } from '@players/pages/user-works'
 import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
+import { usePageMeta } from '@sitekit/head'
 
 // The Don tab draws with three.js: loaded when it is opened, not with every page.
 const DonTab = lazy(() => import('@players/pages/user-don').then((m) => ({ default: m.DonTab })))
@@ -94,6 +95,13 @@ export function UserPage() {
       .catch((e) => !controller.signal.aborted && setError(e.message))
     return () => controller.abort()
   }, [id])
+  const nickname = profile?.user.nickname
+  usePageMeta({
+    title: nickname || undefined,
+    description: nickname ? t('meta.player', { name: nickname }) : undefined,
+    image: profile?.user.avatarUrl,
+    type: 'profile',
+  })
   if (error) return <Notice>{error}</Notice>
   if (!profile) return <Skeleton className="h-40 w-full rounded-3xl" />
   const plate = {

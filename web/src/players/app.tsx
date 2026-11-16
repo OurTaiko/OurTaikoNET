@@ -1,9 +1,11 @@
 // The pages that belong to no song source: home, players (their scores on both sources, titles,
 // 段位 badges and nameplate), the title catalog, messages (chats with other players and the
 // site's notices), and for the site's administrator the manage panel.
+import type { ReactNode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
+import { PageMeta } from '@sitekit/head'
 import { ChatsPage } from '@sitekit/chat-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { SessionProvider } from '@sitekit/session'
@@ -24,6 +26,7 @@ function NotFound() {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-[28px] border border-dashed bg-card/60 px-6 py-16 text-center">
+      <PageMeta title={t('messages.pageNotFound')} noindex />
       <h1 className="text-2xl font-extrabold tracking-tight">{t('messages.pageNotFound')}</h1>
       <Link to="/">{t('messages.backHome')}</Link>
     </div>
@@ -36,7 +39,18 @@ function OldUserAddress() {
   return <Navigate to={`/players/${id}`} replace />
 }
 
+/** A page that names itself and is kept out of search results: the visitor's own or staff's. */
+function Private({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <>
+      <PageMeta title={title} noindex />
+      {children}
+    </>
+  )
+}
+
 function App() {
+  const { t } = useTranslation()
   return (
     <BrowserRouter>
       <RouterBridge />
@@ -47,19 +61,70 @@ function App() {
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
-                <Route path="players" element={<DirectoryPage />} />
+                <Route
+                  path="players"
+                  element={
+                    <>
+                      <PageMeta title={t('shell.directory')} description={t('meta.players')} />
+                      <DirectoryPage />
+                    </>
+                  }
+                />
                 <Route path="players/users/:id" element={<OldUserAddress />} />
                 <Route path="players/:id" element={<UserPage />} />
-                <Route path="titles" element={<TitlesPage />} />
-                <Route path="chats" element={<ChatsPage />} />
-                <Route path="chats/:id" element={<ChatsPage />} />
+                <Route
+                  path="titles"
+                  element={
+                    <>
+                      <PageMeta title={t('shell.titles')} description={t('meta.titles')} />
+                      <TitlesPage />
+                    </>
+                  }
+                />
+                <Route
+                  path="chats"
+                  element={
+                    <Private title={t('chat.title')}>
+                      <ChatsPage />
+                    </Private>
+                  }
+                />
+                <Route
+                  path="chats/:id"
+                  element={
+                    <Private title={t('chat.title')}>
+                      <ChatsPage />
+                    </Private>
+                  }
+                />
                 {/* The notices were a page of their own; they are a chat now. */}
                 <Route path="notifications" element={<Navigate to="/chats/system" replace />} />
                 <Route path="manage">
                   <Route index element={<NotFound />} />
-                  <Route path="titles" element={<AdminPage />} />
-                  <Route path="groups" element={<ManagePage />} />
-                  <Route path="visits" element={<VisitsPage />} />
+                  <Route
+                    path="titles"
+                    element={
+                      <Private title={t('shell.titleAdmin')}>
+                        <AdminPage />
+                      </Private>
+                    }
+                  />
+                  <Route
+                    path="groups"
+                    element={
+                      <Private title={t('manage.heading')}>
+                        <ManagePage />
+                      </Private>
+                    }
+                  />
+                  <Route
+                    path="visits"
+                    element={
+                      <Private title={t('visits.heading')}>
+                        <VisitsPage />
+                      </Private>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

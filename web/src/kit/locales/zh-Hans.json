@@ -1027,5 +1027,19 @@
     "send": "发送",
     "youSaid": "我：{{text}}",
     "systemReadOnly": "系统通知只能查看，不能回复。"
+  },
+  "meta": {
+    "siteDescription": "OurTaikoNET：太鼓自制谱面社区。试听、下载玩家创作的自制谱面，分享歌单，挑战段位道场，记录你的成绩与称号。",
+    "chart": "「{{title}}」的太鼓谱面（{{courses}}）。在 OurTaikoNET 试听、下载，查看排行榜与评论。",
+    "chartBy": "{{maker}} 制作的「{{title}}」太鼓谱面（{{courses}}）。在 OurTaikoNET 试听、下载，查看排行榜与评论。",
+    "playlist": "歌单「{{name}}」：{{songs}}。在 OurTaikoNET 试听与游玩。",
+    "playlistBy": "{{owner}} 整理的歌单「{{name}}」：{{songs}}。在 OurTaikoNET 试听与游玩。",
+    "dan": "段位道场「{{title}}」，由 {{owner}} 制作：{{songs}}。",
+    "player": "{{name}} 在 OurTaikoNET 的玩家主页：成绩、作品、歌单、段位与称号。",
+    "players": "OurTaikoNET 的玩家列表，查看每位玩家的成绩、作品与称号。",
+    "titles": "OurTaikoNET 的称号目录：可以获得的称号与获得方式。",
+    "playlists": "玩家整理的太鼓谱面歌单，以及系统歌单。",
+    "dans": "官方与社区制作的段位道场，可以在游戏中挑战。",
+    "register": "注册"
   }
 }

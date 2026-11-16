@@ -24,5 +24,8 @@
     "classic": "Classical",
     "variety": "Variety",
     "anime": "Anime"
+  },
+  "meta": {
+    "siteDescription": "Fan-made Taiko charts on OurTaikoNET: preview and download charts uploaded by players, with leaderboards, playlists and dan courses."
   }
 }

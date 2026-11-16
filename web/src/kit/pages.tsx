@@ -52,6 +52,8 @@ import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { EmptyState } from './components/empty-state'
+import { PageMeta, usePageMeta, type PageMetaProps } from './head'
+import type { TFunction } from 'i18next'
 
 // A chart registered without its files yet (OurTaiko Database) has hasFiles false.
 type Chart = ChartBase & { hasFiles?: boolean }
@@ -142,6 +144,7 @@ export function Library({
   const filtered = !!q || Object.entries(filters).some(([key, value]) => key !== 'order' && value)
   return (
     <>
+      {!embedded && <PageMeta title={q ? t('messages.searchResults', { query: q }) : undefined} />}
       {!embedded &&
         (mine ? (
           <h1 className="font-extrabold text-2xl sm:text-3xl">{t('messages.myCharts')}</h1>
@@ -237,6 +240,7 @@ export function Auth({ register = false }: { register?: boolean }) {
   const destination = params.get('returnTo') || '/'
   return (
     <div className="mx-auto max-w-lg space-y-4 py-8">
+      <PageMeta title={register ? t('meta.register') : t('shell.signIn')} noindex />
       <h1 className="text-2xl font-extrabold sm:text-3xl">
         {register ? t('messages.joinTheRhythm') : t('messages.welcomeBack')}
       </h1>
@@ -304,6 +308,23 @@ const manageItemClassName =
 
 type DetailSection = 'info' | 'activity' | 'comments'
 type PageTab = 'info' | 'chart' | 'leaderboard' | 'comments'
+
+/** What a chart's page says of it to search engines and link cards. */
+function chartMeta(chart: Chart | null, t: TFunction): PageMetaProps {
+  if (!chart) return { type: 'music.song' }
+  const { title } = chartText(chart, i18n.resolvedLanguage)
+  const courses = chart.difficulties.map((d) => `${blockName(d)} ★${d.level}`).join(' / ')
+  return {
+    title,
+    description:
+      chart.description.trim() ||
+      (chart.maker.trim()
+        ? t('meta.chartBy', { title, maker: chart.maker.trim(), courses })
+        : t('meta.chart', { title, courses })),
+    image: coverSource(chart),
+    type: 'music.song',
+  }
+}
 
 export function Detail() {
   const { t } = useTranslation()
@@ -442,6 +463,7 @@ export function Detail() {
       setBusy(false)
     }
   }
+  usePageMeta(chartMeta(chart, t))
   if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
   if (!chart)
     return error ? (
@@ -1014,6 +1036,7 @@ export function ChartManagerPage() {
   const tab = pathname.replace(/\/$/, '').endsWith('/publish') ? 'publish' : 'charts'
   return (
     <>
+      <PageMeta title={t('messages.chartManager')} noindex />
       <div className="space-y-1.5">
         <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
           {t('messages.chartManager')}

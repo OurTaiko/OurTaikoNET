@@ -24,5 +24,8 @@
     "classic": "古典",
     "variety": "综合",
     "anime": "动画"
+  },
+  "meta": {
+    "siteDescription": "OurTaikoNET 自制曲源：试听、下载玩家上传的太鼓自制谱面，查看排行榜、歌单和段位道场。"
   }
 }

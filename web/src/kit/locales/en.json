@@ -1039,5 +1039,19 @@
     "send": "Send",
     "youSaid": "You: {{text}}",
     "systemReadOnly": "Notifications can't be replied to."
+  },
+  "meta": {
+    "siteDescription": "OurTaikoNET: a community for fan-made Taiko charts. Preview and download charts made by players, share playlists, take on dan courses and earn titles.",
+    "chart": "Taiko chart for “{{title}}” ({{courses}}). Preview and download it, and see its leaderboard and comments on OurTaikoNET.",
+    "chartBy": "Taiko chart for “{{title}}” by {{maker}} ({{courses}}). Preview and download it, and see its leaderboard and comments on OurTaikoNET.",
+    "playlist": "Playlist “{{name}}”: {{songs}}. Listen and play on OurTaikoNET.",
+    "playlistBy": "Playlist “{{name}}” by {{owner}}: {{songs}}. Listen and play on OurTaikoNET.",
+    "dan": "Dan course “{{title}}” by {{owner}}: {{songs}}.",
+    "player": "{{name}} on OurTaikoNET: scores, charts, playlists, dan ranks and titles.",
+    "players": "Players on OurTaikoNET: their scores, charts and titles.",
+    "titles": "The titles of OurTaikoNET: every title there is to earn, and how.",
+    "playlists": "Taiko playlists put together by players, and the site’s own.",
+    "dans": "Dan courses by the site and the community, to take on in the game.",
+    "register": "Create an account"
   }
 }

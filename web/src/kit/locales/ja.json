@@ -1027,5 +1027,19 @@
     "send": "送信",
     "youSaid": "自分：{{text}}",
     "systemReadOnly": "お知らせには返信できません。"
+  },
+  "meta": {
+    "siteDescription": "OurTaikoNET：太鼓の創作譜面コミュニティ。プレイヤーが作った創作譜面を試聴・ダウンロードし、プレイリストを共有し、段位道場に挑戦して、成績と称号を集めよう。",
+    "chart": "「{{title}}」の太鼓譜面（{{courses}}）。OurTaikoNET で試聴・ダウンロードし、ランキングとコメントを見られます。",
+    "chartBy": "{{maker}} による「{{title}}」の太鼓譜面（{{courses}}）。OurTaikoNET で試聴・ダウンロードし、ランキングとコメントを見られます。",
+    "playlist": "プレイリスト「{{name}}」：{{songs}}。OurTaikoNET で試聴・プレイできます。",
+    "playlistBy": "{{owner}} のプレイリスト「{{name}}」：{{songs}}。OurTaikoNET で試聴・プレイできます。",
+    "dan": "段位道場「{{title}}」（作成：{{owner}}）：{{songs}}。",
+    "player": "OurTaikoNET の {{name}} のページ：成績、譜面、プレイリスト、段位、称号。",
+    "players": "OurTaikoNET のプレイヤー一覧：成績、譜面、称号を見られます。",
+    "titles": "OurTaikoNET の称号一覧：獲得できる称号とその条件。",
+    "playlists": "プレイヤーが作った太鼓譜面のプレイリストと、サイトのプレイリスト。",
+    "dans": "公式とコミュニティの段位道場。ゲームで挑戦できます。",
+    "register": "アカウント登録"
   }
 }

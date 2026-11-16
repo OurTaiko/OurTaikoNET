@@ -1027,5 +1027,19 @@
     "send": "보내기",
     "youSaid": "나: {{text}}",
     "systemReadOnly": "알림에는 답장할 수 없습니다."
+  },
+  "meta": {
+    "siteDescription": "OurTaikoNET: 태고 창작 채보 커뮤니티. 플레이어가 만든 창작 채보를 미리 듣고 내려받고, 플레이리스트를 공유하고, 단위 도장에 도전하며 기록과 칭호를 모아 보세요.",
+    "chart": "「{{title}}」 태고 채보({{courses}}). OurTaikoNET에서 미리 듣고 내려받고, 순위표와 댓글을 볼 수 있습니다.",
+    "chartBy": "{{maker}}의 「{{title}}」 태고 채보({{courses}}). OurTaikoNET에서 미리 듣고 내려받고, 순위표와 댓글을 볼 수 있습니다.",
+    "playlist": "플레이리스트 「{{name}}」: {{songs}}. OurTaikoNET에서 듣고 플레이할 수 있습니다.",
+    "playlistBy": "{{owner}}의 플레이리스트 「{{name}}」: {{songs}}. OurTaikoNET에서 듣고 플레이할 수 있습니다.",
+    "dan": "단위 도장 「{{title}}」(제작: {{owner}}): {{songs}}.",
+    "player": "OurTaikoNET의 {{name}} 플레이어 페이지: 기록, 채보, 플레이리스트, 단위, 칭호.",
+    "players": "OurTaikoNET 플레이어 목록: 기록, 채보, 칭호를 볼 수 있습니다.",
+    "titles": "OurTaikoNET 칭호 목록: 얻을 수 있는 칭호와 조건.",
+    "playlists": "플레이어가 만든 태고 채보 플레이리스트와 사이트 플레이리스트.",
+    "dans": "공식과 커뮤니티의 단위 도장. 게임에서 도전할 수 있습니다.",
+    "register": "회원가입"
   }
 }
