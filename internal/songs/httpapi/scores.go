@@ -224,42 +224,34 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	granted := s.titlesAfterScore(r.Context(), tx, u.User.ID, result)
+	s.titlesAfterScore(r.Context(), tx, u.User.ID, result)
 	if err = tx.Commit(r.Context()); err != nil {
 		internal(w, err)
 		return
 	}
-	if len(granted) == 0 {
-		web.Respond(w, 201, result)
-		return
-	}
-	web.Respond(w, 201, struct {
-		Score
-		// The titles this play earned by rule (package titlerules), by ID.
-		GrantedTitles []string `json:"grantedTitleIds"`
-	}{result, granted})
+	web.Respond(w, 201, result)
 }
 
 // titlesAfterScore gives the player the titles a play that cleared its chart earned by rule,
-// inside the score's transaction, and returns them. A failure there loses the titles of this
-// play and not the score: they are judged again with the player's next play of the chart.
-func (s *Server) titlesAfterScore(ctx context.Context, tx pgx.Tx, user string, result Score) []string {
+// inside the score's transaction. The answer does not say what was given: a client learns of
+// its rewards as of any others (docs/TITLES_PLAN.md, 1.1). A failure here loses the titles of
+// this play and not the score: they are judged again with the player's next play of the chart.
+func (s *Server) titlesAfterScore(ctx context.Context, tx pgx.Tx, user string, result Score) {
 	if result.ClearStatus < 1 {
-		return nil
+		return
 	}
 	inner, err := tx.Begin(ctx)
 	if err != nil {
 		log.Printf("title rules after a score: %v", err)
-		return nil
+		return
 	}
-	granted, err := titlerules.Played(ctx, inner, s.source().schema(), user, result.SongID)
+	_, err = titlerules.Played(ctx, inner, s.source().schema(), user, result.SongID)
 	if err == nil {
 		err = inner.Commit(ctx)
 	}
 	if err != nil {
 		inner.Rollback(ctx)
 		log.Printf("title rules after a score: %v", err)
-		return nil
+		return
 	}
-	return granted
 }

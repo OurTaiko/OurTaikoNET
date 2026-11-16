@@ -75,50 +75,40 @@ func TestRulesGiveTitles(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), bob); err != nil {
 		t.Fatal(err)
 	}
-	play := func(slot int64, clear int) string {
+	play := func(slot int64, clear int) {
 		t.Helper()
 		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6,"ClearStatus":%d}`, slot, clear)))
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		s.Handler().ServeHTTP(w, r)
-		if w.Code != 201 {
+		// The answer is the score alone: rewards are not told in it.
+		if w.Code != 201 || strings.Contains(w.Body.String(), "granted") {
 			t.Fatal(w.Code, w.Body.String())
 		}
-		return w.Body.String()
 	}
 	// Failed: nothing. Easy cleared: not the course either rule of the chart asks for, and
 	// one of two charts of the category.
-	if body := play(aOni, 0); strings.Contains(body, "grantedTitleIds") {
-		t.Fatal(body)
-	}
+	play(aOni, 0)
 	expect(bob, "game")
-	if body := play(aEasy, 3); strings.Contains(body, "grantedTitleIds") {
-		t.Fatal(body)
-	}
+	play(aEasy, 3)
+	expect(bob, "game")
 	// Oni cleared: one Oni chart of the category. Not the full combo the chart's title wants.
-	if body := play(aOni, 1); !strings.Contains(body, `"grantedTitleIds":["genre-oni"]`) {
-		t.Fatal(body)
-	}
-	if body := play(aOni, 2); !strings.Contains(body, `"grantedTitleIds":["song"]`) {
-		t.Fatal(body)
-	}
+	play(aOni, 1)
+	expect(bob, "game", "genre-oni")
+	play(aOni, 2)
+	expect(bob, "game", "genre-oni", "song")
 	// Another category's chart does not count; the second chart of this one completes it.
-	if body := play(cOni, 3); strings.Contains(body, "grantedTitleIds") {
-		t.Fatal(body)
-	}
-	if body := play(bHard, 1); !strings.Contains(body, `"grantedTitleIds":["genre"]`) {
-		t.Fatal(body)
-	}
+	play(cOni, 3)
+	expect(bob, "game", "genre-oni", "song")
+	play(bHard, 1)
 	expect(bob, "game", "genre", "genre-oni", "song")
 
 	// A title taken back is not given again by the same rule.
 	if _, err := pool.Exec(ctx, `DELETE FROM net.user_titles WHERE user_id=$1 AND title_id='song'`, bob); err != nil {
 		t.Fatal(err)
 	}
-	if body := play(aOni, 3); strings.Contains(body, "grantedTitleIds") {
-		t.Fatal(body)
-	}
+	play(aOni, 3)
 	expect(bob, "game", "genre", "genre-oni")
 
 	// A new rule gives its title at once to those who meet it already.

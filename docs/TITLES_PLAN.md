@@ -25,10 +25,25 @@ Decisions the rules were built on, all open to change:
 
 The rules work, but nothing tells a player that they got a title or how far they are from one.
 
+### 1.1 Rewards, told the same way for every request
+
+A reward can come from any request: a score, an upload, or any request of the game at all (`game_login` is judged where a request's activity is written). So no single answer can be where a client learns of it, and none is: not even the score's. There are no exceptions.
+
+- **The server keeps what was not seen yet.** A table of the site's own, `net.rewards (id, user_id, kind, data, created_at, seen_at)`, written in the same statement or transaction that gives the thing: a title from a rule, a 段位 course or an administrator; a 段位 badge; later, anything else given. It is one list for the website and the game.
+- **Every answer to a signed-in request carries a header**, `X-Pending-Rewards: <n>`, the number not seen yet. One middleware sets it for every route of both sources and of the players' part, file downloads included; no answer's body changes. Absent, or 0, means nothing to fetch.
+- **The client fetches when it sees more than 0**: `GET /api/v1/me/rewards` gives the ones not seen, oldest first, each with what is needed to show it (a title with its band). When it has shown them, `POST /api/v1/me/rewards/seen {"ids": […]}`; the header goes back to 0. The game does this on its result screen after a score as anywhere else: the score's answer comes back with the header like every other.
+- **The number must be cheap.** Not a count over the table on every request: keep it on `net.users` (incremented where a reward is written, decremented when marked seen), and read it with the player's activity, which is read on every signed-in request already.
+- A response lost to a timeout or a retry loses nothing: the next answer carries the header again.
+- The website's bell can show the same number, and the inbox can list the rewards; whether rewards and the sources' notifications become one inbox is to be decided when this is built.
+
+### 1.2 The game
+
+OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the rewards (the title band on the result screen, a toast elsewhere) and marks them seen. A change in the game's repository, after 1.1.
+
+### 1.3 and 1.4
+
 | # | What | Notes |
 |---|---|---|
-| 1.1 | **Tell the player they got a title** on the website | The inbox's notifications are per source (`fanmade.notifications`, `official.notifications`) and a title belongs to neither. Either a `net.notifications` table of the site's own that the one inbox also reads, or the notification goes to the source that caused it and the two sign-in rules get a home by convention. The first is cleaner. Covers all three ways of getting a title |
-| 1.2 | **Tell the player in the game** | `POST …/game/scores` already answers `grantedTitleIds` when a play earned titles. OurTaikoPlay's result screen has to read it and show the title band. A change in the game's repository |
 | 1.3 | **Progress** towards the rules that count | For the signed-in player, `GET /api/v1/titles` (or a route of its own) gives `{have, need}` for each `category_clear` and `charts_uploaded` rule they have not met. The counting is the rule's own query without its `HAVING`. Shown on `/titles` as "7 / 10" |
 | 1.4 | **Pick the player by name** when granting by hand | `/manage/titles` asks for a 32-digit ID. The groups panel already searches players by nickname (`GET /api/v1/admin/users?q=`); use the same picker |
 
