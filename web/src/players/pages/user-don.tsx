@@ -1,6 +1,6 @@
 // A player's 3D Don (the one OurTaikoPlay draws for them): a live preview for everyone, and for the
-// player themself the dressing room: a whole costume or a head and a body, a puchichara and the
-// three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
+// player themself the dressing room: a whole costume or a head and a body, a puchichara, makeup and
+// the three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
 // models come from the public bucket's 3dchara folder, which the catalog's baseUrl names.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -52,6 +52,7 @@ function normalize(l: DonLook): DonLook {
     head: l.head,
     body: l.body,
     puchi: l.puchi,
+    paint: l.paint ?? 0,
     colors: l.colors ? (l.colors.map((c) => c.toUpperCase()) as DonLook['colors']) : null,
   }
 }
@@ -220,6 +221,18 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
               onPick={(puchi) => change({ puchi })}
               none={t('don.noPuchi')}
             />
+            {(catalog.items.paint?.length ?? 0) > 0 && (
+              <IconGrid
+                title={t('don.kinds.paint')}
+                kind="paint"
+                catalog={catalog}
+                value={draft.paint ?? 0}
+                language={language}
+                onPick={(paint) => change({ paint })}
+                none={t('don.noPaint')}
+                faceColor={colors[1]}
+              />
+            )}
 
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -278,10 +291,12 @@ function describe(
 ): string {
   const name = (kind: DonPartKind, id: number) =>
     itemName(catalogItem(catalog, kind, id), language, id)
-  const wears = l.costume
+  let wears = l.costume
     ? name('cos', l.cos)
     : t('don.headAndBody', { head: name('head', l.head), body: name('body', l.body) })
-  return l.puchi > 0 ? t('don.withPuchi', { wears, puchi: name('puchi', l.puchi) }) : wears
+  if (l.puchi > 0) wears = t('don.withPuchi', { wears, puchi: name('puchi', l.puchi) })
+  const paint = l.paint ?? 0
+  return paint > 0 ? t('don.withPaint', { wears, paint: name('paint', paint) }) : wears
 }
 
 function IconGrid({
@@ -292,6 +307,7 @@ function IconGrid({
   language,
   onPick,
   none,
+  faceColor,
 }: {
   title: string
   kind: DonPartKind
@@ -300,6 +316,8 @@ function IconGrid({
   language: string
   onPick: (id: number) => void
   none?: string
+  // makeup: its sheet's first face is shown on the Don's face colour
+  faceColor?: string
 }) {
   const items = catalog.items[kind] ?? []
   const tile = (selected: boolean) =>
@@ -340,9 +358,11 @@ function IconGrid({
               title={name}
               className={tile(value === item.id)}
               onClick={() => onPick(item.id)}
+              style={kind === 'paint' ? { backgroundColor: faceColor } : undefined}
             >
-              {kind === 'puchi' ? (
-                // The first of its two frames (stacked top to bottom, so twice as tall as wide).
+              {kind === 'puchi' || kind === 'paint' ? (
+                // The first of its frames (stacked top to bottom: a puchichara has two, a
+                // makeup sheet one per face).
                 <img
                   src={catalogUrl(catalog.baseUrl, item.file)}
                   alt=""

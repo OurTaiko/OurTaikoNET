@@ -271,7 +271,7 @@
   "don": {
     "motion": "动作",
     "dress": "换装",
-    "about": "这是 OurTaikoPlay 画面上属于你的咚酱。选一套服装，或者头和身体，再选小伙伴和颜色，然后保存。",
+    "about": "这是 OurTaikoPlay 画面上属于你的咚酱。选一套服装，或者头和身体，再选小伙伴、妆容和颜色，然后保存。",
     "wear": "穿什么",
     "costume": "整套服装",
     "parts": "头＋身体",
@@ -279,9 +279,11 @@
       "cos": "服装",
       "head": "头",
       "body": "身体",
-      "puchi": "小伙伴"
+      "puchi": "小伙伴",
+      "paint": "妆容"
     },
     "noPuchi": "不要",
+    "noPaint": "不化妆",
     "colors": "颜色",
     "defaultColors": "默认颜色",
     "color": {
@@ -295,6 +297,7 @@
     "saved": "已保存。下次在游戏里登录时就会换上。",
     "headAndBody": "{{head}}＋{{body}}",
     "withPuchi": "{{wears}}，带着{{puchi}}",
+    "withPaint": "{{wears}}，妆容 {{paint}}",
     "motions": {
       "Normal": "平常",
       "Combo": "连击",

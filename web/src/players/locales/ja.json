@@ -271,7 +271,7 @@
   "don": {
     "motion": "モーション",
     "dress": "きせかえ",
-    "about": "OurTaikoPlay の画面に出てくるあなたのどんちゃんです。きぐるみか、あたまとからだ、プチキャラ、色を選んで保存してください。",
+    "about": "OurTaikoPlay の画面に出てくるあなたのどんちゃんです。きぐるみか、あたまとからだ、プチキャラ、メイク、色を選んで保存してください。",
     "wear": "着るもの",
     "costume": "きぐるみ",
     "parts": "あたま＋からだ",
@@ -279,9 +279,11 @@
       "cos": "きぐるみ",
       "head": "あたま",
       "body": "からだ",
-      "puchi": "プチキャラ"
+      "puchi": "プチキャラ",
+      "paint": "メイク"
     },
     "noPuchi": "なし",
+    "noPaint": "なし",
     "colors": "色",
     "defaultColors": "もとの色",
     "color": {
@@ -295,6 +297,7 @@
     "saved": "保存しました。次にサインインしたときからゲームに反映されます。",
     "headAndBody": "{{head}}＋{{body}}",
     "withPuchi": "{{wears}}、{{puchi}}といっしょ",
+    "withPaint": "{{wears}}、メイク {{paint}}",
     "motions": {
       "Normal": "ふだん",
       "Combo": "コンボ",

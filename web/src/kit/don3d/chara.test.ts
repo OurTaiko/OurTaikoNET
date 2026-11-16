@@ -12,6 +12,8 @@ import {
 } from './chara'
 import { FacePlayer, parseFaceTimelines } from './face'
 import { catalogUrl, resolveDonLook, type DonCatalog } from './catalog'
+import type { DonPartData } from './part'
+import { paintPlaneScale, scaleFacePlates } from './renderer'
 
 // animations.glb's names: the 26 motions, then their _mirror versions with miss6 before miss.
 function motionNames(): string[] {
@@ -299,9 +301,50 @@ describe('resolveDonLook', () => {
     expect(resolveDonLook(catalog, { ...look, puchi: 5 }).puchi).toBeNull()
   })
 
+  it('wears makeup the catalog has; none for 0, absent, or a catalog without makeup', () => {
+    const withPaint: DonCatalog = {
+      ...catalog,
+      items: { ...catalog.items, paint: [{ id: 2, name: {}, file: file('paint/2.png') }] },
+    }
+    expect(resolveDonLook(withPaint, { ...look, paint: 2 }).paint?.id).toBe(2)
+    expect(resolveDonLook(withPaint, { ...look, paint: 0 }).paint).toBeNull()
+    expect(resolveDonLook(withPaint, look).paint).toBeNull()
+    expect(resolveDonLook(withPaint, { ...look, paint: 9 }).paint).toBeNull()
+    expect(resolveDonLook(catalog, { ...look, paint: 2 }).paint).toBeNull()
+  })
+
   it('builds versioned URLs', () => {
     expect(catalogUrl('https://distrib.ourtaiko.org/3dchara', file('cos/0.glb'))).toBe(
       'https://distrib.ourtaiko.org/3dchara/cos/0.glb?v=abcdef012345',
     )
+  })
+})
+
+describe('scaleFacePlates', () => {
+  // a face plate 0.2 wide around (1, 2, 3), and a body triangle that must not move
+  const plate = new Float32Array([0.9, 1.9, 3, 1.1, 1.9, 3, 1.1, 2.1, 3, 0.9, 2.1, 3])
+  const body = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])
+  const data = {
+    primitives: [
+      { material: 0, positions: plate },
+      { material: 1, positions: body },
+    ],
+    materials: [{ face: true }, { face: false }],
+    jointNames: [],
+  } as unknown as DonPartData
+  const part = () => ({ data, sources: [plate, body], faceScale: 1 })
+
+  it('makes each plate a third larger about its centre, and back', () => {
+    const p = part()
+    scaleFacePlates(p, paintPlaneScale)
+    const s = p.sources[0]
+    expect(s[0]).toBeCloseTo(1 - 0.1 * paintPlaneScale)
+    expect(s[4]).toBeCloseTo(2 - 0.1 * paintPlaneScale)
+    expect(s[6]).toBeCloseTo(1 + 0.1 * paintPlaneScale)
+    expect(s[2]).toBeCloseTo(3)
+    expect(p.sources[1]).toBe(body)
+    expect(plate[0]).toBeCloseTo(0.9) // the shared part data is untouched
+    scaleFacePlates(p, 1)
+    expect(p.sources[0]).toBe(plate)
   })
 })
