@@ -46,7 +46,10 @@
     "allGood": "got all good",
     "uploaded": "uploaded a chart",
     "noActivity": "Nothing has happened yet.",
-    "activityFailed": "The activity could not be loaded."
+    "activityFailed": "The activity could not be loaded.",
+    "friends": "Friends",
+    "thanks": "Credits",
+    "thanksPrefix": "Special thanks:"
   },
   "profile": {
     "unknownPlayer": "Player",

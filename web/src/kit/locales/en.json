@@ -995,6 +995,17 @@
     "layoutCredit": "Layout after",
     "signedOut": "Not signed in",
     "signInHint": "Sign in to keep your scores and playlists",
-    "closeSearch": "Close search"
+    "closeSearch": "Close search",
+    "footer": {
+      "tagline": "A Taiko chart community: fan-made and official charts, playlists, dan courses and player scores.",
+      "explore": "Explore",
+      "community": "Community",
+      "contact": "Contact & feedback",
+      "bilibili": "Bilibili",
+      "qqGroup": "QQ group",
+      "feedback": "Send feedback / report a problem",
+      "nonProfit": "Non-profit community project",
+      "notice": "A player community project, not affiliated with Bandai Namco Entertainment. Taiko no Tatsujin and related material belong to their owners."
+    }
   }
 }

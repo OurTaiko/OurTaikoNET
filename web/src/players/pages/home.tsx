@@ -8,6 +8,7 @@ import type { SourceId } from '@sitekit/source'
 import { newestOf } from '@players/newest'
 import { Notice } from '@players/notice'
 import { CommunityActivity } from '@players/components/community-activity'
+import { Friends } from '@players/components/friends'
 import { RecentWorks } from '@players/components/recent-works'
 import { sourceApi, sources } from '@players/components/song-tile'
 
@@ -60,6 +61,7 @@ export function HomePage() {
         />
         <CommunityActivity />
       </div>
+      <Friends />
     </div>
   )
 }

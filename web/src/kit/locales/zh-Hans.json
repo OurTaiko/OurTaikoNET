@@ -984,6 +984,17 @@
     "layoutCredit": "界面布局参照了",
     "signedOut": "未登录",
     "signInHint": "登录以同步成绩与歌单",
-    "closeSearch": "关闭搜索"
+    "closeSearch": "关闭搜索",
+    "footer": {
+      "tagline": "太鼓谱面社区：自制与官方谱面、歌单、段位道场和玩家成绩。",
+      "explore": "探索",
+      "community": "社区",
+      "contact": "联系与反馈",
+      "bilibili": "Bilibili 主页",
+      "qqGroup": "QQ 群",
+      "feedback": "提交反馈 / 报告问题",
+      "nonProfit": "非营利社区项目",
+      "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
+    }
   }
 }

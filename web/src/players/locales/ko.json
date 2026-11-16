@@ -46,7 +46,10 @@
     "allGood": "님이 전량",
     "uploaded": "님이 채보 업로드",
     "noActivity": "아직 소식이 없습니다.",
-    "activityFailed": "소식을 불러오지 못했습니다."
+    "activityFailed": "소식을 불러오지 못했습니다.",
+    "friends": "친구 사이트",
+    "thanks": "감사의 말",
+    "thanksPrefix": "Special Thanks:"
   },
   "profile": {
     "unknownPlayer": "플레이어",

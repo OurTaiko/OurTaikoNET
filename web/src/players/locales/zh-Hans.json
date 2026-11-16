@@ -46,7 +46,10 @@
     "allGood": "全良了",
     "uploaded": "上传了谱面",
     "noActivity": "还没有动态。",
-    "activityFailed": "动态加载失败。"
+    "activityFailed": "动态加载失败。",
+    "friends": "友链",
+    "thanks": "鸣谢",
+    "thanksPrefix": "Special Thanks："
   },
   "profile": {
     "unknownPlayer": "玩家",

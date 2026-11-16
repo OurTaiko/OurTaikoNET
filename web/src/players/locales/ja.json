@@ -46,7 +46,10 @@
     "allGood": "が全良",
     "uploaded": "が譜面を投稿",
     "noActivity": "まだ動きはありません。",
-    "activityFailed": "読み込めませんでした。"
+    "activityFailed": "読み込めませんでした。",
+    "friends": "リンク",
+    "thanks": "謝辞",
+    "thanksPrefix": "Special Thanks："
   },
   "profile": {
     "unknownPlayer": "プレイヤー",

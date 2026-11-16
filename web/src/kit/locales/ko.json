@@ -984,6 +984,17 @@
     "layoutCredit": "레이아웃 참고:",
     "signedOut": "로그인하지 않음",
     "signInHint": "로그인하고 기록과 플레이리스트를 동기화",
-    "closeSearch": "검색 닫기"
+    "closeSearch": "검색 닫기",
+    "footer": {
+      "tagline": "태고 채보 커뮤니티: 창작·공식 채보, 플레이리스트, 단위 도장, 플레이어 기록.",
+      "explore": "둘러보기",
+      "community": "커뮤니티",
+      "contact": "문의 및 피드백",
+      "bilibili": "Bilibili",
+      "qqGroup": "QQ 그룹",
+      "feedback": "피드백 보내기 / 문제 신고",
+      "nonProfit": "비영리 커뮤니티 프로젝트",
+      "notice": "이 사이트는 플레이어 커뮤니티 프로젝트이며 반다이남코 엔터테인먼트와 관련이 없습니다. 「태고의 달인」 및 관련 자료의 권리는 해당 권리자에게 있습니다."
+    }
   }
 }

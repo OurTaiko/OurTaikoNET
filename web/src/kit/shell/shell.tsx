@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { useTellBuddy } from './buddy'
+import { FrameFooter } from './footer'
 import { setBellSlot, signOut, useTold } from './frame'
 import { SettingsSheet } from './settings'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
@@ -614,19 +615,24 @@ export function Frame({ children }: { children: ReactNode }) {
         {menu}
       </aside>
 
+      {/* The page, then the footer under it: outside every area, so it is the same on every
+          page, and moved aside with the page while the menu is beside it. */}
       <div
         className={cn(
-          'pt-[4.75rem]',
+          'flex flex-col pt-[4.75rem] min-h-svh',
           settled && 'transition-[padding] duration-300 ease-emphasized',
           docked && 'lg:pl-[18.5rem]',
         )}
       >
         <main
           id="main"
-          className="space-y-6 mx-auto px-3 sm:px-4 pb-24 lg:pb-8 max-w-[92rem] min-w-0"
+          className="flex-1 space-y-6 mx-auto px-3 sm:px-4 pb-8 w-full max-w-[92rem] min-w-0"
         >
           {children}
         </main>
+        <div className="mx-auto px-3 sm:px-4 pb-24 lg:pb-4 w-full max-w-[92rem] min-w-0">
+          <FrameFooter source={source} />
+        </div>
       </div>
 
       {/* On a phone the main places stay one tap away at the bottom. */}
