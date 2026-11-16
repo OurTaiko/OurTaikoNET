@@ -12,6 +12,7 @@ import { IconContext } from '@phosphor-icons/react'
 import { applyTone } from '@sitekit/accent'
 import { i18n, setAreaCatalogues, type Language } from '@sitekit/i18n'
 import { moveInArea, setVisitor } from '@sitekit/navigation'
+import { FrameBuddy } from '@sitekit/shell/buddy'
 import { rememberSource, rememberedSource } from '@sitekit/shell/site'
 import { areaOf, setArea, type SourceId } from '@sitekit/source'
 import { ThemeProvider } from '@sitekit/theme'
@@ -123,6 +124,8 @@ function Root() {
           <ThemeProvider storageKey="ourtaiko-net-theme">
             {/* A new key for each area: its router and every page under it start afresh. */}
             {current && <current.part.App key={current.area} />}
+            {/* The player's Don: one for the whole site, so it is not drawn anew with an area. */}
+            <FrameBuddy />
           </ThemeProvider>
         </IconContext.Provider>
       </I18nextProvider>

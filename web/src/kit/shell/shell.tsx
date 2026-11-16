@@ -6,7 +6,7 @@
 // players, titles), at the top. The frame's links are whole addresses; one that stays in the
 // area it is shown in is a router link, any other is a plain link, which the root follows by
 // swapping the area in place.
-import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
@@ -43,11 +43,9 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
+import { useTellBuddy } from './buddy'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
-
-// The signed-in player's Don in a corner of every page; three.js comes only with it.
-const DonBuddy = lazy(() => import('./don-buddy'))
 
 export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
 
@@ -101,6 +99,8 @@ export function Shell({
   // The source the Songs group points at: this page's, or the one used last.
   const remembered = useRememberedSource()
   const source = area || remembered
+  // The player's Don, drawn above the areas so that it keeps moving across them.
+  useTellBuddy(user, loading, source)
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('ourtaiko-net-menu') === 'collapsed'
@@ -461,6 +461,13 @@ export function Shell({
           </div>
           <form
             action={`/${source}/`}
+            // Searched in place, like every link of the site; the action is for a page whose
+            // scripts did not load.
+            onSubmit={(event) => {
+              event.preventDefault()
+              const q = new FormData(event.currentTarget).get('q')
+              visit(`/${source}/${q ? `?q=${encodeURIComponent(String(q))}` : ''}`)
+            }}
             role="search"
             className="hidden sm:flex flex-1 items-center gap-2.5 bg-card shadow-elev-1 ml-auto px-5 rounded-full max-w-sm h-14 text-muted-foreground focus-within:ring-3 focus-within:ring-ring/30"
           >
@@ -559,12 +566,6 @@ export function Shell({
           </ShellLink>
         ))}
       </nav>
-
-      {!loading && user && (
-        <Suspense fallback={null}>
-          <DonBuddy user={user} source={source} />
-        </Suspense>
-      )}
     </div>
   )
 }
