@@ -271,10 +271,12 @@
   "don": {
     "motion": "动作",
     "dress": "换装",
-    "about": "这是 OurTaikoPlay 画面上属于你的咚酱。选一套服装，或者头和身体，再选小伙伴、妆容和颜色，然后保存。",
+    "tabs": {
+      "outfit": "着装"
+    },
     "wear": "穿什么",
-    "costume": "整套服装",
-    "parts": "头＋身体",
+    "costume": "套装",
+    "parts": "搭配",
     "kinds": {
       "cos": "服装",
       "head": "头",

@@ -271,10 +271,12 @@
   "don": {
     "motion": "모션",
     "dress": "옷 갈아입기",
-    "about": "OurTaikoPlay 화면에 나오는 나의 동입니다. 코스튬, 또는 머리와 몸, 푸치캐릭터, 메이크업과 색을 골라 저장하세요.",
+    "tabs": {
+      "outfit": "의상"
+    },
     "wear": "입을 것",
     "costume": "코스튬",
-    "parts": "머리＋몸",
+    "parts": "조합",
     "kinds": {
       "cos": "코스튬",
       "head": "머리",

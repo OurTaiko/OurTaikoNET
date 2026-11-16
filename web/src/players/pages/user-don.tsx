@@ -1,6 +1,6 @@
 // A player's 3D Don (the one OurTaikoPlay draws for them): a live preview for everyone, and for the
-// player themself the dressing room: a whole costume or a head and a body, a puchichara, makeup and
-// the three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
+// player themself the dressing room, in tabs: the outfit (a whole costume, or a head and a body),
+// the puchichara and the makeup; below them the three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
 // models come from the public bucket's 3dchara folder, which the catalog's baseUrl names.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +13,7 @@ import { useSession } from '@players/session-context'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sitekit/components/ui/tabs'
 import { cn } from '@sitekit/lib/utils'
 import {
   DonPreview,
@@ -39,6 +40,9 @@ const motions = [
 ] as const satisfies readonly DonMotionName[]
 
 const colorKeys = ['body', 'face', 'rim'] as const
+
+// The dressing room's tabs: what the Don wears, its puchichara, its makeup.
+type DressTab = 'outfit' | 'puchi' | 'paint'
 
 /** The same look, for comparing a draft with what is saved. */
 export function sameLook(a: DonLook, b: DonLook): boolean {
@@ -75,6 +79,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  const [dressTab, setDressTab] = useState<DressTab>('outfit')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -121,6 +126,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
   if (error && !draft) return <Notice>{error}</Notice>
   if (!catalog || !draft) return <Skeleton className="h-[480px] w-full rounded-3xl" />
   const colors = draft.colors ?? catalog.defaultColors.p1
+  // a catalog from before makeup has none to offer
+  const hasPaint = (catalog.items.paint?.length ?? 0) > 0
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
@@ -158,81 +165,101 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
             <CardTitle>{t('don.dress')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <p className="text-sm text-muted-foreground">{t('don.about')}</p>
-            <div
-              className="inline-flex rounded-full border p-1"
-              role="radiogroup"
-              aria-label={t('don.wear')}
+            <Tabs
+              value={hasPaint ? dressTab : dressTab === 'paint' ? 'outfit' : dressTab}
+              onValueChange={(value) => setDressTab(value as DressTab)}
+              className="gap-4"
             >
-              {[true, false].map((costume) => (
-                <button
-                  key={String(costume)}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.costume === costume}
-                  onClick={() => change({ costume })}
-                  className={cn(
-                    'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                    draft.costume === costume
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {t(costume ? 'don.costume' : 'don.parts')}
-                </button>
-              ))}
-            </div>
+              <TabsList variant="line" aria-label={t('don.dress')}>
+                <TabsTrigger value="outfit">{t('don.tabs.outfit')}</TabsTrigger>
+                <TabsTrigger value="puchi">{t('don.kinds.puchi')}</TabsTrigger>
+                {hasPaint && <TabsTrigger value="paint">{t('don.kinds.paint')}</TabsTrigger>}
+              </TabsList>
 
-            {draft.costume ? (
-              <IconGrid
-                title={t('don.kinds.cos')}
-                kind="cos"
-                catalog={catalog}
-                value={draft.cos}
-                language={language}
-                onPick={(cos) => change({ cos })}
-              />
-            ) : (
-              <>
+              <TabsContent value="outfit" className="space-y-6">
+                <div
+                  className="inline-flex rounded-full border p-1"
+                  role="radiogroup"
+                  aria-label={t('don.wear')}
+                >
+                  {[true, false].map((costume) => (
+                    <button
+                      key={String(costume)}
+                      type="button"
+                      role="radio"
+                      aria-checked={draft.costume === costume}
+                      onClick={() => change({ costume })}
+                      className={cn(
+                        'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                        draft.costume === costume
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {t(costume ? 'don.costume' : 'don.parts')}
+                    </button>
+                  ))}
+                </div>
+                {draft.costume ? (
+                  <IconGrid
+                    title={t('don.kinds.cos')}
+                    kind="cos"
+                    catalog={catalog}
+                    value={draft.cos}
+                    language={language}
+                    onPick={(cos) => change({ cos })}
+                  />
+                ) : (
+                  <>
+                    <IconGrid
+                      title={t('don.kinds.head')}
+                      kind="head"
+                      catalog={catalog}
+                      value={draft.head}
+                      language={language}
+                      onPick={(head) => change({ head })}
+                    />
+                    <IconGrid
+                      title={t('don.kinds.body')}
+                      kind="body"
+                      catalog={catalog}
+                      value={draft.body}
+                      language={language}
+                      onPick={(body) => change({ body })}
+                    />
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="puchi">
                 <IconGrid
-                  title={t('don.kinds.head')}
-                  kind="head"
+                  title={t('don.kinds.puchi')}
+                  hideTitle
+                  kind="puchi"
                   catalog={catalog}
-                  value={draft.head}
+                  value={draft.puchi}
                   language={language}
-                  onPick={(head) => change({ head })}
+                  onPick={(puchi) => change({ puchi })}
+                  none={t('don.noPuchi')}
                 />
-                <IconGrid
-                  title={t('don.kinds.body')}
-                  kind="body"
-                  catalog={catalog}
-                  value={draft.body}
-                  language={language}
-                  onPick={(body) => change({ body })}
-                />
-              </>
-            )}
-            <IconGrid
-              title={t('don.kinds.puchi')}
-              kind="puchi"
-              catalog={catalog}
-              value={draft.puchi}
-              language={language}
-              onPick={(puchi) => change({ puchi })}
-              none={t('don.noPuchi')}
-            />
-            {(catalog.items.paint?.length ?? 0) > 0 && (
-              <IconGrid
-                title={t('don.kinds.paint')}
-                kind="paint"
-                catalog={catalog}
-                value={draft.paint ?? 0}
-                language={language}
-                onPick={(paint) => change({ paint })}
-                none={t('don.noPaint')}
-                faceColor={colors[1]}
-              />
-            )}
+              </TabsContent>
+
+              {hasPaint && (
+                <TabsContent value="paint">
+                  <IconGrid
+                    title={t('don.kinds.paint')}
+                    hideTitle
+                    kind="paint"
+                    catalog={catalog}
+                    value={draft.paint ?? 0}
+                    language={language}
+                    onPick={(paint) => change({ paint })}
+                    none={t('don.noPaint')}
+                    faceColor={colors[1]}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
 
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -301,6 +328,7 @@ function describe(
 
 function IconGrid({
   title,
+  hideTitle = false,
   kind,
   catalog,
   value,
@@ -310,6 +338,8 @@ function IconGrid({
   faceColor,
 }: {
   title: string
+  // the tab already names it: the heading is only for screen readers
+  hideTitle?: boolean
   kind: DonPartKind
   catalog: Catalog
   value: number
@@ -328,7 +358,7 @@ function IconGrid({
     )
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className={hideTitle ? 'sr-only' : 'text-sm font-semibold'}>{title}</h3>
       <div
         className="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 overflow-y-auto pr-1"
         role="radiogroup"
