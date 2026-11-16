@@ -27,16 +27,8 @@
     "charts": "谱面"
   },
   "home": {
-    "register": "注册账号",
     "signInFailed": "登录没有完成，请再试一次。",
-    "scoresTitle": "全部成绩",
-    "scoresText": "两台服务器的成绩合在一张表：每首的最佳成绩和每一局游玩记录。",
-    "titlesTitle": "称号与段位",
-    "titlesText": "挑战在线段位获得段位徽章和称号，社区段位的称号会标明来源。",
-    "plateTitle": "名牌",
-    "plateText": "选好佩戴的称号，游戏里 1P、2P 的名牌都会跟着变。",
     "songs": "{{n}} 首",
-    "signInTitle": "登录后保存你的成绩",
     "loadFailed": "歌曲加载失败。",
     "recentCharts": "最近作品",
     "openChart": "查看谱面",

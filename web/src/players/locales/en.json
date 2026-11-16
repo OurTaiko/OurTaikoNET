@@ -27,16 +27,8 @@
     "charts": "Charts"
   },
   "home": {
-    "register": "Create an account",
     "signInFailed": "Signing in did not finish. Please try again.",
-    "scoresTitle": "All your scores",
-    "scoresText": "Both servers in one table: your best on each chart and every play.",
-    "titlesTitle": "Titles and dan ranks",
-    "titlesText": "Pass online dan courses for dan badges and titles; titles from community courses say so.",
-    "plateTitle": "Nameplate",
-    "plateText": "Pick the title you wear and the 1P and 2P plates in the game follow.",
     "songs": "{{n}} songs",
-    "signInTitle": "Sign in to keep your scores",
     "loadFailed": "The songs could not be loaded.",
     "recentCharts": "Recent charts",
     "openChart": "Open chart",

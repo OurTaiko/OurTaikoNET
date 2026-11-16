@@ -27,16 +27,8 @@
     "charts": "譜面"
   },
   "home": {
-    "register": "アカウント登録",
     "signInFailed": "ログインが完了しませんでした。もう一度お試しください。",
-    "scoresTitle": "すべてのスコア",
-    "scoresText": "2 つのサーバーのスコアを 1 つの表に。譜面ごとのベストと、すべてのプレイ記録。",
-    "titlesTitle": "称号と段位",
-    "titlesText": "オンライン段位に合格すると段位バッジと称号を獲得。コミュニティ段位の称号は出典を表示します。",
-    "plateTitle": "ネームプレート",
-    "plateText": "着ける称号を選ぶと、ゲームの 1P・2P のネームプレートにも反映されます。",
     "songs": "{{n}} 曲",
-    "signInTitle": "ログインしてスコアを残そう",
     "loadFailed": "楽曲を読み込めませんでした。",
     "recentCharts": "最近の譜面",
     "openChart": "譜面を見る",

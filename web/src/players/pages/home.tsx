@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { ChartBarIcon, IdentificationCardIcon, MedalIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import type { ChartBase, ChartList } from '@sitekit/api/types'
 import { supportsChart } from '@sitekit/courses'
-import { buttonVariants } from '@sitekit/components/ui/button'
-import { Skeleton } from '@sitekit/components/ui/skeleton'
 import type { SourceId } from '@sitekit/source'
-import { endpoints } from '@players/api/endpoints'
 import { newestOf } from '@players/newest'
-import { useSession } from '@players/session-context'
 import { Notice } from '@players/notice'
 import { CommunityActivity } from '@players/components/community-activity'
 import { RecentWorks } from '@players/components/recent-works'
@@ -41,50 +36,6 @@ function useLibraries() {
   return libraries
 }
 
-// A guest is asked to sign in here; a player finds their plate and things in the frame's Don.
-function You() {
-  const { t } = useTranslation()
-  const session = useSession()
-  if (session.loading) return <Skeleton className="rounded-[28px] w-full h-40" />
-  if (!session.user) {
-    const features = [
-      { icon: ChartBarIcon, title: t('home.scoresTitle'), text: t('home.scoresText') },
-      { icon: MedalIcon, title: t('home.titlesTitle'), text: t('home.titlesText') },
-      { icon: IdentificationCardIcon, title: t('home.plateTitle'), text: t('home.plateText') },
-    ]
-    return (
-      <section className="gap-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] bg-card shadow-elev-1 p-6 rounded-[28px]">
-        <div className="space-y-4">
-          <h2 className="font-extrabold text-2xl tracking-tight">{t('home.signInTitle')}</h2>
-          <div className="flex flex-wrap gap-2">
-            <a className={buttonVariants()} href={endpoints.login('/')}>
-              {t('nav.signIn')}
-            </a>
-            <a
-              className={buttonVariants({ variant: 'outline' })}
-              href={endpoints.account('register')}
-            >
-              {t('home.register')}
-            </a>
-          </div>
-        </div>
-        <ul className="space-y-3">
-          {features.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex gap-3 text-sm">
-              <Icon className="mt-0.5 size-5 text-primary shrink-0" aria-hidden="true" />
-              <p>
-                <span className="block font-bold">{title}</span>
-                <span className="text-muted-foreground">{text}</span>
-              </p>
-            </li>
-          ))}
-        </ul>
-      </section>
-    )
-  }
-  return null
-}
-
 export function HomePage() {
   const { t } = useTranslation()
   const [params] = useSearchParams()
@@ -109,7 +60,6 @@ export function HomePage() {
         />
         <CommunityActivity />
       </div>
-      <You />
     </div>
   )
 }
