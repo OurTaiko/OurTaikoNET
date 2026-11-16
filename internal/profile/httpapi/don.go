@@ -108,7 +108,7 @@ func (s *Server) donCatalog(ctx context.Context) (*donCatalog, error) {
 	if s.don != nil && time.Since(s.donAt) < donCatalogTTL {
 		return s.don, nil
 	}
-	c, err := s.readDonCatalog(ctx)
+	c, err := s.readDonCatalog(ctx, s.donCatalogURL())
 	if err != nil {
 		if s.don != nil {
 			s.donAt = time.Now() // keep the last good one; try again after a while
@@ -120,8 +120,7 @@ func (s *Server) donCatalog(ctx context.Context) (*donCatalog, error) {
 	return c, nil
 }
 
-func (s *Server) readDonCatalog(ctx context.Context) (*donCatalog, error) {
-	address := s.donCatalogURL()
+func (s *Server) readDonCatalog(ctx context.Context, address string) (*donCatalog, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", address, nil)
@@ -191,7 +190,7 @@ func (c *donCatalog) check(l *DonLook) string {
 
 // files are what the game needs to draw the look: the costume, or the head and the body, and
 // the puchichara.
-func (c *donCatalog) files(l DonLook) []DonFile {
+func (c *donCatalog) files(l DonLook, mirror *donMirror) []DonFile {
 	var want [][2]any
 	if l.Costume {
 		want = append(want, [2]any{"cos", l.Cos})
@@ -205,7 +204,11 @@ func (c *donCatalog) files(l DonLook) []DonFile {
 	for _, w := range want {
 		kind, id := w[0].(string), w[1].(int)
 		if it, ok := c.item(kind, id); ok {
-			files = append(files, DonFile{Kind: kind, ID: id, URL: c.url(it.File), Size: it.File.Size, SHA256: it.File.SHA256})
+			address := mirror.url(it.File)
+			if address == "" {
+				address = c.url(it.File)
+			}
+			files = append(files, DonFile{Kind: kind, ID: id, URL: address, Size: it.File.Size, SHA256: it.File.SHA256})
 		}
 	}
 	return files
@@ -236,8 +239,11 @@ func (s *Server) donLook(ctx context.Context, q interface {
 // (the game then keeps the plain Don), but the look is still told.
 func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 	answer := DonAnswer{Look: l, Files: []DonFile{}}
+	if s.Config.DonMirrorCatalogURL != "" {
+		w.Header().Set("Cache-Control", "private, no-store")
+	}
 	if c, err := s.donCatalog(r.Context()); err == nil {
-		answer.Files = c.files(l)
+		answer.Files = c.files(l, s.mirrorForDonRequest(r))
 	}
 	web.Respond(w, 200, answer)
 }
@@ -258,7 +264,17 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	base, _ := json.Marshal(c.baseURL)
 	all["baseUrl"] = base
-	w.Header().Set("Cache-Control", "public, max-age=60")
+	if s.Config.DonMirrorCatalogURL != "" {
+		w.Header().Set("Cache-Control", "private, no-store")
+		delete(all, "mirrorUrls")
+		if mirror := s.mirrorForDonRequest(r); mirror != nil {
+			if urls := mirror.urls(c); len(urls) > 0 {
+				all["mirrorUrls"], _ = json.Marshal(urls)
+			}
+		}
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=60")
+	}
 	web.Respond(w, 200, all)
 }
 

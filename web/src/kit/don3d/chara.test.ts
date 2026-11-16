@@ -304,4 +304,14 @@ describe('resolveDonLook', () => {
       'https://distrib.ourtaiko.org/3dchara/cos/0.glb?v=abcdef012345',
     )
   })
+
+  it('uses the regional URL only for files listed by the API', () => {
+    const base = 'https://distrib.ourtaiko.org/3dchara/'
+    const head = 'https://static.sakura-bot.cn/3dchara/head/3.glb?v=abcdef012345'
+    const mirrorUrls = { 'head/3.glb': head }
+    expect(catalogUrl(base, file('head/3.glb'), mirrorUrls)).toBe(head)
+    expect(catalogUrl(base, file('body/4.glb'), mirrorUrls)).toBe(
+      base + 'body/4.glb?v=abcdef012345',
+    )
+  })
 })

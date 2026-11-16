@@ -346,10 +346,12 @@ export function createDonRenderer(
       const [loadedBase, datas, puchiBitmap] = await Promise.all([
         ensureBase(),
         Promise.all(
-          resolved.parts.map((p) => loadPart(catalogUrl(baseUrl, p.item.file), p.normalizeFace)),
+          resolved.parts.map((p) =>
+            loadPart(catalogUrl(baseUrl, p.item.file, catalog.mirrorUrls), p.normalizeFace),
+          ),
         ),
         resolved.puchi
-          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file))
+          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file, catalog.mirrorUrls))
           : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
@@ -363,7 +365,7 @@ export function createDonRenderer(
       if (disposed || token !== lookToken) return
       let puchi: Texture | null = null
       if (resolved.puchi && puchiBitmap) {
-        const url = catalogUrl(baseUrl, resolved.puchi.file)
+        const url = catalogUrl(baseUrl, resolved.puchi.file, catalog.mirrorUrls)
         puchi = puchiTextures.get(url) ?? null
         if (!puchi) {
           // drawn straight onto the canvas: no colour space

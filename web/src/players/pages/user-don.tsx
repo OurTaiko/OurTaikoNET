@@ -344,14 +344,14 @@ function IconGrid({
               {kind === 'puchi' ? (
                 // The first of its two frames (stacked top to bottom, so twice as tall as wide).
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.file)}
+                  src={catalogUrl(catalog.baseUrl, item.file, catalog.mirrorUrls)}
                   alt=""
                   loading="lazy"
                   className="absolute inset-x-0 top-0 w-full"
                 />
               ) : item.icon ? (
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.icon)}
+                  src={catalogUrl(catalog.baseUrl, item.icon, catalog.mirrorUrls)}
                   alt=""
                   loading="lazy"
                   className="size-full object-contain p-1"

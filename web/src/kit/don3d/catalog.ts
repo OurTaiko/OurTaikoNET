@@ -14,6 +14,7 @@ export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi'
 
 export type DonCatalog = {
   version: number
+  mirrorUrls?: Record<string, string>
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
   defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
   items: Record<DonPartKind, DonCatalogItem[]>
@@ -30,7 +31,13 @@ export type DonLook = {
   colors: [string, string, string] | null
 }
 
-export function catalogUrl(baseUrl: string, file: DonCatalogFile): string {
+export function catalogUrl(
+  baseUrl: string,
+  file: DonCatalogFile,
+  mirrorUrls?: DonCatalog['mirrorUrls'],
+): string {
+  const mirrored = mirrorUrls?.[file.path]
+  if (typeof mirrored === 'string') return mirrored
   const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
   return base + file.path + '?v=' + file.sha256.slice(0, 12)
 }

@@ -132,6 +132,36 @@ Each step touches production and is done with the owner's go-ahead.
 6. **Release** the backend, then the website (then still OurTaikoNetWeb). **Done on 2026-11-14**,
    before steps 3 and 5.
 
+## Regional 3D Don mirror rollout
+
+Keep `DON_CATALOG_URL` on the canonical CloudFront catalog. Stage the public `3dchara/` files
+in OSS and publish the mirror's `catalog.json` after all objects it lists have been uploaded
+and verified through ESA. For a partial mirror, publish a catalog listing only the files
+actually mirrored. Retain the relative paths, original bytes, SHA-256 and sizes. If paths are
+reused for new versions, keep the `v` query parameter in the ESA cache key and invalidate any
+cached older bytes. Allow CORS from the website for browser previews.
+
+Put a GeoLite2 Country or compatible MMDB file in `/opt/ourtaiko-net/geoip`, readable by the
+container. Set these in the server's `api.env` and recreate the container:
+
+```dotenv
+DON_GEOIP_DB=/srv/geoip/GeoLite2-Country.mmdb
+DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko-mirror-staging/1.0.1-525/3dchara/catalog.json
+```
+
+The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP and
+`TRUSTED_PROXY_CIDRS` must identify the proxy. Mainland China (`CN`) requests get mirror URLs
+only for exact catalog matches. Overseas, Hong Kong, Macao, Taiwan and unknown locations get
+canonical URLs, as do unlisted or changed files and requests during a failed mirror refresh.
+The per-user Don and website catalog responses bypass shared caches during rollout.
+
+Check the same outfit from one mainland and one overseas connection. Inspect both
+`/api/v1/users/{id}/don` and `/api/v1/don/catalog`, then load the outfit with a fresh game cache
+and in the browser. Include an outfit whose mirror file is missing or outdated. To disable the
+rollout, clear `DON_MIRROR_CATALOG_URL` and recreate the container. Restart after replacing the
+country database. Leave the Fanmade and official chart distribution settings on their current
+values while validating Don.
+
 ## Multi-Enso (gRPC)
 
 **On since 2026-11-14.** The steps below were done that day, in the order 2, 3, 1, 4, and

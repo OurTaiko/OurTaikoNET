@@ -42,6 +42,9 @@ type Config struct {
 	// reads it (nil: http.DefaultClient; tests give their own).
 	DonCatalogURL string
 	DonClient     *http.Client
+	// Optional inventory of the published mirror and an IP-to-country lookup for routing Don files.
+	DonMirrorCatalogURL string
+	DonIPCountry        func(netip.Addr) string
 	// Now is the clock of the visit count (visits.go); nil: time.Now. Tests move it.
 	Now func() time.Time
 }
@@ -55,9 +58,12 @@ type Server struct {
 	feed   []Activity
 	feedAt time.Time
 	// The 3D Don's catalog as last read (don.go).
-	donMu sync.Mutex
-	don   *donCatalog
-	donAt time.Time
+	donMu          sync.Mutex
+	don            *donCatalog
+	donAt          time.Time
+	donMirrorMu    sync.Mutex
+	donMirror      *donMirror
+	donMirrorUntil time.Time
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
