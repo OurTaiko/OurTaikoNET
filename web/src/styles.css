@@ -219,6 +219,43 @@
   --ring: #6fdbe3;
 }
 
+/* The frame's floating panes (src/kit/shell): the card's colour, a little see-through, with
+   what is under it blurred. glass-thick is for the drawer over the page on a phone. */
+@utility glass {
+  background-color: color-mix(in srgb, var(--card) 84%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow-elev-1);
+}
+@utility glass-thick {
+  background-color: color-mix(in srgb, var(--card) 94%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: var(--shadow-elev-3);
+}
+/* The top bar is transparent; once the page scrolls under it, what is under it fades into the
+   background at its edge instead of meeting a hard bar. */
+@utility scroll-edge {
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 -1.5rem;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--background) 80%, transparent),
+      color-mix(in srgb, var(--background) 45%, transparent) 60%,
+      transparent
+    );
+    opacity: 0;
+    transition: opacity 200ms var(--ease-emphasized);
+  }
+  &[data-scrolled='true']::before {
+    opacity: 1;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

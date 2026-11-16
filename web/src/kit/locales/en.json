@@ -961,9 +961,6 @@
     "player": "OurTaiko Player",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "openMenu": "Open menu",
-    "collapseMenu": "Collapse menu",
-    "expandMenu": "Expand menu",
     "closeMenu": "Close menu",
     "search": "Search songs",
     "source": "Song source",
@@ -986,6 +983,18 @@
       "playlists": "My playlists",
       "page": "My page",
       "charts": "My charts"
-    }
+    },
+    "menu": "Menu",
+    "settings": "Settings",
+    "appearance": "Theme",
+    "accentHint": "The accent of the home, players and titles pages.",
+    "accentSourceHint": "This is a page of the {{source}} source, which has its own accent; your choice is used on the home, players and titles pages.",
+    "about": "About",
+    "license": "OurTaikoNET is free software under the GNU Affero General Public License, version 3 or later: anyone may get, change and share its source.",
+    "sourceCode": "Source code",
+    "layoutCredit": "Layout after",
+    "signedOut": "Not signed in",
+    "signInHint": "Sign in to keep your scores and playlists",
+    "closeSearch": "Close search"
   }
 }

@@ -1,20 +1,23 @@
-// The site's one frame, the same on every page of every area: a menu that floats at the left
-// (a bar at the bottom on a phone), a top row of pills, and the page between them.
+// The site's one frame, the same on every page of every area and drawn once above them all
+// (src/root.tsx), so that it stays put when a link crosses from one area to another: a top bar
+// fixed to the window, a menu that slides in at the left (a drawer over the page on a phone,
+// with a bar of the main places at the bottom), and the settings sheet at the right. The layout
+// follows Moesekai's (see the README's License).
 //
-// The site has three areas, each with a router of its own (see src/root.tsx): the two song
-// sources, under /fanmade and /official, and everything that belongs to no source (home,
-// players, titles), at the top. The frame's links are whole addresses; one that stays in the
-// area it is shown in is a router link, any other is a plain link, which the root follows by
-// swapping the area in place.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+// The site has three areas, each with a router of its own: the two song sources, under
+// /fanmade and /official, and everything that belongs to no source (home, players, titles), at
+// the top. The area shown tells the frame where the page is and who is signed in (./frame).
+// The frame's links are plain links to whole addresses, which the root follows in place: by the
+// area's router when they stay in it, by swapping the area when they leave it.
+import { useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation } from 'react-router-dom'
 import {
   CaretDownIcon,
   CompassIcon,
   FolderIcon,
   GameControllerIcon,
+  GearSixIcon,
   HouseIcon,
   BellIcon,
   IdentificationCardIcon,
@@ -26,6 +29,7 @@ import {
   SignInIcon,
   SignOutIcon,
   TagIcon,
+  UserIcon,
   UsersThreeIcon,
   UsersIcon,
   XIcon,
@@ -33,7 +37,6 @@ import {
 import { cn } from '../lib/utils'
 import { visit } from '../navigation'
 import { sources, type SourceId } from '../source'
-import { ThemeToggle } from '../theme'
 import { UserAvatar } from '../components/user-avatar'
 import { Button } from '../components/ui/button'
 import {
@@ -44,10 +47,10 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { useTellBuddy } from './buddy'
+import { setBellSlot, signOut, useTold } from './frame'
+import { SettingsSheet } from './settings'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
-
-export type ShellUser = { id: string; nickname: string; avatarUrl?: string }
 
 type Item = {
   key: string
@@ -63,80 +66,104 @@ type Item = {
   external?: boolean
 }
 
-// How far the menu is scrolled. The frame is drawn anew each time the area changes (see
-// src/root.tsx); the menu of the new one starts where the last one was left.
-let menuScroll = 0
+type GroupId = 'songs' | 'players' | 'you' | 'more'
+
+const menuKey = 'ourtaiko-net-menu'
+const groupsKey = 'ourtaiko-net-menu-groups'
+// Wide enough to keep the menu beside the page (Tailwind's lg).
+const wideQuery = '(min-width: 1024px)'
 
 const signInAddress = () =>
   `/api/v1/auth/sso/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`
 
-/**
- * area: where this page is ('' for the top). canUpload: whether the menu offers the chart
- * manager of the source chosen. bell: the area's notification bell, if it has one.
- */
-export function Shell({
-  area,
-  user,
-  loading,
-  canUpload,
-  bell,
-  onSignOut,
-  children,
-}: {
-  area: SourceId | ''
-  user: ShellUser | null
-  loading: boolean
-  canUpload: (source: SourceId) => boolean
-  bell?: ReactNode
-  onSignOut: () => void
-  children: ReactNode
-}) {
+function readGroups(): Partial<Record<GroupId, boolean>> {
+  try {
+    const kept = JSON.parse(localStorage.getItem(groupsKey) ?? '{}')
+    return kept && typeof kept === 'object' ? kept : {}
+  } catch {
+    return {}
+  }
+}
+
+/** The frame around the area shown (children). */
+export function Frame({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
-  const { pathname } = useLocation()
+  const { area, path, user, loading, uploadsHere } = useTold()
   const base = area ? `/${area}` : ''
-  const here = base + (pathname === '/' ? (base ? '/' : '/') : pathname)
+  const here = base + (path === '/' ? '/' : path)
   const roles = useSiteRoles(user?.id)
   // The source the Songs group points at: this page's, or the one used last.
   const remembered = useRememberedSource()
   const source = area || remembered
   // The player's Don, drawn above the areas so that it keeps moving across them.
   useTellBuddy(user, loading, source)
-  const [collapsed, setCollapsed] = useState(() => {
+  // Anyone uploads to Fanmade; the official source's songs are its managers'. On a source's
+  // own pages, the source's session says.
+  const canUpload = (of: SourceId) =>
+    of === area ? uploadsHere : of === 'fanmade' || roles.groups.includes('OFFICIAL_MANAGER')
+
+  // Beside the page (wide screens): shown or put away, as the player last left it.
+  const [docked, setDocked] = useState(() => {
     try {
-      return localStorage.getItem('ourtaiko-net-menu') === 'collapsed'
+      return localStorage.getItem(menuKey) !== 'collapsed'
     } catch {
-      return false
+      return true
     }
   })
-  const [open, setOpen] = useState(false)
-  useEffect(() => setOpen(false), [pathname])
-  const menuBox = useRef<HTMLElement>(null)
-  // When the player last moved the menu themselves: only then is a scroll theirs to remember.
-  const menuTouched = useRef(0)
-  const touchMenu = () => {
-    menuTouched.current = Date.now()
-  }
-  useLayoutEffect(() => {
-    const box = menuBox.current
-    if (!box) return
-    const restore = () => {
-      box.scrollTop = menuScroll
-    }
-    restore()
-    // The menu grows once the session is known (the player's own items), and until then it
-    // may be too short to scroll that far: put it back again as it grows.
-    if (typeof ResizeObserver === 'undefined' || !box.firstElementChild) return
-    const watcher = new ResizeObserver(restore)
-    watcher.observe(box.firstElementChild)
-    return () => watcher.disconnect()
-  }, [])
   useEffect(() => {
     try {
-      localStorage.setItem('ourtaiko-net-menu', collapsed ? 'collapsed' : 'open')
+      localStorage.setItem(menuKey, docked ? 'open' : 'collapsed')
     } catch {
       /* The choice is simply not remembered. */
     }
-  }, [collapsed])
+  }, [docked])
+  // Over the page (narrow screens).
+  const [drawer, setDrawer] = useState(false)
+  useEffect(() => setDrawer(false), [here])
+  useEffect(() => {
+    if (!drawer) return
+    const close = (event: KeyboardEvent) => event.key === 'Escape' && setDrawer(false)
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [drawer])
+  const [wide, setWide] = useState(() => window.matchMedia(wideQuery).matches)
+  useEffect(() => {
+    const media = window.matchMedia(wideQuery)
+    const look = () => setWide(media.matches)
+    media.addEventListener('change', look)
+    return () => media.removeEventListener('change', look)
+  }, [])
+  const toggleMenu = () => (wide ? setDocked(!docked) : setDrawer(true))
+  // Only once the page has been drawn do the menu's moves animate: not as it first appears.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSettled(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  const [groups, setGroups] = useState(readGroups)
+  const toggleGroup = (id: GroupId) => {
+    const next = { ...groups, [id]: !(groups[id] ?? true) }
+    setGroups(next)
+    try {
+      localStorage.setItem(groupsKey, JSON.stringify(next))
+    } catch {
+      /* Not remembered. */
+    }
+  }
+
+  const [settings, setSettings] = useState(false)
+  // The top bar thickens once the page scrolls under it.
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const look = () => setScrolled(window.scrollY > 4)
+    look()
+    window.addEventListener('scroll', look, { passive: true })
+    return () => window.removeEventListener('scroll', look)
+  }, [])
+  // On a narrow screen the search takes the whole top bar while it is open.
+  const [searching, setSearching] = useState(false)
+  useEffect(() => setSearching(false), [here])
 
   const songs: Item[] = [
     {
@@ -232,47 +259,66 @@ export function Shell({
   const choose = (next: SourceId) => {
     rememberSource(next)
     if (!area || next === area) return
-    // This area's session says who uploads here; for the other source the site's groups do:
-    // anyone uploads to Fanmade, the official source's songs are its managers'.
-    const mayUpload = next === 'fanmade' || roles.groups.includes('OFFICIAL_MANAGER')
-    visit(`/${next}${twinPath(pathname, mayUpload)}`)
+    visit(`/${next}${twinPath(path, canUpload(next))}`)
   }
 
-  const entry = (item: Item, rail: boolean) => (
-    <ShellLink
+  const entry = (item: Item) => (
+    <FrameLink
       key={item.key}
       href={item.href}
-      base={base}
       external={item.external}
       aria-current={lit(item) ? 'page' : undefined}
-      title={rail ? item.label : undefined}
       className={cn(
-        'flex items-center rounded-full font-medium text-muted-foreground text-sm outline-none transition-colors duration-200 ease-emphasized focus-visible:ring-3 focus-visible:ring-ring/40 hover:bg-accent hover:text-foreground',
-        rail ? 'size-11 justify-center' : 'gap-3.5 px-4 h-11',
+        'flex items-center gap-3.5 px-4 h-11 rounded-full font-medium text-muted-foreground text-sm outline-none transition-colors duration-200 ease-emphasized focus-visible:ring-3 focus-visible:ring-ring/40 hover:bg-accent hover:text-foreground',
         lit(item) &&
           'bg-secondary font-semibold text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground',
       )}
     >
       <item.icon className="size-5 shrink-0" aria-hidden="true" />
-      {rail ? (
-        <span className="sr-only">{item.label}</span>
-      ) : (
-        <span className="truncate">{item.label}</span>
-      )}
-    </ShellLink>
+      <span className="truncate">{item.label}</span>
+    </FrameLink>
   )
-  const group = (label: string, rail: boolean) =>
-    rail ? (
-      <div className="mx-auto my-1.5 bg-border w-6 h-px" aria-hidden="true" />
-    ) : (
-      <div className="px-4 pt-3.5 pb-1.5 font-semibold text-muted-foreground text-xs">{label}</div>
+  // A group of the menu: its name, which folds it away or opens it again, then its items.
+  const group = (id: GroupId, label: string, content: ReactNode) => {
+    const open = groups[id] ?? true
+    return (
+      <div key={id} className="mt-1 pt-1 border-t border-border/70">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => toggleGroup(id)}
+          className="flex justify-between items-center hover:bg-accent px-4 rounded-full outline-none w-full h-9 font-semibold text-muted-foreground text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
+        >
+          {label}
+          <CaretDownIcon
+            aria-hidden="true"
+            className={cn(
+              'size-4',
+              settled && 'transition-transform duration-300 ease-emphasized',
+              open && 'rotate-180',
+            )}
+          />
+        </button>
+        <div
+          className={cn(
+            'grid',
+            settled && 'transition-[grid-template-rows,opacity] duration-300 ease-emphasized',
+            open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+          )}
+        >
+          <div className="flex flex-col gap-0.5 min-h-0 overflow-hidden" inert={!open}>
+            {content}
+          </div>
+        </div>
+      </div>
     )
-  const sourceSwitch = (rail: boolean) => (
+  }
+  const sourceSwitch = (
     <div
       role="group"
       aria-label={t('shell.source')}
       data-testid="source-switch"
-      className={cn('flex gap-1 bg-muted p-1 rounded-full', rail ? 'flex-col' : 'mx-1 mb-1.5')}
+      className="flex gap-1 bg-muted mx-1 mt-0.5 mb-1 p-1 rounded-full"
     >
       {sources.map(({ id }) => (
         <button
@@ -280,98 +326,105 @@ export function Shell({
           type="button"
           aria-pressed={id === source}
           onClick={() => choose(id)}
-          title={rail ? t(`shell.${id}`) : undefined}
           className={cn(
-            'rounded-full font-semibold text-muted-foreground text-sm outline-none transition-all duration-200 ease-emphasized focus-visible:ring-3 focus-visible:ring-ring/40',
-            rail ? 'size-9' : 'flex-1 h-9',
+            'flex-1 rounded-full h-9 font-semibold text-muted-foreground text-sm outline-none transition-all duration-200 ease-emphasized focus-visible:ring-3 focus-visible:ring-ring/40',
             id === source && 'bg-card text-foreground shadow-elev-1',
           )}
         >
           <span
             aria-hidden="true"
             className={cn(
-              'inline-block rounded-full size-2',
-              rail ? '' : 'mr-2',
+              'inline-block mr-2 rounded-full size-2',
               id === 'official' ? 'bg-don' : 'bg-ka',
             )}
           />
-          {rail ? <span className="sr-only">{t(`shell.${id}`)}</span> : t(`shell.${id}`)}
+          {t(`shell.${id}`)}
         </button>
       ))}
     </div>
   )
-  const account = (rail: boolean) =>
-    loading ? null : user ? (
-      <div
-        className={cn(
-          'flex items-center bg-surface-low shadow-elev-1 mt-2.5',
-          rail ? 'flex-col gap-1 p-1 rounded-full' : 'gap-3 p-2.5 pl-3 rounded-[20px]',
-        )}
-      >
-        <ShellLink
-          href={`/players/${user.id}`}
-          base={base}
-          className="flex flex-1 items-center gap-3 rounded-full outline-none min-w-0 focus-visible:ring-3 focus-visible:ring-ring/40"
-        >
-          <UserAvatar nickname={user.nickname} avatarUrl={user.avatarUrl} className="size-9" />
-          {!rail && (
-            <span data-testid="account-nickname" className="font-semibold text-sm truncate">
-              {user.nickname}
+  // Who is signed in, kept at the foot of the menu however far it is scrolled.
+  const account = (
+    <div className="p-3 border-t border-border/70 shrink-0">
+      {loading && !user ? (
+        <div className="flex items-center gap-3 p-2" aria-hidden="true">
+          <span className="bg-muted rounded-full size-10 animate-pulse" />
+          <span className="flex-1 bg-muted rounded-full h-3 animate-pulse" />
+        </div>
+      ) : user ? (
+        <div className="flex items-center gap-1">
+          <FrameLink
+            href={`/players/${user.id}`}
+            className="flex flex-1 items-center gap-3 hover:bg-accent p-2 rounded-[20px] outline-none min-w-0 transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
+          >
+            <UserAvatar nickname={user.nickname} avatarUrl={user.avatarUrl} className="size-10" />
+            <span className="flex-1 min-w-0">
+              <span data-testid="account-nickname" className="block font-semibold text-sm truncate">
+                {user.nickname}
+              </span>
+              <span className="block text-muted-foreground text-xs truncate">
+                {t('shell.myPage')}
+              </span>
             </span>
-          )}
-        </ShellLink>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('shell.signOut')}
-          title={t('shell.signOut')}
-          onClick={onSignOut}
+          </FrameLink>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('shell.signOut')}
+            title={t('shell.signOut')}
+            onClick={signOut}
+          >
+            <SignOutIcon aria-hidden="true" />
+          </Button>
+        </div>
+      ) : (
+        <a
+          href={signInAddress()}
+          className="flex items-center gap-3 hover:bg-accent p-2 rounded-[20px] outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
         >
-          <SignOutIcon aria-hidden="true" />
-        </Button>
-      </div>
-    ) : (
-      <a
-        href={signInAddress()}
-        title={rail ? t('shell.signIn') : undefined}
-        className={cn(
-          'flex justify-center items-center gap-2 bg-primary mt-2.5 rounded-full font-semibold text-primary-foreground text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40',
-          rail ? 'size-11' : 'h-11',
-        )}
-      >
-        <SignInIcon className="size-5" aria-hidden="true" />
-        {rail ? <span className="sr-only">{t('shell.signIn')}</span> : t('shell.signIn')}
-      </a>
-    )
-  const menu = (rail: boolean) => (
-    <nav
-      aria-label={t('messages.mainNavigation')}
-      className={cn(
-        'flex flex-col gap-0.5 bg-card shadow-elev-1',
-        rail ? 'items-center p-2 rounded-[28px]' : 'p-3 rounded-[28px]',
+          <span className="flex justify-center items-center bg-primary rounded-full size-10 text-primary-foreground shrink-0">
+            <UserIcon className="size-5" aria-hidden="true" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-semibold text-sm truncate">{t('shell.signedOut')}</span>
+            <span className="block text-muted-foreground text-xs truncate">
+              {t('shell.signInHint')}
+            </span>
+          </span>
+          <SignInIcon className="size-5 text-muted-foreground shrink-0" aria-hidden="true" />
+        </a>
       )}
-    >
-      {entry(home, rail)}
-      {group(t('shell.songs'), rail)}
-      {sourceSwitch(rail)}
-      {songs.map((item) => entry(item, rail))}
-      {group(t('shell.players'), rail)}
-      {players.map((item) => entry(item, rail))}
-      {you.length > 0 && group(t('shell.you'), rail)}
-      {you.map((item) => entry(item, rail))}
-      {group(t('shell.more'), rail)}
-      {entry(player, rail)}
-      {account(rail)}
-    </nav>
+    </div>
+  )
+  const menu = (
+    <>
+      <nav
+        aria-label={t('messages.mainNavigation')}
+        className="flex flex-col flex-1 gap-0.5 px-2 pt-3 pb-2 overflow-y-auto overscroll-contain"
+      >
+        {entry(home)}
+        {group(
+          'songs',
+          t('shell.songs'),
+          <>
+            {sourceSwitch}
+            {songs.map(entry)}
+          </>,
+        )}
+        {group('players', t('shell.players'), players.map(entry))}
+        {you.length > 0 && group('you', t('shell.you'), you.map(entry))}
+        {group('more', t('shell.more'), entry(player))}
+      </nav>
+      {account}
+    </>
   )
   const brand = (
-    <ShellLink
+    <FrameLink
       href="/"
-      base={base}
-      className="rounded-full outline-none font-extrabold text-primary text-xl tracking-tight focus-visible:ring-3 focus-visible:ring-ring/40 shrink-0"
+      className="px-1 rounded-full outline-none font-extrabold text-primary text-xl tracking-tight focus-visible:ring-3 focus-visible:ring-ring/40 shrink-0"
     >
       OurTaikoNET
-    </ShellLink>
+    </FrameLink>
   )
   // The route beside the name: which section this page is in and which page of it, each a
   // menu of the others. The sections are the menu's groups; which source the songs are of is
@@ -415,6 +468,44 @@ export function Shell({
       )}
     </nav>
   )
+  const search = (
+    <form
+      action={`/${source}/`}
+      // Searched in place, like every link of the site; the action is for a page whose
+      // scripts did not load.
+      onSubmit={(event) => {
+        event.preventDefault()
+        const q = new FormData(event.currentTarget).get('q')
+        visit(`/${source}/${q ? `?q=${encodeURIComponent(String(q))}` : ''}`)
+      }}
+      role="search"
+      className={cn(
+        'glass items-center gap-2.5 px-5 rounded-full h-12 text-muted-foreground focus-within:ring-3 focus-within:ring-ring/30',
+        searching ? 'flex flex-1' : 'hidden lg:flex w-72 shrink',
+      )}
+    >
+      <MagnifyingGlassIcon className="size-5 shrink-0" aria-hidden="true" />
+      <input
+        type="search"
+        name="q"
+        aria-label={t('shell.search')}
+        placeholder={t('shell.search')}
+        autoFocus={searching}
+        className="flex-1 bg-transparent outline-none min-w-0 text-foreground text-sm placeholder:text-muted-foreground"
+      />
+      {searching && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="-mr-3"
+          aria-label={t('shell.closeSearch')}
+          onClick={() => setSearching(false)}
+        >
+          <XIcon aria-hidden="true" />
+        </Button>
+      )}
+    </form>
+  )
   const bar: Item[] = [
     home,
     // Lit on the source's song pages, but not on its playlists, which have the next item.
@@ -431,123 +522,122 @@ export function Shell({
 
   return (
     <div className="isolate relative bg-background min-h-svh text-foreground">
-      <div className="flex flex-col gap-4 sm:gap-5 mx-auto p-3 sm:p-4 max-w-[92rem]">
-        {/* The top row stays in reach while the page scrolls: the name with the route, the
-            search, and the tools. */}
-        <div className="top-3 sm:top-4 z-30 sticky flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1 bg-card shadow-elev-1 pr-4 pl-1.5 rounded-full min-w-0 h-14">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="max-lg:hidden"
-              aria-label={collapsed ? t('shell.expandMenu') : t('shell.collapseMenu')}
-              aria-expanded={!collapsed}
-              onClick={() => setCollapsed(!collapsed)}
-            >
-              <ListIcon className="size-5" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              aria-label={t('shell.openMenu')}
-              aria-expanded={open}
-              onClick={() => setOpen(true)}
-            >
-              <ListIcon className="size-5" aria-hidden="true" />
-            </Button>
-            {brand}
-            {route}
-          </div>
-          <form
-            action={`/${source}/`}
-            // Searched in place, like every link of the site; the action is for a page whose
-            // scripts did not load.
-            onSubmit={(event) => {
-              event.preventDefault()
-              const q = new FormData(event.currentTarget).get('q')
-              visit(`/${source}/${q ? `?q=${encodeURIComponent(String(q))}` : ''}`)
-            }}
-            role="search"
-            className="hidden sm:flex flex-1 items-center gap-2.5 bg-card shadow-elev-1 ml-auto px-5 rounded-full max-w-sm h-14 text-muted-foreground focus-within:ring-3 focus-within:ring-ring/30"
-          >
-            <MagnifyingGlassIcon className="size-5 shrink-0" aria-hidden="true" />
-            <input
-              type="search"
-              name="q"
-              aria-label={t('shell.search')}
-              placeholder={t('shell.search')}
-              className="flex-1 bg-transparent outline-none min-w-0 text-foreground text-sm placeholder:text-muted-foreground"
-            />
-          </form>
-          <div className="flex items-center bg-card shadow-elev-1 ml-auto sm:ml-0 px-1.5 rounded-full h-14 shrink-0">
-            {bell}
-            <ThemeToggle />
-          </div>
+      {/* The top bar: transparent, its controls in floating capsules; what scrolls under it
+          fades out at its edge. */}
+      <header data-scrolled={scrolled} className="top-0 z-40 fixed inset-x-0 scroll-edge">
+        <div className="flex items-center gap-2 px-2 sm:px-3 h-16">
+          {searching ? (
+            search
+          ) : (
+            <>
+              <div className="flex items-center gap-1 pr-2 sm:pr-4 pl-1 rounded-full min-w-0 h-12 glass">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('shell.menu')}
+                  title={t('shell.menu')}
+                  aria-expanded={wide ? docked : drawer}
+                  onClick={toggleMenu}
+                >
+                  <ListIcon className="size-5" aria-hidden="true" />
+                </Button>
+                {brand}
+                {route}
+              </div>
+              <div className="flex-1 min-w-0" />
+              {search}
+              <div className="flex items-center gap-0.5 px-1 rounded-full h-12 glass shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden"
+                  aria-label={t('shell.search')}
+                  onClick={() => setSearching(true)}
+                >
+                  <MagnifyingGlassIcon className="size-5" aria-hidden="true" />
+                </Button>
+                {/* The area's notification bell (./frame). */}
+                <span ref={setBellSlot} className="contents" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('shell.settings')}
+                  title={t('shell.settings')}
+                  aria-expanded={settings}
+                  className={cn(settings && 'bg-secondary text-secondary-foreground')}
+                  onClick={() => setSettings(true)}
+                >
+                  <GearSixIcon className="size-5" aria-hidden="true" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
-        <div className="flex items-start gap-6">
-          {/* The menu, on screens wide enough to keep it beside the page. */}
-          <aside
-            ref={menuBox}
-            onWheel={touchMenu}
-            onTouchMove={touchMenu}
-            onPointerDown={touchMenu}
-            onKeyDown={touchMenu}
-            onScroll={(event) => {
-              // A scroll the browser made itself (the menu was too short for a moment) is
-              // not the player's, and must not replace where they left it.
-              if (Date.now() - menuTouched.current < 1500)
-                menuScroll = event.currentTarget.scrollTop
-            }}
-            className={cn(
-              'hidden lg:block top-[5.5rem] sticky max-h-[calc(100svh-6.5rem)] overflow-y-auto -m-1 p-1 rounded-[28px] shrink-0',
-              collapsed ? 'w-[4.25rem]' : 'w-[16.5rem]',
-            )}
+      </header>
+
+      {/* Behind the menu while it is open over the page (narrow screens). */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        className={cn(
+          'lg:hidden z-50 fixed inset-0 bg-foreground/40 backdrop-blur-[2px] transition-opacity duration-300',
+          drawer ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        onClick={() => setDrawer(false)}
+      />
+      {/* The menu: a drawer over the page on narrow screens, a pane floating beside it on wide
+          ones, which the menu button slides away and back. */}
+      <aside
+        aria-label={t('shell.menu')}
+        inert={(wide ? !docked : !drawer) || undefined}
+        className={cn(
+          'z-50 lg:z-30 fixed inset-y-0 left-0 flex flex-col w-72 max-w-[85vw] overflow-hidden glass-thick rounded-r-[28px]',
+          'lg:top-[4.75rem] lg:bottom-3 lg:left-3 lg:w-[17rem] lg:rounded-[28px] lg:glass',
+          settled && 'transition-transform duration-300 ease-emphasized',
+          // Put away a little past the edge, so that its shadow goes too.
+          drawer ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]',
+          docked ? 'lg:translate-x-0' : 'lg:-translate-x-[calc(100%+1.5rem)]',
+        )}
+      >
+        <div className="lg:hidden flex items-center gap-1 px-2 h-16 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('shell.closeMenu')}
+            onClick={() => setDrawer(false)}
           >
-            {menu(collapsed)}
-          </aside>
-          <main id="main" className="flex-1 space-y-6 pb-24 lg:pb-8 min-w-0">
-            {children}
-          </main>
+            <XIcon className="size-5" aria-hidden="true" />
+          </Button>
+          {brand}
         </div>
+        {menu}
+      </aside>
+
+      <div
+        className={cn(
+          'pt-[4.75rem]',
+          settled && 'transition-[padding] duration-300 ease-emphasized',
+          docked && 'lg:pl-[18.5rem]',
+        )}
+      >
+        <main
+          id="main"
+          className="space-y-6 mx-auto px-3 sm:px-4 pb-24 lg:pb-8 max-w-[92rem] min-w-0"
+        >
+          {children}
+        </main>
       </div>
 
-      {/* On a phone the menu opens over the page. */}
-      {open && (
-        <div className="lg:hidden z-50 fixed inset-0 flex">
-          <button
-            type="button"
-            aria-label={t('shell.closeMenu')}
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative flex flex-col gap-3 p-3 w-72 max-w-[85vw] overflow-y-auto animate-in slide-in-from-left duration-300 ease-emphasized">
-            <div className="flex items-center gap-1 bg-card shadow-elev-1 pr-5 pl-1.5 rounded-full h-14 self-start shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('shell.closeMenu')}
-                onClick={() => setOpen(false)}
-              >
-                <XIcon className="size-5" aria-hidden="true" />
-              </Button>
-              {brand}
-            </div>
-            {menu(false)}
-          </div>
-        </div>
-      )}
-
-      {/* … and its main places stay one tap away at the bottom. */}
+      {/* On a phone the main places stay one tap away at the bottom. */}
       <nav
         aria-label={t('messages.mainNavigation')}
         className="lg:hidden right-3 bottom-3 left-3 z-40 fixed flex items-center bg-card shadow-elev-3 px-2 py-1.5 rounded-[28px]"
       >
         {bar.map((item) => (
-          <ShellLink
+          <FrameLink
             key={item.key}
             href={item.href}
-            base={base}
             aria-current={lit(item) ? 'page' : undefined}
             className={cn(
               'flex flex-col flex-1 justify-center items-center gap-0.5 rounded-2xl outline-none min-w-0 min-h-14 font-semibold text-[0.6875rem] text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/40',
@@ -563,9 +653,11 @@ export function Shell({
               <item.icon className="size-5" aria-hidden="true" />
             </span>
             <span className="px-1 max-w-full truncate">{item.label}</span>
-          </ShellLink>
+          </FrameLink>
         ))}
       </nav>
+
+      <SettingsSheet open={settings} onOpenChange={setSettings} area={area} />
     </div>
   )
 }
@@ -630,39 +722,30 @@ function Crumb({
   )
 }
 
-/** A link of the frame: a router link inside this area, a plain one out of it. */
-function ShellLink({
+/**
+ * A link of the frame. A plain link: the root follows it in place, by the area's router or by
+ * swapping the area (src/root.tsx).
+ */
+function FrameLink({
   href,
-  base,
   external,
   children,
   ...props
 }: {
   href: string
-  base: string
   external?: boolean
   children: ReactNode
   className?: string
   title?: string
   'aria-current'?: 'page'
 }) {
-  if (external)
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-        {children}
-      </a>
-    )
-  const first = href.split('/')[1]
-  const area = sources.some((source) => source.id === first) ? `/${first}` : ''
-  if (area !== base)
-    return (
-      <a href={href} {...props}>
-        {children}
-      </a>
-    )
-  return (
-    <Link to={href.slice(base.length) || '/'} {...props}>
+  return external ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
       {children}
-    </Link>
+    </a>
+  ) : (
+    <a href={href} {...props}>
+      {children}
+    </a>
   )
 }

@@ -950,9 +950,6 @@
     "player": "OurTaiko Player",
     "signIn": "登录",
     "signOut": "退出登录",
-    "openMenu": "打开菜单",
-    "collapseMenu": "收起菜单",
-    "expandMenu": "展开菜单",
     "closeMenu": "关闭菜单",
     "search": "搜索歌曲",
     "source": "曲源",
@@ -975,6 +972,18 @@
       "playlists": "我的歌单",
       "page": "个人主页",
       "charts": "我的谱面"
-    }
+    },
+    "menu": "菜单",
+    "settings": "设置",
+    "appearance": "颜色主题",
+    "accentHint": "首页、玩家和称号等页面使用的强调色。",
+    "accentSourceHint": "这里是{{source}}曲源的页面，强调色跟随曲源；你的选择用在首页、玩家和称号等页面。",
+    "about": "关于",
+    "license": "OurTaikoNET 是自由软件，以 GNU Affero 通用公共许可证第 3 版（或更新版本）发布，任何人都可以获取、修改和分享它的源代码。",
+    "sourceCode": "源代码",
+    "layoutCredit": "界面布局参照了",
+    "signedOut": "未登录",
+    "signInHint": "登录以同步成绩与歌单",
+    "closeSearch": "关闭搜索"
   }
 }

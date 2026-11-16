@@ -1,22 +1,7 @@
-import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { MoonIcon as Moon, SunIcon as Sun, MonitorIcon as Monitor } from '@phosphor-icons/react'
 import { ThemeContext } from './theme-context'
 import type { Theme } from './theme-context'
-import { useTheme } from './theme-context'
-import { Button } from './components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './components/ui/dropdown-menu'
-import { chooseTone, useChosenTone, type Tone } from './accent'
 
 /** storageKey names the browser's saved choice, one per site. */
 export function ThemeProvider({
@@ -64,56 +49,4 @@ export function ThemeProvider({
     return () => window.removeEventListener('storage', sync)
   }, [storageKey])
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>
-}
-
-export function ThemeToggle() {
-  const { t } = useTranslation()
-
-  const { theme, setTheme } = useTheme()
-  const tone = useChosenTone()
-  const Icon = theme === 'system' ? Monitor : theme === 'dark' ? Moon : Sun
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" aria-label={t('messages.changeColorTheme')} />}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>
-          <DropdownMenuRadioItem value="light">
-            <Sun />
-            {t('messages.light')}
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">
-            <Moon />
-            {t('messages.dark')}
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system">
-            <Monitor />
-            {t('messages.system')}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        {/* The accent of the pages that belong to no song source; see ./accent. */}
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('shell.accent')}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={tone}
-            onValueChange={(value) => chooseTone(value as Tone)}
-            data-testid="accent-choice"
-          >
-            <DropdownMenuRadioItem value="don">
-              <span aria-hidden="true" className="size-3 rounded-full bg-don" />
-              {t('shell.don')}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="ka">
-              <span aria-hidden="true" className="size-3 rounded-full bg-ka" />
-              {t('shell.ka')}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }

@@ -2,7 +2,8 @@
 // /fanmade/… and /official/…, and the pages that belong to no source (home, players, titles),
 // at the top. Each has a router and pages of its own, fetched the first time one of its
 // pages is opened; this is what shows one of them at a time and moves from one to another
-// without loading the page anew. All three wear the same frame (@sitekit/shell).
+// without loading the page anew. All three are shown in the same frame (@sitekit/shell), drawn
+// once here.
 import { StrictMode, useSyncExternalStore } from 'react'
 import type { ComponentType } from 'react'
 import { flushSync } from 'react-dom'
@@ -13,6 +14,7 @@ import { applyTone } from '@sitekit/accent'
 import { i18n, setAreaCatalogues, type Language } from '@sitekit/i18n'
 import { moveInArea, setVisitor } from '@sitekit/navigation'
 import { FrameBuddy } from '@sitekit/shell/buddy'
+import { Frame } from '@sitekit/shell/shell'
 import { rememberSource, rememberedSource } from '@sitekit/shell/site'
 import { areaOf, setArea, type SourceId } from '@sitekit/source'
 import { ThemeProvider } from '@sitekit/theme'
@@ -122,8 +124,11 @@ function Root() {
       <I18nextProvider i18n={i18n}>
         <IconContext.Provider value={{ weight: 'bold' }}>
           <ThemeProvider storageKey="ourtaiko-net-theme">
-            {/* A new key for each area: its router and every page under it start afresh. */}
-            {current && <current.part.App key={current.area} />}
+            {/* The frame: one for the whole site, so it stays put when the area changes. */}
+            <Frame>
+              {/* A new key for each area: its router and every page under it start afresh. */}
+              {current && <current.part.App key={current.area} />}
+            </Frame>
             {/* The player's Don: one for the whole site, so it is not drawn anew with an area. */}
             <FrameBuddy />
           </ThemeProvider>

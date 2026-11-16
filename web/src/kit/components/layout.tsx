@@ -1,31 +1,38 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Notice } from '../notifications'
 import { NotificationBell } from '../notification-center'
 import { useSession } from '../session-context'
-import { Shell } from '../shell/shell'
+import { FrameBell, useTellFrame } from '../shell/frame'
 import { useSite } from '../site'
 import { SOURCE } from '../source'
 
-/** A page of a song source inside the site's frame. */
+/** A page of a song source, inside the site's frame (drawn by src/root.tsx). */
 export function Layout() {
   const session = useSession()
   const site = useSite()
+  const { pathname } = useLocation()
   const [error, setError] = useState('')
+  useTellFrame({
+    area: SOURCE,
+    path: pathname,
+    user: session.user,
+    loading: session.loading,
+    uploadsHere: site.canUpload(session.user),
+    signOut: () => {
+      setError('')
+      void session.logout().catch((e) => setError(e.message))
+    },
+  })
   return (
-    <Shell
-      area={SOURCE}
-      user={session.user}
-      loading={session.loading}
-      canUpload={() => site.canUpload(session.user)}
-      bell={session.user ? <NotificationBell /> : null}
-      onSignOut={() => {
-        setError('')
-        void session.logout().catch((e) => setError(e.message))
-      }}
-    >
+    <>
+      {session.user && (
+        <FrameBell>
+          <NotificationBell />
+        </FrameBell>
+      )}
       {(session.error || error) && <Notice>{session.error || error}</Notice>}
       <Outlet />
-    </Shell>
+    </>
   )
 }

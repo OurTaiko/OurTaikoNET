@@ -950,9 +950,6 @@
     "player": "OurTaiko Player",
     "signIn": "로그인",
     "signOut": "로그아웃",
-    "openMenu": "메뉴 열기",
-    "collapseMenu": "메뉴 접기",
-    "expandMenu": "메뉴 펼치기",
     "closeMenu": "메뉴 닫기",
     "search": "곡 검색",
     "source": "곡 소스",
@@ -975,6 +972,18 @@
       "playlists": "내 플레이리스트",
       "page": "내 페이지",
       "charts": "내 채보"
-    }
+    },
+    "menu": "메뉴",
+    "settings": "설정",
+    "appearance": "색상 테마",
+    "accentHint": "홈, 플레이어, 칭호 등의 페이지에 쓰이는 강조 색입니다.",
+    "accentSourceHint": "이곳은 {{source}} 곡 소스의 페이지라 강조 색이 곡 소스를 따릅니다. 고른 색은 홈, 플레이어, 칭호 등의 페이지에 쓰입니다.",
+    "about": "정보",
+    "license": "OurTaikoNET은 GNU Affero 일반 공중 사용 허가서 3판(또는 그 이후 판)으로 공개된 자유 소프트웨어입니다. 누구나 소스 코드를 받고, 고치고, 공유할 수 있습니다.",
+    "sourceCode": "소스 코드",
+    "layoutCredit": "레이아웃 참고:",
+    "signedOut": "로그인하지 않음",
+    "signInHint": "로그인하고 기록과 플레이리스트를 동기화",
+    "closeSearch": "검색 닫기"
   }
 }
