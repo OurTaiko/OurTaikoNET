@@ -503,7 +503,12 @@ function TitlesTab({
                     <span>{titleName(h.title, language)}</span>
                     <span>·</span>
                     <span>
-                      {h.courseTitle || (h.service === 'admin' ? t('titles.byAdmin') : h.service)}
+                      {h.courseTitle ||
+                        (h.service === 'admin'
+                          ? t('titles.byAdmin')
+                          : h.service === 'rule'
+                            ? t('titles.byRule')
+                            : h.service)}
                     </span>
                     <span>·</span>
                     <span>{date.format(new Date(h.grantedAt))}</span>

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -73,7 +74,7 @@ func (s *Server) gameSession(r *http.Request) (session, error) {
 		return v, e
 	}
 	v.User = u
-	return v, signin.RecordActivity(r.Context(), s.DB, v.User.ID, false)
+	return v, signin.RecordActivity(r.Context(), s.DB, v.User.ID, false, titlerules.GameLogin)
 }
 func (s *Server) required(w http.ResponseWriter, r *http.Request, csrf bool) (session, bool) {
 	v, e := s.current(r)

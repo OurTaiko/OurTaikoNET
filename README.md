@@ -53,7 +53,30 @@ How much the website is visited (`internal/visits`, migration `0005_visits`). Th
 - **Visitors.** No cookie and no stored address: a visitor is `sha256(the day's random salt || IP and User-Agent)`, so the same person is one visitor a day and cannot be followed from one day to the next. Every hour the days that are over are closed: the hashes are counted into `visit_days.visitors` and deleted with the salt. Over several days "visitors" is the sum of each day's.
 - `POST /api/v1/visits` `{"path": "/fanmade/charts/…"}` → 204, with or without a session. Not counted, and still 204: a User-Agent that is a program's or missing, more than 60 a minute from one address, a path that is no address of the site. It does not count against the 40 writes a minute.
 - `GET /api/v1/visits`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s. The footer of every page shows it.
-- `GET /api/v1/admin/visits?days=30` (1–366), the site's administrator → the same, plus `days` (each day, oldest first, with the days nobody came) and `pages` (the 50 seen most in the period). The website shows it at `/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator.
+- `GET /api/v1/admin/visits?days=30` (1–366), the site's administrator → the same, plus `days` (each day, oldest first, with the days nobody came) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator.
+
+## Titles by rule
+
+Besides a 段位 course and an administrator's hand, a title is given by rule (`internal/titlerules`, table `net.title_rules`, migration `0006_title_rules`). A title may have several rules; meeting any one gives it. Only a title of the catalog's own (no `owner_id`) takes rules.
+
+| `kind` | Met by | Fields |
+|---|---|---|
+| `chart_clear` | a score on one chart of a source | `source`, `chartId`, `clear`, `course`? |
+| `category_clear` | scores on `count` charts of a category of a source; without `count`, on every chart of it that has a course high enough | `source`, `category` (the source's category ID), `clear`, `course`?, `count`? |
+| `charts_uploaded` | being the first owner of `count` charts of a source | `source`, `count` |
+| `site_login` | being seen signed in on the website | |
+| `game_login` | being seen signed in in the game | |
+
+`clear` is the lowest crown that counts (1 cleared, 2 full combo, 3 all good), `course` the lowest course (Easy < Normal < Hard < Oni < Edit; none: any). Only scores that still stand (`is_latest`) on published charts with files count, and only such charts are counted as uploads.
+
+- **When rules are judged.** A score that clears: in the score's transaction, the rules of its chart and of its categories (`POST …/scores` and `…/game/scores` then answer with `grantedTitleIds`, the titles this play earned; the field is absent when there are none). An upload that publishes a chart: the upload rules of its first owner. Being seen: whenever a signed-in request writes the player's activity (at most once a minute) and at every sign-in, `site_login` for a website session and `game_login` for a game token. A failure to judge is logged and never fails the score, upload or request.
+- **Once.** What a rule gave is a row of `net.awards` with `service = 'rule'` and `request_key = '<rule id>:<user id>'`. A rule gives a player its title once: after an administrator takes the title back, the same rule does not give it again (a new rule would). Nothing is taken back when a player stops meeting a rule, or when a rule is deleted.
+- **Those who meet it already.** Creating a rule gives its title at once to every player who meets it. The two sign-in rules have nothing kept to go by there: `site_login` goes to the players with a website session at that moment, `game_login` to the players who have any score; everyone else gets them the next time they are seen.
+- `GET /api/v1/titles`, public → `titles` and `rules`: every rule with its `titleId`, the fields above, and for a chart rule `chart` (`id`, `title`, `titleTranslations`, `gone` when it is no longer published).
+- `POST /api/v1/admin/titles/{id}/rules` (TITLE_MANAGER) with the fields of the kind → 201 `{"rule", "granted"}`, `granted` being how many players got the title at once. 422 `RULE_INVALID`, `RULE_CHART_NOT_FOUND`, `RULE_TITLE_OWNED`.
+- `DELETE /api/v1/admin/rules/{id}` (TITLE_MANAGER). A rule is not changed: delete it and make another.
+
+The website shows each title's rules in the catalog (`/titles`) and edits them at `/manage/titles` (`web/src/players/components/title-rules-card.tsx`; the wording is `web/src/players/title-rules.ts`, which also lists each source's category IDs and has to follow `songs.Fanmade` and `songs.Official`).
 
 ## The 3D Don
 

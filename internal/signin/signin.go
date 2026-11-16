@@ -9,6 +9,7 @@ package signin
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -115,7 +117,7 @@ func (s *Sessions) Current(r *http.Request) (Session, error) {
 		}
 		v.User = u
 	}
-	if e = RecordActivity(r.Context(), s.DB, v.User.ID, false); e != nil {
+	if e = RecordActivity(r.Context(), s.DB, v.User.ID, false, titlerules.SiteLogin); e != nil {
 		return Session{}, e
 	}
 	return v, nil
@@ -123,20 +125,34 @@ func (s *Sessions) Current(r *http.Request) (Session, error) {
 
 type activityWriter interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
 // RecordActivity notes that a player was just seen, and with login that they signed in. A
 // player not known to the site yet becomes known. Call only after authentication. Writes at
 // most once a minute for a player.
-func RecordActivity(ctx context.Context, db activityWriter, id string, login bool) error {
-	_, err := db.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at)
+//
+// seen says where they were seen, titlerules.SiteLogin or titlerules.GameLogin, and gives them
+// the titles there are for that (as often as this writes, and at every sign-in); "" gives
+// none. Failing to give a title is logged and does not fail the request, so do not pass seen
+// with a transaction: an error would spoil it.
+func RecordActivity(ctx context.Context, db activityWriter, id string, login bool, seen string) error {
+	tag, err := db.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at)
  VALUES($1,CASE WHEN $2 THEN now() ELSE NULL END,now())
  ON CONFLICT(id) DO UPDATE SET
  first_login_at=COALESCE(users.first_login_at,EXCLUDED.first_login_at),
  last_active_at=GREATEST(users.last_active_at,EXCLUDED.last_active_at)
  WHERE users.last_active_at IS NULL OR users.last_active_at < now()-interval '1 minute'
  OR (users.first_login_at IS NULL AND EXCLUDED.first_login_at IS NOT NULL)`, id, login)
-	return err
+	if err != nil {
+		return err
+	}
+	if seen != "" && (login || tag.RowsAffected() > 0) {
+		if _, e := titlerules.Seen(ctx, db, seen, id); e != nil {
+			log.Printf("title rules for a player seen (%s): %v", seen, e)
+		}
+	}
+	return nil
 }
 
 // SafeReturn is where signing in returns to: the local path asked for, or DefaultReturn when
@@ -166,7 +182,7 @@ func (s *Sessions) Open(ctx context.Context, user, access, refresh string, acces
 		return "", expires, e
 	}
 	defer tx.Rollback(ctx)
-	if e = RecordActivity(ctx, tx, user, true); e != nil {
+	if e = RecordActivity(ctx, tx, user, true, ""); e != nil {
 		return "", expires, e
 	}
 	if s.SSO == nil {
@@ -178,7 +194,14 @@ func (s *Sessions) Open(ctx context.Context, user, access, refresh string, acces
 	if e != nil {
 		return "", expires, e
 	}
-	return rawSession, expires, tx.Commit(ctx)
+	if e = tx.Commit(ctx); e != nil {
+		return "", expires, e
+	}
+	// The titles for signing in on the website, once the session stands.
+	if _, e = titlerules.Seen(ctx, s.DB, titlerules.SiteLogin, user); e != nil {
+		log.Printf("title rules for a sign-in: %v", e)
+	}
+	return rawSession, expires, nil
 }
 
 // Login begins a sign-in: GET …/auth/sso/login?returnTo=<page>. Without an account center it

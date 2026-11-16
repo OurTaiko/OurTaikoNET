@@ -174,8 +174,8 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		SessionCookie: SessionCookie, Groups: true, DonCatalogURL: cfg.DonCatalogURL,
 		Sources: []profile.Source{
-			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
-			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
+			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite, Categories: songs.Fanmade.CategoryBits()},
+			{ID: "official", Name: "OurTaiko Database", Site: officialSite, Categories: songs.Official.CategoryBits()},
 		},
 	})
 

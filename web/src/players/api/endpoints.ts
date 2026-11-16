@@ -22,6 +22,9 @@ export const endpoints = {
   userDans: (id: string) => `${API_ROOT}/users/${id}/dans`,
   adminTitle: (id: string) => `${API_ROOT}/admin/titles/${encodeURIComponent(id)}`,
   adminGrants: `${API_ROOT}/admin/grants`,
+  // The rules that give a title by themselves.
+  adminTitleRules: (id: string) => `${API_ROOT}/admin/titles/${encodeURIComponent(id)}/rules`,
+  adminRule: (id: number) => `${API_ROOT}/admin/rules/${id}`,
   // The manage panel: user groups.
   groups: `${API_ROOT}/admin/groups`,
   groupMembers: `${API_ROOT}/admin/users`,

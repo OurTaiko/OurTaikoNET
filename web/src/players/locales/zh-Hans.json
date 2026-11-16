@@ -157,7 +157,8 @@
     "keptStyles": "彩虹和紫色留给官方称号。",
     "save": "保存",
     "createButton": "创建",
-    "cancel": "取消"
+    "cancel": "取消",
+    "byRule": "达成条件获得"
   },
   "dans": {
     "badges": "段位徽章",
@@ -303,6 +304,68 @@
       "EntryLoop": "入场",
       "FullCombo": "全连",
       "Miss": "失误"
+    }
+  },
+  "rules": {
+    "heading": "自动发放条件",
+    "howTo": "获得方式",
+    "none": "还没有条件。",
+    "title": "称号",
+    "kind": "条件",
+    "source": "曲源",
+    "chart": "歌曲 ID 或歌曲页地址",
+    "category": "分类",
+    "course": "最低难度",
+    "anyCourse": "不限难度",
+    "clear": "要求",
+    "count": "数量",
+    "countAll": "留空为全部",
+    "add": "添加条件",
+    "added": "已添加，并发给了 {{n}} 位已达成的玩家。",
+    "delete": "删除",
+    "confirmDelete": "删除这条条件？已经发出的称号不会收回。",
+    "deleted": "已删除。",
+    "chartGone": "（歌曲已下架）",
+    "kinds": {
+      "chart_clear": "打完某首歌",
+      "category_clear": "打完某个分类的歌",
+      "site_login": "登录网站",
+      "game_login": "登录游戏",
+      "charts_uploaded": "上传谱面数"
+    },
+    "clears": {
+      "1": "通关",
+      "2": "全连",
+      "3": "全良"
+    },
+    "atLeast": "（{{course}}及以上）",
+    "text": {
+      "site_login": "登录网站",
+      "game_login": "登录游戏",
+      "chart_clear": "{{clear}}{{source}}曲源的《{{title}}》{{course}}",
+      "category_all": "{{clear}}{{source}}曲源「{{category}}」分类的全部歌曲{{course}}",
+      "category_count": "{{clear}}{{source}}曲源「{{category}}」分类的 {{count}} 首歌曲{{course}}",
+      "charts_uploaded": "在{{source}}曲源上传 {{count}} 张谱面"
+    },
+    "categories": {
+      "fanmade": {
+        "game": "游戏",
+        "virtual-singer": "虚拟歌手",
+        "pop": "流行",
+        "classic": "古典",
+        "variety": "综合",
+        "anime": "动画"
+      },
+      "official": {
+        "namco": "南梦宫原创",
+        "pop": "流行音乐",
+        "game": "游戏音乐",
+        "anime": "动画",
+        "vocaloid": "VOCALOID",
+        "variety": "综合",
+        "kids": "儿童",
+        "classics": "古典"
+      }
     }
   }
 }

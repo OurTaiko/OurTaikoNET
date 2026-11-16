@@ -157,7 +157,8 @@
     "keptStyles": "Rainbow and purple are kept for official titles.",
     "save": "Save",
     "createButton": "Create",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "byRule": "Earned by meeting its condition"
   },
   "dans": {
     "badges": "Dan badges",
@@ -303,6 +304,68 @@
       "EntryLoop": "Entry",
       "FullCombo": "Full combo",
       "Miss": "Miss"
+    }
+  },
+  "rules": {
+    "heading": "Conditions that give titles",
+    "howTo": "How to get it",
+    "none": "No conditions yet.",
+    "title": "Title",
+    "kind": "Condition",
+    "source": "Source",
+    "chart": "Song ID or the address of its page",
+    "category": "Category",
+    "course": "Lowest course",
+    "anyCourse": "Any course",
+    "clear": "Needs",
+    "count": "How many",
+    "countAll": "Empty for all of them",
+    "add": "Add condition",
+    "added": "Added, and given to {{n}} players who met it already.",
+    "delete": "Delete",
+    "confirmDelete": "Delete this condition? Titles it already gave stay.",
+    "deleted": "Deleted.",
+    "chartGone": " (song no longer available)",
+    "kinds": {
+      "chart_clear": "Clear a song",
+      "category_clear": "Clear songs of a category",
+      "site_login": "Sign in on the website",
+      "game_login": "Sign in in the game",
+      "charts_uploaded": "Number of charts uploaded"
+    },
+    "clears": {
+      "1": "Clear",
+      "2": "Full combo",
+      "3": "All good"
+    },
+    "atLeast": ", {{course}} or harder",
+    "text": {
+      "site_login": "Sign in on the website",
+      "game_login": "Sign in in the game",
+      "chart_clear": "{{clear}}: “{{title}}” ({{source}}{{course}})",
+      "category_all": "{{clear}}: every song in {{category}} ({{source}}{{course}})",
+      "category_count": "{{clear}}: {{count}} songs in {{category}} ({{source}}{{course}})",
+      "charts_uploaded": "Upload {{count}} charts ({{source}})"
+    },
+    "categories": {
+      "fanmade": {
+        "game": "Game",
+        "virtual-singer": "Virtual Singer",
+        "pop": "Pop",
+        "classic": "Classical",
+        "variety": "Variety",
+        "anime": "Anime"
+      },
+      "official": {
+        "namco": "Namco Original",
+        "pop": "Pop",
+        "game": "Game Music",
+        "anime": "Anime",
+        "vocaloid": "VOCALOID",
+        "variety": "Variety",
+        "kids": "Kids",
+        "classics": "Classical"
+      }
     }
   }
 }

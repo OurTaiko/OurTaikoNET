@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { Title, TitleStyle } from '@players/api/types'
+import type { Title, TitleRule, TitleStyle } from '@players/api/types'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
 import { Badge } from '@sitekit/components/ui/badge'
@@ -15,6 +15,7 @@ import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { titleName } from '@players/dan'
+import { ruleText } from '@players/title-rules'
 
 export const titleStyles: TitleStyle[] = ['wood', 'teal', 'wood2', 'purple', 'gold', 'rainbow']
 // Rainbow and purple are kept for official titles.
@@ -25,16 +26,20 @@ const languages = ['en', 'ja', 'ko'] as const
 
 export function useTitles() {
   const [titles, setTitles] = useState<Title[] | null>(null)
+  const [rules, setRules] = useState<TitleRule[]>([])
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
-    api<{ titles: Title[] }>(endpoints.titles, { signal: controller.signal })
-      .then((r) => setTitles(r.titles))
+    api<{ titles: Title[]; rules?: TitleRule[] }>(endpoints.titles, { signal: controller.signal })
+      .then((r) => {
+        setTitles(r.titles)
+        setRules(r.rules ?? [])
+      })
       .catch((e) => !controller.signal.aborted && setError(e.message))
     return () => controller.abort()
   }, [revision])
-  return { titles, error, reload: () => setRevision((r) => r + 1) }
+  return { titles, rules, error, reload: () => setRevision((r) => r + 1) }
 }
 
 type Draft = {
@@ -281,7 +286,7 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
 // titles come first.
 export function TitlesPage() {
   const { t, i18n } = useTranslation()
-  const { titles, error, reload } = useTitles()
+  const { titles, rules, error, reload } = useTitles()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   return (
     <div className="space-y-6">
@@ -318,6 +323,18 @@ export function TitlesPage() {
                     <code>{title.id}</code>
                   </div>
                   {title.description && <p className="text-sm">{title.description}</p>}
+                  {rules.some((rule) => rule.titleId === title.id) && (
+                    <div className="text-sm" data-testid="title-rules">
+                      <p className="text-xs text-muted-foreground">{t('rules.howTo')}</p>
+                      <ul className="list-disc pl-5">
+                        {rules
+                          .filter((rule) => rule.titleId === title.id)
+                          .map((rule) => (
+                            <li key={rule.id}>{ruleText(rule, t, language)}</li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

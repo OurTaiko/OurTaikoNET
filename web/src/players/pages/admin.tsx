@@ -12,6 +12,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
+import { TitleRulesCard } from '@players/components/title-rules-card'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { useTitles } from './titles'
@@ -23,7 +24,7 @@ const languages = ['en', 'ja', 'ko'] as const
 export function AdminPage() {
   const { t } = useTranslation()
   const session = useSession()
-  const { titles, error: loadError, reload } = useTitles()
+  const { titles, rules, error: loadError, reload } = useTitles()
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -38,11 +39,11 @@ export function AdminPage() {
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   if (session.loading) return null
   if (!session.user?.isAdmin) return <Navigate to="/" replace />
-  const run = async (work: () => Promise<unknown>, done: string) => {
+  const run = async <T,>(work: () => Promise<T>, done: string | ((result: T) => string)) => {
     setMessage(null)
     try {
-      await work()
-      setMessage({ kind: 'info', text: done })
+      const result = await work()
+      setMessage({ kind: 'info', text: typeof done === 'string' ? done : done(result) })
       reload()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
@@ -235,6 +236,26 @@ export function AdminPage() {
           </ul>
         </CardContent>
       </Card>
+      <TitleRulesCard
+        titles={titles ?? []}
+        rules={rules}
+        onAdd={(titleId, rule) =>
+          void run(
+            () =>
+              api<{ granted: number }>(
+                endpoints.adminTitleRules(titleId),
+                jsonRequest('POST', rule, session.csrfToken),
+              ),
+            (result) => t('rules.added', { n: result.granted }),
+          )
+        }
+        onDelete={(rule) =>
+          void run(
+            () => api(endpoints.adminRule(rule.id), jsonRequest('DELETE', {}, session.csrfToken)),
+            t('rules.deleted'),
+          )
+        }
+      />
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('admin.grant')}</CardTitle>

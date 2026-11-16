@@ -125,6 +125,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/admin/visits", s.visitReport)
 	mux.HandleFunc("PUT /api/v1/admin/titles/{id}", s.saveTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/titles/{id}", s.deleteTitle)
+	mux.HandleFunc("POST /api/v1/admin/titles/{id}/rules", s.createTitleRule)
+	mux.HandleFunc("DELETE /api/v1/admin/rules/{id}", s.deleteTitleRule)
 	mux.HandleFunc("POST /api/v1/admin/grants", s.grantTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/grants", s.revokeTitle)
 	mux.HandleFunc("GET /api/v1/admin/groups", s.groupCatalog)

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/signin"
+	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -69,7 +70,7 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		result.User.AvatarURL = s.Config.SSO.AvatarURL(result.User)
 	}
-	if e := signin.RecordActivity(r.Context(), s.DB, result.User.ID, true); e != nil {
+	if e := signin.RecordActivity(r.Context(), s.DB, result.User.ID, true, titlerules.GameLogin); e != nil {
 		internal(w, e)
 		return
 	}

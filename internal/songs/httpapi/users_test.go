@@ -127,7 +127,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := signin.RecordActivity(ctx, pool, newID, true); err != nil {
+			if err := signin.RecordActivity(ctx, pool, newID, true, ""); err != nil {
 				t.Error(err)
 			}
 		}()
