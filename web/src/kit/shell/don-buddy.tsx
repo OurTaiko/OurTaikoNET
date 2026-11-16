@@ -1,10 +1,13 @@
 // The signed-in player's own 3D Don, standing in a corner of every page (the look they chose on
 // their page, from the public bucket). A click makes it jump to the middle of the screen: their
 // nameplate below it, and above it three ways on: their playlists, their page, their charts. A
-// click outside, Escape or the Don again sends it back. Loaded lazily by the frame, so three.js
+// click outside, Escape or the Don again sends it back. In its corner it can be dragged anywhere
+// on the screen, and it stays where it is put (remembered in this browser, measured from the
+// bottom right corner so it keeps its place when the window changes size). Loaded lazily by the
+// frame, so three.js
 // comes only with a signed-in player; it draws nothing until the catalog and look are read.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent } from 'react'
+import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileTextIcon, PlaylistIcon, UserIcon } from '@phosphor-icons/react'
 import { api } from '../api/client'
@@ -29,6 +32,29 @@ const WIDE = frame.width / frame.height
 const JUMP_MS = 650
 const BUTTONS = 48 // the row of buttons above the Don, and its gap
 const PLATE_GAP = 4
+const DRAG_START = 6 // a press that moves less than this is still a click
+
+// Where the player put the Don: how far its box is from the right and bottom edges.
+type Spot = { right: number; bottom: number }
+const SPOT_KEY = 'ourtaiko.buddy.spot'
+function readSpot(): Spot | null {
+  try {
+    const kept = JSON.parse(window.localStorage.getItem(SPOT_KEY) ?? 'null') as Partial<Spot> | null
+    return kept && Number.isFinite(kept.right) && Number.isFinite(kept.bottom)
+      ? { right: kept.right as number, bottom: kept.bottom as number }
+      : null
+  } catch {
+    return null
+  }
+}
+function keepSpot(spot: Spot) {
+  try {
+    window.localStorage.setItem(SPOT_KEY, JSON.stringify(spot))
+  } catch {
+    // Private windows and blocked storage: it stays put until the page is left.
+  }
+}
+const within = (value: number, most: number) => Math.min(Math.max(value, 0), Math.max(most, 0))
 
 type Look = { catalog: ServedDonCatalog; look: DonLook }
 // The same for every area's frame (the frame is drawn anew when the area changes).
@@ -77,6 +103,17 @@ export default function DonBuddy({
   const viewport = useViewport()
   const buddy = useRef<HTMLButtonElement>(null)
   const middle = useRef<HTMLAnchorElement>(null)
+  const [spot, setSpot] = useState<Spot | null>(readSpot)
+  // While it is being dragged: where its box is. The press that may become a drag is in `press`.
+  const [dragAt, setDragAt] = useState<{ x: number; y: number } | null>(null)
+  const press = useRef<{
+    pointer: number
+    x: number
+    y: number
+    fromX: number
+    fromY: number
+  } | null>(null)
+  const dragged = useRef(false) // the click that ends a drag is not a click
   const still =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -132,14 +169,47 @@ export default function DonBuddy({
   const plateHeight = (plateWidth * 81) / 329
   const column = BUTTONS + BIG + PLATE_GAP + plateHeight
   const top = Math.max(16, (height - column) / 2)
-  const corner = {
-    x: width - SMALL * WIDE - (wide ? 24 : 16),
-    y: height - SMALL - (wide ? 24 : 92),
-  }
+  const most = { x: width - SMALL * WIDE, y: height - SMALL }
+  const away = spot ?? { right: wide ? 24 : 16, bottom: wide ? 24 : 92 }
+  const corner = { x: within(most.x - away.right, most.x), y: within(most.y - away.bottom, most.y) }
   const centre = { x: (width - BIG * WIDE) / 2, y: top + BUTTONS }
-  const at = open ? centre : corner
+  const at = open ? centre : (dragAt ?? corner)
   const scale = open ? 1 : SMALL / BIG
-  const move = (curve: string) => (still ? 'none' : `transform ${JUMP_MS}ms cubic-bezier(${curve})`)
+  const move = (curve: string) =>
+    still || dragAt ? 'none' : `transform ${JUMP_MS}ms cubic-bezier(${curve})`
+
+  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    dragged.current = false
+    if (open || event.button !== 0) return
+    press.current = {
+      pointer: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      fromX: corner.x,
+      fromY: corner.y,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const from = press.current
+    if (!from || from.pointer !== event.pointerId) return
+    const dx = event.clientX - from.x
+    const dy = event.clientY - from.y
+    if (!dragged.current && Math.hypot(dx, dy) < DRAG_START) return
+    dragged.current = true
+    setDragAt({ x: within(from.fromX + dx, most.x), y: within(from.fromY + dy, most.y) })
+  }
+  const onPointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (press.current?.pointer !== event.pointerId) return
+    press.current = null
+    if (!dragAt) return
+    if (event.type === 'pointerup') {
+      const put = { right: most.x - dragAt.x, bottom: most.y - dragAt.y }
+      setSpot(put)
+      keepSpot(put)
+    }
+    setDragAt(null)
+  }
   // The sideways move and the growth are even; the vertical one is a hop: up to the middle it
   // rises past and lands, down to the corner it springs up first and drops.
   const xStyle: CSSProperties = {
@@ -248,8 +318,18 @@ export default function DonBuddy({
               aria-label={t(open ? 'shell.buddy.close' : 'shell.buddy.open')}
               aria-expanded={open}
               aria-haspopup="dialog"
-              onClick={() => setOpen((o) => !o)}
-              className="block rounded-[32px] outline-none focus-visible:ring-3 focus-visible:ring-ring pointer-events-auto cursor-pointer"
+              onClick={() => {
+                if (dragged.current) dragged.current = false
+                else setOpen((o) => !o)
+              }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerEnd}
+              onPointerCancel={onPointerEnd}
+              className={cn(
+                'block rounded-[32px] outline-none focus-visible:ring-3 focus-visible:ring-ring pointer-events-auto select-none touch-none',
+                open ? 'cursor-pointer' : dragAt ? 'cursor-grabbing' : 'cursor-grab',
+              )}
               style={{ width: BIG * WIDE, height: BIG }}
             >
               <DonPreview
