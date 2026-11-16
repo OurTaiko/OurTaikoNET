@@ -110,3 +110,14 @@ The plan, the decisions behind it and the work log are in the private notes repo
 ## The database in one paragraph
 
 `ourtaiko_net` has three schemas. `fanmade` and `official` each hold one song source: its charts, files, dan courses, comments, playlists, scores, exactly the tables the old sites had. `net` holds what the site has once: players, sign-in, roles, titles and nameplates. `net.scores` and `net.dan_attempts` are parents over the two sources' tables, so a player's plays across both sources are one query while each source's scores keep their foreign key to that source's charts. See [db/README.md](db/README.md).
+
+## License
+
+OurTaikoNet (the backend and the website under `web/`) is free software under the GNU Affero
+General Public License, version 3 or (at your option) any later version; see [LICENSE](LICENSE).
+As the AGPL asks of a program used over a network, the website links to this source from its
+settings (About).
+
+The website's frame (the top bar, the side menu and the settings sheet) follows the layout of
+[Moesekai](https://github.com/StarMoe-org/Moesekai), which is under the AGPL-3.0.
+`web/src/TJARenderer` keeps its own MIT license (`web/src/TJARenderer/LICENSE`).
