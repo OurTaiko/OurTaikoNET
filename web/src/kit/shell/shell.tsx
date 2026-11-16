@@ -69,7 +69,7 @@ type Item = {
   external?: boolean
 }
 
-type GroupId = 'songs' | 'players' | 'you' | 'more'
+type GroupId = 'songs' | 'players' | 'you' | 'manage' | 'more'
 
 const menuKey = 'ourtaiko-net-menu'
 const groupsKey = 'ourtaiko-net-menu-groups'
@@ -229,13 +229,36 @@ export function Frame({ children }: { children: ReactNode }) {
           label: t('shell.myPlaylists'),
           icon: PlaylistIcon,
         },
+      ]
+    : []
+  // What only those who manage the site see, under /manage/: the title catalog for its
+  // managers, players' user groups and the visit count for the site's administrator.
+  const manage: Item[] = user
+    ? [
         ...(roles.titleManager
-          ? [{ key: 'admin', href: '/admin', label: t('shell.titleAdmin'), icon: ShieldStarIcon }]
+          ? [
+              {
+                key: 'titleAdmin',
+                href: '/manage/titles',
+                label: t('shell.titleAdmin'),
+                icon: ShieldStarIcon,
+              },
+            ]
           : []),
         ...(roles.siteAdmin
           ? [
-              { key: 'manage', href: '/manage', label: t('shell.manage'), icon: UsersThreeIcon },
-              { key: 'visits', href: '/visits', label: t('shell.visits'), icon: ChartBarIcon },
+              {
+                key: 'userGroups',
+                href: '/manage/groups',
+                label: t('shell.manage'),
+                icon: UsersThreeIcon,
+              },
+              {
+                key: 'visits',
+                href: '/manage/visits',
+                label: t('shell.visits'),
+                icon: ChartBarIcon,
+              },
             ]
           : []),
       ]
@@ -421,6 +444,7 @@ export function Frame({ children }: { children: ReactNode }) {
         )}
         {group('players', t('shell.players'), players.map(entry))}
         {you.length > 0 && group('you', t('shell.you'), you.map(entry))}
+        {manage.length > 0 && group('manage', t('shell.manageGroup'), manage.map(entry))}
         {group('more', t('shell.more'), entry(player))}
       </nav>
       {account}
@@ -441,6 +465,7 @@ export function Frame({ children }: { children: ReactNode }) {
     { key: 'songs', label: t('shell.songs'), items: songs },
     { key: 'players', label: t('shell.players'), items: players },
     ...(you.length ? [{ key: 'you', label: t('shell.you'), items: you }] : []),
+    ...(manage.length ? [{ key: 'manage', label: t('shell.manageGroup'), items: manage }] : []),
   ]
   const found = sections.find((section) => section.items.some(lit))
   // A page of a source that is no item of the menu (signing in, the account) is still among

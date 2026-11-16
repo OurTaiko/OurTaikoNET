@@ -41,7 +41,7 @@ export function setArea(area: SourceId | '') {
 /** Where the pages about players are: their scores on every source, titles, nameplate. */
 export const PLAYERS_BASE = '/players'
 /** The first part of the addresses that belong to no source. */
-export const sitePages = ['', 'players', 'titles', 'notifications', 'admin', 'manage', 'visits']
+export const sitePages = ['', 'players', 'titles', 'notifications', 'manage']
 /** The area an address is in; null when it is no page of this site as it is now. */
 export function areaOf(pathname: string): SourceId | '' | null {
   return sourceOf(pathname) ?? (sitePages.includes(pathname.split('/')[1]) ? '' : null)

@@ -52,9 +52,13 @@ function App() {
                 <Route path="players/:id" element={<UserPage />} />
                 <Route path="titles" element={<TitlesPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
-                <Route path="admin" element={<AdminPage />} />
-                <Route path="manage" element={<ManagePage />} />
-                <Route path="visits" element={<VisitsPage />} />
+                <Route path="manage">
+                  <Route index element={<NotFound />} />
+                  <Route path="titles" element={<AdminPage />} />
+                  <Route path="groups" element={<ManagePage />} />
+                  <Route path="visits" element={<VisitsPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
