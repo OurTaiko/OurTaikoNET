@@ -231,6 +231,28 @@
     "TITLE_OFFICIAL": "공식 칭호는 관리자만 삭제할 수 있습니다.",
     "TITLE_CHANGED": "관리자가 방금 이 칭호를 수정했습니다. 페이지를 새로고침한 뒤 다시 시도하세요."
   },
+  "visits": {
+    "heading": "방문 통계",
+    "about": "웹사이트가 페이지를 표시할 때마다 조회 1회로 셉니다. 방문자는 하루 단위로만 구분하며, 쿠키를 쓰지 않고 IP 주소도 저장하지 않습니다. 하루는 UTC+8 0시에 시작합니다.",
+    "today": "오늘",
+    "period": "최근 {{n}}일",
+    "total": "누적",
+    "since": "{{day}}부터",
+    "views": "조회수",
+    "visitors": "방문자",
+    "visitorDays": "방문자(일별 합계)",
+    "range": "기간",
+    "days": "{{n}}일",
+    "viewsHeading": "일별 조회수",
+    "visitorsHeading": "일별 방문자",
+    "pagesHeading": "가장 많이 본 페이지",
+    "page": "페이지",
+    "share": "비율",
+    "noPages": "이 기간에는 아직 방문 기록이 없습니다.",
+    "other": "기타 페이지",
+    "table": "일별 데이터를 표로 보기",
+    "day": "날짜"
+  },
   "manage": {
     "heading": "사용자 그룹",
     "setHeading": "플레이어의 그룹 설정",

@@ -231,6 +231,28 @@
     "TITLE_OFFICIAL": "Only administrators can delete an official title.",
     "TITLE_CHANGED": "An administrator just changed this title. Reload the page and try again."
   },
+  "visits": {
+    "heading": "Visits",
+    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. A day starts at midnight UTC+8.",
+    "today": "Today",
+    "period": "Last {{n}} days",
+    "total": "All time",
+    "since": "since {{day}}",
+    "views": "Views",
+    "visitors": "Visitors",
+    "visitorDays": "Visitors (summed by day)",
+    "range": "Period",
+    "days": "{{n}} days",
+    "viewsHeading": "Views per day",
+    "visitorsHeading": "Visitors per day",
+    "pagesHeading": "Most visited pages",
+    "page": "Page",
+    "share": "Share",
+    "noPages": "No visits in this period yet.",
+    "other": "Other pages",
+    "table": "Show the days as a table",
+    "day": "Day"
+  },
   "manage": {
     "heading": "User groups",
     "setHeading": "A player's groups",

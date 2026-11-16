@@ -946,6 +946,7 @@
     "myPlaylists": "내 플레이리스트",
     "notifications": "알림",
     "manage": "사용자 그룹",
+    "visits": "방문 통계",
     "titleAdmin": "칭호 관리",
     "player": "OurTaiko Player",
     "signIn": "로그인",
@@ -994,6 +995,7 @@
       "qqGroup": "QQ 그룹",
       "feedback": "피드백 보내기 / 문제 신고",
       "nonProfit": "비영리 커뮤니티 프로젝트",
+      "visits": "누적 조회 {{total}}회 · 오늘 조회 {{today}}회, 방문자 {{visitors}}명",
       "notice": "이 사이트는 플레이어 커뮤니티 프로젝트이며 반다이남코 엔터테인먼트와 관련이 없습니다. 「태고의 달인」 및 관련 자료의 권리는 해당 권리자에게 있습니다."
     }
   }

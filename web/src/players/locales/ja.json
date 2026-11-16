@@ -231,6 +231,28 @@
     "TITLE_OFFICIAL": "公式称号を削除できるのは管理者だけです。",
     "TITLE_CHANGED": "この称号は管理者によって変更されました。ページを再読み込みしてやり直してください。"
   },
+  "visits": {
+    "heading": "アクセス統計",
+    "about": "ページが表示されるたびに 1 PV として数えます。訪問者は 1 日単位で区別し、Cookie は使わず、IP アドレスも保存しません。1 日は UTC+8 の 0 時に始まります。",
+    "today": "今日",
+    "period": "直近 {{n}} 日",
+    "total": "累計",
+    "since": "{{day}} から",
+    "views": "PV",
+    "visitors": "訪問者",
+    "visitorDays": "訪問者（日ごとの合計）",
+    "range": "期間",
+    "days": "{{n}} 日",
+    "viewsHeading": "日別 PV",
+    "visitorsHeading": "日別訪問者",
+    "pagesHeading": "よく見られているページ",
+    "page": "ページ",
+    "share": "割合",
+    "noPages": "この期間のアクセスはまだありません。",
+    "other": "その他のページ",
+    "table": "日別データを表で見る",
+    "day": "日付"
+  },
   "manage": {
     "heading": "ユーザーグループ",
     "setHeading": "プレイヤーのグループを設定",

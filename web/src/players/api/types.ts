@@ -125,3 +125,17 @@ export type AwardRecord = {
   createdAt: string
 }
 export type Dans = { badges: DanBadge[]; history: AwardRecord[] }
+
+// How much the site is visited (the backend's internal/visits). Over more than one day,
+// visitors is the sum of each day's.
+export type VisitCount = { views: number; visitors: number }
+export type VisitDay = VisitCount & { day: string }
+export type VisitReport = {
+  total: VisitCount
+  today: VisitCount
+  /** The first day counted (YYYY-MM-DD); empty when nothing has been. */
+  since: string
+  /** Oldest first, today last, with the days nobody came. */
+  days: VisitDay[]
+  pages: { page: string; views: number }[]
+}

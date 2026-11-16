@@ -14,6 +14,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   CaretDownIcon,
+  ChartBarIcon,
   CompassIcon,
   FolderIcon,
   GameControllerIcon,
@@ -52,6 +53,7 @@ import { setBellSlot, signOut, useTold } from './frame'
 import { SettingsSheet } from './settings'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
+import { useCountVisit } from './visits'
 
 type Item = {
   key: string
@@ -93,6 +95,8 @@ export function Frame({ children }: { children: ReactNode }) {
   const base = area ? `/${area}` : ''
   const here = base + (path === '/' ? '/' : path)
   const roles = useSiteRoles(user?.id)
+  // Each page shown is counted (./visits).
+  useCountVisit(here)
   // The source the Songs group points at: this page's, or the one used last.
   const remembered = useRememberedSource()
   const source = area || remembered
@@ -229,7 +233,10 @@ export function Frame({ children }: { children: ReactNode }) {
           ? [{ key: 'admin', href: '/admin', label: t('shell.titleAdmin'), icon: ShieldStarIcon }]
           : []),
         ...(roles.siteAdmin
-          ? [{ key: 'manage', href: '/manage', label: t('shell.manage'), icon: UsersThreeIcon }]
+          ? [
+              { key: 'manage', href: '/manage', label: t('shell.manage'), icon: UsersThreeIcon },
+              { key: 'visits', href: '/visits', label: t('shell.visits'), icon: ChartBarIcon },
+            ]
           : []),
       ]
     : []

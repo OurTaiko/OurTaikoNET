@@ -17,6 +17,7 @@ import { UserPage } from './pages/user'
 import { TitlesPage } from './pages/titles'
 import { AdminPage } from './pages/admin'
 import { ManagePage } from './pages/manage'
+import { VisitsPage } from './pages/visits'
 import '../styles.css'
 
 function NotFound() {
@@ -53,6 +54,7 @@ function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="admin" element={<AdminPage />} />
                 <Route path="manage" element={<ManagePage />} />
+                <Route path="visits" element={<VisitsPage />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

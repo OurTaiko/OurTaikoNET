@@ -45,6 +45,16 @@ OurTaikoPlay's online multiplayer (マルチ演奏). The protocol is [`proto/our
 
 The state machine (`room.go`, `manager.go`) does no I/O and is tested on a clock the tests move; `server.go` is the gRPC service around it, tested over a loopback connection.
 
+## Visits
+
+How much the website is visited (`internal/visits`, migration `0005_visits`). The website tells the server each page it shows (`web/src/kit/shell/visits.ts`, from the frame, once a page has stayed 0.6 s); nothing is counted from the requests themselves, so the game and programs reading the API are not visitors.
+
+- **What is kept.** `net.visit_days (day, views, visitors, salt)`, `net.visit_pages (day, page, views)` and, for the day that is still open, `net.visit_visitors (day, visitor)`. A day is a day of UTC+8. A page is an address with every part that is not a plain word replaced by `:id` (`/fanmade/charts/:id`); a day has at most 300 pages, the rest go to `(other)`.
+- **Visitors.** No cookie and no stored address: a visitor is `sha256(the day's random salt || IP and User-Agent)`, so the same person is one visitor a day and cannot be followed from one day to the next. Every hour the days that are over are closed: the hashes are counted into `visit_days.visitors` and deleted with the salt. Over several days "visitors" is the sum of each day's.
+- `POST /api/v1/visits` `{"path": "/fanmade/charts/…"}` → 204, with or without a session. Not counted, and still 204: a User-Agent that is a program's or missing, more than 60 a minute from one address, a path that is no address of the site. It does not count against the 40 writes a minute.
+- `GET /api/v1/visits`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s. The footer of every page shows it.
+- `GET /api/v1/admin/visits?days=30` (1–366), the site's administrator → the same, plus `days` (each day, oldest first, with the days nobody came) and `pages` (the 50 seen most in the period). The website shows it at `/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator.
+
 ## The 3D Don
 
 OurTaikoPlay draws each player's 3D Don (its Chara3D, ported from YataiDON). The models are not in this repository or the game: they are in the public bucket under `3dchara/` (`https://distrib.ourtaiko.org/3dchara/`), listed by `3dchara/catalog.json`, which `tools/3dchara/catalog.py` writes for a local copy of that folder and `tools/3dchara/publish.sh` uploads (files first, catalog last). A new costume is a new file there (and its name in `names.json`).

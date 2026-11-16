@@ -292,6 +292,7 @@ func (a *App) Start(ctx context.Context) error {
 	if a.sso != nil {
 		go a.sso.RunProfileRefresh(ctx)
 	}
+	go a.Players.RunVisitUpkeep(ctx)
 	go a.Fanmade.RunDifficultyConstants(ctx)
 	go a.Fanmade.RunNotificationPrune(ctx)
 	go a.Official.RunNotificationPrune(ctx)

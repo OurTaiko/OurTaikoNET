@@ -4,7 +4,7 @@
 // feedback, and the small print.
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowSquareOutIcon, BugIcon, GithubLogoIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, BugIcon, EyeIcon, GithubLogoIcon } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import type { SourceId } from '../source'
 import {
@@ -14,6 +14,7 @@ import {
   qqGroupAddress,
   sourceCodeAddress,
 } from './community'
+import { useVisitSummary } from './visits'
 
 const playerAddress = 'https://play.ourtaiko.org/'
 const licenseAddress = 'https://www.gnu.org/licenses/agpl-3.0.html'
@@ -50,7 +51,10 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 
 /** The footer; `source` is the one the song links are of (this page's, or the one used last). */
 export function FrameFooter({ source }: { source: SourceId }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // How much the site is visited; the line is left out until that is known.
+  const visits = useVisitSummary()
+  const number = new Intl.NumberFormat(i18n.language)
   const places = [
     { href: '/', label: t('shell.home') },
     { href: `/${source}/`, label: t('shell.browse') },
@@ -159,6 +163,18 @@ export function FrameFooter({ source }: { source: SourceId }) {
           <p className="text-muted-foreground/70 uppercase tracking-wider">
             {t('shell.footer.nonProfit')}
           </p>
+          {visits && (
+            <p className="flex items-center gap-1.5 pt-1" data-testid="site-visits">
+              <EyeIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                {t('shell.footer.visits', {
+                  total: number.format(visits.total.views),
+                  today: number.format(visits.today.views),
+                  visitors: number.format(visits.today.visitors),
+                })}
+              </span>
+            </p>
+          )}
         </div>
         <p className="max-w-md md:text-right">{t('shell.footer.notice')}</p>
       </div>

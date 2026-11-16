@@ -946,6 +946,7 @@
     "myPlaylists": "マイプレイリスト",
     "notifications": "お知らせ",
     "manage": "ユーザーグループ",
+    "visits": "アクセス統計",
     "titleAdmin": "称号管理",
     "player": "OurTaiko Player",
     "signIn": "ログイン",
@@ -994,6 +995,7 @@
       "qqGroup": "QQ グループ",
       "feedback": "フィードバック・不具合の報告",
       "nonProfit": "非営利のコミュニティプロジェクト",
+      "visits": "累計 {{total}} PV · 今日 {{today}} PV、訪問者 {{visitors}} 人",
       "notice": "当サイトはプレイヤーによるコミュニティプロジェクトであり、バンダイナムコエンターテインメントとは関係ありません。「太鼓の達人」および関連素材の権利は権利者に帰属します。"
     }
   }

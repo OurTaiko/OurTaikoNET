@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -40,6 +41,8 @@ type Config struct {
 	// reads it (nil: http.DefaultClient; tests give their own).
 	DonCatalogURL string
 	DonClient     *http.Client
+	// Now is the clock of the visit count (visits.go); nil: time.Now. Tests move it.
+	Now func() time.Time
 }
 type Server struct {
 	DB     *pgxpool.Pool
@@ -54,6 +57,12 @@ type Server struct {
 	donMu sync.Mutex
 	don   *donCatalog
 	donAt time.Time
+	// The visit count (visits.go): the totals as last read, and each visitor's views this
+	// minute (under mu).
+	visitMu     sync.Mutex
+	visit       visits.Summary
+	visitAt     time.Time
+	visitLimits map[string]window
 }
 type window struct {
 	since time.Time
@@ -61,7 +70,7 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}}
+	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}}
 }
 
 func (s *Server) sessionCookie() string {
@@ -111,6 +120,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/v1/users/{id}/titles", s.userTitles)
 	mux.HandleFunc("GET /api/v1/users/{id}/dans", s.userDans)
+	mux.HandleFunc("POST /api/v1/visits", s.countVisit)
+	mux.HandleFunc("GET /api/v1/visits", s.visitSummary)
+	mux.HandleFunc("GET /api/v1/admin/visits", s.visitReport)
 	mux.HandleFunc("PUT /api/v1/admin/titles/{id}", s.saveTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/titles/{id}", s.deleteTitle)
 	mux.HandleFunc("POST /api/v1/admin/grants", s.grantTitle)
@@ -137,7 +149,8 @@ func (s *Server) Handler() http.Handler {
 			problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
 			return
 		}
-		if !service && ((r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login") && !s.allow(r) {
+		// Showing a page is no write of the visitor's: it has a count of its own (visits.go).
+		if !service && ((r.Method != "GET" && r.Method != "HEAD") || r.URL.Path == "/api/v1/auth/sso/login") && r.URL.Path != "/api/v1/visits" && !s.allow(r) {
 			problem(w, 429, "RATE_LIMITED", "操作过于频繁，请稍后再试")
 			return
 		}

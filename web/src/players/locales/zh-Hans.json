@@ -231,6 +231,28 @@
     "TITLE_OFFICIAL": "官方称号只有管理员可以删除。",
     "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。"
   },
+  "visits": {
+    "heading": "访问统计",
+    "about": "网页每显示一个页面记一次浏览；访客按天区分，不使用 Cookie，也不保存 IP 地址。一天从北京时间 0 点算起。",
+    "today": "今日",
+    "period": "最近 {{n}} 天",
+    "total": "累计",
+    "since": "自 {{day}} 起",
+    "views": "浏览量",
+    "visitors": "访客",
+    "visitorDays": "访客（按天合计）",
+    "range": "时间范围",
+    "days": "{{n}} 天",
+    "viewsHeading": "每日浏览量",
+    "visitorsHeading": "每日访客",
+    "pagesHeading": "最常访问的页面",
+    "page": "页面",
+    "share": "占比",
+    "noPages": "这段时间还没有访问记录。",
+    "other": "其他页面",
+    "table": "以表格查看每日数据",
+    "day": "日期"
+  },
   "manage": {
     "heading": "用户组",
     "setHeading": "设置玩家的用户组",
