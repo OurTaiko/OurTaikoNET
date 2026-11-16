@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Writes catalog.json for a nameplate folder (the bucket's nameplate/ prefix, mirrored locally).
 
-The folder holds the game's nameplate art unchanged (OurTaikoPlay
-Assets/OurTaiko/Art/global/nameplate, the Nijiiro skin's global/nameplate plus the game's own
-段位 rings and texts), all drawn on the 408x96 plate canvas:
+The folder holds the nameplate art (the Nijiiro skin's global/nameplate plus OurTaikoPlay's own
+段位 rings and texts), all drawn on the 408x96 plate canvas. Both the website and the game read it
+from the bucket; the game keeps no copy and caches what it fetches at sign-in:
 
     shadow.png, outline.png        the plate and the band's outline, 408x96
     frame_top.png                  the 5 title bands, 408x56 each, stacked top to bottom

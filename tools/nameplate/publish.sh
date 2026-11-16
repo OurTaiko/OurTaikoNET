@@ -7,7 +7,10 @@
 # (distrib.ourtaiko.org keys its cache on the path alone). Needs `aws login` with write access to
 # the bucket and to that distribution.
 #
-# The folder is the game's Assets/OurTaiko/Art/global/nameplate (its .meta files are left out).
+# The folder holds the 12 PNGs catalog.py lists. The game no longer carries them (2026-11-15: it
+# fetches this prefix at sign-in and caches it), so the bucket is where they live; to change one,
+# download the prefix (or take Nijiiro's global/nameplate for the skin's files), replace the file,
+# and publish the whole folder.
 #
 # Usage: tools/nameplate/publish.sh <folder>
 set -eu
