@@ -17,17 +17,17 @@ import { readChartFilters } from './components/chart-search'
 import { Skeleton } from './components/ui/skeleton'
 import { Card } from './components/ui/card'
 import { UserAvatar } from './components/user-avatar'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DownloadSimpleIcon as Download,
   UploadSimpleIcon as Upload,
-  ArrowSquareOutIcon,
   GitBranchIcon,
   ChatCircleIcon,
   CaretRightIcon,
   FileDashedIcon,
   PlaylistIcon,
+  PencilSimpleLineIcon,
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
 import type { ChartBase, ChartList, ScoreReplay, Vote, VoteResult } from './api/types'
@@ -280,6 +280,22 @@ export function Auth({ register = false }: { register?: boolean }) {
   )
 }
 const detailCardClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
+
+/** The uploader's notes on a chart. The song page places it in one of two spots by width. */
+function ChartNotes({ description, className }: { description: string; className?: string }) {
+  const { t } = useTranslation()
+  const heading = useId()
+  return (
+    <section aria-labelledby={heading} className={cn(detailCardClassName, 'space-y-3', className)}>
+      <h2 id={heading} className="text-lg font-extrabold">
+        {t('messages.notes')}
+      </h2>
+      <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground wrap-anywhere">
+        {description || t('messages.noNotesYet')}
+      </p>
+    </section>
+  )
+}
 // A list of facts, one to a row: the name at the left, what it is at the right.
 const rowsClassName =
   '-mt-px grid grid-cols-[auto_minmax(0,1fr)] text-sm [&>dd]:border-t [&>dd]:py-2.5 [&>dd]:text-right [&>dd]:font-semibold [&>dd]:wrap-anywhere [&>dt]:border-t [&>dt]:py-2.5 [&>dt]:pr-4 [&>dt]:text-muted-foreground'
@@ -465,6 +481,65 @@ export function Detail() {
     if (value === 'leaderboard') setActivityTab('leaderboard')
     else if (activityTab === 'leaderboard') setActivityTab('image')
   }
+  // The difficulties: from lg in the about column, below lg at the head of the chart tab.
+  const difficultyCard = (headingId: string, className: string) => (
+    <section aria-labelledby={headingId} className={cn(detailCardClassName, className)}>
+      <h2 id={headingId} className="pb-2 text-lg font-extrabold">
+        {t('messages.chartDifficulty')}
+      </h2>
+      {/* Choosing one turns the constants, the chart image and the leaderboard to it. */}
+      <ul className="-mx-2 space-y-0.5" data-testid="detail-difficulties">
+        {chart.difficulties
+          .filter((d) => isSupportedCourse(d.course))
+          .map((d) => {
+            const rated = d.constants?.find((r) => r.route === 'master') ?? d.constants?.[0]
+            return (
+              <li key={slotKey(d)}>
+                <button
+                  type="button"
+                  aria-pressed={slotKey(d) === course}
+                  onClick={() => setChosenCourse(slotKey(d))}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-[14px] px-2 text-left text-sm transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring aria-pressed:bg-secondary aria-pressed:text-secondary-foreground"
+                >
+                  <span
+                    className={cn(
+                      'inline-flex h-[1.375rem] min-w-[1.625rem] shrink-0 items-center justify-center rounded-[7px] px-1.5 text-xs font-bold text-white tabular-nums',
+                      difficultyColors[d.course as keyof typeof difficultyColors] ?? 'bg-muted',
+                    )}
+                  >
+                    {d.level}
+                  </span>
+                  <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                    <span className="shrink-0 font-medium">{blockName(d)}</span>
+                    {/* Who designed this block's notes: NOTESDESIGNERn, else MAKER. */}
+                    {d.maker && (
+                      <span className="inline-flex min-w-0 items-center gap-1 self-center text-xs opacity-75">
+                        <PencilSimpleLineIcon
+                          className="size-3.5 shrink-0"
+                          aria-label={t('messages.chartCreator')}
+                        />
+                        <span className="truncate">{d.maker}</span>
+                      </span>
+                    )}
+                  </span>
+                  {d.branching && (
+                    <GitBranchIcon
+                      className="size-3.5 shrink-0"
+                      aria-label={t('messages.hasBranching')}
+                    />
+                  )}
+                  {rated && rated.mainConstant > 0 && (
+                    <span className="shrink-0 text-xs tabular-nums opacity-80">
+                      {t('constants.main')} {formatConstant(rated.mainConstant)}
+                    </span>
+                  )}
+                </button>
+              </li>
+            )
+          })}
+      </ul>
+    </section>
+  )
   return (
     <div className="flex flex-col gap-6">
       <header className="space-y-2.5">
@@ -489,13 +564,10 @@ export function Detail() {
         {chart.title !== text.title && (
           <p className="text-sm text-muted-foreground wrap-anywhere">{chart.title}</p>
         )}
-        <p data-testid="detail-facts" className="text-sm text-muted-foreground wrap-anywhere">
-          {t('messages.chartCreator')}{' '}
-          <span className="font-medium text-foreground">{chart.maker || chart.uploader}</span>
-        </p>
       </header>
       {error && <Notice>{error}</Notice>}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      {/* Named, so both columns can tell when the right one (all but 24rem and the gap) is 48rem wide. */}
+      <div className="@container/detail grid items-start gap-5 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         {/* The cover with what one does with the song: listen, take it, keep it, rate it. */}
         <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-1">
           {/* Below lg the cover is kept small, so what one does with the song is on screen. */}
@@ -520,24 +592,15 @@ export function Detail() {
           )}
           <div className="flex flex-wrap items-center gap-2">
             {hasFiles ? (
-              <>
-                <Button
-                  size="lg"
-                  className="h-11 flex-1 px-5 sm:flex-none"
-                  disabled={packaging}
-                  onClick={downloadPackage}
-                >
-                  <Download size={18} aria-hidden="true" />
-                  {t(packaging ? 'messages.packagingChart' : 'messages.downloadChartPackage')}
-                </Button>
-                <a
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'lg' }), 'h-11')}
-                  href={endpoints.resource(chart, 'tja')}
-                >
-                  <ArrowSquareOutIcon size={17} aria-hidden="true" />
-                  TJA
-                </a>
-              </>
+              <Button
+                size="lg"
+                className="h-11 flex-1 px-5 sm:flex-none"
+                disabled={packaging}
+                onClick={downloadPackage}
+              >
+                <Download size={18} aria-hidden="true" />
+                {t(packaging ? 'messages.packagingChart' : 'messages.downloadChartPackage')}
+              </Button>
             ) : canManage ? (
               <Link
                 className={cn(buttonVariants({ size: 'lg' }), 'h-11 flex-1 px-5 sm:flex-none')}
@@ -616,106 +679,74 @@ export function Detail() {
             section !== 'info' && 'max-lg:hidden',
           )}
         >
-          <section aria-labelledby="chart-information-heading" className={detailCardClassName}>
-            <h2 id="chart-information-heading" className="pb-2 text-lg font-extrabold">
-              {t('messages.chartInformation')}
-            </h2>
-            <div className="overflow-hidden">
-              <dl className={rowsClassName}>
-                <dt>{t('messages.chartNumber')}</dt>
-                <dd className="tabular-nums">{chart.numberId}</dd>
-                <dt>BPM</dt>
-                <dd className="tabular-nums">{chart.bpm > 0 ? chart.bpm : '—'}</dd>
-                <dt>{t('messages.duration')}</dt>
-                <dd className="tabular-nums">{hasFiles ? formatDuration(chart.duration) : '—'}</dd>
-                {votes > 0 && (
-                  <>
-                    <dt>{t('interactions.approval')}</dt>
-                    <dd className="tabular-nums">{Math.round((chart.upvotes / votes) * 100)}%</dd>
-                  </>
-                )}
-                <dt className="self-center">{t('collaboration.owners')}</dt>
-                <dd className="flex flex-wrap justify-end gap-3">
-                  {chartOwners(chart).map((owner) => (
-                    <PlayerLink
-                      key={owner.id}
-                      className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
-                      id={owner.id}
-                    >
-                      <UserAvatar
-                        nickname={owner.nickname}
-                        avatarUrl={owner.avatarUrl}
-                        className="size-6"
-                        fallbackClassName="text-xs"
-                      />
-                      <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
-                    </PlayerLink>
-                  ))}
-                </dd>
-                {chartRecord?.(chart)}
-                <dt>{t('messages.createdAt')}</dt>
-                <dd>
-                  <time dateTime={chart.createdAt}>{date(chart.createdAt)}</time>
-                </dd>
-                <dt>{t('messages.lastChanged')}</dt>
-                <dd>
-                  <time dateTime={chart.updateAt}>{date(chart.updateAt)}</time>
-                </dd>
-              </dl>
-            </div>
-          </section>
-          <section aria-labelledby="chart-difficulties-heading" className={detailCardClassName}>
-            <h2 id="chart-difficulties-heading" className="pb-2 text-lg font-extrabold">
-              {t('messages.chartDifficulty')}
-            </h2>
-            {/* Choosing one turns the constants, the chart image and the leaderboard to it. */}
-            <ul className="-mx-2 space-y-0.5" data-testid="detail-difficulties">
-              {chart.difficulties
-                .filter((d) => isSupportedCourse(d.course))
-                .map((d) => {
-                  const rated = d.constants?.find((r) => r.route === 'master') ?? d.constants?.[0]
-                  return (
-                    <li key={slotKey(d)}>
-                      <button
-                        type="button"
-                        aria-pressed={slotKey(d) === course}
-                        onClick={() => setChosenCourse(slotKey(d))}
-                        className="flex min-h-11 w-full items-center gap-3 rounded-[14px] px-2 text-left text-sm transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring aria-pressed:bg-secondary aria-pressed:text-secondary-foreground"
+          {/* Where this column is wide it is two by two: the facts beside the notes, the difficulties
+              beside the constants of the one chosen. On a phone the notes come between the facts and the
+              difficulties; on a narrower desktop column they stay under the cover. */}
+          <div className="grid gap-5 @min-[73.25rem]/detail:grid-cols-2">
+            <section aria-labelledby="chart-information-heading" className={detailCardClassName}>
+              <h2 id="chart-information-heading" className="pb-2 text-lg font-extrabold">
+                {t('messages.chartInformation')}
+              </h2>
+              <div className="overflow-hidden">
+                <dl className={rowsClassName}>
+                  <dt>{t('messages.chartNumber')}</dt>
+                  <dd className="tabular-nums">{chart.numberId}</dd>
+                  <dt>BPM</dt>
+                  <dd className="tabular-nums">{chart.bpm > 0 ? chart.bpm : '—'}</dd>
+                  <dt>{t('messages.duration')}</dt>
+                  <dd className="tabular-nums">
+                    {hasFiles ? formatDuration(chart.duration) : '—'}
+                  </dd>
+                  {votes > 0 && (
+                    <>
+                      <dt>{t('interactions.approval')}</dt>
+                      <dd className="tabular-nums">{Math.round((chart.upvotes / votes) * 100)}%</dd>
+                    </>
+                  )}
+                  {/* Centred inside, so its rule still runs along the top of the row. */}
+                  <dt className="flex items-center">{t('collaboration.owners')}</dt>
+                  <dd className="flex flex-wrap justify-end gap-3">
+                    {chartOwners(chart).map((owner) => (
+                      <PlayerLink
+                        key={owner.id}
+                        className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
+                        id={owner.id}
                       >
-                        <span
-                          className={cn(
-                            'inline-flex h-[1.375rem] min-w-[1.625rem] shrink-0 items-center justify-center rounded-[7px] px-1.5 text-xs font-bold text-white tabular-nums',
-                            difficultyColors[d.course as keyof typeof difficultyColors] ??
-                              'bg-muted',
-                          )}
-                        >
-                          {d.level}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate font-medium">{blockName(d)}</span>
-                        {d.branching && (
-                          <GitBranchIcon
-                            className="size-3.5 shrink-0"
-                            aria-label={t('messages.hasBranching')}
-                          />
-                        )}
-                        {rated && rated.mainConstant > 0 && (
-                          <span className="shrink-0 text-xs tabular-nums opacity-80">
-                            {t('constants.main')} {formatConstant(rated.mainConstant)}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  )
-                })}
-            </ul>
-          </section>
-          {showConstants && (
-            <DifficultyConstants
-              key={course}
-              difficulty={chosenDifficulty}
-              className="max-lg:hidden"
+                        <UserAvatar
+                          nickname={owner.nickname}
+                          avatarUrl={owner.avatarUrl}
+                          className="size-6"
+                          fallbackClassName="text-xs"
+                        />
+                        <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
+                      </PlayerLink>
+                    ))}
+                  </dd>
+                  {chartRecord?.(chart)}
+                  <dt>{t('messages.createdAt')}</dt>
+                  <dd>
+                    <time dateTime={chart.createdAt}>{date(chart.createdAt)}</time>
+                  </dd>
+                  <dt>{t('messages.lastChanged')}</dt>
+                  <dd>
+                    <time dateTime={chart.updateAt}>{date(chart.updateAt)}</time>
+                  </dd>
+                </dl>
+              </div>
+            </section>
+            <ChartNotes
+              description={chart.description}
+              className="hidden max-lg:block @min-[73.25rem]/detail:block"
             />
-          )}
+            {difficultyCard('chart-difficulties-heading', 'max-lg:hidden')}
+            {showConstants && (
+              <DifficultyConstants
+                key={course}
+                difficulty={chosenDifficulty}
+                className="max-lg:hidden"
+              />
+            )}
+          </div>
         </div>
         {/* From lg these go under the cover, where the other column leaves room. */}
         <div
@@ -724,17 +755,10 @@ export function Detail() {
             section !== 'info' && 'max-lg:hidden',
           )}
         >
-          <section
-            aria-labelledby="chart-notes-heading"
-            className={cn(detailCardClassName, 'space-y-3')}
-          >
-            <h2 id="chart-notes-heading" className="text-lg font-extrabold">
-              {t('messages.notes')}
-            </h2>
-            <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground wrap-anywhere">
-              {chart.description || t('messages.noNotesYet')}
-            </p>
-          </section>
+          <ChartNotes
+            description={chart.description}
+            className="max-lg:hidden @min-[73.25rem]/detail:hidden"
+          />
           {canManage && (
             <section
               aria-labelledby="chart-manage-heading"
@@ -892,7 +916,10 @@ export function Detail() {
         </div>
       </div>
       <div className={cn('flex min-w-0 flex-col gap-5', section !== 'activity' && 'max-lg:hidden')}>
-        {/* Below lg the constants head the chart section; from lg they sit beside the cover. */}
+        {/* Below lg the difficulties and their constants head the chart tab (not the leaderboard);
+            from lg they are in the other column. */}
+        {activityTab !== 'leaderboard' &&
+          difficultyCard('chart-difficulties-heading-chart', 'lg:hidden')}
         {showConstants && (
           <DifficultyConstants key={course} difficulty={chosenDifficulty} className="lg:hidden" />
         )}

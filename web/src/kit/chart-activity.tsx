@@ -134,7 +134,14 @@ export function ChartActivity({
             {t('messages.leaderboard')}
           </TabsTrigger>
         </TabsList>
-        <div className="-mx-1 flex min-w-0 max-w-full items-center gap-3 overflow-x-auto px-1 py-1">
+        {/* Below lg the chart tab has the page's own list of difficulties above; the leaderboard
+            keeps these. */}
+        <div
+          className={cn(
+            '-mx-1 flex min-w-0 max-w-full items-center gap-3 overflow-x-auto px-1 py-1',
+            tab !== 'leaderboard' && 'max-lg:hidden',
+          )}
+        >
           <Tabs
             value={group?.base ?? ''}
             onValueChange={(value) => {
