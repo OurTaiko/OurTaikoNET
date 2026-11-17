@@ -93,11 +93,20 @@ func (s *Server) mirrorPaths(c *donCatalog, m *donMirror) *donMirrorPaths {
 	return p
 }
 
-func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror, error) {
+// ParseDonMirrorCatalogURL checks DON_MIRROR_CATALOG_URL; the server does not start with a bad one.
+func ParseDonMirrorCatalogURL(address string) (*url.URL, error) {
 	u, err := url.Parse(address)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil ||
 		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
 		return nil, errors.New("DON_MIRROR_CATALOG_URL must be an HTTPS URL without credentials, query or fragment")
+	}
+	return u, nil
+}
+
+func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror, error) {
+	u, err := ParseDonMirrorCatalogURL(address)
+	if err != nil {
+		return nil, err
 	}
 	timeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()

@@ -147,6 +147,9 @@ DON_GEOIP_DB=/srv/geoip/GeoLite2-Country.mmdb
 DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko/3dchara/catalog.json
 ```
 
+With `DON_MIRROR_CATALOG_URL` set, the server refuses to start if it is not a plain HTTPS URL
+or the country database cannot be opened; check `docker logs` after recreating.
+
 The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP and
 `TRUSTED_PROXY_CIDRS` must identify the proxy. Mainland China (`CN`) requests get mirror URLs
 only for exact catalog matches. Overseas, Hong Kong, Macao, Taiwan and unknown locations get

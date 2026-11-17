@@ -25,6 +25,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/charthash"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -105,19 +106,22 @@ func main() {
 	}
 	cfg.DonCatalogURL = os.Getenv("DON_CATALOG_URL")
 	cfg.DonMirrorCatalogURL = os.Getenv("DON_MIRROR_CATALOG_URL")
+	// The regional Don mirror needs a good catalog address and the IP country database.
 	if cfg.DonMirrorCatalogURL != "" {
+		if _, err := httpapi.ParseDonMirrorCatalogURL(cfg.DonMirrorCatalogURL); err != nil {
+			log.Fatal(err)
+		}
 		db, err := maxminddb.Open(os.Getenv("DON_GEOIP_DB"))
 		if err != nil {
-			log.Printf("Don mirror disabled: opening IP country database: %v", err)
-		} else {
-			defer db.Close()
-			cfg.DonIPCountry = func(ip netip.Addr) string {
-				var country string
-				if err := db.Lookup(ip).DecodePath(&country, "country", "iso_code"); err != nil {
-					return ""
-				}
-				return country
+			log.Fatalf("DON_GEOIP_DB: %v", err)
+		}
+		defer db.Close()
+		cfg.DonIPCountry = func(ip netip.Addr) string {
+			var country string
+			if err := db.Lookup(ip).DecodePath(&country, "country", "iso_code"); err != nil {
+				return ""
 			}
+			return country
 		}
 	}
 	// Multi-Enso, the game's online rooms: a gRPC service on its own port. Off without
