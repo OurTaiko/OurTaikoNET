@@ -99,3 +99,33 @@ func TestRegionalPlayerBuild(t *testing.T) {
 		})
 	}
 }
+
+func TestRegionalSource(t *testing.T) {
+	router := testRouter()
+	router.Client = &http.Client{Transport: publicTransport(func(*http.Request) (*http.Response, error) {
+		t.Error("source answer must not probe")
+		return nil, http.ErrHandlerTimeout
+	})}
+	for _, ip := range []string{"203.0.113.1", "203.0.113.2"} {
+		request := mainland()
+		request.Header.Set("X-Real-IP", ip)
+		request.URL.Path = "/api/v1/distribution/source"
+		response := httptest.NewRecorder()
+		router.Public(response, request)
+		var answer SourceAnswer
+		if response.Code != 200 || response.Header().Get("Cache-Control") != "no-store" || json.Unmarshal(response.Body.Bytes(), &answer) != nil {
+			t.Fatalf("source answer for %s", ip)
+		}
+		want := SourceAnswer{BaseURL: CanonicalBase, CanonicalBaseURL: CanonicalBase}
+		if ip == "203.0.113.1" {
+			want = SourceAnswer{Mirror: true, BaseURL: strings.TrimRight(router.Base, "/") + "/", CanonicalBaseURL: CanonicalBase}
+		}
+		if answer != want {
+			t.Fatalf("source for %s: %+v", ip, answer)
+		}
+	}
+	var none *Router
+	if answer := none.Source(mainland()); answer.Mirror || answer.BaseURL != CanonicalBase {
+		t.Fatal("no router must keep the canonical root")
+	}
+}

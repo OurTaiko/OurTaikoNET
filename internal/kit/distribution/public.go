@@ -28,6 +28,23 @@ func (r *Router) Avatar(request *http.Request, original string) string {
 	return original
 }
 
+// SourceAnswer tells a page, once, which root this visitor's public files come from, so it
+// can build avatar and other public addresses itself instead of asking for each one.
+type SourceAnswer struct {
+	Mirror           bool   `json:"mirror"`
+	BaseURL          string `json:"baseUrl"`
+	CanonicalBaseURL string `json:"canonicalBaseUrl"`
+}
+
+// Source uses the same country and trusted-proxy policy as every other mirror choice. It does
+// not probe: a page falls back to the canonical address when a mirror object fails to load.
+func (r *Router) Source(request *http.Request) SourceAnswer {
+	if r == nil || r.Base == "" || !r.IsMainland(request) {
+		return SourceAnswer{BaseURL: CanonicalBase, CanonicalBaseURL: CanonicalBase}
+	}
+	return SourceAnswer{Mirror: true, BaseURL: strings.TrimRight(r.Base, "/") + "/", CanonicalBaseURL: CanonicalBase}
+}
+
 // Public serves both browsers (redirect=1) and credential-free game requests.
 func (r *Router) Public(w http.ResponseWriter, request *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -48,6 +65,8 @@ func (r *Router) Public(w http.ResponseWriter, request *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]string{"url": selected, "fallbackUrl": original})
+	case "/api/v1/distribution/source":
+		json.NewEncoder(w).Encode(r.Source(request))
 	case "/api/v1/distribution/player-build":
 		r.playerAnswer(w, request)
 	default:

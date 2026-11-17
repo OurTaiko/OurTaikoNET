@@ -1008,6 +1008,9 @@
       "feedback": "Send feedback / report a problem",
       "nonProfit": "Non-profit community project",
       "visits": "{{total}} page views in all · today {{today}} views by {{visitors}} visitors",
+      "source": "Files served from: {{name}} ({{host}})",
+      "sourceMirror": "Mainland China mirror",
+      "sourceCanonical": "Global CDN",
       "notice": "A player community project, not affiliated with Bandai Namco Entertainment. Taiko no Tatsujin and related material belong to their owners."
     }
   },

@@ -147,9 +147,14 @@ canonical S3 public bases.
 avatar URLs, uses the same country/trusted-proxy policy and a successful mirror HEAD, and
 returns `url` plus the original `fallbackUrl`. `redirect=1` supports ordinary browser images.
 Both variants send `Cache-Control: no-store` so region selection is never shared by a CDN.
-The website's common avatar component and Play's common account/multiplayer picture loader
-use this endpoint, retain the original URL, and fall back if the mirror is unavailable.
-Signed, private, and custom-origin pictures keep their original route.
+Play's common account/multiplayer picture loader uses this endpoint, retains the original URL,
+and falls back if the mirror is unavailable.
+
+`GET /api/v1/distribution/source` answers `mirror`, `baseUrl` and `canonicalBaseUrl` for the
+visitor (same country policy, `no-store`, no probe). The website asks it once per page load,
+builds public avatar addresses on that root itself, falls back to the original address when
+the mirror copy fails to load, and shows the root in the footer. Signed, private, and
+custom-origin pictures keep their original route.
 
 `GET /api/v1/distribution/player-build` compares the canonical and mirror manifests,
 including every file hash, before selecting the mirror for mainland visitors. The website
