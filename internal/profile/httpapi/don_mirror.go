@@ -88,9 +88,14 @@ func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror,
 	return m, nil
 }
 
+// donRegional says whether Don files may be routed by where a request comes from.
+func (s *Server) donRegional() bool {
+	return s.Config.DonMirrorCatalogURL != "" && s.Config.DonIPCountry != nil
+}
+
 func (s *Server) mirrorForDonRequest(r *http.Request) *donMirror {
 	cfg := s.Config
-	if cfg.DonMirrorCatalogURL == "" || cfg.DonIPCountry == nil {
+	if !s.donRegional() {
 		return nil
 	}
 	ip, err := netip.ParseAddr(web.ClientIP(r, cfg.TrustedProxies))

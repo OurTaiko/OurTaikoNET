@@ -128,7 +128,7 @@ func TestDonMirrorRouting(t *testing.T) {
 		}
 		return catalog.MirrorURLs, w.Header().Get("Cache-Control")
 	}
-	if urls, cache := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 || cache != "private, no-store" ||
+	if urls, cache := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 || cache != "private, max-age=60" ||
 		urls[head.Path] != origin.URL+"/staging/3dchara/"+head.Path+"?v="+head.SHA256[:12] ||
 		urls[paint.Path] != origin.URL+"/staging/3dchara/"+paint.Path+"?v="+paint.SHA256[:12] ||
 		urls[face.Path] != origin.URL+"/staging/3dchara/"+face.Path+"?v="+face.SHA256[:12] {
@@ -171,6 +171,11 @@ func TestDonMirrorRouting(t *testing.T) {
 	}
 	if got := mirrorReads.Load(); got != 3 {
 		t.Fatalf("mirror catalog fetched %d times after a first failed read", got)
+	}
+	noCountry := cfg
+	noCountry.DonIPCountry = nil
+	if urls, cache := catalogAnswer(t, New(nil, noCountry), "203.0.113.1"); len(urls) != 0 || cache != "public, max-age=60" {
+		t.Fatalf("catalog without country lookup URLs = %v, cache = %q", urls, cache)
 	}
 	cfg.DonMirrorCatalogURL = ""
 	if urls, cache := catalogAnswer(t, New(nil, cfg), "203.0.113.1"); len(urls) != 0 || cache != "public, max-age=60" {

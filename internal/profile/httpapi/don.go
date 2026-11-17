@@ -251,7 +251,8 @@ func (s *Server) donLook(ctx context.Context, q interface {
 // (the game then keeps the plain Don), but the look is still told.
 func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 	answer := DonAnswer{Look: l, Files: []DonFile{}}
-	if s.Config.DonMirrorCatalogURL != "" {
+	if s.donRegional() {
+		// the files' addresses depend on where the request comes from
 		w.Header().Set("Cache-Control", "private, no-store")
 	}
 	if c, err := s.donCatalog(r.Context()); err == nil {
@@ -276,8 +277,8 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	base, _ := json.Marshal(c.baseURL)
 	all["baseUrl"] = base
-	if s.Config.DonMirrorCatalogURL != "" {
-		w.Header().Set("Cache-Control", "private, no-store")
+	if s.donRegional() {
+		w.Header().Set("Cache-Control", "private, max-age=60")
 		delete(all, "mirrorUrls")
 		if mirror := s.mirrorForDonRequest(r); mirror != nil {
 			if urls := mirror.urls(c); len(urls) > 0 {

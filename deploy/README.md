@@ -151,7 +151,9 @@ The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP an
 `TRUSTED_PROXY_CIDRS` must identify the proxy. Mainland China (`CN`) requests get mirror URLs
 only for exact catalog matches. Overseas, Hong Kong, Macao, Taiwan and unknown locations get
 canonical URLs, as do unlisted or changed files and requests during a failed mirror refresh.
-The per-user Don and website catalog responses bypass shared caches during rollout.
+While both settings are in effect, the per-user Don answer is `private, no-store` and the
+website catalog `private, max-age=60`, so shared caches never hand one region's addresses to
+another; otherwise the catalog stays `public, max-age=60`.
 
 Check the same outfit from one mainland and one overseas connection. Inspect both
 `/api/v1/users/{id}/don` and `/api/v1/don/catalog`, then load the outfit with a fresh game cache
