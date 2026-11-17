@@ -5,6 +5,9 @@ export type ResourceFile = {
   sha256?: string
 }
 
+/** How long an attempt may go without receiving a byte before the next address is tried. */
+const stallMs = 30_000
+
 function resourceUrl(value: string): string {
   const url = new URL(value, globalThis.location?.origin ?? 'http://localhost')
   if (url.username || url.password || url.hash || !['https:', 'http:'].includes(url.protocol))
@@ -18,13 +21,25 @@ export async function verifiedResource(
   file: ResourceFile,
   signal?: AbortSignal,
 ): Promise<ArrayBuffer> {
-  const urls = [...new Set([file.url, file.fallbackUrl ?? originResource(file.url)].filter((v): v is string => !!v))]
+  const urls = [
+    ...new Set(
+      [file.url, file.fallbackUrl ?? originResource(file.url)].filter((v): v is string => !!v),
+    ),
+  ]
   urls.forEach(resourceUrl)
   let error: unknown
   for (const url of urls) {
+    // An attempt fails when no bytes arrive for a while, not after a fixed total time:
+    // a large package file over a slow line keeps going as long as it makes progress.
+    const stalled = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const progress = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => stalled.abort(new Error('RESOURCE_DOWNLOAD_STALLED')), stallMs)
+    }
     try {
-      const timeout = AbortSignal.timeout(urls.length > 1 && url === urls[0] ? 30_000 : 120_000)
-      const attempt = signal ? AbortSignal.any([signal, timeout]) : timeout
+      progress()
+      const attempt = signal ? AbortSignal.any([signal, stalled.signal]) : stalled.signal
       const response = await fetch(url, { signal: attempt, credentials: 'omit' })
       if (!response.ok) throw new Error('RESOURCE_DOWNLOAD_FAILED')
       const limit = file.size ?? 256 * 1024 * 1024
@@ -37,6 +52,7 @@ export async function verifiedResource(
         for (;;) {
           const { done, value } = await reader.read()
           if (done) break
+          progress()
           size += value.byteLength
           if (size > limit) throw new Error('RESOURCE_INTEGRITY_FAILED')
           chunks.push(value)
@@ -62,6 +78,8 @@ export async function verifiedResource(
     } catch (reason) {
       if (signal?.aborted) throw reason
       error = reason
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw error ?? new Error('RESOURCE_DOWNLOAD_FAILED')

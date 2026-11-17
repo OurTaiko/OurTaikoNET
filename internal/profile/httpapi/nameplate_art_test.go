@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -67,11 +68,16 @@ func TestNameplateArtRouting(t *testing.T) {
 		t.Fatal("origin bypass ignored")
 	}
 	down.Store(true)
-	server.nameplateMirrorAt = time.Time{}
+	server.nameplateMu.Lock()
+	server.nameplateMirror.until = time.Time{}
+	server.nameplateMu.Unlock()
 	if answer("203.0.113.1", "")["mirrorBaseUrl"] == nil {
 		t.Fatal("last good catalog lost")
 	}
-	answer("203.0.113.1", "")
+	waitNameplateRefresh(t, server)
+	if answer("203.0.113.1", "")["mirrorBaseUrl"] == nil {
+		t.Fatal("failed refresh dropped the last good catalog")
+	}
 	if mirrorHits.Load() != 2 {
 		t.Fatal("failed refresh not throttled")
 	}
@@ -91,5 +97,47 @@ func TestNameplateArtFailureThrottle(t *testing.T) {
 	}
 	if hits.Load() != 1 {
 		t.Fatalf("unavailable catalog fetched %d times", hits.Load())
+	}
+}
+
+// A visitor who leaves while the first read runs does not turn it into a failure for others.
+func TestNameplateArtRefreshOutlivesRequest(t *testing.T) {
+	release := make(chan struct{})
+	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		json.NewEncoder(w).Encode(nameplateCatalog{Version: 1, Files: map[string]donFileRef{"shadow": {"shadow.png", 3, strings.Repeat("a", 64)}}})
+	}))
+	defer site.Close()
+	server := New(nil, Config{NameplateCatalogURL: site.URL + "/catalog.json", DonClient: site.Client()})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog", nil).WithContext(ctx))
+	if w.Code != 503 {
+		t.Fatalf("status = %d", w.Code)
+	}
+	close(release)
+	waitNameplateRefresh(t, server)
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog", nil))
+	if w.Code != 200 {
+		t.Fatalf("status after refresh = %d", w.Code)
+	}
+}
+
+func waitNameplateRefresh(t *testing.T, server *Server) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		server.nameplateMu.Lock()
+		busy := server.nameplateArt.done != nil || server.nameplateMirror.done != nil
+		server.nameplateMu.Unlock()
+		if !busy {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("nameplate refresh did not finish")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }

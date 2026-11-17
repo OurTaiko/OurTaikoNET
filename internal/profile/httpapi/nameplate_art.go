@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -65,6 +66,60 @@ func (s *Server) readNameplateCatalog(ctx context.Context, address string) (*nam
 	return &catalog, nil
 }
 
+// nameplateSlot is one catalog as last read. A refresh runs in the background, once at a
+// time, so a visitor who leaves or a slow source never holds up the others; the last good
+// catalog keeps being answered meanwhile.
+type nameplateSlot struct {
+	catalog *nameplateCatalog
+	until   time.Time
+	done    chan struct{}
+}
+
+// nameplateNow answers the catalog at address, waiting for a read only when none has
+// succeeded yet (and no longer than the caller's request).
+func (s *Server) nameplateNow(ctx context.Context, slot *nameplateSlot, address string) *nameplateCatalog {
+	s.nameplateMu.Lock()
+	catalog := slot.catalog
+	if time.Now().Before(slot.until) {
+		s.nameplateMu.Unlock()
+		return catalog
+	}
+	done := slot.done
+	if done == nil {
+		done = make(chan struct{})
+		slot.done = done
+		go s.refreshNameplate(slot, address, done)
+	}
+	s.nameplateMu.Unlock()
+	if catalog != nil {
+		return catalog
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return nil
+	}
+	s.nameplateMu.Lock()
+	defer s.nameplateMu.Unlock()
+	return slot.catalog
+}
+
+func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan struct{}) {
+	catalog, err := s.readNameplateCatalog(context.Background(), address)
+	s.nameplateMu.Lock()
+	defer s.nameplateMu.Unlock()
+	ttl := donCatalogTTL
+	if err != nil {
+		ttl = donMirrorRetry
+		log.Printf("reading nameplate catalog %s: %v", address, err)
+	} else {
+		slot.catalog = catalog
+	}
+	slot.until = time.Now().Add(ttl)
+	slot.done = nil
+	close(done)
+}
+
 func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
 	router := s.Config.Distribution
 	regional := router != nil && router.Base != "" && router.Country != nil
@@ -73,41 +128,20 @@ func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=60")
 	}
-	s.nameplateMu.Lock()
-	defer s.nameplateMu.Unlock()
 	address := s.Config.NameplateCatalogURL
 	if address == "" {
 		address = distribution.CanonicalBase + "nameplate/catalog.json"
 	}
-	if s.nameplateArtAt.IsZero() || time.Since(s.nameplateArtAt) >= donCatalogTTL {
-		catalog, err := s.readNameplateCatalog(r.Context(), address)
-		if err == nil {
-			s.nameplateArtCatalog = catalog
-		}
-		s.nameplateArtAt = time.Now()
-		if err != nil {
-			s.nameplateArtAt = s.nameplateArtAt.Add(-donCatalogTTL + donMirrorRetry)
-		}
-	}
-	if s.nameplateArtCatalog == nil {
+	canonical := s.nameplateNow(r.Context(), &s.nameplateArt, address)
+	if canonical == nil {
 		problem(w, http.StatusServiceUnavailable, "NAMEPLATE_CATALOG_UNAVAILABLE", "名牌资源清单暂时不可用")
 		return
 	}
-	answer := map[string]any{"version": s.nameplateArtCatalog.Version, "files": s.nameplateArtCatalog.Files, "baseUrl": s.nameplateArtCatalog.base}
+	answer := map[string]any{"version": canonical.Version, "files": canonical.Files, "baseUrl": canonical.base}
 	if regional && router.IsMainland(r) && r.URL.Query().Get("origin") != "1" {
-		if s.nameplateMirrorAt.IsZero() || time.Since(s.nameplateMirrorAt) >= donCatalogTTL {
-			catalog, err := s.readNameplateCatalog(r.Context(), router.Base+"nameplate/catalog.json")
-			if err == nil {
-				s.nameplateMirror = catalog
-			}
-			s.nameplateMirrorAt = time.Now()
-			if err != nil {
-				s.nameplateMirrorAt = s.nameplateMirrorAt.Add(-donCatalogTTL + donMirrorRetry)
-			}
-		}
-		if mirror := s.nameplateMirror; mirror != nil {
+		if mirror := s.nameplateNow(r.Context(), &s.nameplateMirror, router.Base+"nameplate/catalog.json"); mirror != nil {
 			var paths []string
-			for key, ref := range s.nameplateArtCatalog.Files {
+			for key, ref := range canonical.Files {
 				if mirror.Files[key] == ref {
 					paths = append(paths, ref.Path)
 				}

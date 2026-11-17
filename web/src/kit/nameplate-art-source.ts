@@ -1,3 +1,4 @@
+import { SITE_API_ROOT } from './api/config'
 import { verifiedResource, type ResourceFile } from './resource-download'
 
 const canonical = 'https://distrib.ourtaiko.org/nameplate/'
@@ -13,7 +14,7 @@ type Catalog = {
 export async function nameplateArtSources(): Promise<Record<string, ResourceFile>> {
   let catalog: Catalog
   try {
-    const response = await fetch('/api/v1/nameplate-art/catalog')
+    const response = await fetch(`${SITE_API_ROOT}/nameplate-art/catalog`)
     if (!response.ok) throw new Error('NAMEPLATE_CATALOG_UNAVAILABLE')
     catalog = (await response.json()) as Catalog
   } catch {

@@ -37,6 +37,45 @@ describe('regional resource downloads', () => {
         expect(call[1]?.credentials).toBe('omit')
     },
   )
+  it('gives up on a stalled mirror but not on a slow one that keeps sending', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === canonical) {
+          // Slow but steady: one byte every 20 s, longer in total than any stall limit.
+          let sent = 0
+          return new Response(
+            new ReadableStream({
+              async pull(controller) {
+                await new Promise((resolve) => setTimeout(resolve, 20_000))
+                controller.enqueue(new TextEncoder().encode(bytes[sent++]))
+                if (sent === bytes.length) controller.close()
+              },
+            }),
+          )
+        }
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () => controller.error(init.signal!.reason))
+            },
+          }),
+        )
+      })
+      vi.stubGlobal('fetch', fetch)
+      const result = verifiedResource({
+        url: mirror,
+        fallbackUrl: canonical,
+        size: bytes.length,
+        sha256: hash,
+      })
+      await vi.advanceTimersByTimeAsync(30_000 + 20_000 * bytes.length)
+      expect(new TextDecoder().decode(await result)).toBe(bytes)
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([mirror, canonical])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
   it('does not accept corrupt bytes from either origin', async () => {
     const fetch = vi.fn(async () => new Response('x'.repeat(bytes.length)))
     vi.stubGlobal('fetch', fetch)

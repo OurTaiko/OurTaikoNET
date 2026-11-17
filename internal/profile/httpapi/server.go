@@ -66,16 +66,15 @@ type Server struct {
 	don   *donCatalog
 	donAt time.Time
 	// The mirror catalog as last read (don_mirror.go); donMirrorDone is open while a refresh runs.
-	donMirrorMu         sync.Mutex
-	donMirror           *donMirror
-	donMirrorUntil      time.Time
-	donMirrorDone       chan struct{}
-	donMirrorPaths      *donMirrorPaths
-	nameplateMu         sync.Mutex
-	nameplateArtCatalog *nameplateCatalog
-	nameplateArtAt      time.Time
-	nameplateMirror     *nameplateCatalog
-	nameplateMirrorAt   time.Time
+	donMirrorMu    sync.Mutex
+	donMirror      *donMirror
+	donMirrorUntil time.Time
+	donMirrorDone  chan struct{}
+	donMirrorPaths *donMirrorPaths
+	// The nameplate art catalogs as last read (nameplate_art.go), under nameplateMu.
+	nameplateMu     sync.Mutex
+	nameplateArt    nameplateSlot
+	nameplateMirror nameplateSlot
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
