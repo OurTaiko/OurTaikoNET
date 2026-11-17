@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -139,17 +140,15 @@ func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	answer := map[string]any{"version": canonical.Version, "files": canonical.Files, "baseUrl": canonical.base}
 	if regional && router.IsMainland(r) && r.URL.Query().Get("origin") != "1" {
-		if mirror := s.nameplateNow(r.Context(), &s.nameplateMirror, router.Base+"nameplate/catalog.json"); mirror != nil {
-			var paths []string
-			for key, ref := range canonical.Files {
-				if mirror.Files[key] == ref {
-					paths = append(paths, ref.Path)
-				}
-			}
-			if len(paths) > 0 {
-				sort.Strings(paths)
-				answer["mirrorBaseUrl"], answer["mirrorPaths"] = mirror.base, paths
-			}
+		// Every file of the canonical catalog, at the mirror's root; the mirror's own catalog
+		// is not read (the country alone decides).
+		paths := make([]string, 0, len(canonical.Files))
+		for _, ref := range canonical.Files {
+			paths = append(paths, ref.Path)
+		}
+		if len(paths) > 0 {
+			sort.Strings(paths)
+			answer["mirrorBaseUrl"], answer["mirrorPaths"] = router.MirrorBase(r)+"nameplate/", slices.Compact(paths)
 		}
 	}
 	web.Respond(w, http.StatusOK, answer)

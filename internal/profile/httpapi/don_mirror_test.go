@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func TestDonMirrorRouting(t *testing.T) {
@@ -29,21 +28,6 @@ func TestDonMirrorRouting(t *testing.T) {
 			"paint": {{ID: 2, File: paint}},
 		},
 	}
-	oldBody := body
-	oldBody.SHA256 = strings.Repeat("f", 64)
-	wrongSize := puchi
-	wrongSize.Size++
-	mirrored := donCatalog{
-		Version: 1,
-		Base:    map[string]donFileRef{"face": face},
-		Items: map[string][]donItem{
-			"head":  {{ID: 3, File: head}},
-			"body":  {{ID: 4, File: oldBody}},
-			"puchi": {{ID: 1, File: wrongSize}},
-			"paint": {{ID: 2, File: paint}},
-		},
-	}
-	var mirrorDown atomic.Bool
 	var mirrorReads atomic.Int32
 	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -51,11 +35,7 @@ func TestDonMirrorRouting(t *testing.T) {
 			json.NewEncoder(w).Encode(canonical)
 		case "/staging/3dchara/catalog.json":
 			mirrorReads.Add(1)
-			if mirrorDown.Load() {
-				http.Error(w, "unavailable", 503)
-				return
-			}
-			json.NewEncoder(w).Encode(mirrored)
+			http.Error(w, "the mirror catalog is not read", 500)
 		default:
 			http.NotFound(w, r)
 		}
@@ -96,7 +76,7 @@ func TestDonMirrorRouting(t *testing.T) {
 			}
 			for i, ref := range []donFileRef{body, head, puchi, paint} {
 				prefix := "/canonical/"
-				if (i == 1 || i == 3) && tc.headMirrored {
+				if tc.headMirrored {
 					prefix = "/staging/3dchara/"
 				}
 				want := origin.URL + prefix + ref.Path + "?v=" + ref.SHA256[:12]
@@ -108,8 +88,8 @@ func TestDonMirrorRouting(t *testing.T) {
 			if got := w.Header().Get("Cache-Control"); got != "private, no-store" {
 				t.Fatalf("Cache-Control = %q", got)
 			}
-			if !tc.headMirrored && mirrorReads.Load() != 0 {
-				t.Fatal("non-mainland request fetched the mirror catalog")
+			if mirrorReads.Load() != 0 {
+				t.Fatal("the mirror catalog was fetched")
 			}
 		})
 	}
@@ -133,51 +113,20 @@ func TestDonMirrorRouting(t *testing.T) {
 		}
 		return catalog.MirrorPaths, w.Header().Get("Cache-Control")
 	}
-	if paths, cache := catalogAnswer(t, s, "203.0.113.1"); cache != "private, max-age=60" ||
-		!slices.Equal(paths, []string{face.Path, head.Path, paint.Path}) {
+	all := []string{face.Path, body.Path, head.Path, icon.Path, paint.Path, puchi.Path}
+	slices.Sort(all)
+	if paths, cache := catalogAnswer(t, s, "203.0.113.1"); cache != "private, max-age=60" || !slices.Equal(paths, all) {
 		t.Fatalf("mainland catalog paths = %v, cache = %q", paths, cache)
 	}
 	first := s.donMirrorPaths
-	if paths, _ := catalogAnswer(t, s, "203.0.113.1"); len(paths) != 3 || s.donMirrorPaths != first {
+	if paths, _ := catalogAnswer(t, s, "203.0.113.1"); len(paths) != len(all) || s.donMirrorPaths != first {
 		t.Fatalf("mirror paths worked out again: %v", paths)
 	}
 	if paths, _ := catalogAnswer(t, s, "203.0.113.2"); len(paths) != 0 {
 		t.Fatalf("overseas catalog paths = %v", paths)
 	}
-	if got := mirrorReads.Load(); got != 1 {
+	if got := mirrorReads.Load(); got != 0 {
 		t.Fatalf("mirror catalog fetched %d times", got)
-	}
-	refreshed := func(server *Server) {
-		server.donMirrorMu.Lock()
-		done := server.donMirrorDone
-		server.donMirrorMu.Unlock()
-		if done != nil {
-			<-done
-		}
-	}
-	// A due refresh runs on its own; the last good mirror is kept while it runs and after it fails.
-	mirrorDown.Store(true)
-	s.donMirrorMu.Lock()
-	s.donMirrorUntil = time.Time{}
-	s.donMirrorMu.Unlock()
-	for range 2 {
-		if paths, _ := catalogAnswer(t, s, "203.0.113.1"); len(paths) != 3 {
-			t.Fatalf("failed refresh dropped mirror paths: %v", paths)
-		}
-		refreshed(s)
-	}
-	if got := mirrorReads.Load(); got != 2 {
-		t.Fatalf("mirror catalog fetched %d times after a failed refresh", got)
-	}
-	// Without a good mirror ever read, everything stays canonical.
-	fresh := New(nil, cfg)
-	for range 2 {
-		if paths, _ := catalogAnswer(t, fresh, "203.0.113.1"); len(paths) != 0 {
-			t.Fatalf("first failed read gave mirror paths: %v", paths)
-		}
-	}
-	if got := mirrorReads.Load(); got != 3 {
-		t.Fatalf("mirror catalog fetched %d times after a first failed read", got)
 	}
 	noCountry := cfg
 	noCountry.DonIPCountry = nil
@@ -187,39 +136,5 @@ func TestDonMirrorRouting(t *testing.T) {
 	cfg.DonMirrorCatalogURL = ""
 	if paths, cache := catalogAnswer(t, New(nil, cfg), "203.0.113.1"); len(paths) != 0 || cache != "public, max-age=60" {
 		t.Fatalf("disabled mirror catalog paths = %v, cache = %q", paths, cache)
-	}
-}
-
-func TestDonMirrorEntries(t *testing.T) {
-	face := donFileRef{"base/face.png", 9, strings.Repeat("d", 64)}
-	head := donFileRef{"head/3.glb", 4, strings.Repeat("a", 64)}
-	otherHead := head
-	otherHead.SHA256 = strings.Repeat("b", 64)
-	empty := donFileRef{"puchi/1.png", 0, strings.Repeat("c", 64)}
-	badHash := donFileRef{"paint/2.png", 8, strings.Repeat("z", 64)}
-	mirrored := donCatalog{
-		Version: 1,
-		Base:    map[string]donFileRef{"face": face},
-		Items: map[string][]donItem{
-			"head":  {{ID: 3, File: head}, {ID: 4, File: otherHead}},
-			"puchi": {{ID: 1, File: empty}},
-			"paint": {{ID: 2, File: badHash}},
-		},
-	}
-	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(mirrored)
-	}))
-	defer origin.Close()
-	s := New(nil, Config{DonClient: origin.Client()})
-	m, err := s.readDonMirror(t.Context(), origin.URL+"/3dchara/catalog.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// invalid entries and the conflicting path are left out; the rest of the mirror is kept
-	if len(m.files) != 1 || !m.has(face) || m.has(head) || m.has(otherHead) || m.has(empty) || m.has(badHash) {
-		t.Fatalf("mirror files = %v", m.files)
-	}
-	if got, want := m.url(face), origin.URL+"/3dchara/base/face.png?v="+face.SHA256[:12]; got != want {
-		t.Fatalf("mirror URL = %q, want %q", got, want)
 	}
 }

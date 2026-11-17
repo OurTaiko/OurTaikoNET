@@ -256,7 +256,7 @@ func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 		w.Header().Set("Cache-Control", "private, no-store")
 	}
 	if c, err := s.donCatalog(r.Context()); err == nil {
-		answer.Files = c.files(l, s.mirrorForDonRequest(r))
+		answer.Files = c.files(l, s.mirrorForDonRequest(r, c))
 	}
 	web.Respond(w, 200, answer)
 }
@@ -283,7 +283,7 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	delete(all, "mirrorPaths")
 	if s.donRegional() {
 		w.Header().Set("Cache-Control", "private, max-age=60")
-		if mirror := s.mirrorForDonRequest(r); mirror != nil {
+		if mirror := s.mirrorForDonRequest(r, c); mirror != nil {
 			if p := s.mirrorPaths(c, mirror); p.paths != nil {
 				all["mirrorBaseUrl"], all["mirrorPaths"] = p.base, p.paths
 			}

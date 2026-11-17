@@ -6,7 +6,7 @@ import { endpoints } from './api/endpoints'
 import type { ChartBase, ScoreReplay } from './api/types'
 import { formatLocale } from './i18n'
 import { canonicalPlayerUrl, resolvePlayerUrl } from './embedded-player-source'
-import { SITE_API_ROOT } from './api/config'
+import { askSource, canonicalBaseUrl } from './distribution'
 import { PlayerAudioLoad } from './embedded-player-audio'
 import {
   defaultDrumVolume,
@@ -18,7 +18,7 @@ import {
   type PlayerReplayResult,
 } from './embedded-player-protocol'
 
-const playerManifestUrl = `${SITE_API_ROOT}/distribution/player-build`
+const playerManifestUrl = `${canonicalBaseUrl}player-build.json`
 
 // `replay`: a recorded play of this block to show instead of practice or the chart alone; the
 // other two modes close it (onReplayClose).
@@ -71,9 +71,10 @@ export default function EmbeddedPlayer({
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
     async function resolvePlayer() {
       try {
+        const source = await askSource()
         const url = await resolvePlayerUrl({
           manifestUrl: playerManifestUrl,
-          fallbackManifestUrl: 'https://distrib.ourtaiko.org/player-build.json',
+          baseUrl: source.baseUrl,
           parentOrigin: window.location.origin,
           signal: controller.signal,
         })
@@ -105,7 +106,9 @@ export default function EmbeddedPlayer({
   }, [playerUrl])
   useEffect(() => {
     if (!opened || !playerUrl || ready || canonicalPlayerUrl(playerUrl) === playerUrl) return
-    const timeout = window.setTimeout(retryPlayerOrigin, 30_000)
+    // Only a mirror that never starts the player (a missing object shows OSS's own page) is
+    // left for the origin; a slow mainland download of the ~40 MB build is not.
+    const timeout = window.setTimeout(retryPlayerOrigin, 90_000)
     return () => window.clearTimeout(timeout)
   }, [opened, playerUrl, ready, retryPlayerOrigin])
   const send = useCallback(

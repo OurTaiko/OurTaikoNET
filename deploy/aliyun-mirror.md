@@ -13,8 +13,8 @@ shared resource prefix. Desired cloud settings are recorded in
 | Official TJA and full audio | `ourtaiko/database/` | `https://static.sakura-bot.cn/ourtaiko/database/catalog.json` |
 
 The song catalogs are mirror inventories, not a replacement for NET's authoritative source
-APIs. Regional song routing reads the current API resource metadata and probes mirror HEAD;
-it does not depend on these inventories. TJA, audio, preview, covers, background images and
+APIs. Regional song routing uses the visitor's country alone (no HEAD probe) and does not
+depend on these inventories. TJA, audio, preview, covers, background images and
 MP4 videos share the immutable-file route. Videos are fetched on demand; no bulk video copy
 is required.
 
@@ -129,23 +129,25 @@ For regional routing, keep `DON_CATALOG_URL` canonical and set:
 DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko/3dchara/catalog.json
 ```
 
-The existing GeoIP database and trusted proxy settings apply to every collection. Mainland
-requests receive ESA song URLs only for public canonical content-hash files with a successful
-HEAD check (2-second shared response budget; cold probes may finish in the background
-within 15 seconds; success cached 5 minutes, failure 30 seconds).
+The existing GeoIP database and trusted proxy settings apply to every collection, and the
+country alone decides: NET neither probes mirror objects nor reads or compares mirror
+catalogs. Mainland requests receive ESA song URLs for every public canonical content-hash
+file; a missing object is fetched by OSS back-to-origin on first request.
 Manifests retain canonical `fallbackUrl`; signed/private/custom-origin URLs are unchanged.
 GET/HEAD media redirects use the same policy, and `?origin=1` bypasses the mirror.
 
 `GET /api/v1/nameplate-art/catalog` carries canonical `files`/`baseUrl` and, for mainland
-requests, exact-match `mirrorBaseUrl`/`mirrorPaths`. The website and updated Play use this API,
-verify files, and retry the canonical source on mirror errors. Older NET servers are supported
+requests, `mirrorBaseUrl`/`mirrorPaths` listing every canonical file (likewise the 3D Don
+catalog and `/users/{id}/don`). The website and updated Play use this API,
+verify files, and retry the canonical source on mirror errors. Because nothing is compared,
+3D Don and nameplate files must reach the mirror by back-to-origin or by the synchronization
+worker before mainland visitors need them. Older NET servers are supported
 by falling back to the canonical nameplate catalog. Deploy NET and its website, then release
 Play so nameplate routing and download recovery reach game clients. Do not globally replace
 canonical S3 public bases.
 
 `GET /api/v1/distribution/avatar?url=...` accepts only canonical content-addressed SSO
-avatar URLs, uses the same country/trusted-proxy policy and a successful mirror HEAD, and
-returns `url` plus the original `fallbackUrl`. `redirect=1` supports ordinary browser images.
+avatar URLs, uses the same country/trusted-proxy policy (no probe), and returns `url` plus the original `fallbackUrl`. `redirect=1` supports ordinary browser images.
 Both variants send `Cache-Control: no-store` so region selection is never shared by a CDN.
 Play's common account/multiplayer picture loader uses this endpoint, retains the original URL,
 and falls back if the mirror is unavailable.
@@ -156,11 +158,10 @@ builds public avatar addresses on that root itself, falls back to the original a
 the mirror copy fails to load, and shows the root in the footer. Signed, private, and
 custom-origin pictures keep their original route.
 
-`GET /api/v1/distribution/player-build` compares the canonical and mirror manifests,
-including every file hash, before selecting the mirror for mainland visitors. The website
-preserves the OSS prefix and exact build version, falls back to the canonical manifest when
-the API is unavailable, and retries the canonical iframe if mirror startup fails or stalls.
-Non-mainland visitors always retain the canonical base. Deploy the updated NET backend and
+The website reads the canonical `player-build.json` and, for mainland visitors, loads that
+exact build from the mirror root in the source answer (keeping the OSS prefix). It retries the
+canonical iframe if the mirror reports a startup error or the player is not ready after 90
+seconds. Non-mainland visitors always retain the canonical base. Deploy the updated NET backend and
 website together; game avatar routing also needs the updated Play build. Syncing the OSS
 files alone does not change already released application code.
 

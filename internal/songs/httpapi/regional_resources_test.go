@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
@@ -13,10 +12,9 @@ import (
 )
 
 func TestRegionalResources(t *testing.T) {
-	mirror := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Length", "3") }))
-	defer mirror.Close()
-	router := distribution.FromDonCatalog(mirror.URL+"/ourtaiko/3dchara/catalog.json", func(ip netip.Addr) string { return "CN" }, nil)
-	router.Client = mirror.Client()
+	// The mirror is never contacted: the visitor's country alone decides.
+	const mirror = "https://mirror.invalid"
+	router := distribution.FromDonCatalog(mirror+"/ourtaiko/3dchara/catalog.json", func(ip netip.Addr) string { return "CN" }, nil)
 	remote := &objectstore.S3{}
 	if err := remote.SetPublicBaseURL(distribution.CanonicalBase + "fanmade/"); err != nil {
 		t.Fatal(err)
@@ -34,7 +32,7 @@ func TestRegionalResources(t *testing.T) {
 					r.URL.RawQuery = "origin=1"
 				}
 				link := s.routeResource(r, resourceLink{URL: original, HeadURL: original, SHA256: digest, Size: 3})
-				want := mirror.URL + "/ourtaiko/fanmade/" + key
+				want := mirror + "/ourtaiko/fanmade/" + key
 				if bypass {
 					want = original
 				}

@@ -1,15 +1,11 @@
 package distribution
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func testRouter() *Router {
@@ -69,100 +65,24 @@ func TestRegionalCandidates(t *testing.T) {
 	}
 }
 
-func TestMirrorReadiness(t *testing.T) {
-	var hits atomic.Int32
-	var status atomic.Int32
-	status.Store(200)
-	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		if r.Method != "HEAD" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
-			t.Error("unsafe probe")
-		}
-		w.Header().Set("Content-Length", "3")
-		w.WriteHeader(int(status.Load()))
-	}))
-	defer site.Close()
+func TestSelectUsesCountryAlone(t *testing.T) {
 	router := testRouter()
-	router.Base = site.URL + "/ourtaiko/"
-	router.Client = site.Client()
-	original := CanonicalBase + "fanmade/" + strings.Repeat("a", 64) + ".ogg"
-	r := mainland()
-	r.Header.Set("Authorization", "Bearer api-secret")
-	r.Header.Set("Cookie", "private=secret")
-	var wait sync.WaitGroup
-	for range 20 {
-		wait.Go(func() {
-			if got := router.Select(r, original, strings.Repeat("a", 64), 3); got == original {
-				t.Error("healthy mirror ignored")
-			}
-		})
-	}
-	wait.Wait()
-	if hits.Load() != 1 {
-		t.Fatalf("coalesced probes = %d", hits.Load())
-	}
-	// A prior size-free redirect probe cannot validate a size-bearing manifest.
-	if got := router.Select(r, original, strings.Repeat("a", 64), 4); got != original {
-		t.Fatal("wrong size accepted")
-	}
-	status.Store(503)
-	failed := strings.ReplaceAll(original, strings.Repeat("a", 64), strings.Repeat("b", 64))
-	for range 2 {
-		if router.Select(r, failed, strings.Repeat("b", 64), 3) != failed {
-			t.Fatal("failed mirror accepted")
-		}
-	}
-	if hits.Load() != 3 {
-		t.Fatalf("negative cache probes = %d", hits.Load())
-	}
-	canceled, cancel := context.WithCancel(r.Context())
-	cancel()
-	before := hits.Load()
-	if router.Select(r.WithContext(canceled), original, strings.Repeat("a", 64), 5) != original {
-		t.Fatal("cancel ignored")
-	}
-	if hits.Load() != before {
-		t.Fatal("canceled probe sent network request")
-	}
-}
-
-func TestColdProbeSurvivesResponseDeadline(t *testing.T) {
-	started, release := make(chan struct{}), make(chan struct{})
-	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(started)
-		<-release
-		w.Header().Set("Content-Length", "3")
-	}))
-	defer site.Close()
-	router := testRouter()
-	router.Base = site.URL + "/ourtaiko/"
-	router.Client = site.Client()
 	digest := strings.Repeat("a", 64)
 	original := CanonicalBase + "fanmade/" + digest + ".ogg"
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan string)
-	go func() { done <- router.Select(mainland().WithContext(ctx), original, digest, 3) }()
-	<-started
-	cancel()
-	if got := <-done; got != original {
-		t.Fatal("response cancellation ignored")
+	// No HTTP client is involved: an unreachable mirror is still chosen for mainland visitors.
+	if got := router.Select(mainland(), original, digest, 3); got != router.Base+"fanmade/"+digest+".ogg" {
+		t.Fatal(got)
 	}
-	close(release)
-	deadline := time.Now().Add(time.Second)
-	for {
-		router.mu.Lock()
-		pending := len(router.flights)
-		router.mu.Unlock()
-		if pending == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("cold probe did not finish")
-		}
-		time.Sleep(time.Millisecond)
+	overseas := mainland()
+	overseas.Header.Set("X-Real-IP", "203.0.113.2")
+	if got := router.Select(overseas, original, digest, 3); got != original {
+		t.Fatal(got)
 	}
-	if router.Select(mainland(), original, digest, 3) == original {
-		t.Fatal("background result lost")
+	if router.MirrorBase(overseas) != "" || router.MirrorBase(mainland()) != router.Base {
+		t.Fatal("mirror base policy")
+	}
+	var none *Router
+	if none.Select(mainland(), original, digest, 3) != original || none.MirrorBase(mainland()) != "" {
+		t.Fatal("nil router must keep canonical addresses")
 	}
 }
