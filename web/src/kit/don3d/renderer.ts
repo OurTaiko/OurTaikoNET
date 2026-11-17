@@ -39,7 +39,7 @@ import {
   partPixels,
   type DonBase,
 } from './assets'
-import { catalogUrl, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
+import { catalogUrl, donSource, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
 import {
   DonAnim,
   DonAnimator,
@@ -386,13 +386,15 @@ export function createDonRenderer(
       const [loadedBase, datas, puchiFile, paintBitmap] = await Promise.all([
         ensureBase(),
         Promise.all(
-          resolved.parts.map((p) => loadPart(catalogUrl(baseUrl, p.item.file), p.normalizeFace)),
+          resolved.parts.map((p) =>
+            loadPart(donSource(baseUrl, p.item.file, catalog), p.normalizeFace),
+          ),
         ),
         resolved.puchi
-          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file))
+          ? loadPuchi(donSource(baseUrl, resolved.puchi.file, catalog))
           : Promise.resolve(null),
         resolved.paint
-          ? loadPaint(catalogUrl(baseUrl, resolved.paint.file))
+          ? loadPaint(donSource(baseUrl, resolved.paint.file, catalog))
           : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
@@ -406,6 +408,7 @@ export function createDonRenderer(
       if (disposed || token !== lookToken) return
       let puchi: Texture | null = null
       if (resolved.puchi && puchiFile) {
+        // textures are kept by the canonical address, as the files are (assets.ts)
         const url = catalogUrl(baseUrl, resolved.puchi.file)
         puchi = puchiTextures.get(url) ?? null
         if (!puchi) {

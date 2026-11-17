@@ -35,6 +35,8 @@ services:
     ports: ['127.0.0.1:8096:8080', '127.0.0.1:8097:8081']
     volumes:
       - /opt/ourtaiko-net/web:/srv/web:ro
+      # Optional GeoIP files for the regional Don mirror. Enabled via api.env.
+      - /opt/ourtaiko-net/geoip:/srv/geoip:ro
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=1g']
     security_opt: ['no-new-privileges:true']
