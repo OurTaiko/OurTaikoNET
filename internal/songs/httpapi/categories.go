@@ -136,3 +136,12 @@ func (src *Source) playlistCategory(id string) Category {
 	flag, _ := src.categoryFlag(src.PlaylistCategories[id])
 	return src.categoryByFlag(flag)
 }
+
+// CategoryBits are the source's categories, each ID with its bit in charts.category_flags.
+func (src *Source) CategoryBits() map[string]int {
+	bits := map[string]int{}
+	for _, category := range src.Categories {
+		bits[category.ID] = int(category.Flag)
+	}
+	return bits
+}

@@ -54,6 +54,7 @@ import { SettingsSheet } from './settings'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
 import { useCountVisit } from './visits'
+import { RewardsDialog } from '../rewards/rewards-dialog'
 
 type Item = {
   key: string
@@ -563,6 +564,8 @@ export function Frame({ children }: { children: ReactNode }) {
 
   return (
     <div className="isolate relative bg-background min-h-svh text-foreground">
+      {/* What the player was given, over any page (../rewards). */}
+      <RewardsDialog />
       {/* The top bar: transparent, its controls in floating capsules; what scrolls under it
           fades out at its edge. */}
       <header data-scrolled={scrolled} className="top-0 z-40 fixed inset-x-0 scroll-edge">

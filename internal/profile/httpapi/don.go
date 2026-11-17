@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/donitems"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -353,6 +354,16 @@ func (s *Server) wearDon(w http.ResponseWriter, r *http.Request) {
 	}
 	if why := c.check(&l); why != "" {
 		problem(w, 422, "DON_LOOK_INVALID", why)
+		return
+	}
+	// A locked part is worn only by those who own it (don_items.go).
+	barred, err := donitems.Barred(r.Context(), s.DB, v.User.ID, l.worn())
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	if len(barred) > 0 {
+		web.Respond(w, 403, map[string]any{"code": "DON_ITEM_LOCKED", "message": "还没有获得这件装扮", "items": barred})
 		return
 	}
 	var colors []string

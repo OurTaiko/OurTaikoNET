@@ -1,13 +1,22 @@
 // How much the site is visited. The frame (./shell) tells the server each page it shows, and
 // the footer shows the totals. Nothing is kept in the browser: no cookie, no id. The server
-// counts pages a day and tells one day's visitors apart without keeping who they were (the
-// backend's internal/visits).
+// keeps each view with its time and tells one day's visitors apart without keeping who they
+// were (the backend's internal/visits); its days are those of the time zone it is asked in.
 import { useEffect, useState } from 'react'
 
 const address = '/api/v1/visits'
 
 export type VisitCount = { views: number; visitors: number }
 export type VisitSummary = { total: VisitCount; today: VisitCount; since: string }
+
+/** The browser's time zone (Asia/Shanghai), in which the server is asked; empty: UTC. */
+export function browserZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
+  } catch {
+    return ''
+  }
+}
 
 /**
  * Counts the page at `path` (an address of the site, without its query) once it has stayed
@@ -33,7 +42,11 @@ export function useCountVisit(path: string) {
 // Asked once per page load: every footer shows the same answer.
 let asked: Promise<VisitSummary | null> | null = null
 function ask() {
-  asked ??= fetch(address, { headers: { Accept: 'application/json' }, credentials: 'omit' })
+  const zone = browserZone()
+  asked ??= fetch(zone ? `${address}?tz=${encodeURIComponent(zone)}` : address, {
+    headers: { Accept: 'application/json' },
+    credentials: 'omit',
+  })
     .then((response) => (response.ok ? (response.json() as Promise<VisitSummary>) : null))
     .catch(() => null)
   return asked

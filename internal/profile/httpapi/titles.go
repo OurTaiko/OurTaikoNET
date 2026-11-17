@@ -207,7 +207,8 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 // titleCatalog is GET /api/v1/titles: every title, readable from any website (the 段位 editors of
-// the other OurTaiko websites pick reward titles from it).
+// the other OurTaiko websites pick reward titles from it), and the rules that give titles by
+// themselves (title_rules.go).
 func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	rows, err := s.DB.Query(r.Context(), `SELECT `+titleColumns+` FROM titles t ORDER BY t.official DESC,t.created_at,t.id`)
@@ -229,7 +230,12 @@ func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	web.Respond(w, 200, map[string]any{"titles": titles})
+	rules, err := s.titleRules(r.Context())
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	web.Respond(w, 200, map[string]any{"titles": titles, "rules": rules})
 }
 
 // HeldTitle is a title a player holds and what gave it.
@@ -309,7 +315,7 @@ func (s *Server) userDans(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	history := []AwardRecord{}
-	rows, err = s.DB.Query(r.Context(), `SELECT service,course_title,official,verdict,dan,granted,created_at FROM awards WHERE user_id=$1 AND service<>'admin' ORDER BY created_at DESC,id DESC LIMIT 50`, id)
+	rows, err = s.DB.Query(r.Context(), `SELECT service,course_title,official,verdict,dan,granted,created_at FROM awards WHERE user_id=$1 AND service NOT IN ('admin','rule') ORDER BY created_at DESC,id DESC LIMIT 50`, id)
 	if err != nil {
 		internal(w, err)
 		return

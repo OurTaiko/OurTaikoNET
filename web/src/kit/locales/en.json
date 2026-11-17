@@ -1056,5 +1056,23 @@
     "playlists": "Taiko playlists put together by players, and the site’s own.",
     "dans": "Dan courses by the site and the community, to take on in the game.",
     "register": "Create an account"
+  },
+  "rewards": {
+    "heading": "You got something new",
+    "title": "New title",
+    "dan": "段位",
+    "fromCourse": "For the 段位 course “{{course}}”",
+    "fromRule": "For meeting its condition",
+    "fromAdmin": "Given by an administrator",
+    "wear": "Wear it",
+    "gotIt": "Got it",
+    "donItem": "New Don part",
+    "donPart": {
+      "cos": "Costume",
+      "head": "Head",
+      "body": "Body",
+      "puchi": "Puchichara",
+      "paint": "Makeup"
+    }
   }
 }

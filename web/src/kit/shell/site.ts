@@ -1,6 +1,7 @@
 // What the frame knows of the whole site, whichever area shows it.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { sourceOf, type SourceId } from '../source'
+import { noticeRewards } from '../rewards/store'
 
 const sourceKey = 'ourtaiko-net-source'
 
@@ -55,7 +56,11 @@ export function useSiteRoles(userId: string | undefined): SiteRoles {
     if (!userId) return
     const controller = new AbortController()
     fetch('/api/v1/me', { signal: controller.signal, headers: { Accept: 'application/json' } })
-      .then((response) => (response.ok ? response.json() : null))
+      .then((response) => {
+        // The first answer of a signed-in page: rewards waiting since last time (../rewards).
+        noticeRewards(response)
+        return response.ok ? response.json() : null
+      })
       .then((body) => {
         const user = body?.user
         if (user?.id !== userId) return

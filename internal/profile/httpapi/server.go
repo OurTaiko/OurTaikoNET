@@ -16,7 +16,6 @@ import (
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/chat"
 	"ourtaiko.dev/net/internal/kit/distribution"
-	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -75,11 +74,10 @@ type Server struct {
 	nameplateMu     sync.Mutex
 	nameplateArt    nameplateSlot
 	nameplateMirror nameplateSlot
-	// The visit count (visits.go): the totals as last read, and each visitor's views this
-	// minute (under mu).
+	// The visit count (visits.go): the totals of each time zone as last read, and each
+	// visitor's views this minute (under mu).
 	visitMu     sync.Mutex
-	visit       visits.Summary
-	visitAt     time.Time
+	visits      map[string]keptVisits
 	visitLimits map[string]window
 	// Who waits for news of their chats (chats.go).
 	chats *chat.Hub
@@ -93,7 +91,7 @@ func New(pool *pgxpool.Pool, cfg Config) *Server {
 	if cfg.Distribution == nil {
 		cfg.Distribution = distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
 	}
-	s := &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
+	s := &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
 	s.nameplateMirror.ttl = donMirrorTTL // the mirror's CDN keeps its catalog 60 seconds
 	return s
 }
@@ -141,6 +139,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/me/don", s.myDon)
 	mux.HandleFunc("PUT /api/v1/me/don", s.wearDon)
 	mux.HandleFunc("GET /api/v1/don/catalog", s.donCatalogAnswer)
+	mux.HandleFunc("GET /api/v1/don/items", s.donItems)
+	mux.HandleFunc("GET /api/v1/me/don/items", s.myDonItems)
 	mux.HandleFunc("GET /api/v1/nameplate-art/catalog", s.nameplateArtAnswer)
 	mux.HandleFunc("GET /api/v1/distribution/", s.Config.Distribution.Public)
 	mux.HandleFunc("GET /api/v1/nameplates", s.nameplates)
@@ -161,6 +161,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/admin/visits", s.visitReport)
 	mux.HandleFunc("PUT /api/v1/admin/titles/{id}", s.saveTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/titles/{id}", s.deleteTitle)
+	mux.HandleFunc("POST /api/v1/admin/titles/{id}/rules", s.createTitleRule)
+	mux.HandleFunc("POST /api/v1/admin/don/items/{part}/{id}/rules", s.createDonItemRule)
+	mux.HandleFunc("PUT /api/v1/admin/don/locks/{part}/{id}", s.lockDonItem)
+	mux.HandleFunc("POST /api/v1/admin/don/grants", s.grantDonItem)
+	mux.HandleFunc("DELETE /api/v1/admin/don/grants", s.revokeDonItem)
+	mux.HandleFunc("DELETE /api/v1/admin/rules/{id}", s.deleteTitleRule)
 	mux.HandleFunc("POST /api/v1/admin/grants", s.grantTitle)
 	mux.HandleFunc("DELETE /api/v1/admin/grants", s.revokeTitle)
 	mux.HandleFunc("GET /api/v1/admin/groups", s.groupCatalog)

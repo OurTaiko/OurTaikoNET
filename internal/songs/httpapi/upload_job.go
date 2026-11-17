@@ -15,6 +15,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
+	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -336,6 +337,7 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 	if err = tx.Commit(ctx); err != nil {
 		return failed(err)
 	}
+	s.titlesAfterUpload(ctx, id)
 	// Shared files stay while another chart or playlist refers to them.
 	var retired []int64
 	for _, change := range []struct {
@@ -523,4 +525,18 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 	}
 	web.Respond(w, status, result.chart)
 	return true
+}
+
+// titlesAfterUpload gives the uploader of a chart that was just published the titles their
+// number of charts earns by rule (package titlerules). The uploader is the chart's first
+// owner, whoever sent the files. A failure is only logged: the next upload judges again.
+func (s *Server) titlesAfterUpload(ctx context.Context, chart string) {
+	var owner string
+	err := s.DB.QueryRow(ctx, `SELECT c.owner_ids[1] FROM charts c WHERE c.id=$1 AND `+playableChart, chart).Scan(&owner)
+	if err == nil {
+		_, err = titlerules.Uploaded(ctx, s.DB, s.source().schema(), owner)
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		log.Printf("title rules after an upload: %v", err)
+	}
 }

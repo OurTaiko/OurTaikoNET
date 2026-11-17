@@ -157,7 +157,8 @@
     "keptStyles": "Rainbow and purple are kept for official titles.",
     "save": "Save",
     "createButton": "Create",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "byRule": "Earned by meeting its condition"
   },
   "dans": {
     "badges": "Dan badges",
@@ -233,7 +234,8 @@
   },
   "visits": {
     "heading": "Visits",
-    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. A day starts at midnight UTC+8.",
+    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. Days and hours are those of your time zone.",
+    "zone": "Time zone: {{zone}}",
     "today": "Today",
     "period": "Last {{n}} days",
     "total": "All time",
@@ -245,11 +247,12 @@
     "days": "{{n}} days",
     "viewsHeading": "Views per day",
     "visitorsHeading": "Visitors per day",
+    "hoursHeading": "Views by hour of day",
+    "hour": "{{h}}:00",
     "pagesHeading": "Most visited pages",
     "page": "Page",
     "share": "Share",
     "noPages": "No visits in this period yet.",
-    "other": "Other pages",
     "table": "Show the days as a table",
     "day": "Day"
   },
@@ -308,6 +311,90 @@
       "EntryLoop": "Entry",
       "FullCombo": "Full combo",
       "Miss": "Miss"
-    }
+    },
+    "locked": "not earned"
+  },
+  "rules": {
+    "heading": "Conditions that give titles",
+    "howTo": "How to get it",
+    "none": "No conditions yet.",
+    "title": "Title",
+    "kind": "Condition",
+    "source": "Source",
+    "chart": "Song ID or the address of its page",
+    "category": "Category",
+    "course": "Lowest course",
+    "anyCourse": "Any course",
+    "clear": "Needs",
+    "count": "How many",
+    "countAll": "Empty for all of them",
+    "add": "Add condition",
+    "added": "Added, and given to {{n}} players who met it already.",
+    "delete": "Delete",
+    "confirmDelete": "Delete this condition? Titles it already gave stay.",
+    "deleted": "Deleted.",
+    "chartGone": " (song no longer available)",
+    "kinds": {
+      "chart_clear": "Clear a song",
+      "category_clear": "Clear songs of a category",
+      "site_login": "Sign in on the website",
+      "game_login": "Sign in in the game",
+      "charts_uploaded": "Number of charts uploaded"
+    },
+    "clears": {
+      "1": "Clear",
+      "2": "Full combo",
+      "3": "All good"
+    },
+    "atLeast": ", {{course}} or harder",
+    "text": {
+      "site_login": "Sign in on the website",
+      "game_login": "Sign in in the game",
+      "chart_clear": "{{clear}}: “{{title}}” ({{source}}{{course}})",
+      "category_all": "{{clear}}: every song in {{category}} ({{source}}{{course}})",
+      "category_count": "{{clear}}: {{count}} songs in {{category}} ({{source}}{{course}})",
+      "charts_uploaded": "Upload {{count}} charts ({{source}})"
+    },
+    "categories": {
+      "fanmade": {
+        "game": "Game",
+        "virtual-singer": "Virtual Singer",
+        "pop": "Pop",
+        "classic": "Classical",
+        "variety": "Variety",
+        "anime": "Anime"
+      },
+      "official": {
+        "namco": "Namco Original",
+        "pop": "Pop",
+        "game": "Game Music",
+        "anime": "Anime",
+        "vocaloid": "VOCALOID",
+        "variety": "Variety",
+        "kids": "Kids",
+        "classics": "Classical"
+      }
+    },
+    "target": "Gives",
+    "targets": {
+      "title": "A title",
+      "don": "A Don part"
+    },
+    "donPart": "Part",
+    "donItem": "Number"
+  },
+  "donItems": {
+    "heading": "Don parts to earn",
+    "part": "Part",
+    "id": "Number",
+    "notInCatalog": "Not in the catalog",
+    "locked": "Locked: earned to be worn",
+    "free": "Anyone can wear it",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "lockedDone": "Locked; the {{n}} players wearing it were given it.",
+    "unlockedDone": "Unlocked; anyone can wear it.",
+    "lockedList": "Locked parts",
+    "noneLocked": "Nothing is locked; every part can be worn."
   }
 }

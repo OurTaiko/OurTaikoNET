@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
 import { api } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { VisitDay, VisitReport } from '@players/api/types'
+import type { VisitReport } from '@players/api/types'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import {
@@ -17,11 +17,10 @@ import {
 import { cn } from '@sitekit/lib/utils'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
+import { browserZone } from '@sitekit/shell/visits'
 
 // The periods offered, in days; today is the last day of each.
 const periods = [7, 30, 90, 365]
-// What the server files the views of pages beyond a day's limit under.
-const otherPages = '(other)'
 
 /** A round number at or above `most` whose half is round too: the top of a chart's scale. */
 function scaleTop(most: number) {
@@ -41,29 +40,23 @@ function Figure({ label, value, note }: { label: string; value: string; note?: s
   )
 }
 
-// One number a day as bars on one scale from zero. A whole column answers the pointer, not
-// only its bar, and says its day and number above the plot; the table below the charts has
-// every day for those who do not point.
-function DayBars({
-  days,
-  pick,
-  format,
-}: {
-  days: VisitDay[]
-  pick: (day: VisitDay) => number
-  format: (n: number) => string
-}) {
+type Bar = { key: string; label: string; mark: string; value: number }
+
+// One number a day (or an hour) as bars on one scale from zero. A whole column answers the
+// pointer, not only its bar, and says its label and number above the plot; the table below
+// the charts has every day for those who do not point.
+function Bars({ bars, format }: { bars: Bar[]; format: (n: number) => string }) {
   const [at, setAt] = useState<number | null>(null)
-  const top = scaleTop(Math.max(0, ...days.map(pick)))
-  const shown = at !== null && at < days.length ? days[at] : null
-  const marks = [days[0], days[Math.floor((days.length - 1) / 2)], days[days.length - 1]]
+  const top = scaleTop(Math.max(0, ...bars.map((bar) => bar.value)))
+  const shown = at !== null && at < bars.length ? bars[at] : null
+  const marks = [bars[0], bars[Math.floor((bars.length - 1) / 2)], bars[bars.length - 1]]
   return (
     <div>
       <p className="h-5 text-sm tabular-nums" aria-hidden="true">
         {shown && (
           <>
-            <span className="text-muted-foreground">{shown.day}</span>{' '}
-            <span className="font-semibold">{format(pick(shown))}</span>
+            <span className="text-muted-foreground">{shown.label}</span>{' '}
+            <span className="font-semibold">{format(shown.value)}</span>
           </>
         )}
       </p>
@@ -85,14 +78,14 @@ function DayBars({
             <div
               className={cn(
                 'absolute inset-0 flex items-end',
-                days.length > 120 ? 'gap-0' : days.length > 45 ? 'gap-px' : 'gap-0.5',
+                bars.length > 120 ? 'gap-0' : bars.length > 45 ? 'gap-px' : 'gap-0.5',
               )}
             >
-              {days.map((day, i) => {
-                const value = pick(day)
+              {bars.map((bar, i) => {
+                const value = bar.value
                 return (
                   <div
-                    key={day.day}
+                    key={bar.key}
                     className="flex flex-1 justify-center items-end h-full"
                     onPointerEnter={() => setAt(i)}
                     onPointerDown={() => setAt(i)}
@@ -100,7 +93,7 @@ function DayBars({
                     <div
                       className={cn(
                         'bg-primary rounded-t-[4px] w-full max-w-7 transition-opacity',
-                        days.length > 120 && 'rounded-t-none',
+                        bars.length > 120 && 'rounded-t-none',
                         at !== null && at !== i && 'opacity-40',
                       )}
                       style={{ height: `${(value / top) * 100}%`, minHeight: value > 0 ? 2 : 0 }}
@@ -111,8 +104,8 @@ function DayBars({
             </div>
           </div>
           <div className="flex justify-between mt-1.5 text-muted-foreground text-xs tabular-nums">
-            {marks.map((day, i) => (
-              <span key={i}>{day?.day.slice(5)}</span>
+            {marks.map((bar, i) => (
+              <span key={i}>{bar?.mark}</span>
             ))}
           </div>
         </div>
@@ -121,8 +114,9 @@ function DayBars({
   )
 }
 
-// How much the site is visited: today, the chosen period day by day, and the pages seen most.
-// Only the site's administrator sees it; everyone sees the totals at the foot of every page.
+// How much the site is visited: today, the chosen period day by day and hour by hour, and the
+// pages seen most, all in the reader's time zone. Only the site's administrator sees it;
+// everyone sees the totals at the foot of every page.
 export function VisitsPage() {
   const { t, i18n } = useTranslation()
   const session = useSession()
@@ -130,11 +124,12 @@ export function VisitsPage() {
   const [period, setPeriod] = useState(30)
   const [answer, setAnswer] = useState<{ period: number; report: VisitReport } | null>(null)
   const [error, setError] = useState('')
+  const [zone] = useState(browserZone)
 
   useEffect(() => {
     if (!allowed) return
     let dropped = false
-    api<VisitReport>(endpoints.visitReport(period))
+    api<VisitReport>(endpoints.visitReport(period, zone))
       .then((report) => {
         if (dropped) return
         setAnswer({ period, report })
@@ -146,7 +141,7 @@ export function VisitsPage() {
     return () => {
       dropped = true
     }
-  }, [allowed, period])
+  }, [allowed, period, zone])
 
   if (session.loading) return null
   if (!allowed) return <Navigate to="/" replace />
@@ -165,6 +160,14 @@ export function VisitsPage() {
   const visitors = days.reduce((sum, day) => sum + day.visitors, 0)
   const pages = report?.pages ?? []
   const mostSeen = Math.max(1, ...pages.map((page) => page.views))
+  const dayBars = (pick: (day: (typeof days)[number]) => number): Bar[] =>
+    days.map((day) => ({ key: day.day, label: day.day, mark: day.day.slice(5), value: pick(day) }))
+  const hourBars: Bar[] = (report?.hours ?? []).map((value, h) => ({
+    key: String(h),
+    label: t('visits.hour', { h }),
+    mark: String(h),
+    value,
+  }))
 
   return (
     <div className="space-y-6" data-testid="visits-panel">
@@ -172,6 +175,11 @@ export function VisitsPage() {
         <div className="space-y-1">
           <h1 className="font-semibold text-2xl tracking-tight">{t('visits.heading')}</h1>
           <p className="max-w-2xl text-muted-foreground text-sm">{t('visits.about')}</p>
+          {report && (
+            <p className="text-muted-foreground text-xs" data-testid="visits-zone">
+              {t('visits.zone', { zone: report.zone })}
+            </p>
+          )}
         </div>
         <div className="flex gap-1.5" role="group" aria-label={t('visits.range')}>
           {periods.map((n) => (
@@ -235,7 +243,7 @@ export function VisitsPage() {
                 <CardTitle>{t('visits.viewsHeading')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <DayBars days={days} pick={(day) => day.views} format={format} />
+                <Bars bars={dayBars((day) => day.views)} format={format} />
               </CardContent>
             </Card>
             <Card className="rounded-3xl">
@@ -243,10 +251,21 @@ export function VisitsPage() {
                 <CardTitle>{t('visits.visitorsHeading')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <DayBars days={days} pick={(day) => day.visitors} format={format} />
+                <Bars bars={dayBars((day) => day.visitors)} format={format} />
               </CardContent>
             </Card>
           </div>
+
+          {hourBars.length > 0 && (
+            <Card className="rounded-3xl">
+              <CardHeader>
+                <CardTitle>{t('visits.hoursHeading')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Bars bars={hourBars} format={format} />
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="rounded-3xl">
             <CardHeader>
@@ -268,7 +287,7 @@ export function VisitsPage() {
                     {pages.map((page) => (
                       <TableRow key={page.page}>
                         <TableCell className="font-mono text-xs break-all whitespace-normal">
-                          {page.page === otherPages ? t('visits.other') : page.page}
+                          {page.page}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {format(page.views)}

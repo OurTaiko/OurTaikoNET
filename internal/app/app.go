@@ -26,6 +26,7 @@ import (
 	"ourtaiko.dev/net/internal/multiplay"
 	"ourtaiko.dev/net/internal/netdb"
 	profile "ourtaiko.dev/net/internal/profile/httpapi"
+	"ourtaiko.dev/net/internal/rewards"
 	"ourtaiko.dev/net/internal/site"
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
@@ -97,6 +98,9 @@ type App struct {
 	rooms     *multiplay.Server
 	roomsAddr string
 	roomsSite site.Multiplay
+	// rewards tells players what they were given (Handler); shared is the pool it listens on (Start).
+	rewards rewards.Store
+	shared  *pgxpool.Pool
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -174,6 +178,8 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	if officialSite == "" {
 		officialSite = cfg.Origin + "/official"
 	}
+	a.rewards = rewards.NewStore(shared)
+	a.shared = shared
 	resources := distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
@@ -181,10 +187,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		DonMirrorCatalogURL: cfg.DonMirrorCatalogURL, DonIPCountry: cfg.DonIPCountry,
 		Distribution: resources,
 		Sources: []profile.Source{
-			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
-			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
+			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite, Categories: songs.Fanmade.CategoryBits()},
+			{ID: "official", Name: "OurTaiko Database", Site: officialSite, Categories: songs.Official.CategoryBits()},
 		},
 	})
+	// A reward of a Don part is described from the catalog the players' part reads.
+	a.rewards.Describe = a.Players.DescribeReward
 
 	// What a dan attempt earns is recorded by the players' part in the attempt's own
 	// transaction (Awards). The sources still read the title catalog as the old sites read
@@ -223,10 +231,10 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	// Each old host still answers its API; its pages are those of the new site now.
 	if cfg.LegacyFanmadeHost != "" {
-		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.Fanmade.Handler(), Page: legacy.Under(cfg.Origin, "/fanmade")}
+		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.withRewards(a.Fanmade.Handler()), Page: legacy.Under(cfg.Origin, "/fanmade")}
 	}
 	if cfg.LegacyOfficialHost != "" {
-		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.Official.Handler(), Page: legacy.Under(cfg.Origin, "/official")}
+		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.withRewards(a.Official.Handler()), Page: legacy.Under(cfg.Origin, "/official")}
 	}
 	if cfg.LegacyProfileHost != "" {
 		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.Players.Handler()), Page: legacy.Players(cfg.Origin)}
@@ -263,14 +271,22 @@ func (a *App) Handler() http.Handler {
 	// Both sources and the players' part read one database, so one readiness check speaks
 	// for the site.
 	ready := a.Fanmade.Handler()
-	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/readyz" {
-			ready.ServeHTTP(w, r)
-			return
-		}
-		current.ServeHTTP(w, r)
-	})
-	return legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, api))
+	routes := http.NewServeMux()
+	routes.Handle("/readyz", ready)
+	routes.Handle("/", a.withRewards(current))
+	// Every answer, the old domains' too, says how many rewards its player has not seen.
+	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
+}
+
+// withRewards serves the rewards' routes (package rewards) in front of an API: the website asks
+// with its session, the game with its token. Either source knows a game's token; the players'
+// part knows the website. The old domains have them too, for a game that still uses one.
+func (a *App) withRewards(next http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	a.rewards.Routes(mux, "/api/v1/me/rewards", a.Players.Require)
+	a.rewards.Routes(mux, "/api/v1/game/rewards", a.Fanmade.Require)
+	mux.Handle("/", next)
+	return mux
 }
 
 // Start fails the uploads a restart interrupted and runs each source's background work until
@@ -298,6 +314,14 @@ func (a *App) Start(ctx context.Context) error {
 		go a.Official.RunFileCleanup(ctx)
 		go a.Official.RunPreviewBackfill(ctx)
 	}
+	// The rewards' counts are kept while it listens on a connection of the shared pool.
+	go a.rewards.Run(ctx, func(ctx context.Context) (rewards.Listener, func(), error) {
+		conn, err := a.shared.Acquire(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return conn.Conn(), conn.Release, nil
+	})
 	if a.sso != nil {
 		go a.sso.RunProfileRefresh(ctx)
 	}

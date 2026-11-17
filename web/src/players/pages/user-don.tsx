@@ -8,6 +8,9 @@ import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import { readDonCatalog, type Catalog } from '@players/don-catalog'
+import { useDonItems } from '@players/don-items'
+import { ruleText } from '@players/title-rules'
+import { LockSimpleIcon } from '@phosphor-icons/react'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { Button } from '@sitekit/components/ui/button'
@@ -19,9 +22,9 @@ import {
   DonPreview,
   catalogItem,
   donImage,
+  donItemName,
   donSource,
   type DonCatalog,
-  type DonCatalogItem,
   type DonLook,
   type DonMotionName,
   type DonPartKind,
@@ -62,12 +65,8 @@ function normalize(l: DonLook): DonLook {
   }
 }
 
-/** An item's name in the reader's language, else Japanese (the cabinet's), else its number. */
-export function itemName(item: DonCatalogItem | undefined, language: string, id: number): string {
-  if (!item) return `#${id}`
-  const short = language.split('-')[0]
-  return item.name[language] ?? item.name[short] ?? item.name.ja ?? `#${id}`
-}
+/** An item's name in the reader's language (the shared donItemName). */
+export const itemName = donItemName
 
 export function DonTab({ id, mine }: { id: string; mine: boolean }) {
   const { t, i18n } = useTranslation()
@@ -81,6 +80,12 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
   const [dressTab, setDressTab] = useState<DressTab>('outfit')
+  // Parts that must be earned (players/don-items): locked ones the player does not own are shown
+  // locked, with how to earn them.
+  const donItems = useDonItems(mine)
+  const barred = (kind: DonPartKind) => (itemId: number) => donItems?.barred(kind, itemId) ?? false
+  const howTo = (kind: DonPartKind) => (itemId: number) =>
+    (donItems?.rulesFor(kind, itemId) ?? []).map((rule) => ruleText(rule, t, language)).join(' / ')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -206,6 +211,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
                   <IconGrid
                     title={t('don.kinds.cos')}
                     kind="cos"
+                    barred={barred('cos')}
+                    howTo={howTo('cos')}
                     catalog={catalog}
                     value={draft.cos}
                     language={language}
@@ -216,6 +223,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
                     <IconGrid
                       title={t('don.kinds.head')}
                       kind="head"
+                      barred={barred('head')}
+                      howTo={howTo('head')}
                       catalog={catalog}
                       value={draft.head}
                       language={language}
@@ -224,6 +233,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
                     <IconGrid
                       title={t('don.kinds.body')}
                       kind="body"
+                      barred={barred('body')}
+                      howTo={howTo('body')}
                       catalog={catalog}
                       value={draft.body}
                       language={language}
@@ -238,6 +249,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
                   title={t('don.kinds.puchi')}
                   hideTitle
                   kind="puchi"
+                  barred={barred('puchi')}
+                  howTo={howTo('puchi')}
                   catalog={catalog}
                   value={draft.puchi}
                   language={language}
@@ -252,6 +265,8 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
                     title={t('don.kinds.paint')}
                     hideTitle
                     kind="paint"
+                    barred={barred('paint')}
+                    howTo={howTo('paint')}
                     catalog={catalog}
                     value={draft.paint ?? 0}
                     language={language}
@@ -338,6 +353,8 @@ function IconGrid({
   onPick,
   none,
   faceColor,
+  barred,
+  howTo,
 }: {
   title: string
   // the tab already names it: the heading is only for screen readers
@@ -350,7 +367,11 @@ function IconGrid({
   none?: string
   // makeup: its sheet's first face is shown on the Don's face colour
   faceColor?: string
+  // A part that must be earned and is not: shown locked, not picked; howTo says how to earn it.
+  barred?: (id: number) => boolean
+  howTo?: (id: number) => string
 }) {
+  const { t } = useTranslation()
   const items = catalog.items[kind] ?? []
   const tile = (selected: boolean) =>
     cn(
@@ -380,16 +401,23 @@ function IconGrid({
         )}
         {items.map((item) => {
           const name = itemName(item, language, item.id)
+          const locked = (barred?.(item.id) ?? false) && value !== item.id
+          const how = locked ? howTo?.(item.id) : ''
+          const label = locked ? `${name}（${t('don.locked')}${how ? `：${how}` : ''}）` : name
           return (
             <button
               key={item.id}
               type="button"
               role="radio"
               aria-checked={value === item.id}
-              aria-label={name}
-              title={name}
-              className={tile(value === item.id)}
-              onClick={() => onPick(item.id)}
+              aria-disabled={locked}
+              aria-label={label}
+              title={label}
+              className={cn(
+                tile(value === item.id),
+                locked && 'cursor-not-allowed opacity-45 grayscale',
+              )}
+              onClick={() => !locked && onPick(item.id)}
               style={kind === 'paint' ? { backgroundColor: faceColor } : undefined}
             >
               {(kind === 'puchi' || kind === 'paint') && !item.icon ? (
@@ -410,6 +438,13 @@ function IconGrid({
                 />
               ) : (
                 <span className="text-xs text-muted-foreground">#{item.id}</span>
+              )}
+              {locked && (
+                <LockSimpleIcon
+                  aria-hidden="true"
+                  weight="fill"
+                  className="absolute right-1 bottom-1 size-4 rounded-full bg-background p-0.5 text-foreground"
+                />
               )}
             </button>
           )

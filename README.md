@@ -47,13 +47,54 @@ The state machine (`room.go`, `manager.go`) does no I/O and is tested on a clock
 
 ## Visits
 
-How much the website is visited (`internal/visits`, migration `0005_visits`). The website tells the server each page it shows (`web/src/kit/shell/visits.ts`, from the frame, once a page has stayed 0.6 s); nothing is counted from the requests themselves, so the game and programs reading the API are not visitors.
+How much the website is visited (`internal/visits`, migrations `0005_visits` and `0008_visit_times`). The website tells the server each page it shows (`web/src/kit/shell/visits.ts`, from the frame, once a page has stayed 0.6 s); nothing is counted from the requests themselves, so the game and programs reading the API are not visitors. Every view is kept with the moment it was made, and whoever reads the count names their time zone (`?tz=`, the browser's IANA name; UTC without one): days, "today" and hours are those of that zone.
 
-- **What is kept.** `net.visit_days (day, views, visitors, salt)`, `net.visit_pages (day, page, views)` and, for the day that is still open, `net.visit_visitors (day, visitor)`. A day is a day of UTC+8. A page is an address with every part that is not a plain word replaced by `:id` (`/fanmade/charts/:id`); a day has at most 300 pages, the rest go to `(other)`.
-- **Visitors.** No cookie and no stored address: a visitor is `sha256(the day's random salt || IP and User-Agent)`, so the same person is one visitor a day and cannot be followed from one day to the next. Every hour the days that are over are closed: the hashes are counted into `visit_days.visitors` and deleted with the salt. Over several days "visitors" is the sum of each day's.
+- **What is kept.** `net.visit_views (at, page, visitor_even, visitor_odd)`, one row a view, and `net.visit_salts (span, salt)`. A page is an address with every part that is not a plain word replaced by `:id` (`/fanmade/charts/:id`).
+- **Visitors.** No cookie and no stored address. A salt belongs to a span of two UTC days, and a span begins every day, so every moment lies in two spans: one beginning on an even day (counted from 1970-01-01), one on an odd day. Each view keeps `sha256(salt || IP and User-Agent)` under both. A day of any time zone (up to 24 h from UTC) lies inside the span beginning on the UTC day it begins on, so its visitors are the distinct hashes of that span's column. Every hour the salts of spans that are over (begun two days ago or more) are deleted: from then on the hashes still tell that span's visitors apart but nobody can tell who they were, and the same person cannot be followed from one span to the next. Over several days "visitors" is the sum of each day's. A 25-hour day at the end of daylight saving time may stick out of its span by the extra hour at most; a visitor in that hour can be counted twice.
+- **Before 2026-11-17.** The first count (`0005`) kept only totals per day of UTC+8: `net.visit_days`, `net.visit_pages` (`net.visit_visitors` is empty). Nothing is added there any more; its views and visitors are in the totals, not in the days, hours or pages.
 - `POST /api/v1/visits` `{"path": "/fanmade/charts/…"}` → 204, with or without a session. Not counted, and still 204: a User-Agent that is a program's or missing, more than 60 a minute from one address, a path that is no address of the site. It does not count against the 40 writes a minute.
-- `GET /api/v1/visits`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s. The footer of every page shows it.
-- `GET /api/v1/admin/visits?days=30` (1–366), the site's administrator → the same, plus `days` (each day, oldest first, with the days nobody came) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator.
+- `GET /api/v1/visits?tz=Asia/Shanghai`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s per time zone (64 zones at most). The footer of every page shows it. A `tz` that is no time zone → 400.
+- `GET /api/v1/admin/visits?days=30&tz=Asia/Shanghai` (days 1–366), the site's administrator → the same, plus `zone`, `days` (each day of that zone, oldest first, with the days nobody came), `hours` (views in each hour of the day 0–23 over those days) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator, in the browser's time zone.
+
+## Titles by rule
+
+A rule gives one item: a title, or a part of the 3D Don (see "Parts of the Don to earn"); everything below holds for both. A rule has `titleId`, or `donPart` and `donItem`; each kind of item says in `titlerules.target` how it is given, and nothing else in the package knows it. A rule for a part is made at `POST /api/v1/admin/don/items/{part}/{id}/rules` with the same body, and the part must be in the catalog.
+
+Besides a 段位 course and an administrator's hand, a title is given by rule (`internal/titlerules`, table `net.title_rules`, migration `0009_title_rules`). A title may have several rules; meeting any one gives it. Only a title of the catalog's own (no `owner_id`) takes rules.
+
+| `kind` | Met by | Fields |
+|---|---|---|
+| `chart_clear` | a score on one chart of a source | `source`, `chartId`, `clear`, `course`? |
+| `category_clear` | scores on `count` charts of a category of a source; without `count`, on every chart of it that has a course high enough | `source`, `category` (the source's category ID), `clear`, `course`?, `count`? |
+| `charts_uploaded` | being the first owner of `count` charts of a source | `source`, `count` |
+| `site_login` | being seen signed in on the website | |
+| `game_login` | being seen signed in in the game | |
+
+`clear` is the lowest crown that counts (1 cleared, 2 full combo, 3 all good), `course` the lowest course (Easy < Normal < Hard < Oni < Edit; none: any). Only scores that still stand (`is_latest`) on published charts with files count, and only such charts are counted as uploads.
+
+- **When rules are judged.** A score that clears: in the score's transaction, the rules of its chart and of its categories; the score's answer does not say what it earned (see `docs/TITLES_PLAN.md`, 1.1). An upload that publishes a chart: the upload rules of its first owner. Being seen: whenever a signed-in request writes the player's activity (at most once a minute) and at every sign-in, `site_login` for a website session and `game_login` for a game token. A failure to judge is logged and never fails the score, upload or request.
+- **Once.** What a rule gave is a row of `net.awards` with `service = 'rule'` and `request_key = '<rule id>:<user id>'`. A rule gives a player its title once: after an administrator takes the title back, the same rule does not give it again (a new rule would). Nothing is taken back when a player stops meeting a rule, or when a rule is deleted.
+- **Those who meet it already.** Creating a rule gives its title at once to every player who meets it. The two sign-in rules have nothing kept to go by there: `site_login` goes to the players with a website session at that moment, `game_login` to the players who have any score; everyone else gets them the next time they are seen.
+- `GET /api/v1/titles`, public → `titles` and `rules`: every rule with its `titleId`, the fields above, and for a chart rule `chart` (`id`, `title`, `titleTranslations`, `gone` when it is no longer published).
+- `POST /api/v1/admin/titles/{id}/rules` (TITLE_MANAGER) with the fields of the kind → 201 `{"rule", "granted"}`, `granted` being how many players got the title at once. 422 `RULE_INVALID`, `RULE_CHART_NOT_FOUND`, `RULE_TITLE_OWNED`.
+- `DELETE /api/v1/admin/rules/{id}` (TITLE_MANAGER). A rule is not changed: delete it and make another.
+
+The website shows each title's rules in the catalog (`/titles`) and edits them at `/manage/titles` (`web/src/players/components/title-rules-card.tsx`; the wording is `web/src/players/title-rules.ts`, which also lists each source's category IDs and has to follow `songs.Fanmade` and `songs.Official`).
+
+## Rewards
+
+What a player was given (a title, by any of the three ways; a 段位 badge that gets better), told the same way to the website and the game and for every request (`internal/rewards`, migration `0010_rewards`). No answer's body says what was given; the score's answer does not either.
+
+- **The header.** Every answer to a request whose player is known carries `X-Pending-Rewards: <n>`, the rewards not seen yet: from both sources and the players' part, on the old domains too, file downloads included. Without a signed-in player there is no header. The count is read as the answer starts, after the handler ran, so the answer to the request that gave something already counts it. If the count cannot be read the header is left out.
+- **Fetching.** `GET /api/v1/me/rewards` (website session) or `GET /api/v1/game/rewards` (game token) → `{"rewards": [{"id","kind","data","createdAt"}]}`, the unseen ones, oldest first, at most 50. Then `POST …/seen {"ids": [...]}` (the website with its CSRF token) → `{"marked": n}`; ids of others' rewards, or of seen ones, are passed over.
+- **Kinds.** `title`: `data.title` (the title as it was when given: `id`, `name`, `nameTranslations`, `description`, `style`, `official`, `ownerId`), `data.service` (`fanmade`, `official`, `rule`, `admin`, or null) and `data.courseTitle`. `dan`: `index`, `verdict`, and `gold`, `combo` as the emblem is drawn. A client draws the kinds it knows and marks the others seen with the rest.
+- **Where rewards come from.** Triggers in the database, one per thing that can be given: a row added to `net.user_titles`, a row of `net.user_dans` added or with a better verdict. The code that gives titles or badges knows nothing of rewards. A title taken back before it was seen is taken out of the unseen rewards. A new kind of reward is a new trigger, and one entry in the website's dialog.
+- **Kinds, continued.** `don_item`: `data.part`, `data.itemId`, `data.service`, `data.courseTitle`; when fetched, the app's `Describe` hook adds `data.name` (by language) and `data.picture` (the mirror's address for a visitor it serves) from the catalog, which the database does not hold. The stored reward does not change.
+- **Counting.** The count is a query on the partial index of unseen rewards. While the server listens on a connection (`Store.Run`, started by `app.Start`), each player's count is kept in memory and dropped when the database says that player's rewards changed (`LISTEN net_rewards`, notified by a trigger on `net.rewards` for every insert, delete or seen). A request other than GET or HEAD counts afresh, so the answer to the request that gave something is never stale. A count read across a change is not kept (a generation number), counts live 5 minutes at most, and while not listening every answer counts.
+- **Pruning.** Seen rewards are deleted 90 days after being seen (`rewards.Retention`), hourly.
+- **An answer with nothing written** still carries the header: `Announce` sets it after the handler returns, before the server writes its 200.
+- **The old domains** serve both routes too (`app.withRewards`), for a game whose server has no site address.
+- **The parts.** `internal/requester` carries who a request is from: `signin.RecordActivity`, where every signed-in request is recorded, notes it; `rewards.Store.Announce`, wrapped around the whole site in `internal/app`, reads it. The routes are given each part's own sign-in check (`Require` of the players' part for the website, of a source for the game). On the website, `web/src/kit/rewards/` is the store (both API clients and the frame's first request hand it their answers) and the dialog the frame mounts.
 
 ## Messages
 
@@ -63,6 +104,17 @@ Players writing to each other (`internal/chat`, migration `0006_chats`; the rout
 - **Blocking.** While either of two players has blocked the other, neither can write in their chat (403 `CHAT_BLOCKED`). The blocked one is not told why.
 - **Routes**, all for the signed-in player: `GET /api/v1/chats` (the chats written in, the latest first, at most 200, and `cursor`), `POST /api/v1/chats {"userId"}` (the chat with a player who has been here, made if there is none; 404 `USER_NOT_FOUND`, 400 `CHAT_SELF`), `GET /api/v1/chats/unread` (`{"count","chats","cursor"}`), `GET /api/v1/chats/{id}`, `GET …/{id}/messages?before=<seq>&limit=<1–100>` (oldest first, and `more`), `POST …/{id}/messages {"body"}` (201), `POST …/{id}/read {"seq"}`, `PUT …/{id}/block {"blocked"}`. A chat is `{"id","peer":{"id","nickname","avatarUrl"},"lastMessage","unread","readSeq","peerReadSeq","blocked","canWrite","createdAt"}`. Marking read does not count against the 40 writes a minute.
 - **Live.** `GET /api/v1/chats/updates?after=<cursor>` answers at once with the messages after the cursor, or waits up to 25 s for one or for something else in the player's chats (a read, a block: `"changed": true`): `{"messages","cursor","changed"}`. The waiting is in this process (`chat.Hub`), so it holds while the site runs as one instance. The website keeps one such request open per page, only while the page is shown (`web/src/kit/chat.ts`); a hidden page reads its count once a minute.
+
+## Parts of the Don to earn
+
+Every part of the 3D Don's catalog may be worn by anyone unless an administrator **locks** it (`internal/donitems`, migration `0011_don_items`). A locked part is worn only by players who own it.
+
+- **Tables.** `net.don_item_locks (part, item_id)`: the locked parts. `net.user_don_items (user_id, part, item_id, award_id, acquired_at)`: what each player owns, with the award that gave it (none when given on locking). Parts are `cos`, `head`, `body`, `puchi`, `paint`; number 0 (taken off, or none) is never locked or owned. The catalog is the bucket's, so `item_id` has no foreign key; the routes check it against the catalog.
+- **Locking** gives the part to everyone wearing it at that moment, so nobody's Don changes; it is not a reward. Unlocking leaves owners as they are.
+- **Wearing.** `PUT /api/v1/me/don` answers 403 `DON_ITEM_LOCKED` (with `items`) for a locked part the player does not own among what the look puts on: the costume, or the head and the body, and the puchichara and the makeup. A part only stored (the costume while wearing a head and a body) is not checked.
+- **Giving.** By an administrator (`POST`/`DELETE /api/v1/admin/don/grants {userId, part, id}`, service `admin`) or by a rule. Taking a part back takes it off the player too, if it is locked. A part given (not on locking) is a reward of the kind `don_item`, by trigger, like a title.
+- **Routes.** `GET /api/v1/don/items` (public): `{locked, rules}`. `GET /api/v1/me/don/items`: `{owned}`. `PUT /api/v1/admin/don/locks/{part}/{id} {locked}` → `{given}`. The administrators are TITLE_MANAGER, as for titles.
+- **Website.** `web/src/players/don-items.ts` reads them; the dressing room shows a locked part the player does not own greyed, with a lock and how it is earned, and does not pick it; `/manage/titles` has the card to lock, give and take back, and the rules' card gives a title or a part.
 
 ## The 3D Don
 

@@ -39,3 +39,11 @@ func (s *Server) source() *Source {
 	}
 	return Fanmade
 }
+
+// schema is the source's name: its schema in the database, and what the site calls it.
+func (src *Source) schema() string {
+	if src.Official {
+		return "official"
+	}
+	return "fanmade"
+}
