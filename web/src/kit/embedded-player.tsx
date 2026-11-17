@@ -18,8 +18,6 @@ import {
   type PlayerReplayResult,
 } from './embedded-player-protocol'
 
-const playerManifestUrl = `${canonicalBaseUrl}player-build.json`
-
 // `replay`: a recorded play of this block to show instead of practice or the chart alone; the
 // other two modes close it (onReplayClose).
 export default function EmbeddedPlayer({
@@ -71,13 +69,22 @@ export default function EmbeddedPlayer({
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
     async function resolvePlayer() {
       try {
+        // The manifest and its build both come from the visitor's root (the mirror's CDN keeps
+        // the manifest 60 seconds); the canonical pair is used if the mirror's manifest fails.
         const source = await askSource()
-        const url = await resolvePlayerUrl({
-          manifestUrl: playerManifestUrl,
-          baseUrl: source.baseUrl,
-          parentOrigin: window.location.origin,
-          signal: controller.signal,
-        })
+        const resolve = (root: string) =>
+          resolvePlayerUrl({
+            manifestUrl: `${root}player-build.json`,
+            parentOrigin: window.location.origin,
+            signal: controller.signal,
+          })
+        let url: string
+        try {
+          url = await resolve(source.baseUrl)
+        } catch (error) {
+          if (!source.mirror || controller.signal.aborted) throw error
+          url = await resolve(canonicalBaseUrl)
+        }
         if (!controller.signal.aborted) setPlayerUrl(url)
       } catch {
         if (!disposed) {

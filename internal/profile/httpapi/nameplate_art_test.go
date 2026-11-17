@@ -15,7 +15,10 @@ import (
 func TestNameplateArtRouting(t *testing.T) {
 	shadow := donFileRef{"shadow.png", 3, strings.Repeat("a", 64)}
 	outline := donFileRef{"outline.png", 4, strings.Repeat("b", 64)}
+	old := outline
+	old.SHA256 = strings.Repeat("c", 64)
 	var mirrorHits atomic.Int32
+	var down atomic.Bool
 	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/canonical/catalog.json" {
 			json.NewEncoder(w).Encode(nameplateCatalog{Version: 1, Files: map[string]donFileRef{"shadow": shadow, "outline": outline}})
@@ -23,7 +26,11 @@ func TestNameplateArtRouting(t *testing.T) {
 		}
 		if r.URL.Path == "/ourtaiko/nameplate/catalog.json" {
 			mirrorHits.Add(1)
-			w.WriteHeader(500)
+			if down.Load() {
+				w.WriteHeader(503)
+				return
+			}
+			json.NewEncoder(w).Encode(nameplateCatalog{Version: 1, Files: map[string]donFileRef{"shadow": shadow, "outline": old}})
 			return
 		}
 		http.NotFound(w, r)
@@ -49,20 +56,38 @@ func TestNameplateArtRouting(t *testing.T) {
 		}
 		return result
 	}
-	if value := answer("203.0.113.2", ""); value["mirrorBaseUrl"] != nil || mirrorHits.Load() != 0 {
+	outlineSHA := func(value map[string]any) any {
+		return value["files"].(map[string]any)["outline"].(map[string]any)["sha256"]
+	}
+	if value := answer("203.0.113.2", ""); value["mirrorBaseUrl"] != nil || mirrorHits.Load() != 0 || outlineSHA(value) != outline.SHA256 {
 		t.Fatal("overseas fetched mirror")
 	}
-	// Every canonical file is on the mirror for mainland visitors; the mirror is never read.
+	// The mainland answer is the mirror's own catalog, as it is, with every file it lists.
 	value := answer("203.0.113.1", "")
 	paths, _ := value["mirrorPaths"].([]any)
-	if len(paths) != 2 || paths[0] != "outline.png" || paths[1] != "shadow.png" || value["mirrorBaseUrl"] != site.URL+"/ourtaiko/nameplate/" {
+	if len(paths) != 2 || paths[0] != "outline.png" || paths[1] != "shadow.png" || value["mirrorBaseUrl"] != site.URL+"/ourtaiko/nameplate/" ||
+		value["baseUrl"] != site.URL+"/canonical/" || outlineSHA(value) != old.SHA256 {
 		t.Fatalf("answer = %v", value)
 	}
 	if answer("203.0.113.1", "?origin=1")["mirrorBaseUrl"] != nil {
 		t.Fatal("origin bypass ignored")
 	}
-	if mirrorHits.Load() != 0 {
-		t.Fatal("the mirror catalog was fetched")
+	if server.nameplateMirror.ttl != time.Minute {
+		t.Fatal("the mirror catalog is not read as often as its CDN keeps it")
+	}
+	down.Store(true)
+	server.nameplateMu.Lock()
+	server.nameplateMirror.until = time.Time{}
+	server.nameplateMu.Unlock()
+	if answer("203.0.113.1", "")["mirrorBaseUrl"] == nil {
+		t.Fatal("last good catalog lost")
+	}
+	waitNameplateRefresh(t, server)
+	if answer("203.0.113.1", "")["mirrorBaseUrl"] == nil {
+		t.Fatal("failed refresh dropped the last good catalog")
+	}
+	if mirrorHits.Load() != 2 {
+		t.Fatal("failed refresh not throttled")
 	}
 }
 
@@ -113,7 +138,7 @@ func waitNameplateRefresh(t *testing.T, server *Server) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		server.nameplateMu.Lock()
-		busy := server.nameplateArt.done != nil
+		busy := server.nameplateArt.done != nil || server.nameplateMirror.done != nil
 		server.nameplateMu.Unlock()
 		if !busy {
 			return

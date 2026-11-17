@@ -198,8 +198,9 @@ func (c *donCatalog) check(l *DonLook) string {
 }
 
 // files are what the game needs to draw the look: the costume, or the head and the body, and
-// the puchichara and the makeup.
-func (c *donCatalog) files(l DonLook, mirror *donMirror) []DonFile {
+// the puchichara and the makeup. A mainland visitor's come from the mirror's catalog; an item it
+// does not list yet keeps its canonical file.
+func (c *donCatalog) files(l DonLook, mirror *donCatalog) []DonFile {
 	var want [][2]any
 	if l.Costume {
 		want = append(want, [2]any{"cos", l.Cos})
@@ -215,12 +216,14 @@ func (c *donCatalog) files(l DonLook, mirror *donMirror) []DonFile {
 	files := []DonFile{}
 	for _, w := range want {
 		kind, id := w[0].(string), w[1].(int)
-		if it, ok := c.item(kind, id); ok {
-			address := mirror.url(it.File)
-			if address == "" {
-				address = c.url(it.File)
+		from := c
+		if mirror != nil {
+			if _, ok := mirror.item(kind, id); ok {
+				from = mirror
 			}
-			files = append(files, DonFile{Kind: kind, ID: id, URL: address, Size: it.File.Size, SHA256: it.File.SHA256})
+		}
+		if it, ok := from.item(kind, id); ok {
+			files = append(files, DonFile{Kind: kind, ID: id, URL: from.url(it.File), Size: it.File.Size, SHA256: it.File.SHA256})
 		}
 	}
 	return files
@@ -256,7 +259,7 @@ func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 		w.Header().Set("Cache-Control", "private, no-store")
 	}
 	if c, err := s.donCatalog(r.Context()); err == nil {
-		answer.Files = c.files(l, s.mirrorForDonRequest(r, c))
+		answer.Files = c.files(l, s.donMirrorFor(r))
 	}
 	web.Respond(w, 200, answer)
 }
@@ -270,8 +273,14 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 		problem(w, 503, "DON_CATALOG_UNAVAILABLE", "服装目录暂时读不到")
 		return
 	}
+	// A mainland visitor's catalog is the mirror's own; baseUrl stays canonical for fallback.
+	mirror := s.donMirrorFor(r)
+	raw := c.raw
+	if mirror != nil {
+		raw = mirror.raw
+	}
 	var all map[string]json.RawMessage
-	if err = json.Unmarshal(c.raw, &all); err != nil {
+	if err = json.Unmarshal(raw, &all); err != nil {
 		internal(w, err)
 		return
 	}
@@ -283,10 +292,9 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	delete(all, "mirrorPaths")
 	if s.donRegional() {
 		w.Header().Set("Cache-Control", "private, max-age=60")
-		if mirror := s.mirrorForDonRequest(r, c); mirror != nil {
-			if p := s.mirrorPaths(c, mirror); p.paths != nil {
-				all["mirrorBaseUrl"], all["mirrorPaths"] = p.base, p.paths
-			}
+		if mirror != nil {
+			p := s.mirrorPaths(mirror)
+			all["mirrorBaseUrl"], all["mirrorPaths"] = p.base, p.paths
 		}
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=60")

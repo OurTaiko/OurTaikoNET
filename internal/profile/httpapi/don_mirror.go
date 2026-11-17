@@ -1,33 +1,34 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"slices"
 	"time"
 )
 
-// donMirror is where a mainland visitor fetches the canonical catalog's files: every file, at
-// the mirror's root. The country alone decides; the mirror's own catalog is not read (OSS fetches
-// a missing object from the origin, and clients check each file's SHA-256).
-type donMirror struct {
-	base  string
-	files map[string]donFileRef
-}
+// A mainland visitor gets everything from the mirror, the catalog included: the mirror's own
+// catalog.json (its CDN keeps it 60 seconds) and the files it lists, at the mirror's root. The
+// country alone decides; nothing is compared with the canonical catalog. The synchronization
+// worker publishes that catalog after the files it lists, so they are there when it names them.
+
+// How long the mirror's catalog is used before it is read again (its CDN caches it as long),
+// and how long a failed read waits before the next try.
+const (
+	donMirrorTTL   = time.Minute
+	donMirrorRetry = 30 * time.Second
+)
 
 // donMirrorPaths is what the website catalog adds for a mainland visitor: the mirror's base and
-// the paths of the files it holds as the canonical catalog lists them, worked out once per pair
-// of catalogs.
+// every path its catalog lists, worked out once per catalog read.
 type donMirrorPaths struct {
 	catalog     *donCatalog
-	mirror      *donMirror
 	base, paths json.RawMessage
 }
-
-// How long a failed catalog read waits before the next try.
-const donMirrorRetry = 30 * time.Second
 
 func (c *donCatalog) fileRefs(yield func(donFileRef) bool) {
 	for _, ref := range c.Base {
@@ -44,43 +45,21 @@ func (c *donCatalog) fileRefs(yield func(donFileRef) bool) {
 	}
 }
 
-func (m *donMirror) has(ref donFileRef) bool {
-	if m == nil {
-		return false
-	}
-	mirrored, ok := m.files[ref.Path]
-	return ok && mirrored == ref
-}
-
-// url is a file's address on the mirror, made like the canonical one; "" when it is not there.
-func (m *donMirror) url(ref donFileRef) string {
-	if !m.has(ref) {
-		return ""
-	}
-	return m.base + ref.Path + "?v=" + ref.SHA256[:12]
-}
-
-// mirrorPaths is the mirror as the website catalog tells it; nil fields when it holds none of
-// the catalog's files.
-func (s *Server) mirrorPaths(c *donCatalog, m *donMirror) *donMirrorPaths {
+// mirrorPaths is the mirror catalog m as the website catalog tells it.
+func (s *Server) mirrorPaths(m *donCatalog) *donMirrorPaths {
 	s.donMirrorMu.Lock()
 	defer s.donMirrorMu.Unlock()
-	if p := s.donMirrorPaths; p != nil && p.catalog == c && p.mirror == m {
+	if p := s.donMirrorPaths; p != nil && p.catalog == m {
 		return p
 	}
 	var paths []string
-	for ref := range c.fileRefs {
-		if m.has(ref) {
-			paths = append(paths, ref.Path)
-		}
+	for ref := range m.fileRefs {
+		paths = append(paths, ref.Path)
 	}
 	slices.Sort(paths)
-	paths = slices.Compact(paths)
-	p := &donMirrorPaths{catalog: c, mirror: m}
-	if len(paths) > 0 {
-		p.base, _ = json.Marshal(m.base)
-		p.paths, _ = json.Marshal(paths)
-	}
+	p := &donMirrorPaths{catalog: m}
+	p.base, _ = json.Marshal(m.baseURL)
+	p.paths, _ = json.Marshal(slices.Compact(paths))
 	s.donMirrorPaths = p
 	return p
 }
@@ -100,24 +79,58 @@ func (s *Server) donRegional() bool {
 	return s.Config.DonMirrorCatalogURL != "" && s.Config.Distribution != nil && s.Config.Distribution.Country != nil
 }
 
-// mirrorForDonRequest is the mirror for a mainland visitor of catalog c, nil for everyone else.
-func (s *Server) mirrorForDonRequest(r *http.Request, c *donCatalog) *donMirror {
+// donMirrorFor is the mirror's catalog for a mainland visitor; nil for everyone else, and while
+// the mirror's catalog has never been read (the canonical one is used then).
+func (s *Server) donMirrorFor(r *http.Request) *donCatalog {
 	if !s.donRegional() || !s.Config.Distribution.IsMainland(r) {
 		return nil
 	}
-	u, err := ParseDonMirrorCatalogURL(s.Config.DonMirrorCatalogURL)
-	if err != nil {
+	return s.donMirrorNow(r.Context())
+}
+
+// donMirrorNow is the mirror's catalog as last read. When it is due, one refresh runs on its own;
+// requests keep the last good catalog meanwhile, and only wait when there has never been one.
+func (s *Server) donMirrorNow(ctx context.Context) *donCatalog {
+	s.donMirrorMu.Lock()
+	mirror := s.donMirror
+	if time.Now().Before(s.donMirrorUntil) {
+		s.donMirrorMu.Unlock()
+		return mirror
+	}
+	done := s.donMirrorDone
+	if done == nil {
+		done = make(chan struct{})
+		s.donMirrorDone = done
+		go s.refreshDonMirror(done)
+	}
+	s.donMirrorMu.Unlock()
+	if mirror != nil {
+		return mirror
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
 		return nil
 	}
 	s.donMirrorMu.Lock()
 	defer s.donMirrorMu.Unlock()
-	if m := s.donMirror; m != nil && s.donMirrorOf == c {
-		return m
+	return s.donMirror
+}
+
+func (s *Server) refreshDonMirror(done chan struct{}) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	mirror, err := s.readDonCatalog(ctx, s.Config.DonMirrorCatalogURL)
+	s.donMirrorMu.Lock()
+	ttl := donMirrorTTL
+	if err != nil {
+		ttl = donMirrorRetry
+		log.Printf("reading Don mirror catalog: %v", err)
+	} else {
+		s.donMirror = mirror
 	}
-	m := &donMirror{base: u.ResolveReference(&url.URL{Path: "."}).String(), files: make(map[string]donFileRef)}
-	for ref := range c.fileRefs {
-		m.files[ref.Path] = ref
-	}
-	s.donMirror, s.donMirrorOf = m, c
-	return m
+	s.donMirrorUntil = time.Now().Add(ttl)
+	s.donMirrorDone = nil
+	s.donMirrorMu.Unlock()
+	close(done)
 }

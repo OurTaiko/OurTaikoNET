@@ -24,13 +24,32 @@ it('uses only the server-approved mirror paths and retains canonical fallbacks',
   expect(sources.outline.fallbackUrl).toBeUndefined()
 })
 it('supports an older NET server without the nameplate API', async () => {
+  vi.resetModules()
+  const { nameplateArtSources } = await import('./nameplate-art-source')
   const fetch = vi
     .fn()
+    .mockResolvedValueOnce(new Response('', { status: 404 }))
     .mockResolvedValueOnce(new Response('', { status: 404 }))
     .mockResolvedValueOnce(Response.json({ version: 1, files }))
   vi.stubGlobal('fetch', fetch)
   expect((await nameplateArtSources()).shadow.url).toContain(baseUrl)
-  expect(fetch.mock.calls[1][0]).toBe(baseUrl + 'catalog.json')
+  expect(fetch.mock.calls[1][0]).toBe('/api/v1/distribution/source')
+  expect(fetch.mock.calls[2][0]).toBe(baseUrl + 'catalog.json')
+})
+it('reads the catalog from the mirror without the nameplate API', async () => {
+  vi.resetModules()
+  const { nameplateArtSources } = await import('./nameplate-art-source')
+  const mirrorRoot = 'https://mirror.example/ourtaiko/'
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response('', { status: 503 }))
+    .mockResolvedValueOnce(Response.json({ mirror: true, baseUrl: mirrorRoot }))
+    .mockResolvedValueOnce(Response.json({ version: 1, files }))
+  vi.stubGlobal('fetch', fetch)
+  const sources = await nameplateArtSources()
+  expect(fetch.mock.calls[2][0]).toBe(mirrorBaseUrl + 'catalog.json')
+  expect(sources.shadow.url).toBe(mirrorBaseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
+  expect(sources.shadow.fallbackUrl).toBe(baseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
 })
 it('verifies all art before exposing blob URLs', async () => {
   vi.stubGlobal(

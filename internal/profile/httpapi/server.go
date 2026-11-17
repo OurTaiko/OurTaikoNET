@@ -65,14 +65,16 @@ type Server struct {
 	donMu sync.Mutex
 	don   *donCatalog
 	donAt time.Time
-	// The mirror view of the current catalog (don_mirror.go), worked out once per catalog.
+	// The mirror's own catalog as last read (don_mirror.go); donMirrorDone is open while a refresh runs.
 	donMirrorMu    sync.Mutex
-	donMirror      *donMirror
-	donMirrorOf    *donCatalog
+	donMirror      *donCatalog
+	donMirrorUntil time.Time
+	donMirrorDone  chan struct{}
 	donMirrorPaths *donMirrorPaths
 	// The nameplate art catalogs as last read (nameplate_art.go), under nameplateMu.
-	nameplateMu  sync.Mutex
-	nameplateArt nameplateSlot
+	nameplateMu     sync.Mutex
+	nameplateArt    nameplateSlot
+	nameplateMirror nameplateSlot
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
@@ -91,7 +93,9 @@ func New(pool *pgxpool.Pool, cfg Config) *Server {
 	if cfg.Distribution == nil {
 		cfg.Distribution = distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
 	}
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
+	s := &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
+	s.nameplateMirror.ttl = donMirrorTTL // the mirror's CDN keeps its catalog 60 seconds
+	return s
 }
 
 func (s *Server) sessionCookie() string {

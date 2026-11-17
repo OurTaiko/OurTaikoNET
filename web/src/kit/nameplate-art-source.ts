@@ -1,5 +1,6 @@
 import { SITE_API_ROOT } from './api/config'
 import { verifiedResource, type ResourceFile } from './resource-download'
+import { askSource } from './distribution'
 
 const canonical = 'https://distrib.ourtaiko.org/nameplate/'
 type File = { path: string; size: number; sha256: string }
@@ -18,9 +19,16 @@ export async function nameplateArtSources(): Promise<Record<string, ResourceFile
     if (!response.ok) throw new Error('NAMEPLATE_CATALOG_UNAVAILABLE')
     catalog = (await response.json()) as Catalog
   } catch {
-    const response = await fetch(canonical + 'catalog.json', { credentials: 'omit' })
+    // Without the API, the catalog comes straight from the visitor's root, like its files.
+    const source = await askSource()
+    const root = source.baseUrl + 'nameplate/'
+    const response = await fetch(root + 'catalog.json', { credentials: 'omit' })
     if (!response.ok) throw new Error('NAMEPLATE_CATALOG_UNAVAILABLE')
     catalog = (await response.json()) as Catalog
+    if (source.mirror) {
+      catalog.mirrorBaseUrl = root
+      catalog.mirrorPaths = Object.values(catalog.files ?? {}).map((file) => file.path)
+    }
   }
   if (
     catalog.version !== 1 ||

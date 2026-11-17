@@ -74,6 +74,8 @@ type nameplateSlot struct {
 	catalog *nameplateCatalog
 	until   time.Time
 	done    chan struct{}
+	// How long a good read is kept; donCatalogTTL when zero.
+	ttl time.Duration
 }
 
 // nameplateNow answers the catalog at address, waiting for a read only when none has
@@ -109,7 +111,10 @@ func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan
 	catalog, err := s.readNameplateCatalog(context.Background(), address)
 	s.nameplateMu.Lock()
 	defer s.nameplateMu.Unlock()
-	ttl := donCatalogTTL
+	ttl := slot.ttl
+	if ttl == 0 {
+		ttl = donCatalogTTL
+	}
 	if err != nil {
 		ttl = donMirrorRetry
 		log.Printf("reading nameplate catalog %s: %v", address, err)
@@ -140,15 +145,17 @@ func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	answer := map[string]any{"version": canonical.Version, "files": canonical.Files, "baseUrl": canonical.base}
 	if regional && router.IsMainland(r) && r.URL.Query().Get("origin") != "1" {
-		// Every file of the canonical catalog, at the mirror's root; the mirror's own catalog
-		// is not read (the country alone decides).
-		paths := make([]string, 0, len(canonical.Files))
-		for _, ref := range canonical.Files {
-			paths = append(paths, ref.Path)
-		}
-		if len(paths) > 0 {
+		// The mirror's own catalog (its CDN keeps it 60 seconds) and every file it lists, at the
+		// mirror's root; nothing is compared with the canonical one. baseUrl stays canonical for
+		// fallback. Until the mirror's catalog has been read once, the canonical one is answered.
+		if mirror := s.nameplateNow(r.Context(), &s.nameplateMirror, router.MirrorBase(r)+"nameplate/catalog.json"); mirror != nil {
+			paths := make([]string, 0, len(mirror.Files))
+			for _, ref := range mirror.Files {
+				paths = append(paths, ref.Path)
+			}
 			sort.Strings(paths)
-			answer["mirrorBaseUrl"], answer["mirrorPaths"] = router.MirrorBase(r)+"nameplate/", slices.Compact(paths)
+			answer["version"], answer["files"] = mirror.Version, mirror.Files
+			answer["mirrorBaseUrl"], answer["mirrorPaths"] = mirror.base, slices.Compact(paths)
 		}
 	}
 	web.Respond(w, http.StatusOK, answer)
