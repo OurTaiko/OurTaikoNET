@@ -8,13 +8,10 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"slices"
 	"strings"
 	"time"
-
-	"ourtaiko.dev/net/internal/web"
 )
 
 // A mirror catalog is published after the objects it lists. The canonical catalog still decides
@@ -140,7 +137,7 @@ func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror,
 
 // donRegional says whether Don files may be routed by where a request comes from.
 func (s *Server) donRegional() bool {
-	return s.Config.DonMirrorCatalogURL != "" && s.Config.DonIPCountry != nil
+	return s.Config.DonMirrorCatalogURL != "" && s.Config.Distribution != nil && s.Config.Distribution.Country != nil
 }
 
 func (s *Server) mirrorForDonRequest(r *http.Request) *donMirror {
@@ -148,8 +145,7 @@ func (s *Server) mirrorForDonRequest(r *http.Request) *donMirror {
 	if !s.donRegional() {
 		return nil
 	}
-	ip, err := netip.ParseAddr(web.ClientIP(r, cfg.TrustedProxies))
-	if err != nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || cfg.DonIPCountry(ip) != "CN" {
+	if !cfg.Distribution.IsMainland(r) {
 		return nil
 	}
 	return s.donMirrorNow(r.Context())

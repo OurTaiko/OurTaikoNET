@@ -8,12 +8,8 @@ import {
 } from 'react'
 import { cn } from '../lib/utils'
 
-// The game's nameplate art, unchanged, from the public bucket (tools/nameplate uploads OurTaikoPlay's
-// Assets/OurTaiko/Art/global/nameplate to https://distrib.ourtaiko.org/nameplate/). Every piece is
-// placed as the game's NameplateView places it on the 408x96 plate canvas (Nijiiro nameplate.lua).
-export const NAMEPLATE_ART_BASE = 'https://distrib.ourtaiko.org/nameplate/'
+import { loadNameplateArt } from '../nameplate-art-source'
 
-type ArtFile = { path: string; size: number; sha256: string }
 type ArtKey =
   | 'shadow'
   | 'outline'
@@ -32,17 +28,10 @@ type Art = Record<ArtKey, string>
 // One catalog read per page load; files are asked for by hash, so a replaced file is never stale.
 let art: Promise<Art | null> | undefined
 function loadArt(): Promise<Art | null> {
-  art ??= fetch(`${NAMEPLATE_ART_BASE}catalog.json`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((catalog: { files?: Record<ArtKey, ArtFile> } | null) => {
-      if (!catalog?.files) return null
-      const urls = {} as Art
-      for (const [key, file] of Object.entries(catalog.files) as [ArtKey, ArtFile][])
-        urls[key] = `${NAMEPLATE_ART_BASE}${file.path}?v=${file.sha256.slice(0, 12)}`
-      return urls
-    })
+  art ??= loadNameplateArt()
+    .then((value) => value as Art)
     .catch(() => {
-      art = undefined // try again next time something needs it
+      art = undefined
       return null
     })
   return art

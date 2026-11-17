@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,6 +22,7 @@ type resourceLink struct {
 	SHA256      string `json:"sha256"`
 	Size        int64  `json:"size"`
 	ContentType string `json:"contentType"`
+	FallbackURL string `json:"fallbackUrl,omitempty"`
 }
 
 // directLink is the public address of an object, or one signed for 15 minutes
@@ -28,14 +30,25 @@ type resourceLink struct {
 func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, digest string, size int64) (resourceLink, error) {
 	public, e := remote.PublicURL(key)
 	if e != nil || public != "" {
-		return resourceLink{public, public, digest, size, media}, e
+		return resourceLink{URL: public, HeadURL: public, SHA256: digest, Size: size, ContentType: media}, e
 	}
 	get, e := remote.Sign(ctx, key, "GET", name, media, 15*time.Minute)
 	if e != nil {
 		return resourceLink{}, e
 	}
 	head, e := remote.Sign(ctx, key, "HEAD", name, media, 15*time.Minute)
-	return resourceLink{get, head, digest, size, media}, e
+	return resourceLink{URL: get, HeadURL: head, SHA256: digest, Size: size, ContentType: media}, e
+}
+
+func (s *Server) routeResource(r *http.Request, link resourceLink) resourceLink {
+	if r.URL.Query().Get("origin") == "1" {
+		return link
+	}
+	target := s.Config.Distribution.Select(r, link.URL, link.SHA256, link.Size)
+	if target != link.URL {
+		link.FallbackURL, link.URL, link.HeadURL = link.URL, target, target
+	}
+	return link
 }
 
 // resourceLinks lists where a client downloads a chart's current files and how to verify
@@ -71,7 +84,7 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	add := func(kind, key, name, media, digest string, size int64) error {
 		if remote == nil {
 			route := s.apiBase() + "/charts/" + c.ID + "/" + kind
-			resources[kind] = resourceLink{route, route, digest, size, media}
+			resources[kind] = resourceLink{URL: route, HeadURL: route, SHA256: digest, Size: size, ContentType: media}
 			return nil
 		}
 		link, e := directLink(r.Context(), remote, key, name, media, digest, size)
@@ -116,5 +129,22 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
+	// Probe only after releasing the DB snapshot, with one shared deadline for all files.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	request := r.WithContext(ctx)
+	var wait sync.WaitGroup
+	var lock sync.Mutex
+	routed := make(map[string]resourceLink, len(resources))
+	for kind, link := range resources {
+		wait.Go(func() {
+			selected := s.routeResource(request, link)
+			lock.Lock()
+			routed[kind] = selected
+			lock.Unlock()
+		})
+	}
+	wait.Wait()
+	resources = routed
 	web.Respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/cover"
+	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
@@ -21,6 +22,7 @@ import (
 )
 
 type Config struct {
+	Distribution *distribution.Router
 	// Source is the song source this server serves; nil is the Fanmade source.
 	Source          *Source
 	Origin, Storage string
