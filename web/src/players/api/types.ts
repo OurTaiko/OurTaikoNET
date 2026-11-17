@@ -126,16 +126,20 @@ export type AwardRecord = {
 }
 export type Dans = { badges: DanBadge[]; history: AwardRecord[] }
 
-// How much the site is visited (the backend's internal/visits). Over more than one day,
-// visitors is the sum of each day's.
+// How much the site is visited (the backend's internal/visits), in the time zone asked for.
+// Over more than one day, visitors is the sum of each day's.
 export type VisitCount = { views: number; visitors: number }
 export type VisitDay = VisitCount & { day: string }
 export type VisitReport = {
+  /** The time zone the days and hours are of (UTC when none was asked for). */
+  zone: string
   total: VisitCount
   today: VisitCount
   /** The first day counted (YYYY-MM-DD); empty when nothing has been. */
   since: string
   /** Oldest first, today last, with the days nobody came. */
   days: VisitDay[]
+  /** The views made in each hour of the day (0 to 23) over those days. */
+  hours: number[]
   pages: { page: string; views: number }[]
 }

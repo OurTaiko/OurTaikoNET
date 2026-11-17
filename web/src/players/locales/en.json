@@ -233,7 +233,8 @@
   },
   "visits": {
     "heading": "Visits",
-    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. A day starts at midnight UTC+8.",
+    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. Days and hours are those of your time zone.",
+    "zone": "Time zone: {{zone}}",
     "today": "Today",
     "period": "Last {{n}} days",
     "total": "All time",
@@ -245,11 +246,12 @@
     "days": "{{n}} days",
     "viewsHeading": "Views per day",
     "visitorsHeading": "Visitors per day",
+    "hoursHeading": "Views by hour of day",
+    "hour": "{{h}}:00",
     "pagesHeading": "Most visited pages",
     "page": "Page",
     "share": "Share",
     "noPages": "No visits in this period yet.",
-    "other": "Other pages",
     "table": "Show the days as a table",
     "day": "Day"
   },

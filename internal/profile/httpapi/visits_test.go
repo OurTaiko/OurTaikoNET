@@ -18,8 +18,8 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 	var summary visits.Summary
 	read := func() visits.Summary {
 		t.Helper()
-		app.visitAt = time.Time{} // not from memory
-		c.json("GET", "/api/v1/visits", "", 200, &summary)
+		clear(app.visits) // not from memory
+		c.json("GET", "/api/v1/visits?tz=Asia/Shanghai", "", 200, &summary)
 		return summary
 	}
 
@@ -42,10 +42,17 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 
 	// The totals are answered from memory for a while.
 	c.json("POST", "/api/v1/visits", `{"path":"/titles"}`, 204, nil, browser)
-	c.json("GET", "/api/v1/visits", "", 200, &summary)
+	c.json("GET", "/api/v1/visits?tz=Asia/Shanghai", "", 200, &summary)
 	if summary.Total.Views != 3 {
 		t.Fatalf("not from memory %+v", summary)
 	}
+	// Each time zone is its own: at 04:00 UTC it is still the 15th in Los Angeles, where every
+	// view so far was made on the 15th. A time zone that is none is refused.
+	c.json("GET", "/api/v1/visits?tz=America/Los_Angeles", "", 200, &summary)
+	if summary.Total.Views != 4 || summary.Today != (visits.Count{Views: 4, Visitors: 2}) || summary.Since != "2026-11-15" {
+		t.Fatalf("in Los Angeles %+v", summary)
+	}
+	c.json("GET", "/api/v1/visits?tz=Mars/Olympus", "", 400, nil)
 
 	// One visitor is counted for only so many pages a minute, and it costs them none of
 	// their writes.
@@ -61,13 +68,19 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 	c.signIn()
 	c.json("GET", "/api/v1/admin/visits?days=0", "", 400, nil)
 	c.json("GET", "/api/v1/admin/visits?days=367", "", 400, nil)
+	c.json("GET", "/api/v1/admin/visits?tz=Local", "", 400, nil)
 	var report struct {
+		Zone         string
 		Total, Today visits.Count
 		Since        string
 		Days         []visits.DayCount
+		Hours        []int64
 		Pages        []visits.PageCount
 	}
-	c.json("GET", "/api/v1/admin/visits?days=7", "", 200, &report)
+	c.json("GET", "/api/v1/admin/visits?days=7&tz=Asia/Shanghai", "", 200, &report)
+	if report.Zone != "Asia/Shanghai" || len(report.Hours) != 24 || report.Hours[12] != visitsAMinute {
+		t.Fatalf("zone %q, hours %v", report.Zone, report.Hours)
+	}
 	if len(report.Days) != 7 || report.Days[0].Day != "2026-11-10" || report.Days[6] != (visits.DayCount{Day: "2026-11-16", Count: visits.Count{Views: visitsAMinute, Visitors: 2}}) {
 		t.Fatalf("days %+v", report.Days)
 	}
@@ -75,7 +88,7 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 		t.Fatalf("report %+v", report)
 	}
 	c.json("GET", "/api/v1/admin/visits", "", 200, &report)
-	if len(report.Days) != 30 {
-		t.Fatalf("%d days by default", len(report.Days))
+	if len(report.Days) != 30 || report.Zone != "UTC" || report.Days[29].Day != "2026-11-16" {
+		t.Fatalf("%d days by default, in %q", len(report.Days), report.Zone)
 	}
 }

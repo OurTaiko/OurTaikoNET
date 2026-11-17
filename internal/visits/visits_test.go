@@ -3,6 +3,7 @@ package visits
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,107 +54,162 @@ func TestProgramsAreNotVisitors(t *testing.T) {
 	}
 }
 
-func TestViewsAndVisitorsADay(t *testing.T) {
+func TestATimeZoneIsNamed(t *testing.T) {
+	for name, want := range map[string]string{"": "UTC", "UTC": "UTC", "Asia/Shanghai": "Asia/Shanghai", "Etc/GMT+8": "Etc/GMT+8", "America/Argentina/Buenos_Aires": "America/Argentina/Buenos_Aires"} {
+		if loc, err := Zone(name); err != nil || loc.String() != want {
+			t.Errorf("Zone(%q) = %v, %v", name, loc, err)
+		}
+	}
+	for _, name := range []string{"Local", "Mars/Olympus", "../../etc/passwd", "Asia/Shanghai ", "/Asia", strings.Repeat("A", 65)} {
+		if _, err := Zone(name); err != ErrZone {
+			t.Errorf("Zone(%q): %v", name, err)
+		}
+	}
+}
+
+// Every reader sees the days of their own time zone, and a visitor is one visitor all of a day
+// of any zone, though it spans two UTC days.
+func TestViewsAndVisitorsInEveryTimeZone(t *testing.T) {
 	ctx := context.Background()
 	pool := netdbtest.NewShared(t)
-	// 23:00 UTC is already the next day where days are counted.
-	now := time.Date(2026, 11, 15, 23, 0, 0, 0, time.UTC)
+	var now time.Time
 	store := Store{DB: pool, Now: func() time.Time { return now }}
-	record := func(page, who string) {
+	at := func(when, page, who string) {
 		t.Helper()
+		var err error
+		if now, err = time.Parse(time.RFC3339, when); err != nil {
+			t.Fatal(err)
+		}
 		if err := store.Record(ctx, page, who); err != nil {
 			t.Fatal(err)
 		}
 	}
-	summary := func() Summary {
+	zone := func(name string) *time.Location {
+		loc, err := Zone(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return loc
+	}
+	shanghai, angeles, utc := zone("Asia/Shanghai"), zone("America/Los_Angeles"), zone("")
+	summary := func(loc *time.Location) Summary {
 		t.Helper()
-		s, err := store.Summary(ctx)
+		s, err := store.Summary(ctx, loc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return s
 	}
 
-	if s := summary(); s != (Summary{}) {
+	if s := summary(shanghai); s != (Summary{}) {
 		t.Fatalf("before anyone came %+v", s)
 	}
-	record("/", "1.1.1.1\nSafari")
-	record("/fanmade/charts/:id", "1.1.1.1\nSafari")
-	record("/fanmade/charts/:id", "2.2.2.2\nSafari")
-	record("/", "1.1.1.1\nFirefox")
-	if s := summary(); s.Total != (Count{4, 3}) || s.Today != (Count{4, 3}) || s.Since != "2026-11-16" {
-		t.Fatalf("the first day %+v", s)
+	x, y := "1.1.1.1\nSafari", "2.2.2.2\nSafari"
+	//                          Shanghai     Los Angeles
+	at("2026-11-15T15:00:00Z", "/", x)        // 15th 23:00  15th 07:00
+	at("2026-11-15T17:00:00Z", "/players", x) // 16th 01:00  15th 09:00
+	at("2026-11-16T01:00:00Z", "/", x)        // 16th 09:00  15th 17:00
+	at("2026-11-16T03:00:00Z", "/", y)        // 16th 11:00  15th 19:00
+	at("2026-11-16T10:00:00Z", "/titles", x)  // 16th 18:00  16th 02:00
+	now = time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+
+	for _, c := range []struct {
+		loc  *time.Location
+		want Summary
+	}{
+		{shanghai, Summary{Total: Count{5, 3}, Today: Count{4, 2}, Since: "2026-11-15"}},
+		{angeles, Summary{Total: Count{5, 3}, Today: Count{1, 1}, Since: "2026-11-15"}},
+		{utc, Summary{Total: Count{5, 3}, Today: Count{3, 2}, Since: "2026-11-15"}},
+	} {
+		if s := summary(c.loc); s != c.want {
+			t.Errorf("in %v %+v; want %+v", c.loc, s, c.want)
+		}
+	}
+	report := func(loc *time.Location, days, pages int) Report {
+		t.Helper()
+		r, err := store.Report(ctx, loc, days, pages)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	r := report(shanghai, 3, 10)
+	if fmt.Sprint(r.Days) != "[{2026-11-14 {0 0}} {2026-11-15 {1 1}} {2026-11-16 {4 2}}]" {
+		t.Errorf("days in Shanghai %v", r.Days)
+	}
+	if fmt.Sprint(r.Hours) != "[0 1 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 1 0 0 0 0 1]" {
+		t.Errorf("hours in Shanghai %v", r.Hours)
+	}
+	if fmt.Sprint(r.Pages) != "[{/ 3} {/players 1} {/titles 1}]" {
+		t.Errorf("pages %v", r.Pages)
+	}
+	r = report(angeles, 2, 1)
+	if fmt.Sprint(r.Days) != "[{2026-11-15 {4 2}} {2026-11-16 {1 1}}]" || fmt.Sprint(r.Pages) != "[{/ 3}]" || r.Hours[2] != 1 || r.Hours[7] != 1 {
+		t.Errorf("Los Angeles %+v", r)
+	}
+	// Today alone, in Los Angeles: only the last view.
+	if r = report(angeles, 1, 10); fmt.Sprint(r.Days) != "[{2026-11-16 {1 1}}]" || fmt.Sprint(r.Pages) != "[{/titles 1}]" {
+		t.Errorf("today in Los Angeles %+v", r)
 	}
 
-	// Nothing that is kept says who came: only hashes, which the day's salt made.
+	// Nothing that is kept says who came: only hashes, which the salts made.
 	var plain int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.visit_visitors WHERE length(visitor) <> 32 OR position('1.1.1.1' in encode(visitor, 'escape')) > 0`).Scan(&plain); err != nil || plain != 0 {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.visit_views WHERE position('1.1.1.1' in encode(visitor_even || visitor_odd, 'escape')) > 0`).Scan(&plain); err != nil || plain != 0 {
 		t.Fatal("visitors are not kept as hashes", plain, err)
 	}
 
-	// The next day the same people are visitors again, and the day before is closed: counted,
-	// and what told its visitors apart is gone.
-	now = now.Add(24 * time.Hour)
+	// A span is over two days after it began, and its salt goes; the counts stay as they were.
 	if closed, err := store.Close(ctx); err != nil || closed != 1 {
-		t.Fatal("closing the first day", closed, err)
+		t.Fatal("closing on the 16th", closed, err)
 	}
-	if closed, err := store.Close(ctx); err != nil || closed != 0 {
-		t.Fatal("closing again", closed, err)
+	now = now.Add(48 * time.Hour)
+	if closed, err := store.Close(ctx); err != nil || closed != 2 {
+		t.Fatal("closing on the 18th", closed, err)
 	}
-	var kept int
-	var salted bool
-	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM net.visit_visitors), (SELECT salt IS NOT NULL FROM net.visit_days WHERE day = '2026-11-16')`).Scan(&kept, &salted); err != nil || kept != 0 || salted {
-		t.Fatal("a closed day keeps hashes or its salt", kept, salted, err)
+	var salts int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.visit_salts`).Scan(&salts); err != nil || salts != 0 {
+		t.Fatal("salts kept", salts, err)
 	}
-	record("/", "1.1.1.1\nSafari")
-	record("/players", "1.1.1.1\nSafari")
-	if s := summary(); s.Total != (Count{6, 4}) || s.Today != (Count{2, 1}) || s.Since != "2026-11-16" {
-		t.Fatalf("the second day %+v", s)
+	if s := summary(shanghai); s.Total != (Count{5, 3}) || s.Today != (Count{}) {
+		t.Fatalf("after the salts went %+v", s)
 	}
-
-	// A view that arrives for a closed day is a view, and no visitor.
-	late := Store{DB: pool, Now: func() time.Time { return now.Add(-24 * time.Hour) }}
-	if err := late.Record(ctx, "/", "9.9.9.9\nSafari"); err != nil {
-		t.Fatal(err)
-	}
-	if s := summary(); s.Total != (Count{7, 4}) {
-		t.Fatalf("after a late view %+v", s)
-	}
-
-	report, err := store.Report(ctx, 3, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fmt.Sprint(report.Days) != "[{2026-11-15 {0 0}} {2026-11-16 {5 3}} {2026-11-17 {2 1}}]" {
-		t.Fatalf("days %v", report.Days)
-	}
-	if fmt.Sprint(report.Pages) != "[{/ 4} {/fanmade/charts/:id 2}]" {
-		t.Fatalf("pages %v", report.Pages)
-	}
-	if report, err = store.Report(ctx, 1, 10); err != nil || fmt.Sprint(report.Pages) != "[{/ 1} {/players 1}]" || len(report.Days) != 1 {
-		t.Fatalf("today alone %v %v", report, err)
+	// The same people on another day are visitors of that day again.
+	at("2026-11-18T13:00:00Z", "/", x)
+	at("2026-11-18T13:30:00Z", "/", x)
+	if s := summary(shanghai); s.Total != (Count{7, 4}) || s.Today != (Count{2, 1}) {
+		t.Fatalf("on the 18th %+v", s)
 	}
 }
 
-func TestADayHasOnlySoManyPages(t *testing.T) {
+// What was counted by days of UTC+8, before views had their times, is in the totals.
+func TestWhatWasCountedBeforeIsInTheTotals(t *testing.T) {
 	ctx := context.Background()
 	pool := netdbtest.NewShared(t)
-	store := Store{DB: pool}
-	for i := range maxPages + 5 {
-		if err := store.Record(ctx, fmt.Sprintf("/made-up-%d", i), "1.1.1.1\nSafari"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// A page already counted still is.
-	if err := store.Record(ctx, "/made-up-0", "1.1.1.1\nSafari"); err != nil {
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	store := Store{DB: pool, Now: func() time.Time { return now }}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO net.visit_days (day, views, visitors, salt) VALUES ('2026-11-16', 10, 4, NULL), ('2026-11-17', 5, NULL, '\x00');
+INSERT INTO net.visit_visitors (day, visitor) VALUES ('2026-11-17', '\x01'), ('2026-11-17', '\x02');
+INSERT INTO net.visit_pages (day, page, views) VALUES ('2026-11-16', '/', 10)`); err != nil {
 		t.Fatal(err)
 	}
-	var pages int
-	var other, first int64
-	if err := pool.QueryRow(ctx, `SELECT count(*), sum(views) FILTER (WHERE page = $1), sum(views) FILTER (WHERE page = '/made-up-0') FROM net.visit_pages`, Other).Scan(&pages, &other, &first); err != nil {
+	if _, err := store.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if pages != maxPages+1 || other != 5 || first != 2 {
-		t.Fatalf("%d pages, %d views of others, %d of the first", pages, other, first)
+	var open, hashes int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM net.visit_days WHERE salt IS NOT NULL OR visitors IS NULL), (SELECT count(*) FROM net.visit_visitors)`).Scan(&open, &hashes); err != nil || open != 0 || hashes != 0 {
+		t.Fatal("the old count is left open", open, hashes, err)
+	}
+	if err := store.Record(ctx, "/", "1.1.1.1\nSafari"); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Summary(ctx, time.UTC)
+	if err != nil || s != (Summary{Total: Count{16, 7}, Today: Count{1, 1}, Since: "2026-11-16"}) {
+		t.Fatalf("%+v %v", s, err)
+	}
+	// The days and pages are only of views with their times.
+	r, err := store.Report(ctx, time.UTC, 3, 10)
+	if err != nil || fmt.Sprint(r.Days) != "[{2026-11-16 {0 0}} {2026-11-17 {0 0}} {2026-11-18 {1 1}}]" || fmt.Sprint(r.Pages) != "[{/ 1}]" {
+		t.Fatalf("%+v %v", r, err)
 	}
 }

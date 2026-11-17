@@ -233,7 +233,8 @@
   },
   "visits": {
     "heading": "访问统计",
-    "about": "网页每显示一个页面记一次浏览；访客按天区分，不使用 Cookie，也不保存 IP 地址。一天从北京时间 0 点算起。",
+    "about": "网页每显示一个页面记一次浏览；访客在一天之内区分，不使用 Cookie，也不保存 IP 地址。日期和时段都按你所在的时区计算。",
+    "zone": "时区：{{zone}}",
     "today": "今日",
     "period": "最近 {{n}} 天",
     "total": "累计",
@@ -245,11 +246,12 @@
     "days": "{{n}} 天",
     "viewsHeading": "每日浏览量",
     "visitorsHeading": "每日访客",
+    "hoursHeading": "各时段浏览量",
+    "hour": "{{h}} 时",
     "pagesHeading": "最常访问的页面",
     "page": "页面",
     "share": "占比",
     "noPages": "这段时间还没有访问记录。",
-    "other": "其他页面",
     "table": "以表格查看每日数据",
     "day": "日期"
   },
