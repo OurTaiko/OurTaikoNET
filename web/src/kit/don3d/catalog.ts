@@ -55,6 +55,31 @@ export function catalogUrl(baseUrl: string, file: DonCatalogFile, mirror?: DonMi
   return base + file.path + '?v=' + file.sha256.slice(0, 12)
 }
 
+// Where a file is fetched: its canonical address, and the mirror's when the API listed one. The
+// mirror is someone else's bucket, so its bytes are checked against sha256 (assets.ts
+// fetchDonFile) and the canonical address is used when it fails.
+export type DonSource = { url: string; mirror: string | null; sha256: string }
+
+export function donSource(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): DonSource {
+  const url = catalogUrl(baseUrl, file)
+  const mirrored = catalogUrl(baseUrl, file, mirror)
+  return { url, mirror: mirrored === url ? null : mirrored, sha256: file.sha256 }
+}
+
+// An <img> of a catalog picture: the mirror's, back on the canonical one if it fails to load.
+export function donImage(source: DonSource): {
+  src: string
+  onError?: (event: { currentTarget: HTMLImageElement }) => void
+} {
+  if (!source.mirror) return { src: source.url }
+  return {
+    src: source.mirror,
+    onError: ({ currentTarget }) => {
+      if (currentTarget.getAttribute('src') !== source.url) currentTarget.src = source.url
+    },
+  }
+}
+
 export function catalogItem(
   catalog: DonCatalog,
   kind: DonPartKind,
