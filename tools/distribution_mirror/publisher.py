@@ -78,18 +78,6 @@ class Publisher:
         if encoding: result['Content-Encoding'] = encoding
         return result
 
-    def checksum(self, stream, expected_size, digest):
-        size, sha = 0, hashlib.sha256()
-        while True:
-            part = stream.read(256 * 1024)
-            if not part: break
-            self.budget(len(part))
-            size += len(part)
-            if size > (expected_size or 512 * 1024**2):
-                raise ValueError('Mirror object exceeds declared size')
-            sha.update(part)
-        return (expected_size is None or size == expected_size) and sha.hexdigest() == digest
-
     def ensure(self, path, size, digest):
         self.budget()
         key = self.config['prefix'] + path
@@ -101,28 +89,9 @@ class Publisher:
                 return
         except oss2.exceptions.NoSuchKey:
             pass
-        # Missing versioned player files may be populated by OSS mirror back-to-origin.
-        if head is not None or path.startswith('player/'):
-            try:
-                response = bucket.get_object(key)
-                encoding = response.headers.get('Content-Encoding')
-                try:
-                    try: valid = self.checksum(response, size, digest)
-                    except ValueError: valid = False
-                finally: response.close()
-                if valid:
-                    for attempt in range(10):
-                        try:
-                            bucket.head_object(key)
-                            break
-                        except oss2.exceptions.NoSuchKey:
-                            self.budget()
-                            if attempt == 9: raise
-                            time.sleep(1)
-                    bucket.update_object_meta(key, self.headers(path, digest, encoding))
-                    return
-            except oss2.exceptions.NoSuchKey:
-                pass
+        # HEAD may be satisfied by mirror back-to-origin before the object is
+        # persisted. Publish unmarked objects ourselves after verifying source
+        # bytes, rather than racing an asynchronous mirror save with metadata COPY.
         url = self.config['originBaseUrl'].rstrip('/') + '/' + path
         with NamedTemporaryFile(dir=self.scratch) as temporary:
             sha, md5, length = hashlib.sha256(), hashlib.md5(), 0
@@ -141,7 +110,8 @@ class Publisher:
             headers['Content-MD5'] = base64.b64encode(md5.digest()).decode()
             bucket.put_object_from_file(key, temporary.name, headers=headers)
             uploaded = bucket.head_object(key)
-            if uploaded.content_length != length or uploaded.etag.lower() != md5.hexdigest():
+            if (uploaded.content_length != length or uploaded.etag.lower() != md5.hexdigest()
+                    or uploaded.headers.get('x-oss-meta-sha256') != digest):
                 raise ValueError('OSS upload verification failed')
 
     def publish(self, collection):

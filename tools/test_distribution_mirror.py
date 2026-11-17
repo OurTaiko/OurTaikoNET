@@ -1,9 +1,10 @@
+import hashlib
 import importlib.util
-import io
 import json
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import threading
 import time
 import unittest
@@ -60,12 +61,42 @@ class PublicationTests(unittest.TestCase):
                 with self.assertRaises(ValueError): publisher.publish('player')
                 self.assertFalse(any(event[0] == 'published' for event in publisher.events))
 
-    def test_checksum_detects_wrong_bytes_and_enforces_size(self):
-        publisher = Publisher.__new__(Publisher)
-        publisher.lock = threading.Lock(); publisher.downloaded = 0
-        publisher.deadline = time.monotonic() + 10; publisher.maximum = 100
-        self.assertFalse(publisher.checksum(io.BytesIO(b'bad'), 3, 'a' * 64))
-        with self.assertRaises(ValueError): publisher.checksum(io.BytesIO(b'large'), 3, 'a' * 64)
+    def test_virtual_mirror_head_requires_verified_upload_before_marking_ready(self):
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as scratch:
+                good = b'verified source'
+                data = b'wrong source!!' if corrupt else good
+                class Cloud:
+                    written = None
+                    def head_object(self, key):
+                        return SimpleNamespace(content_length=len(good), headers=self.written[1] if self.written else {}, etag=hashlib.md5(good).hexdigest())
+                    def put_object_from_file(self, key, path, headers):
+                        self.written = Path(path).read_bytes(), headers
+                class Source:
+                    headers = {}
+                    def __enter__(self): return self
+                    def __exit__(self, *args): pass
+                    def raise_for_status(self): pass
+                    @property
+                    def raw(self): return self
+                    def stream(self, *args, **kwargs): yield data
+                    def get(self, *args, **kwargs): return self
+                cloud = Cloud()
+                publisher = Publisher.__new__(Publisher)
+                publisher.config = {'prefix': 'ourtaiko/', 'originBaseUrl': 'https://distrib.ourtaiko.org/'}
+                publisher.bucket = lambda: cloud
+                publisher.session = lambda: Source()
+                publisher.scratch = Path(scratch)
+                publisher.lock = threading.Lock(); publisher.downloaded = 0
+                publisher.deadline = time.monotonic() + 10; publisher.maximum = 100
+                digest = hashlib.sha256(good).hexdigest()
+                if corrupt:
+                    with self.assertRaises(ValueError): publisher.ensure('player/version/index.html', len(good), digest)
+                    self.assertIsNone(cloud.written)
+                else:
+                    publisher.ensure('player/version/index.html', len(good), digest)
+                    self.assertEqual(cloud.written[0], good)
+                    self.assertEqual(cloud.written[1]['x-oss-meta-sha256'], digest)
 
 
 class CloudRuleTests(unittest.TestCase):
