@@ -47,6 +47,10 @@ class Publisher:
         if not hasattr(self.local, 'session'):
             self.local.session = requests.Session()
             self.local.session.trust_env = False
+            # Catalog SHA-256 values are of the stored bytes. CloudFront compresses .js/.html
+            # on the fly for gzip/br requests, which would change the raw bytes read below;
+            # identity returns the object as stored (with its own Content-Encoding, if any).
+            self.local.session.headers['Accept-Encoding'] = 'identity'
             # Operator-selected proxy is confined to this sync worker.
             import os
             if os.environ.get('OURTAIKO_MIRROR_PROXY'):

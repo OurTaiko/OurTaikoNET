@@ -99,6 +99,13 @@ class PublicationTests(unittest.TestCase):
                     self.assertEqual(cloud.written[1]['x-oss-meta-sha256'], digest)
 
 
+class SessionTests(unittest.TestCase):
+    def test_downloads_ask_for_stored_bytes_not_cdn_compression(self):
+        publisher = Publisher.__new__(Publisher)
+        publisher.local = threading.local()
+        self.assertEqual(publisher.session().headers['Accept-Encoding'], 'identity')
+
+
 class CloudRuleTests(unittest.TestCase):
     def test_scoped_rule_addition_is_idempotent_and_preserves_existing_routes(self):
         spec = importlib.util.spec_from_file_location('configure_mirror', Path(__file__).with_name('configure-distribution-mirror.py'))
