@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { isOtanim, otanimClipFor, otanimFrameAt, otanimMesh, parseOtanim } from './otanim'
+import {
+  isOtanim,
+  otanimClipFor,
+  otanimFrameAt,
+  otanimMesh,
+  OtanimPlayer,
+  parseOtanim,
+} from './otanim'
 
-// A small .otanim written from the format document (Otanim.md), as the game's OtanimFixture
+// A small .otanim written from the format document (the otanim folder's SPEC.md), as the game's OtanimFixture
 // does: one square part 100 units wide, clips moving it to the given left x per frame.
 async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([bytes as BlobPart])
@@ -171,5 +178,34 @@ describe('otanim', () => {
     m = otanimMesh(file, file.clips[0], 0, box, true)
     expect(m.positions[0]).toBeCloseTo(200)
     expect(m.uvs[3]).toBeCloseTo(0) // v down from the image's top, as stored
+  })
+})
+
+describe('OtanimPlayer', () => {
+  it('loops each clip, cuts only the resting one, lets the rest finish their pass', async () => {
+    const file = await parseOtanim(
+      await fixture(
+        { name: 'idle', loop: true, fps: 10, lefts: [0, 10, 20, 30] }, // 0.4 s
+        { name: 'happy', loop: false, fps: 10, lefts: [0, 10, 20, 30, 40] }, // 0.4 s, once
+        { name: 'gogo', loop: true, fps: 10, lefts: [0, 10, 20, 30, 40, 50], loopStart: 2 }, // 0.6 s, then 0.4 s loops
+      ),
+    )
+    const [idle, happy, gogo] = file.clips
+    const player = new OtanimPlayer(file)
+    expect(player.update(0, idle).clip).toBe(idle)
+    // idle gives way at once
+    expect(player.update(150, happy)).toEqual({ clip: happy, seconds: 0 })
+    // the Don went back to Normal: happy plays on to its end…
+    expect(player.update(400, idle).clip).toBe(happy)
+    // …and is asked for again: it starts over instead of holding its last frame
+    expect(player.update(500, happy).seconds).toBeCloseTo(0.35)
+    expect(player.update(600, happy).seconds).toBeCloseTo(0.05)
+    // asked for idle after a pass ended: idle
+    expect(player.update(950, idle).clip).toBe(idle)
+    expect(player.update(1000, gogo).clip).toBe(gogo)
+    // GOGO over: the intro and the loop's first pass play out (0.6 s), then idle
+    expect(player.update(1300, idle).clip).toBe(gogo)
+    expect(player.update(1550, idle).clip).toBe(gogo)
+    expect(player.update(1650, idle).clip).toBe(idle)
   })
 })

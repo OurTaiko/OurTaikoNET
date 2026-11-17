@@ -1,7 +1,8 @@
 // Development only: a page to look at the 3D Don (`pnpm dev`, then /dev/don3d.html). Not linked
 // from the site and not in the build (vite builds index.html only). Query parameters:
 //   assets=<3dchara folder URL> (default http://127.0.0.1:8765/), costume=0|1, cos, head, body,
-//   puchi, paint, colors=p1|p2, motion=<DonMotionName>, mirror=1, freeze=<0..1>, bg=<css colour>,
+//   puchi, paint, colors=p1|p2, motion=<DonMotionName>, repeat=1 (a one-shot motion over and over,
+//   as the dressing room shows it), mirror=1, freeze=<0..1>, bg=<css colour>,
 //   w, h (CSS pixels of each preview), grid=1 (the game's DonPreview shots side by side; freeze=0
 //   lets them move), snap=1 (each shot drawn at sw × sh pixels, default the game's 960 × 1120, and
 //   POSTed as <prefix><name>.png to upload=<URL>, default http://127.0.0.1:8766/; only=<name>).
@@ -180,6 +181,7 @@ function Page() {
             : 'Normal'
         }
         mirrored={params.get('mirror') === '1'}
+        repeatMotion={params.get('repeat') === '1'}
         frozenAt={freeze === null ? null : Number(freeze)}
         className="size-full"
       />

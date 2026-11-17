@@ -139,6 +139,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
               baseUrl={catalog.baseUrl}
               look={draft}
               motion={motion}
+              repeatMotion
               className="absolute inset-0"
             />
           </div>

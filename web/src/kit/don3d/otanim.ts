@@ -325,3 +325,48 @@ export function otanimMesh(
   }
   return { positions, uvs, colors, indices }
 }
+
+// How many times the clip has come round by `seconds`: a loop's first pass (its intro and its
+// loop) is 0, each loop after it one more; a one-shot plays whole each time.
+export function otanimPass(clip: OtanimClip, seconds: number): number {
+  const n = clip.frames.length
+  const at = Math.max(0, seconds) * clip.fps
+  if (clip.loop) return at < n ? 0 : 1 + Math.floor((at - n) / (n - clip.loopStart))
+  return n > 1 ? Math.floor(at / (n - 1)) : Math.floor(at)
+}
+
+// Plays a puchichara: the clip asked for, over and over (a one-shot starts again when it ends; a
+// loop plays its intro once, then its loop). Asked for another, it changes at once only from the
+// resting clip ("idle", or what stands in for it); any other first plays to the end of its pass,
+// so a reaction is never cut short. The game's PuchiAnimGraphic does the same.
+export class OtanimPlayer {
+  clip: OtanimClip | null = null
+  private since = 0
+  private pass = 0
+
+  constructor(readonly file: Otanim) {}
+
+  // The clip and the time into it to draw at `ms`, `wanted` being what the Don's state asks for.
+  update(ms: number, wanted: OtanimClip): { clip: OtanimClip; seconds: number } {
+    const rest = otanimClipFor(this.file, 'Normal')
+    if (!this.clip) this.start(wanted, ms)
+    else if (wanted !== this.clip) {
+      const pass = otanimPass(this.clip, (ms - this.since) / 1000)
+      if (this.clip === rest || pass > this.pass) this.start(wanted, ms)
+    }
+    const clip = this.clip!
+    let seconds = (ms - this.since) / 1000
+    this.pass = otanimPass(clip, seconds)
+    if (!clip.loop) {
+      const length = (clip.frames.length - 1) / clip.fps
+      seconds = length > 0 ? seconds % length : 0
+    }
+    return { clip, seconds }
+  }
+
+  private start(clip: OtanimClip, ms: number) {
+    this.clip = clip
+    this.since = ms
+    this.pass = 0
+  }
+}

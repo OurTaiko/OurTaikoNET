@@ -52,7 +52,7 @@ import {
   type DonMotionName,
 } from './chara'
 import { drawStage, type DonPartData } from './part'
-import { otanimClipFor, otanimMesh, type Otanim, type OtanimClip } from './otanim'
+import { otanimClipFor, otanimMesh, OtanimPlayer, type Otanim } from './otanim'
 import {
   compositeFragment,
   modelFragment,
@@ -95,6 +95,9 @@ export type DonRendererOptions = {
   // Keeps the canvas's picture readable after it is shown (toBlob / toDataURL), at some cost.
   preserveDrawingBuffer?: boolean
   onStateChange?: (state: DonRendererState) => void
+  // A one-shot motion (Combo, FullCombo, Miss…) plays over and over instead of going back to the
+  // loop it interrupted: a preview showing one state at a time.
+  repeatMotion?: boolean
 }
 
 export type DonRenderer = {
@@ -221,7 +224,9 @@ export function createDonRenderer(
   const puchiAnimMesh = noCull(new Mesh(puchiAnimGeometry, puchiAnimMaterial))
   puchiAnimMesh.frustumCulled = false
   const puchiAnimScene = new Scene().add(puchiAnimMesh)
-  let puchiClip: { clip: OtanimClip; since: number } | null = null
+  let puchiPlayer: OtanimPlayer | null = null
+  // the motion asked for is a one-shot (and repeatMotion plays it again when it ends)
+  let motionIsOneShot = false
 
   let target: WebGLRenderTarget | null = null
   let cssWidth = 0
@@ -274,6 +279,7 @@ export function createDonRenderer(
     animator.bpm = bpm
     animator.setMirror(mirrored, t)
     animator.setAnim(DonAnim[motion], t)
+    motionIsOneShot = !animator.isLooping
     applyFrozen()
     dirty = true
     return loaded
@@ -518,7 +524,8 @@ export function createDonRenderer(
     // each part's meshes, then every part's outline hull
     scene.add(...meshes, ...outlines)
     outfit = { parts, scene, materials, faceRects, faceCount: face.count, puchi, puchiAnim, key }
-    puchiClip = null
+    if (puchiPlayer?.file !== puchiAnim)
+      puchiPlayer = puchiAnim ? new OtanimPlayer(puchiAnim) : null
     posed = { anim: -1, frame: -1, outfit: null }
     shownFace = -1
     dirty = true
@@ -699,8 +706,8 @@ export function createDonRenderer(
     ppu: number,
   ) {
     const name = donMotionNames[(animator?.animIndex ?? DonAnim.Normal) % mirrorOffset]
-    const clip = otanimClipFor(anim, name)
-    if (puchiClip?.clip !== clip) puchiClip = { clip, since: t }
+    if (puchiPlayer?.file !== anim) puchiPlayer = new OtanimPlayer(anim)
+    const { clip, seconds } = puchiPlayer.update(t, otanimClipFor(anim, name))
     const s = layoutScale * frame.drawScale * ppu
     const half = (150 * s) / 2
     const px = x + (mirrored ? 90 : -90) * s
@@ -712,7 +719,7 @@ export function createDonRenderer(
       ((px + half) / width) * 2 - 1,
       1 - ((py - half) / height) * 2,
     ]
-    const mesh = otanimMesh(anim, clip, (t - puchiClip.since) / 1000, box, mirrored)
+    const mesh = otanimMesh(anim, clip, seconds, box, mirrored)
     const n = mesh.positions.length / 2
     // Buffers kept and refilled; larger ones made (and the old freed) only when a frame needs more.
     let position = puchiAnimGeometry.getAttribute('position') as BufferAttribute | undefined
@@ -761,6 +768,9 @@ export function createDonRenderer(
     const t = now()
     if (animator && base) {
       animator.update(t, t)
+      // the one-shot went back to its loop: again, when the preview shows one state
+      if (options.repeatMotion && motionIsOneShot && frozenAt === null && animator.isLooping)
+        animator.setAnim(DonAnim[motion], t)
       const anim = animator.animIndex
       const frameIndex = animator.poseFrame
       if (
@@ -793,6 +803,7 @@ export function createDonRenderer(
       motion = name
       if (animator) {
         animator.setAnim(DonAnim[name], now())
+        motionIsOneShot = !animator.isLooping
         applyFrozen()
       }
     },
