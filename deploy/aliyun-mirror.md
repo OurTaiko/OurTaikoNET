@@ -113,9 +113,9 @@ and `tools/configure-esa-mirror.cjs --backup FILE --apply` (the latter needs the
 Node SDK in the operator tooling or NODE_PATH). Both commands default to read-only plans,
 back up existing configuration, and preserve unrelated settings. New OSS mirror scopes are
 `sso/avatars/*.webp` and public web-player files under `player/`. The player uses one prefix
-rule so the bucket stays within OSS's routing-rule limit (18 rules total). The mutable
-`player-build.json` is published only by the verified synchronization worker, never by
-unverified mirror back-to-origin. Versioned player files and immutable avatars cache for
+rule so the bucket stays within OSS's routing-rule limit (18 rules total). Mutable JSON
+(`player-build.json` and the catalogs) is pulled by back-to-origin like every other object
+and kept 60 seconds by ESA; clients never depend on the synchronization worker. Versioned player files and immutable avatars cache for
 one year; catalogs cache for 60 seconds; errors are not cached. Existing CORS rules cover
 all these public prefixes, including cached HEAD and Range responses.
 
@@ -141,9 +141,9 @@ keeps it) with `mirrorBaseUrl`/`mirrorPaths` listing every file in it; `baseUrl`
 for fallback. The 3D Don catalog and `/users/{id}/don` do the same with
 `3dchara/catalog.json` (an item the mirror's catalog does not list yet keeps its canonical
 file). Until a mirror catalog has been read once, the canonical one is answered. The website and updated Play use this API,
-verify files, and retry the canonical source on mirror errors. The synchronization worker
-publishes each mirror catalog after the files it lists, so a mirror catalog never names a file
-the mirror lacks. Older NET servers are supported
+verify files, and retry the canonical source on mirror errors. Mirror catalogs and the files
+they list are pulled from the origin on demand by back-to-origin (ESA keeps catalogs 60
+seconds); nothing in this path waits for the synchronization worker. Older NET servers are supported
 by falling back to the canonical nameplate catalog. Deploy NET and its website, then release
 Play so nameplate routing and download recovery reach game clients. Do not globally replace
 canonical S3 public bases.

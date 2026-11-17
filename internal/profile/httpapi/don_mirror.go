@@ -13,8 +13,9 @@ import (
 
 // A mainland visitor gets everything from the mirror, the catalog included: the mirror's own
 // catalog.json (its CDN keeps it 60 seconds) and the files it lists, at the mirror's root. The
-// country alone decides; nothing is compared with the canonical catalog. The synchronization
-// worker publishes that catalog after the files it lists, so they are there when it names them.
+// country alone decides; nothing is compared with the canonical catalog. The mirror holds no
+// copy of its own: OSS back-to-origin pulls each object, the catalog included, from the origin
+// on demand, and ESA keeps the catalog 60 seconds.
 
 // How long the mirror's catalog is used before it is read again (its CDN caches it as long),
 // and how long a failed read waits before the next try.
