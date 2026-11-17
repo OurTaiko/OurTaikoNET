@@ -40,6 +40,8 @@ A reward can come from any request: a score, an upload, or any request of the ga
 
 ### 1.2 The game
 
+**Built in the game on OurTaikoPlay's branch `feat/rewards` (2026-11-16), not committed yet**: the game's notes `OurTaikoLogs/OurTaikoPlay/Documentation/Rewards.md` say how. The 段位 result claims the badge it celebrates itself, so it is not shown twice.
+
 OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the rewards (the title band on the result screen, a toast elsewhere) and marks them seen. A change in the game's repository, after 1.1. The server's side is ready: the game reads the header on any answer and uses `GET /api/v1/game/rewards` and `POST /api/v1/game/rewards/seen` with its token.
 
 ### 1.3 and 1.4
