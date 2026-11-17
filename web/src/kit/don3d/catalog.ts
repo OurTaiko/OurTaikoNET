@@ -14,7 +14,10 @@ export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi' | 'paint'
 
 export type DonCatalog = {
   version: number
-  mirrorUrls?: Record<string, string>
+  // Added by the API for a mainland visitor: the files to fetch from the mirror, at
+  // mirrorBaseUrl + path + "?v=..." like the canonical ones.
+  mirrorBaseUrl?: string
+  mirrorPaths?: string[]
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
   defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
   // paint: absent from catalogs written before makeup was added
@@ -33,13 +36,21 @@ export type DonLook = {
   colors: [string, string, string] | null
 }
 
-export function catalogUrl(
-  baseUrl: string,
-  file: DonCatalogFile,
-  mirrorUrls?: DonCatalog['mirrorUrls'],
-): string {
-  const mirrored = mirrorUrls?.[file.path]
-  if (typeof mirrored === 'string') return mirrored
+export type DonMirror = Pick<DonCatalog, 'mirrorBaseUrl' | 'mirrorPaths'>
+
+const mirrored = new WeakMap<string[], Set<string>>()
+
+// A file's address: on the mirror when the API listed it there, else under baseUrl.
+export function catalogUrl(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): string {
+  const paths = mirror?.mirrorPaths
+  if (mirror?.mirrorBaseUrl && paths) {
+    let set = mirrored.get(paths)
+    if (!set) {
+      set = new Set(paths)
+      mirrored.set(paths, set)
+    }
+    if (set.has(file.path)) baseUrl = mirror.mirrorBaseUrl
+  }
   const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
   return base + file.path + '?v=' + file.sha256.slice(0, 12)
 }

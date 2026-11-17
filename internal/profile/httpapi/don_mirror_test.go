@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -112,7 +113,8 @@ func TestDonMirrorRouting(t *testing.T) {
 			}
 		})
 	}
-	catalogAnswer := func(t *testing.T, server *Server, ip string) (map[string]string, string) {
+	mirrorBase := origin.URL + "/staging/3dchara/"
+	catalogAnswer := func(t *testing.T, server *Server, ip string) ([]string, string) {
 		t.Helper()
 		r := httptest.NewRequest("GET", "/api/v1/don/catalog", nil)
 		r.RemoteAddr = "172.20.0.1:1234"
@@ -120,22 +122,27 @@ func TestDonMirrorRouting(t *testing.T) {
 		w := httptest.NewRecorder()
 		server.Handler().ServeHTTP(w, r)
 		var catalog struct {
-			BaseURL    string            `json:"baseUrl"`
-			MirrorURLs map[string]string `json:"mirrorUrls"`
+			BaseURL       string   `json:"baseUrl"`
+			MirrorBaseURL *string  `json:"mirrorBaseUrl"`
+			MirrorPaths   []string `json:"mirrorPaths"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &catalog); err != nil || catalog.BaseURL != origin.URL+"/canonical/" {
+		if err := json.Unmarshal(w.Body.Bytes(), &catalog); err != nil || catalog.BaseURL != origin.URL+"/canonical/" ||
+			(catalog.MirrorBaseURL == nil) != (catalog.MirrorPaths == nil) ||
+			catalog.MirrorBaseURL != nil && *catalog.MirrorBaseURL != mirrorBase {
 			t.Fatalf("catalog %s: %v", w.Body, err)
 		}
-		return catalog.MirrorURLs, w.Header().Get("Cache-Control")
+		return catalog.MirrorPaths, w.Header().Get("Cache-Control")
 	}
-	if urls, cache := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 || cache != "private, max-age=60" ||
-		urls[head.Path] != origin.URL+"/staging/3dchara/"+head.Path+"?v="+head.SHA256[:12] ||
-		urls[paint.Path] != origin.URL+"/staging/3dchara/"+paint.Path+"?v="+paint.SHA256[:12] ||
-		urls[face.Path] != origin.URL+"/staging/3dchara/"+face.Path+"?v="+face.SHA256[:12] {
-		t.Fatalf("mainland catalog URLs = %v, cache = %q", urls, cache)
+	if paths, cache := catalogAnswer(t, s, "203.0.113.1"); cache != "private, max-age=60" ||
+		!slices.Equal(paths, []string{face.Path, head.Path, paint.Path}) {
+		t.Fatalf("mainland catalog paths = %v, cache = %q", paths, cache)
 	}
-	if urls, _ := catalogAnswer(t, s, "203.0.113.2"); len(urls) != 0 {
-		t.Fatalf("overseas catalog URLs = %v", urls)
+	first := s.donMirrorPaths
+	if paths, _ := catalogAnswer(t, s, "203.0.113.1"); len(paths) != 3 || s.donMirrorPaths != first {
+		t.Fatalf("mirror paths worked out again: %v", paths)
+	}
+	if paths, _ := catalogAnswer(t, s, "203.0.113.2"); len(paths) != 0 {
+		t.Fatalf("overseas catalog paths = %v", paths)
 	}
 	if got := mirrorReads.Load(); got != 1 {
 		t.Fatalf("mirror catalog fetched %d times", got)
@@ -154,8 +161,8 @@ func TestDonMirrorRouting(t *testing.T) {
 	s.donMirrorUntil = time.Time{}
 	s.donMirrorMu.Unlock()
 	for range 2 {
-		if urls, _ := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 {
-			t.Fatalf("failed refresh dropped mirror URLs: %v", urls)
+		if paths, _ := catalogAnswer(t, s, "203.0.113.1"); len(paths) != 3 {
+			t.Fatalf("failed refresh dropped mirror paths: %v", paths)
 		}
 		refreshed(s)
 	}
@@ -165,8 +172,8 @@ func TestDonMirrorRouting(t *testing.T) {
 	// Without a good mirror ever read, everything stays canonical.
 	fresh := New(nil, cfg)
 	for range 2 {
-		if urls, _ := catalogAnswer(t, fresh, "203.0.113.1"); len(urls) != 0 {
-			t.Fatalf("first failed read gave mirror URLs: %v", urls)
+		if paths, _ := catalogAnswer(t, fresh, "203.0.113.1"); len(paths) != 0 {
+			t.Fatalf("first failed read gave mirror paths: %v", paths)
 		}
 	}
 	if got := mirrorReads.Load(); got != 3 {
@@ -174,11 +181,11 @@ func TestDonMirrorRouting(t *testing.T) {
 	}
 	noCountry := cfg
 	noCountry.DonIPCountry = nil
-	if urls, cache := catalogAnswer(t, New(nil, noCountry), "203.0.113.1"); len(urls) != 0 || cache != "public, max-age=60" {
-		t.Fatalf("catalog without country lookup URLs = %v, cache = %q", urls, cache)
+	if paths, cache := catalogAnswer(t, New(nil, noCountry), "203.0.113.1"); len(paths) != 0 || cache != "public, max-age=60" {
+		t.Fatalf("catalog without country lookup paths = %v, cache = %q", paths, cache)
 	}
 	cfg.DonMirrorCatalogURL = ""
-	if urls, cache := catalogAnswer(t, New(nil, cfg), "203.0.113.1"); len(urls) != 0 || cache != "public, max-age=60" {
-		t.Fatalf("disabled mirror catalog URLs = %v, cache = %q", urls, cache)
+	if paths, cache := catalogAnswer(t, New(nil, cfg), "203.0.113.1"); len(paths) != 0 || cache != "public, max-age=60" {
+		t.Fatalf("disabled mirror catalog paths = %v, cache = %q", paths, cache)
 	}
 }

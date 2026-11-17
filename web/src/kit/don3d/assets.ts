@@ -43,7 +43,7 @@ const bases = new Map<string, Promise<DonBase>>()
 
 export function loadBase(catalog: DonCatalog, baseUrl: string): Promise<DonBase> {
   const { animations, face, faceAnimations } = catalog.base
-  const url = (file: DonCatalogFile) => catalogUrl(baseUrl, file, catalog.mirrorUrls)
+  const url = (file: DonCatalogFile) => catalogUrl(baseUrl, file, catalog)
   return remember(
     bases,
     url(animations) + '|' + url(face) + '|' + url(faceAnimations),

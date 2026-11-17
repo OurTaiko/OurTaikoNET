@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,8 +21,17 @@ import (
 // A mirror catalog is published after the objects it lists. The canonical catalog still decides
 // which outfits exist and the bytes they require.
 type donMirror struct {
-	base  *url.URL
+	base  string
 	files map[string]donFileRef
+}
+
+// donMirrorPaths is what the website catalog adds for a mainland visitor: the mirror's base and
+// the paths of the files it holds as the canonical catalog lists them, worked out once per pair
+// of catalogs.
+type donMirrorPaths struct {
+	catalog     *donCatalog
+	mirror      *donMirror
+	base, paths json.RawMessage
 }
 
 // How long a failed mirror catalog read waits before the next try.
@@ -41,25 +52,45 @@ func (c *donCatalog) fileRefs(yield func(donFileRef) bool) {
 	}
 }
 
-func (m *donMirror) url(ref donFileRef) string {
+func (m *donMirror) has(ref donFileRef) bool {
 	if m == nil {
-		return ""
+		return false
 	}
 	mirrored, ok := m.files[ref.Path]
-	if !ok || mirrored != ref {
-		return ""
-	}
-	return m.base.ResolveReference(&url.URL{Path: ref.Path, RawQuery: "v=" + ref.SHA256[:12]}).String()
+	return ok && mirrored == ref
 }
 
-func (m *donMirror) urls(c *donCatalog) map[string]string {
-	urls := make(map[string]string)
+// url is a file's address on the mirror, made like the canonical one; "" when it is not there.
+func (m *donMirror) url(ref donFileRef) string {
+	if !m.has(ref) {
+		return ""
+	}
+	return m.base + ref.Path + "?v=" + ref.SHA256[:12]
+}
+
+// mirrorPaths is the mirror as the website catalog tells it; nil fields when it holds none of
+// the catalog's files.
+func (s *Server) mirrorPaths(c *donCatalog, m *donMirror) *donMirrorPaths {
+	s.donMirrorMu.Lock()
+	defer s.donMirrorMu.Unlock()
+	if p := s.donMirrorPaths; p != nil && p.catalog == c && p.mirror == m {
+		return p
+	}
+	var paths []string
 	for ref := range c.fileRefs {
-		if address := m.url(ref); address != "" {
-			urls[ref.Path] = address
+		if m.has(ref) {
+			paths = append(paths, ref.Path)
 		}
 	}
-	return urls
+	slices.Sort(paths)
+	paths = slices.Compact(paths)
+	p := &donMirrorPaths{catalog: c, mirror: m}
+	if len(paths) > 0 {
+		p.base, _ = json.Marshal(m.base)
+		p.paths, _ = json.Marshal(paths)
+	}
+	s.donMirrorPaths = p
+	return p
 }
 
 func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror, error) {
@@ -74,7 +105,7 @@ func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror,
 	if err != nil {
 		return nil, err
 	}
-	m := &donMirror{base: u.ResolveReference(&url.URL{Path: "."}), files: make(map[string]donFileRef)}
+	m := &donMirror{base: u.ResolveReference(&url.URL{Path: "."}).String(), files: make(map[string]donFileRef)}
 	for ref := range c.fileRefs {
 		if _, err = hex.DecodeString(ref.SHA256); !fs.ValidPath(ref.Path) || ref.Path == "." ||
 			strings.ContainsAny(ref.Path, "\\\x00") || ref.Size <= 0 || len(ref.SHA256) != 64 || err != nil {

@@ -387,14 +387,14 @@ export function createDonRenderer(
         ensureBase(),
         Promise.all(
           resolved.parts.map((p) =>
-            loadPart(catalogUrl(baseUrl, p.item.file, catalog.mirrorUrls), p.normalizeFace),
+            loadPart(catalogUrl(baseUrl, p.item.file, catalog), p.normalizeFace),
           ),
         ),
         resolved.puchi
-          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file, catalog.mirrorUrls))
+          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file, catalog))
           : Promise.resolve(null),
         resolved.paint
-          ? loadPaint(catalogUrl(baseUrl, resolved.paint.file, catalog.mirrorUrls))
+          ? loadPaint(catalogUrl(baseUrl, resolved.paint.file, catalog))
           : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
@@ -408,7 +408,7 @@ export function createDonRenderer(
       if (disposed || token !== lookToken) return
       let puchi: Texture | null = null
       if (resolved.puchi && puchiFile) {
-        const url = catalogUrl(baseUrl, resolved.puchi.file, catalog.mirrorUrls)
+        const url = catalogUrl(baseUrl, resolved.puchi.file, catalog)
         puchi = puchiTextures.get(url) ?? null
         if (!puchi) {
           // drawn straight onto the canvas: no colour space
@@ -421,7 +421,7 @@ export function createDonRenderer(
       // the makeup's sheet in place of the plain face (YataiDON Chara3D::set_paint)
       let face = { texture: faceTexture, count: loadedBase.faceCount }
       if (resolved.paint && paintBitmap) {
-        const url = catalogUrl(baseUrl, resolved.paint.file, catalog.mirrorUrls)
+        const url = catalogUrl(baseUrl, resolved.paint.file, catalog)
         let sheet = paintTextures.get(url)
         if (!sheet) {
           sheet = {

@@ -277,12 +277,15 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	}
 	base, _ := json.Marshal(c.baseURL)
 	all["baseUrl"] = base
+	// mirrorBaseUrl and mirrorPaths: the files a mainland visitor fetches from the mirror, at
+	// mirrorBaseUrl + path + "?v=" + the first 12 of the hash, like baseUrl's.
+	delete(all, "mirrorBaseUrl")
+	delete(all, "mirrorPaths")
 	if s.donRegional() {
 		w.Header().Set("Cache-Control", "private, max-age=60")
-		delete(all, "mirrorUrls")
 		if mirror := s.mirrorForDonRequest(r); mirror != nil {
-			if urls := mirror.urls(c); len(urls) > 0 {
-				all["mirrorUrls"], _ = json.Marshal(urls)
+			if p := s.mirrorPaths(c, mirror); p.paths != nil {
+				all["mirrorBaseUrl"], all["mirrorPaths"] = p.base, p.paths
 			}
 		}
 	} else {

@@ -66,6 +66,7 @@ type Server struct {
 	donMirror      *donMirror
 	donMirrorUntil time.Time
 	donMirrorDone  chan struct{}
+	donMirrorPaths *donMirrorPaths
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
