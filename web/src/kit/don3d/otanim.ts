@@ -260,7 +260,8 @@ export function otanimClipFor(file: Otanim, motion: string): OtanimClip {
   return file.clips.find((c) => c.name === 'idle') ?? file.clips[0]
 }
 
-// The clip at `seconds` as triangles fitted into `box` (x0, y0, x1, y1, y up), the view's aspect
+// The clip at `seconds` as triangles fitted into `box` (x0, y0, x1, y1, y up; in units that are
+// the same length both ways, such as pixels, or the aspect is not kept), the view's aspect
 // kept and centred: positions (x, y), uvs (u, v down; additive parts get 2 added to u), colours
 // (premultiplied 0..1) and indices. Frames are eased into each other where the same part is in
 // both.

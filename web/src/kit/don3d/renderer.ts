@@ -712,12 +712,14 @@ export function createDonRenderer(
     const half = (150 * s) / 2
     const px = x + (mirrored ? 90 : -90) * s
     const py = y - 120 * s
-    // the box in clip space (y up), as the mesh is built in
+    // The box in canvas pixels (y up): fitted there, the clip keeps its aspect whatever the
+    // canvas's is (in clip space a wide canvas would squash it, a tall one narrow it); turned into
+    // clip space below.
     const box: [number, number, number, number] = [
-      ((px - half) / width) * 2 - 1,
-      1 - ((py + half) / height) * 2,
-      ((px + half) / width) * 2 - 1,
-      1 - ((py - half) / height) * 2,
+      px - half,
+      height - (py + half),
+      px + half,
+      height - (py - half),
     ]
     const mesh = otanimMesh(anim, clip, seconds, box, mirrored)
     const n = mesh.positions.length / 2
@@ -741,8 +743,8 @@ export function createDonRenderer(
     }
     const pos = position.array as Float32Array
     for (let i = 0; i < n; i++) {
-      pos[3 * i] = mesh.positions[2 * i]
-      pos[3 * i + 1] = mesh.positions[2 * i + 1]
+      pos[3 * i] = (mesh.positions[2 * i] / width) * 2 - 1
+      pos[3 * i + 1] = (mesh.positions[2 * i + 1] / height) * 2 - 1
     }
     ;(puchiAnimGeometry.getAttribute('uv').array as Float32Array).set(mesh.uvs)
     ;(puchiAnimGeometry.getAttribute('tint').array as Float32Array).set(mesh.colors)
