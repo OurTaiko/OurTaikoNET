@@ -51,6 +51,10 @@ OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the re
 | 1.3 | **Progress** towards the rules that count | For the signed-in player, `GET /api/v1/titles` (or a route of its own) gives `{have, need}` for each `category_clear` and `charts_uploaded` rule they have not met. The counting is the rule's own query without its `HAVING`. Shown on `/titles` as "7 / 10" |
 | 1.4 | **Pick the player by name** when granting by hand | `/manage/titles` asks for a 32-digit ID. The groups panel already searches players by nickname (`GET /api/v1/admin/users?q=`); use the same picker |
 
+## Done since: parts of the Don to earn (2026-11-17)
+
+A per-player ownership table for the Don's parts, the way titles have one; rules give a title or a part; administrators lock, give and take back parts. README: "Parts of the Don to earn". Also fixed then: the game drops a signed-out player's queue unmarked, a server without a site gives its own rewards, seen rewards are pruned, counts are kept while the database notifies, and an answer with nothing written carries the header.
+
 ## Stage 2: more to give titles for
 
 Each new kind is one query for "who meets it" in `titlerules.met`, a value in the table's `kind` check, and its fields in the form.
@@ -95,7 +99,7 @@ No behaviour changes; goes with any release of the backend.
 
 ## Releasing `feat/titles`
 
-- It carries migrations `0008_title_rules` and `0009_rewards`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
+- It carries migrations `0008_title_rules`, `0009_rewards` and `0010_don_items`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
 - Releasing the backend closes every Multi-Enso room.
 - `feat/story` has a migration numbered `0003`, which `main` has since used. Whichever of the two branches is merged second renumbers its migration (this branch already moved its own from 0006 to 0008 when it took in `main`).
 - After release, make the first rules by hand in `/manage/titles` and check the number the page reports for each against what is expected.
