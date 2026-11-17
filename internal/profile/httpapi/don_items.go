@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -194,4 +195,49 @@ func (s *Server) revokeDonItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.Respond(w, 200, map[string]bool{"ok": true})
+}
+
+// DescribeReward adds to a reward of a Don part (kind don_item) what the catalog says of it, for
+// a client that does not read the catalog (the game): its name in each language and the address
+// of its picture (the mirror's for a visitor the mirror serves). Other rewards, and a part the
+// catalog does not have, are answered as they are.
+func (s *Server) DescribeReward(r *http.Request, kind string, data json.RawMessage) json.RawMessage {
+	if kind != "don_item" {
+		return data
+	}
+	var fields map[string]any
+	var it struct {
+		Part   string `json:"part"`
+		ItemID int    `json:"itemId"`
+	}
+	if json.Unmarshal(data, &fields) != nil || json.Unmarshal(data, &it) != nil {
+		return data
+	}
+	c, err := s.donCatalog(r.Context())
+	if err != nil {
+		return data
+	}
+	item, ok := c.item(it.Part, it.ItemID)
+	if !ok {
+		return data
+	}
+	fields["name"] = item.Name
+	picture := item.Icon
+	if picture == nil && (it.Part == "puchi" || it.Part == "paint") {
+		picture = &item.File
+	}
+	if picture != nil {
+		address := c.url(*picture)
+		if mirror := s.mirrorForDonRequest(r); mirror != nil {
+			if m := mirror.url(*picture); m != "" {
+				address = m
+			}
+		}
+		fields["picture"] = address
+	}
+	described, err := json.Marshal(fields)
+	if err != nil {
+		return data
+	}
+	return described
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -75,6 +76,26 @@ func TestLockedPartsOfTheDonAreEarned(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT kind FROM net.rewards WHERE user_id=$1 AND data->>'part'='paint'`, player).Scan(&reward); err != nil || reward != "don_item" {
 		t.Fatal(reward, err)
 	}
+	// Described for a client that does not read the catalog: its name and picture.
+	ask := httptest.NewRequest("GET", "/api/v1/game/rewards", nil)
+	raw := string(app.DescribeReward(ask, "don_item", []byte(`{"part":"cos","itemId":30,"service":"admin"}`)))
+	// Costume 30 has no icon in this catalog: a name and no picture.
+	if !strings.Contains(raw, `"鏡もち"`) || !strings.Contains(raw, `"service":"admin"`) || strings.Contains(raw, `"picture"`) {
+		t.Fatal(raw)
+	}
+	// A puchichara is its own picture.
+	raw = string(app.DescribeReward(ask, "don_item", []byte(`{"part":"puchi","itemId":1}`)))
+	if !strings.Contains(raw, `"picture":"`+bucket.URL+`/3dchara/puchi/1.png?v=p1p1p1p1p1p1"`) {
+		t.Fatal(raw)
+	}
+	// A part the catalog does not have is answered as it is.
+	if raw = string(app.DescribeReward(ask, "don_item", []byte(`{"part":"cos","itemId":99}`))); raw != `{"part":"cos","itemId":99}` {
+		t.Fatal(raw)
+	}
+	if got := app.DescribeReward(httptest.NewRequest("GET", "/", nil), "title", []byte(`{"x":1}`)); string(got) != `{"x":1}` {
+		t.Fatal("another kind changed", string(got))
+	}
+
 	// Taken back: off them too.
 	c.json("DELETE", "/api/v1/admin/don/grants", `{"userId":"`+player+`","part":"paint","id":2}`, 200, nil)
 	c.json("DELETE", "/api/v1/admin/don/grants", `{"userId":"`+player+`","part":"paint","id":2}`, 404, nil)

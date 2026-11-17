@@ -191,6 +191,8 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite, Categories: songs.Official.CategoryBits()},
 		},
 	})
+	// A reward of a Don part is described from the catalog the players' part reads.
+	a.rewards.Describe = a.Players.DescribeReward
 
 	// What a dan attempt earns is recorded by the players' part in the attempt's own
 	// transaction (Awards). The sources still read the title catalog as the old sites read

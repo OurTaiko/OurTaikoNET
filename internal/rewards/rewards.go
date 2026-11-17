@@ -47,6 +47,10 @@ type DB interface {
 type Store struct {
 	DB     DB
 	counts *counts
+	// Describe, when set, may add to a reward's data as it is fetched what a client needs to show
+	// it and the database does not keep (a Don part's name and picture, from the catalog). It
+	// returns the data to answer; the stored data does not change.
+	Describe func(r *http.Request, kind string, data json.RawMessage) json.RawMessage
 }
 
 // NewStore is a Store that keeps counts (see Run).
@@ -321,6 +325,11 @@ func (s Store) Routes(mux *http.ServeMux, prefix string, auth Auth) {
 		if err != nil {
 			answers.Internal(w, err)
 			return
+		}
+		if s.Describe != nil {
+			for i := range list {
+				list[i].Data = s.Describe(r, list[i].Kind, list[i].Data)
+			}
 		}
 		web.Respond(w, 200, map[string]any{"rewards": list})
 	})
