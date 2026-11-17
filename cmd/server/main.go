@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,11 +19,13 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/oschwald/maxminddb-golang/v2"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/app"
 	"ourtaiko.dev/net/internal/kit/charthash"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -101,9 +104,28 @@ func main() {
 	if cfg.TrustedProxies, err = web.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		log.Fatal(err)
 	}
+	cfg.DonCatalogURL = os.Getenv("DON_CATALOG_URL")
+	cfg.DonMirrorCatalogURL = os.Getenv("DON_MIRROR_CATALOG_URL")
+	// The regional Don mirror needs a good catalog address and the IP country database.
+	if cfg.DonMirrorCatalogURL != "" {
+		if _, err := httpapi.ParseDonMirrorCatalogURL(cfg.DonMirrorCatalogURL); err != nil {
+			log.Fatal(err)
+		}
+		db, err := maxminddb.Open(os.Getenv("DON_GEOIP_DB"))
+		if err != nil {
+			log.Fatalf("DON_GEOIP_DB: %v", err)
+		}
+		defer db.Close()
+		cfg.DonIPCountry = func(ip netip.Addr) string {
+			var country string
+			if err := db.Lookup(ip).DecodePath(&country, "country", "iso_code"); err != nil {
+				return ""
+			}
+			return country
+		}
+	}
 	// Multi-Enso, the game's online rooms: a gRPC service on its own port. Off without
 	// MULTIPLAY_LISTEN_ADDR.
-	cfg.DonCatalogURL = os.Getenv("DON_CATALOG_URL")
 	cfg.Multiplay = app.Multiplay{ListenAddr: os.Getenv("MULTIPLAY_LISTEN_ADDR"), PublicURL: strings.TrimRight(os.Getenv("MULTIPLAY_PUBLIC_URL"), "/")}
 	if raw := os.Getenv("MULTIPLAY_MIN_PLAYERS"); raw != "" {
 		if cfg.Multiplay.MinPlayers, err = strconv.Atoi(raw); err != nil || cfg.Multiplay.MinPlayers < 1 {

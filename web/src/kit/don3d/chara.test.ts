@@ -318,6 +318,19 @@ describe('resolveDonLook', () => {
       'https://distrib.ourtaiko.org/3dchara/cos/0.glb?v=abcdef012345',
     )
   })
+
+  it('uses the mirror only for files listed by the API', () => {
+    const base = 'https://distrib.ourtaiko.org/3dchara/'
+    const mirror = {
+      mirrorBaseUrl: 'https://static.sakura-bot.cn/3dchara/',
+      mirrorPaths: ['head/3.glb'],
+    }
+    expect(catalogUrl(base, file('head/3.glb'), mirror)).toBe(
+      'https://static.sakura-bot.cn/3dchara/head/3.glb?v=abcdef012345',
+    )
+    expect(catalogUrl(base, file('body/4.glb'), mirror)).toBe(base + 'body/4.glb?v=abcdef012345')
+    expect(catalogUrl(base, file('head/3.glb'), {})).toBe(base + 'head/3.glb?v=abcdef012345')
+  })
 })
 
 describe('scaleFacePlates', () => {

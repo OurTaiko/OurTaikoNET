@@ -18,7 +18,8 @@ import { cn } from '@sitekit/lib/utils'
 import {
   DonPreview,
   catalogItem,
-  catalogUrl,
+  donImage,
+  donSource,
   type DonCatalog,
   type DonCatalogItem,
   type DonLook,
@@ -395,14 +396,14 @@ function IconGrid({
                 // The first of its frames (stacked top to bottom: a puchichara has two, a
                 // makeup sheet one per face).
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.file)}
+                  {...donImage(donSource(catalog.baseUrl, item.file, catalog))}
                   alt=""
                   loading="lazy"
                   className="absolute inset-x-0 top-0 w-full"
                 />
               ) : item.icon ? (
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.icon)}
+                  {...donImage(donSource(catalog.baseUrl, item.icon, catalog))}
                   alt=""
                   loading="lazy"
                   className="size-full object-contain p-1"

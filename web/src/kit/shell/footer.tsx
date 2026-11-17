@@ -18,6 +18,9 @@ import { useVisitSummary } from './visits'
 
 const playerAddress = 'https://play.ourtaiko.org/'
 const licenseAddress = 'https://www.gnu.org/licenses/agpl-3.0.html'
+// The country database that routes mainland visitors' 3D Don files (CC BY 4.0, which asks for
+// this credit in DB-IP's own words).
+const dbipAddress = 'https://db-ip.com'
 
 const linkClass =
   'inline-flex items-center gap-2 rounded-full outline-none min-h-8 text-muted-foreground text-sm transition-colors hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/40'
@@ -158,6 +161,13 @@ export function FrameFooter({ source }: { source: SourceId }) {
               className="rounded-sm outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/40"
             >
               AGPL-3.0-or-later
+            </Away>{' '}
+            ·{' '}
+            <Away
+              href={dbipAddress}
+              className="rounded-sm outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/40"
+            >
+              IP Geolocation by DB-IP
             </Away>
           </p>
           <p className="text-muted-foreground/70 uppercase tracking-wider">

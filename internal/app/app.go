@@ -70,7 +70,9 @@ type Config struct {
 	LegacyFanmadeHost, LegacyOfficialHost, LegacyProfileHost string
 
 	// Where the 3D Don's catalog is read (profile/httpapi don.go); empty: the public bucket's.
-	DonCatalogURL string
+	DonCatalogURL       string
+	DonMirrorCatalogURL string
+	DonIPCountry        func(netip.Addr) string
 	// Multiplay is Multi-Enso, the game's online rooms (multiplay.go). Off by default.
 	Multiplay Multiplay
 }
@@ -174,6 +176,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		SessionCookie: SessionCookie, Groups: true, DonCatalogURL: cfg.DonCatalogURL,
+		DonMirrorCatalogURL: cfg.DonMirrorCatalogURL, DonIPCountry: cfg.DonIPCountry,
 		Sources: []profile.Source{
 			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite},
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite},
