@@ -16,6 +16,25 @@ The song catalogs are mirror inventories, not a replacement for NET's authoritat
 APIs. Current regional Don support does not consume these song inventories. Covers, preview
 audio and videos are outside this snapshot's scope.
 
+## Stage Don and nameplate art
+
+Use Python 3.11 or newer to stage both canonical art catalogs and their objects:
+
+```sh
+python3 -I tools/mirror-distrib.py /path/to/staging
+```
+
+Pass `3dchara` or `nameplate` after the destination to stage one collection. The tool checks
+byte lengths and SHA-256, includes Don base files and website icons, reuses verified local
+files on retry, and writes each local catalog after all its objects pass. Use a fresh
+directory for an exact snapshot; an existing directory can contain older unreferenced files.
+
+Upload the staged objects to the same relative paths under `ourtaiko/3dchara/` and
+`ourtaiko/nameplate/`, preserving bytes and content types. Upload each `catalog.json` last,
+after its objects are reachable and verified through ESA. Repeat staging and upload after
+publishing changed canonical art. This tool stages art only; it does not synchronize song
+resources, upload to OSS or install a recurring job.
+
 ## Missing-object back-to-origin
 
 In OSS, Bucket `sigaer`, Data Management > Mirroring-based back-to-origin, configure six

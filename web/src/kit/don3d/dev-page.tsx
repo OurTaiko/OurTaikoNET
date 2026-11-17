@@ -1,7 +1,7 @@
 // Development only: a page to look at the 3D Don (`pnpm dev`, then /dev/don3d.html). Not linked
 // from the site and not in the build (vite builds index.html only). Query parameters:
 //   assets=<3dchara folder URL> (default http://127.0.0.1:8765/), costume=0|1, cos, head, body,
-//   puchi, colors=p1|p2, motion=<DonMotionName>, mirror=1, freeze=<0..1>, bg=<css colour>,
+//   puchi, paint, colors=p1|p2, motion=<DonMotionName>, mirror=1, freeze=<0..1>, bg=<css colour>,
 //   w, h (CSS pixels of each preview), grid=1 (the game's DonPreview shots side by side; freeze=0
 //   lets them move), snap=1 (each shot drawn at sw × sh pixels, default the game's 960 × 1120, and
 //   POSTed as <prefix><name>.png to upload=<URL>, default http://127.0.0.1:8766/; only=<name>).
@@ -50,6 +50,20 @@ function shots(catalog: DonCatalog): Shot[] {
     {
       name: 'puchi1',
       look: { ...basic, puchi: 1 },
+      motion: 'Normal',
+      progress: 0.25,
+      mirror: false,
+    },
+    {
+      name: 'paint1',
+      look: { ...basic, paint: 1 },
+      motion: 'Normal',
+      progress: 0.25,
+      mirror: false,
+    },
+    {
+      name: 'cos30_paint2',
+      look: { ...basic, cos: 30, paint: 2 },
       motion: 'Normal',
       progress: 0.25,
       mirror: false,
@@ -151,6 +165,7 @@ function Page() {
     head: num('head', 0),
     body: num('body', 0),
     puchi: num('puchi', 0),
+    paint: num('paint', 0),
     colors: params.get('colors') === 'p2' ? catalog.defaultColors.p2 : null,
   }
   return (

@@ -271,17 +271,21 @@
   "don": {
     "motion": "모션",
     "dress": "옷 갈아입기",
-    "about": "OurTaikoPlay 화면에 나오는 나의 동입니다. 코스튬, 또는 머리와 몸, 푸치캐릭터와 색을 골라 저장하세요.",
+    "tabs": {
+      "outfit": "의상"
+    },
     "wear": "입을 것",
     "costume": "코스튬",
-    "parts": "머리＋몸",
+    "parts": "조합",
     "kinds": {
       "cos": "코스튬",
       "head": "머리",
       "body": "몸",
-      "puchi": "푸치캐릭터"
+      "puchi": "푸치캐릭터",
+      "paint": "메이크업"
     },
     "noPuchi": "없음",
+    "noPaint": "없음",
     "colors": "색",
     "defaultColors": "기본 색",
     "color": {
@@ -295,6 +299,7 @@
     "saved": "저장했습니다. 다음에 게임에서 로그인할 때 반영됩니다.",
     "headAndBody": "{{head}}＋{{body}}",
     "withPuchi": "{{wears}}, {{puchi}}와 함께",
+    "withPaint": "{{wears}}, 메이크업 {{paint}}",
     "motions": {
       "Normal": "평소",
       "Combo": "콤보",

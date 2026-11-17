@@ -98,19 +98,21 @@ export function DonPreview({
     look.head,
     look.body,
     look.puchi,
+    look.paint ?? 0,
     look.colors,
   ])
   useEffect(() => {
     if (!renderer) return
-    const [costume, cos, head, body, puchi, colors] = JSON.parse(lookKey) as [
+    const [costume, cos, head, body, puchi, paint, colors] = JSON.parse(lookKey) as [
       boolean,
+      number,
       number,
       number,
       number,
       number,
       DonLook['colors'],
     ]
-    void renderer.setLook({ costume, cos, head, body, puchi, colors })
+    void renderer.setLook({ costume, cos, head, body, puchi, paint, colors })
   }, [renderer, lookKey])
 
   useEffect(() => renderer?.setMotion(motion), [renderer, motion])

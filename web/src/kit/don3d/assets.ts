@@ -113,6 +113,12 @@ export function partPixels(image: DonImage): Promise<ImageData> {
 }
 
 const puchis = new Map<string, Promise<ImageBitmap>>()
+const paints = new Map<string, Promise<ImageBitmap>>()
+
+// A makeup's face sheet (square faces stacked top to bottom, like the base one).
+export function loadPaint(url: string): Promise<ImageBitmap> {
+  return remember(paints, url, async () => decodeImage(await (await fetchOk(url)).blob()))
+}
 
 export function loadPuchi(url: string): Promise<ImageBitmap> {
   return remember(puchis, url, async () => decodeImage(await (await fetchOk(url)).blob()))

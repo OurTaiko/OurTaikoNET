@@ -17,6 +17,7 @@ func TestDonMirrorRouting(t *testing.T) {
 	puchi := donFileRef{"puchi/1.png", 7, strings.Repeat("c", 64)}
 	face := donFileRef{"base/face.png", 9, strings.Repeat("d", 64)}
 	icon := donFileRef{"icons/head/3.png", 10, strings.Repeat("e", 64)}
+	paint := donFileRef{"paint/2.png", 8, strings.Repeat("1", 64)}
 	canonical := donCatalog{
 		Version: 1,
 		Base:    map[string]donFileRef{"face": face},
@@ -24,6 +25,7 @@ func TestDonMirrorRouting(t *testing.T) {
 			"head":  {{ID: 3, File: head, Icon: &icon}},
 			"body":  {{ID: 4, File: body}},
 			"puchi": {{ID: 1, File: puchi}},
+			"paint": {{ID: 2, File: paint}},
 		},
 	}
 	oldBody := body
@@ -37,6 +39,7 @@ func TestDonMirrorRouting(t *testing.T) {
 			"head":  {{ID: 3, File: head}},
 			"body":  {{ID: 4, File: oldBody}},
 			"puchi": {{ID: 1, File: wrongSize}},
+			"paint": {{ID: 2, File: paint}},
 		},
 	}
 	var mirrorDown atomic.Bool
@@ -67,7 +70,7 @@ func TestDonMirrorRouting(t *testing.T) {
 		},
 	}
 	s := New(nil, cfg)
-	look := DonLook{Head: 3, Body: 4, Puchi: 1}
+	look := DonLook{Head: 3, Body: 4, Puchi: 1, Paint: 2}
 	for _, tc := range []struct {
 		name, peer, client string
 		headMirrored       bool
@@ -87,12 +90,12 @@ func TestDonMirrorRouting(t *testing.T) {
 			w := httptest.NewRecorder()
 			s.answerDon(w, r, look)
 			var answer DonAnswer
-			if err := json.Unmarshal(w.Body.Bytes(), &answer); err != nil || len(answer.Files) != 3 {
+			if err := json.Unmarshal(w.Body.Bytes(), &answer); err != nil || len(answer.Files) != 4 {
 				t.Fatalf("answer %s: %v", w.Body, err)
 			}
-			for i, ref := range []donFileRef{body, head, puchi} {
+			for i, ref := range []donFileRef{body, head, puchi, paint} {
 				prefix := "/canonical/"
-				if i == 1 && tc.headMirrored {
+				if (i == 1 || i == 3) && tc.headMirrored {
 					prefix = "/staging/3dchara/"
 				}
 				want := origin.URL + prefix + ref.Path + "?v=" + ref.SHA256[:12]
@@ -125,8 +128,9 @@ func TestDonMirrorRouting(t *testing.T) {
 		}
 		return catalog.MirrorURLs, w.Header().Get("Cache-Control")
 	}
-	if urls, cache := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 2 || cache != "private, no-store" ||
+	if urls, cache := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 || cache != "private, no-store" ||
 		urls[head.Path] != origin.URL+"/staging/3dchara/"+head.Path+"?v="+head.SHA256[:12] ||
+		urls[paint.Path] != origin.URL+"/staging/3dchara/"+paint.Path+"?v="+paint.SHA256[:12] ||
 		urls[face.Path] != origin.URL+"/staging/3dchara/"+face.Path+"?v="+face.SHA256[:12] {
 		t.Fatalf("mainland catalog URLs = %v, cache = %q", urls, cache)
 	}

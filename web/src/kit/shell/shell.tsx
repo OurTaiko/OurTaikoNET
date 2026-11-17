@@ -313,7 +313,10 @@ export function Frame({ children }: { children: ReactNode }) {
   const group = (id: GroupId, label: string, content: ReactNode) => {
     const open = groups[id] ?? true
     return (
-      <div key={id} className="mt-1 pt-1 border-t border-border/70">
+      <div
+        key={id}
+        className="mt-1 first:mt-0 pt-1 first:pt-0 border-t first:border-t-0 border-border/70"
+      >
         <button
           type="button"
           aria-expanded={open}
@@ -427,25 +430,28 @@ export function Frame({ children }: { children: ReactNode }) {
       )}
     </div>
   )
+  // Home stays at the head of the menu and the account at its foot; only the groups between
+  // them scroll (in one flex column a short window squeezed Home instead).
   const menu = (
     <>
-      <nav
-        aria-label={t('messages.mainNavigation')}
-        className="flex flex-col flex-1 gap-0.5 px-2 pt-3 pb-2 overflow-y-auto overscroll-contain"
-      >
-        {entry(home)}
-        {group(
-          'songs',
-          t('shell.songs'),
-          <>
-            {sourceSwitch}
-            {songs.map(entry)}
-          </>,
-        )}
-        {group('players', t('shell.players'), players.map(entry))}
-        {you.length > 0 && group('you', t('shell.you'), you.map(entry))}
-        {manage.length > 0 && group('manage', t('shell.manageGroup'), manage.map(entry))}
-        {group('more', t('shell.more'), entry(player))}
+      <nav aria-label={t('messages.mainNavigation')} className="flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col px-2 pt-3 pb-2 border-b border-border/70 shrink-0">
+          {entry(home)}
+        </div>
+        <div className="flex flex-col flex-1 gap-0.5 px-2 pt-2 pb-2 min-h-0 overflow-y-auto overscroll-contain">
+          {group(
+            'songs',
+            t('shell.songs'),
+            <>
+              {sourceSwitch}
+              {songs.map(entry)}
+            </>,
+          )}
+          {group('players', t('shell.players'), players.map(entry))}
+          {you.length > 0 && group('you', t('shell.you'), you.map(entry))}
+          {manage.length > 0 && group('manage', t('shell.manageGroup'), manage.map(entry))}
+          {group('more', t('shell.more'), entry(player))}
+        </div>
       </nav>
       {account}
     </>

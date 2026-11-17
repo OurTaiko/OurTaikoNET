@@ -30,7 +30,15 @@ import {
   WebGLRenderer,
   WebGLRenderTarget,
 } from 'three'
-import { loadBase, loadPart, loadPuchi, partImage, partPixels, type DonBase } from './assets'
+import {
+  loadBase,
+  loadPaint,
+  loadPart,
+  loadPuchi,
+  partImage,
+  partPixels,
+  type DonBase,
+} from './assets'
 import { catalogUrl, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
 import {
   DonAnim,
@@ -105,6 +113,8 @@ const layoutScale = 1.5 // 1080 lines over YataiDON's 720
 const supersample = 2
 const msaa = 4
 const puchiFrameMs = 850
+// YataiDON PAINT_PLANE_SCALE: makeup is drawn on a face plate a third larger than the plain face's.
+export const paintPlaneScale = 4 / 3
 
 // One part's GPU objects in this renderer: geometry per primitive (skinned on the CPU) and the
 // textures of its pictures, recoloured ones by colours.
@@ -115,6 +125,10 @@ type PartGpu = {
   recolored: Map<string, (Texture | null)[]>
   jointMap: Int32Array
   skin: Float32Array
+  // the bind positions skinning starts from: the part's own, but for the face plates while the
+  // Don wears makeup (scaled by faceScale about each plate's centre)
+  sources: Float32Array[]
+  faceScale: number
   lastUsed: number
 }
 
@@ -124,6 +138,8 @@ type Outfit = {
   scene: Scene
   materials: ShaderMaterial[]
   faceRects: Vector4[]
+  // faces in the sheet the face plates show (the base one's or the makeup's)
+  faceCount: number
   puchi: Texture | null
   key: string
 }
@@ -197,6 +213,7 @@ export function createDonRenderer(
   let outfit: Outfit | null = null
   const gpuParts = new Map<DonPartData, PartGpu>()
   const puchiTextures = new Map<string, Texture>()
+  const paintTextures = new Map<string, { texture: Texture; count: number }>()
   let clock = 0
 
   let bpm = options.bpm ?? 120
@@ -228,15 +245,7 @@ export function createDonRenderer(
     const loaded = await loadBase(catalog, baseUrl)
     if (disposed || base) return base ?? loaded
     base = loaded
-    faceTexture = new Texture(loaded.faceSheet)
-    faceTexture.flipY = false
-    faceTexture.premultiplyAlpha = false
-    faceTexture.colorSpace = SRGBColorSpace
-    faceTexture.generateMipmaps = false
-    faceTexture.minFilter = LinearFilter
-    faceTexture.magFilter = LinearFilter
-    faceTexture.wrapS = faceTexture.wrapT = ClampToEdgeWrapping
-    faceTexture.needsUpdate = true
+    faceTexture = faceSheetTexture(loaded.faceSheet)
     const t = now()
     animator = new DonAnimator(loaded.motions, loaded.faceTimelines, loaded.faceCount, t)
     animator.bpm = bpm
@@ -280,6 +289,8 @@ export function createDonRenderer(
         recolored: new Map(),
         jointMap,
         skin: new Float32Array(joints * 16),
+        sources: data.primitives.map((prim) => prim.positions),
+        faceScale: 1,
         lastUsed: 0,
       }
       gpuParts.set(data, gpu)
@@ -343,7 +354,7 @@ export function createDonRenderer(
     setState({ loading: true, error: null })
     try {
       const resolved = resolveDonLook(catalog, look)
-      const [loadedBase, datas, puchiBitmap] = await Promise.all([
+      const [loadedBase, datas, puchiBitmap, paintBitmap] = await Promise.all([
         ensureBase(),
         Promise.all(
           resolved.parts.map((p) =>
@@ -352,6 +363,9 @@ export function createDonRenderer(
         ),
         resolved.puchi
           ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file, catalog.mirrorUrls))
+          : Promise.resolve(null),
+        resolved.paint
+          ? loadPaint(catalogUrl(baseUrl, resolved.paint.file, catalog.mirrorUrls))
           : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
@@ -375,8 +389,27 @@ export function createDonRenderer(
           puchiTextures.set(url, puchi)
         }
       }
-      const key = JSON.stringify(resolved.parts.map((p) => [p.kind, p.item.id])) + resolved.colors
-      dress(gpus, textures, puchi, key)
+      // the makeup's sheet in place of the plain face (YataiDON Chara3D::set_paint)
+      let face = { texture: faceTexture, count: loadedBase.faceCount }
+      if (resolved.paint && paintBitmap) {
+        const url = catalogUrl(baseUrl, resolved.paint.file, catalog.mirrorUrls)
+        let sheet = paintTextures.get(url)
+        if (!sheet) {
+          sheet = {
+            texture: faceSheetTexture(paintBitmap),
+            count: paintBitmap.width > 0 ? Math.floor(paintBitmap.height / paintBitmap.width) : 0,
+          }
+          paintTextures.set(url, sheet)
+        }
+        face = sheet
+      }
+      const faceScale = resolved.paint ? paintPlaneScale : 1
+      for (const gpu of gpus) scaleFacePlates(gpu, faceScale)
+      const key =
+        JSON.stringify(resolved.parts.map((p) => [p.kind, p.item.id])) +
+        resolved.colors +
+        (resolved.paint?.id ?? 0)
+      dress(gpus, textures, puchi, face, key)
       trimParts()
     } catch (error) {
       if (token === lookToken) failure = error instanceof Error ? error : new Error(String(error))
@@ -390,6 +423,7 @@ export function createDonRenderer(
     parts: PartGpu[],
     textures: (Texture | null)[][],
     puchi: Texture | null,
+    face: { texture: Texture | null; count: number },
     key: string,
   ) {
     const old = outfit
@@ -403,7 +437,7 @@ export function createDonRenderer(
       const main = data.materials.map((info, m) => {
         const uvRect = new Vector4(1, 1, 0, 0)
         if (info.face) faceRects.push(uvRect)
-        const map = info.face ? faceTexture : info.image >= 0 ? textures[p][info.image] : null
+        const map = info.face ? face.texture : info.image >= 0 ? textures[p][info.image] : null
         const material = new ShaderMaterial({
           uniforms: {
             map: { value: map ?? white },
@@ -461,7 +495,7 @@ export function createDonRenderer(
     })
     // each part's meshes, then every part's outline hull
     scene.add(...meshes, ...outlines)
-    outfit = { parts, scene, materials, faceRects, puchi, key }
+    outfit = { parts, scene, materials, faceRects, faceCount: face.count, puchi, key }
     posed = { anim: -1, frame: -1, outfit: null }
     shownFace = -1
     dirty = true
@@ -646,11 +680,11 @@ export function createDonRenderer(
         posed = { anim, frame: frameIndex, outfit }
         dirty = true
       }
-      if (outfit && animator.face !== shownFace && base.faceCount > 0) {
+      if (outfit && animator.face !== shownFace && outfit.faceCount > 0) {
         // the face sheet's cell, faces stacked top to bottom
         shownFace = animator.face
-        for (const rect of outfit.faceRects)
-          rect.set(1, 1 / base.faceCount, 0, shownFace / base.faceCount)
+        const count = outfit.faceCount
+        for (const rect of outfit.faceRects) rect.set(1, 1 / count, 0, shownFace / count)
         dirty = true
       }
     }
@@ -708,6 +742,7 @@ export function createDonRenderer(
       for (const gpu of gpuParts.values()) disposePart(gpu)
       gpuParts.clear()
       puchiTextures.forEach((t) => t.dispose())
+      paintTextures.forEach((s) => s.texture.dispose())
       faceTexture?.dispose()
       white.dispose()
       target?.dispose()
@@ -774,6 +809,55 @@ function setPictureSampling(texture: Texture, anisotropy: number) {
   texture.wrapS = texture.wrapT = RepeatWrapping
 }
 
+// A face sheet as the face plates sample it: no mipmaps, clamped, one face a cell.
+function faceSheetTexture(bitmap: ImageBitmap): Texture {
+  const texture = new Texture(bitmap)
+  texture.flipY = false
+  texture.premultiplyAlpha = false
+  texture.colorSpace = SRGBColorSpace
+  texture.generateMipmaps = false
+  texture.minFilter = LinearFilter
+  texture.magFilter = LinearFilter
+  texture.wrapS = texture.wrapT = ClampToEdgeWrapping
+  texture.needsUpdate = true
+  return texture
+}
+
+// Brings the part's face plates to `factor` times their own size, each about the centre of its box
+// (YataiDON Chara3D::scale_face_planes); skinning then starts from those positions. A plate no
+// joint moves is written into its geometry here.
+export function scaleFacePlates(
+  part: Pick<PartGpu, 'data' | 'sources' | 'faceScale'> & { geometries?: BufferGeometry[] },
+  factor: number,
+) {
+  if (part.faceScale === factor) return
+  part.faceScale = factor
+  part.data.primitives.forEach((prim, p) => {
+    if (part.data.materials[prim.material]?.face !== true) return
+    const src = prim.positions
+    let scaled = src
+    if (factor !== 1 && src.length >= 3) {
+      const min = [Infinity, Infinity, Infinity]
+      const max = [-Infinity, -Infinity, -Infinity]
+      for (let i = 0; i < src.length; i++) {
+        min[i % 3] = Math.min(min[i % 3], src[i])
+        max[i % 3] = Math.max(max[i % 3], src[i])
+      }
+      const centre = min.map((m, k) => (m + max[k]) / 2)
+      scaled = new Float32Array(src.length)
+      for (let i = 0; i < src.length; i++)
+        scaled[i] = centre[i % 3] + (src[i] - centre[i % 3]) * factor
+    }
+    part.sources[p] = scaled
+    const geometry = part.geometries?.[p]
+    if (geometry && !(prim.joints && prim.weights && part.data.jointNames.length > 0)) {
+      const attr = geometry.getAttribute('position') as BufferAttribute
+      ;(attr.array as Float32Array).set(scaled)
+      attr.needsUpdate = true
+    }
+  })
+}
+
 function imageTexture(bitmap: ImageBitmap, anisotropy: number): Texture {
   const texture = new Texture(bitmap)
   setPictureSampling(texture, anisotropy)
@@ -793,7 +877,7 @@ function skinPart(part: PartGpu) {
     const nrmAttr = geometry.getAttribute('normal') as BufferAttribute
     const pos = posAttr.array as Float32Array
     const nrm = nrmAttr.array as Float32Array
-    const src = prim.positions
+    const src = part.sources[p]
     const srcN = prim.normals
     const n = src.length / 3
     const m = new Float64Array(12)

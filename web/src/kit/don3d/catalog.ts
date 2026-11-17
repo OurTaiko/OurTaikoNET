@@ -10,24 +10,26 @@ export type DonCatalogItem = {
   icon?: DonCatalogFile
 }
 
-export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi'
+export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi' | 'paint'
 
 export type DonCatalog = {
   version: number
   mirrorUrls?: Record<string, string>
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
   defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
-  items: Record<DonPartKind, DonCatalogItem[]>
+  // paint: absent from catalogs written before makeup was added
+  items: Record<Exclude<DonPartKind, 'paint'>, DonCatalogItem[]> & { paint?: DonCatalogItem[] }
 }
 
 // How a Don looks, as the API gives it: a whole costume, or a head and a body; the puchichara
-// beside it (0: none); the body, face and rim colours (null: 1P's).
+// beside it (0: none); the makeup (0 or absent: none); the body, face and rim colours (null: 1P's).
 export type DonLook = {
   costume: boolean
   cos: number
   head: number
   body: number
   puchi: number
+  paint?: number
   colors: [string, string, string] | null
 }
 
@@ -60,12 +62,14 @@ export type DonLookPart = {
 export type ResolvedDonLook = {
   parts: DonLookPart[]
   puchi: DonCatalogItem | null
+  // the makeup's face sheet, drawn instead of the plain one on a face plate a third larger
+  paint: DonCatalogItem | null
   colors: [string, string, string]
 }
 
 // What a look draws: the costume, or the body then the head (head with the face plate always
-// normalised); an id the catalog does not have falls back to 0, puchichara 0 (or a missing one) is
-// none, and no colours are 1P's.
+// normalised); an id the catalog does not have falls back to 0, puchichara and makeup 0 (or a
+// missing one) are none, and no colours are 1P's.
 export function resolveDonLook(catalog: DonCatalog, look: DonLook): ResolvedDonLook {
   const pick = (kind: 'cos' | 'head' | 'body', id: number) =>
     catalogItem(catalog, kind, id) ?? catalogItem(catalog, kind, 0)
@@ -80,5 +84,7 @@ export function resolveDonLook(catalog: DonCatalog, look: DonLook): ResolvedDonL
     add('head', look.head, true)
   }
   const puchi = look.puchi > 0 ? (catalogItem(catalog, 'puchi', look.puchi) ?? null) : null
-  return { parts, puchi, colors: look.colors ?? catalog.defaultColors.p1 }
+  const paintId = look.paint ?? 0
+  const paint = paintId > 0 ? (catalogItem(catalog, 'paint', paintId) ?? null) : null
+  return { parts, puchi, paint, colors: look.colors ?? catalog.defaultColors.p1 }
 }

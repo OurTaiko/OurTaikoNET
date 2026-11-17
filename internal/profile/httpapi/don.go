@@ -27,17 +27,20 @@ const DefaultDonCatalogURL = "https://distrib.ourtaiko.org/3dchara/catalog.json"
 // How long a read catalog is used before it is read again (a failed read keeps the last good one).
 const donCatalogTTL = 5 * time.Minute
 
-// DonLook is a player's Don. Colors is body, face and rim as "#RRGGBB", or nil for the seat's.
+// DonLook is a player's Don. Paint is the makeup (0: none). Colors is body, face and rim as
+// "#RRGGBB", or nil for the seat's.
 type DonLook struct {
 	Costume bool      `json:"costume"`
 	Cos     int       `json:"cos"`
 	Head    int       `json:"head"`
 	Body    int       `json:"body"`
 	Puchi   int       `json:"puchi"`
+	Paint   int       `json:"paint"`
 	Colors  *[]string `json:"colors"`
 }
 
-// DonFile is one file a look needs: its kind (cos, head, body, puchi), number, address and content.
+// DonFile is one file a look needs: its kind (cos, head, body, puchi, paint), number, address and
+// content.
 type DonFile struct {
 	Kind   string `json:"kind"`
 	ID     int    `json:"id"`
@@ -180,6 +183,12 @@ func (c *donCatalog) check(l *DonLook) string {
 			id   int
 		}{"puchi", l.Puchi})
 	}
+	if l.Paint != 0 {
+		need = append(need, struct {
+			kind string
+			id   int
+		}{"paint", l.Paint})
+	}
 	for _, n := range need {
 		if _, ok := c.item(n.kind, n.id); !ok {
 			return fmt.Sprintf("没有 %s %d", n.kind, n.id)
@@ -189,7 +198,7 @@ func (c *donCatalog) check(l *DonLook) string {
 }
 
 // files are what the game needs to draw the look: the costume, or the head and the body, and
-// the puchichara.
+// the puchichara and the makeup.
 func (c *donCatalog) files(l DonLook, mirror *donMirror) []DonFile {
 	var want [][2]any
 	if l.Costume {
@@ -199,6 +208,9 @@ func (c *donCatalog) files(l DonLook, mirror *donMirror) []DonFile {
 	}
 	if l.Puchi != 0 {
 		want = append(want, [2]any{"puchi", l.Puchi})
+	}
+	if l.Paint != 0 {
+		want = append(want, [2]any{"paint", l.Paint})
 	}
 	files := []DonFile{}
 	for _, w := range want {
@@ -221,8 +233,8 @@ func (s *Server) donLook(ctx context.Context, q interface {
 }, user string) (DonLook, error) {
 	l := DonLook{}
 	var colors []string
-	err := q.QueryRow(ctx, `SELECT costume, cos_id, head_id, body_id, puchi_id, colors FROM don_looks WHERE user_id=$1`, user).
-		Scan(&l.Costume, &l.Cos, &l.Head, &l.Body, &l.Puchi, &colors)
+	err := q.QueryRow(ctx, `SELECT costume, cos_id, head_id, body_id, puchi_id, paint_id, colors FROM don_looks WHERE user_id=$1`, user).
+		Scan(&l.Costume, &l.Cos, &l.Head, &l.Body, &l.Puchi, &l.Paint, &colors)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return plainDon, nil
 	}
@@ -309,7 +321,8 @@ func (s *Server) myDon(w http.ResponseWriter, r *http.Request) {
 	s.answerDon(w, r, l)
 }
 
-// wearDon is PUT /api/v1/me/don: {costume, cos, head, body, puchi, colors}. Every number must be
+// wearDon is PUT /api/v1/me/don: {costume, cos, head, body, puchi, paint, colors} (paint left out
+// is 0, no makeup). Every number must be
 // in the catalog (the costume's even when wearing a head and body, and the other way round, so a
 // switch back keeps what was chosen); colors null is the seat's defaults.
 func (s *Server) wearDon(w http.ResponseWriter, r *http.Request) {
@@ -334,11 +347,11 @@ func (s *Server) wearDon(w http.ResponseWriter, r *http.Request) {
 	if l.Colors != nil {
 		colors = *l.Colors
 	}
-	_, err = s.DB.Exec(r.Context(), `INSERT INTO don_looks(user_id,costume,cos_id,head_id,body_id,puchi_id,colors,updated_at)
- VALUES($1,$2,$3,$4,$5,$6,$7,now())
+	_, err = s.DB.Exec(r.Context(), `INSERT INTO don_looks(user_id,costume,cos_id,head_id,body_id,puchi_id,paint_id,colors,updated_at)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,now())
  ON CONFLICT(user_id) DO UPDATE SET costume=EXCLUDED.costume,cos_id=EXCLUDED.cos_id,head_id=EXCLUDED.head_id,
- body_id=EXCLUDED.body_id,puchi_id=EXCLUDED.puchi_id,colors=EXCLUDED.colors,updated_at=now()`,
-		v.User.ID, l.Costume, l.Cos, l.Head, l.Body, l.Puchi, colors)
+ body_id=EXCLUDED.body_id,puchi_id=EXCLUDED.puchi_id,paint_id=EXCLUDED.paint_id,colors=EXCLUDED.colors,updated_at=now()`,
+		v.User.ID, l.Costume, l.Cos, l.Head, l.Body, l.Puchi, l.Paint, colors)
 	if err != nil {
 		internal(w, err)
 		return
