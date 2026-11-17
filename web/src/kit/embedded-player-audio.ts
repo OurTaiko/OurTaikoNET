@@ -1,5 +1,6 @@
 import { playerLoad, type PlayerAudioDecode, type PlayerMode } from './embedded-player-protocol'
 import { maxMovie } from './tja-limits'
+import { fetchResource } from './resource-download'
 
 type Options = {
   audioUrl: string
@@ -35,7 +36,7 @@ export class PlayerAudioLoad {
     const id = this.id
     const movie = this.downloadMovie()
     try {
-      const response = await fetch(this.options.audioUrl, {
+      const response = await fetchResource(this.options.audioUrl, {
         signal: this.controller.signal,
         credentials: 'omit',
         mode: 'cors',
@@ -95,7 +96,7 @@ export class PlayerAudioLoad {
     const url = this.options.movieUrl
     if (!url) return null
     try {
-      const response = await fetch(url, {
+      const response = await fetchResource(url, {
         signal: this.controller.signal,
         credentials: 'omit',
         mode: 'cors',

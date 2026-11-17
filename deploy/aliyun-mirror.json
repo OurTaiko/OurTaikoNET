@@ -12,7 +12,12 @@
     "mirrorSuffixes": [
       ".tja",
       ".ogg",
-      ".mp3"
+      ".mp3",
+      ".webp",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".mp4"
     ],
     "mirrorSni": true,
     "mirrorAllowHeadObject": true,
@@ -27,7 +32,7 @@
         "ruleName": "OurTaiko content-addressed songs",
         "sequence": 1,
         "ruleEnable": "on",
-        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\"})",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\" \"webp\" \"png\" \"jpg\" \"jpeg\" \"mp4\"})",
         "bypassCache": "cache_all",
         "edgeCacheMode": "override_origin",
         "edgeCacheTtl": "31536000",
@@ -61,6 +66,34 @@
         "browserCacheTtl": "60",
         "queryStringMode": "reserve_all",
         "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
+      }
+    ],
+    "responseHeaderRules": [
+      {
+        "ruleName": "OurTaiko public resource CORS",
+        "sequence": 1,
+        "ruleEnable": "on",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and starts_with(http.request.uri.path, \"/ourtaiko/\"))",
+        "responseHeaderModification": [
+          {
+            "name": "Access-Control-Allow-Origin",
+            "operation": "add",
+            "type": "static",
+            "value": "*"
+          },
+          {
+            "name": "Access-Control-Allow-Methods",
+            "operation": "add",
+            "type": "static",
+            "value": "GET, HEAD, OPTIONS"
+          },
+          {
+            "name": "Access-Control-Expose-Headers",
+            "operation": "add",
+            "type": "static",
+            "value": "ETag, Content-Length, Content-Range, Accept-Ranges"
+          }
+        ]
       }
     ]
   }

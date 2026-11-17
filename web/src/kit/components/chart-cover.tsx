@@ -8,6 +8,7 @@ import { CoverUploadDialog } from './cover-dialog'
 import type { ChartBase } from '../api/types'
 import { coverSource } from '../cover'
 import { categoryStripeColor } from '../category-colors'
+import { retryResourceOrigin } from '../resource-download'
 
 export function ChartCover({ chart, className }: { chart: ChartBase; className?: string }) {
   const { t } = useTranslation()
@@ -29,7 +30,9 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
             title: chartText(chart, i18n.resolvedLanguage).title,
           })}
           className="size-full object-contain"
-          onError={() => setFailedSource(source)}
+          onError={(event) => {
+            if (!retryResourceOrigin(event.currentTarget)) setFailedSource(source)
+          }}
         />
       ) : (
         <div
