@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/donitems"
 	"ourtaiko.dev/net/internal/titlerules"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -106,11 +107,55 @@ type ruleBody struct {
 	Count    *int    `json:"count"`
 }
 
+// itemCheck checks, in a new rule's transaction, that the item it gives may be given by rule:
+// a status and a problem to answer when not, or an error.
+type itemCheck func(ctx context.Context, tx pgx.Tx) (status int, code, message string, err error)
+
 // createTitleRule is POST /api/v1/admin/titles/{id}/rules {kind, source, chartId, category,
 // course, clear, count}: from now on the title is given to whoever meets the rule, and at once
 // to everyone who meets it already. Only a title of the catalog's own takes rules, not one a
 // player made. It answers {rule, granted}: the rule and how many players got the title now.
 func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	s.createRule(w, r, titlerules.Rule{TitleID: &id}, func(ctx context.Context, tx pgx.Tx) (int, string, string, error) {
+		var owned bool
+		err := tx.QueryRow(ctx, `SELECT owner_id IS NOT NULL FROM net.titles WHERE id=$1 FOR SHARE`, id).Scan(&owned)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return 404, "TITLE_NOT_FOUND", "称号不存在", nil
+		case err != nil:
+			return 0, "", "", err
+		case owned:
+			return 422, "RULE_TITLE_OWNED", "玩家自制的称号不能设置发放条件", nil
+		}
+		return 0, "", "", nil
+	})
+}
+
+// createDonItemRule is POST /api/v1/admin/don/items/{part}/{id}/rules, with the body of
+// createTitleRule: the same for a part of the 3D Don of the catalog (not 0, none).
+func (s *Server) createDonItemRule(w http.ResponseWriter, r *http.Request) {
+	part := r.PathValue("part")
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || !(donitems.Item{Part: part, ID: id}).Valid() {
+		problem(w, 404, "DON_ITEM_NOT_FOUND", "没有这件咚酱装扮")
+		return
+	}
+	s.createRule(w, r, titlerules.Rule{DonPart: &part, DonItem: &id}, func(ctx context.Context, tx pgx.Tx) (int, string, string, error) {
+		c, err := s.donCatalog(ctx)
+		if err != nil {
+			return 503, "DON_CATALOG_UNAVAILABLE", "服装目录暂时读不到，请稍后再试", nil
+		}
+		if _, ok := c.item(part, id); !ok {
+			return 404, "DON_ITEM_NOT_FOUND", "没有这件咚酱装扮", nil
+		}
+		return 0, "", "", nil
+	})
+}
+
+// createRule makes a rule that gives item (a Rule with only its item set), once check has
+// allowed the item, and gives it at once to those who meet the rule already.
+func (s *Server) createRule(w http.ResponseWriter, r *http.Request, item titlerules.Rule, check itemCheck) {
 	v, ok := s.admin(w, r)
 	if !ok {
 		return
@@ -119,7 +164,8 @@ func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	rule := titlerules.Rule{TitleID: r.PathValue("id"), Kind: body.Kind, Source: body.Source, ChartID: body.ChartID, Course: body.Course, Clear: body.Clear, Count: body.Count}
+	rule := item
+	rule.Kind, rule.Source, rule.ChartID, rule.Course, rule.Clear, rule.Count = body.Kind, body.Source, body.ChartID, body.Course, body.Clear, body.Count
 	if body.Category != nil {
 		flag, known := 0, false
 		if body.Source != nil {
@@ -141,18 +187,13 @@ func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var owned bool
-	err = tx.QueryRow(r.Context(), `SELECT owner_id IS NOT NULL FROM net.titles WHERE id=$1 FOR SHARE`, rule.TitleID).Scan(&owned)
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
-		return
-	}
+	status, code, message, err := check(r.Context(), tx)
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	if owned {
-		problem(w, 422, "RULE_TITLE_OWNED", "玩家自制的称号不能设置发放条件")
+	if code != "" {
+		problem(w, status, code, message)
 		return
 	}
 	if rule.ChartID != nil {
@@ -167,8 +208,9 @@ func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err = tx.QueryRow(r.Context(), `INSERT INTO net.title_rules(title_id,kind,source,chart_id,category_flag,course,clear,count,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-		rule.TitleID, rule.Kind, rule.Source, rule.ChartID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count, v.User.ID).Scan(&rule.ID); err != nil {
+	if err = tx.QueryRow(r.Context(), `INSERT INTO net.title_rules(title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count,created_by)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+		rule.TitleID, rule.DonPart, rule.DonItem, rule.Kind, rule.Source, rule.ChartID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count, v.User.ID).Scan(&rule.ID); err != nil {
 		internal(w, err)
 		return
 	}

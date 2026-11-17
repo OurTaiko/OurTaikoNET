@@ -58,3 +58,18 @@ DROP TRIGGER IF EXISTS user_titles_unreward ON net.user_titles;
 CREATE TRIGGER user_titles_unreward AFTER DELETE ON net.user_titles FOR EACH ROW EXECUTE FUNCTION net.unreward_title();
 DROP TRIGGER IF EXISTS user_dans_reward ON net.user_dans;
 CREATE TRIGGER user_dans_reward AFTER INSERT OR UPDATE OF verdict ON net.user_dans FOR EACH ROW EXECUTE FUNCTION net.reward_dan();
+
+-- Whoever counts a player's rewards and keeps the count (internal/rewards, Store.Run) is told
+-- when they change: given, taken back, seen or pruned. The payload is the player.
+CREATE OR REPLACE FUNCTION net.rewards_changed() RETURNS trigger LANGUAGE plpgsql SET search_path = net AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM pg_notify('net_rewards', OLD.user_id);
+  ELSE
+    PERFORM pg_notify('net_rewards', NEW.user_id);
+  END IF;
+  RETURN NULL;
+END $$;
+
+DROP TRIGGER IF EXISTS rewards_changed ON net.rewards;
+CREATE TRIGGER rewards_changed AFTER INSERT OR DELETE OR UPDATE OF seen_at ON net.rewards FOR EACH ROW EXECUTE FUNCTION net.rewards_changed();

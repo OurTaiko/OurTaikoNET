@@ -24,7 +24,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 		Granted int
 	}
 	c.json("POST", "/api/v1/admin/titles/first/rules", `{"kind":"site_login"}`, 201, &made)
-	if made.Granted != 1 || made.Rule.ID == 0 || made.Rule.Kind != "site_login" || made.Rule.TitleID != "first" {
+	if made.Granted != 1 || made.Rule.ID == 0 || made.Rule.Kind != "site_login" || *made.Rule.TitleID != "first" {
 		t.Fatal(made)
 	}
 	var held struct{ Titles []HeldTitle }

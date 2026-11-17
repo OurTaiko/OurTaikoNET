@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 	"ourtaiko.dev/net/internal/requester"
@@ -39,7 +40,7 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 	exec(`INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'hello')`, other)
 
 	store := Store{DB: pool}
-	if n, err := store.Pending(ctx, player); err != nil || n != 3 {
+	if n, err := store.Pending(ctx, player, true); err != nil || n != 3 {
 		t.Fatal("pending", n, err)
 	}
 
@@ -146,3 +147,113 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 }
 
 func jsonID(id int64) string { b, _ := json.Marshal(id); return string(b) }
+
+// A handler that writes nothing still answers with the header.
+func TestAnAnswerWithNothingWrittenIsToldToo(t *testing.T) {
+	pool := netdbtest.NewShared(t)
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO net.users(id) VALUES ($1)`, player); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style) VALUES ('t','t','wood')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'t')`, player); err != nil {
+		t.Fatal(err)
+	}
+	h := Store{DB: pool}.Announce(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requester.Note(r.Context(), player) }))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/quiet", nil))
+	if w.Header().Get(Header) != "1" {
+		t.Fatal(w.Header())
+	}
+}
+
+// While Run listens, a player's count is kept between answers and dropped as soon as the
+// database says it changed, by whatever wrote it; a request that may give something counts afresh.
+// Seen rewards are pruned after Retention.
+func TestCountsAreKeptWhileListeningAndSeenRewardsArePruned(t *testing.T) {
+	pool := netdbtest.NewShared(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO net.users(id) VALUES ($1)`, player)
+	exec(`INSERT INTO net.titles(id,name,style) SELECT id,id,'wood' FROM unnest(ARRAY['a','b','c']) id`)
+	store := NewStore(pool)
+	go store.Run(ctx, func(ctx context.Context) (Listener, func(), error) {
+		conn, err := pool.Acquire(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return conn.Conn(), conn.Release, nil
+	})
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); !ok(); time.Sleep(10 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal(what)
+			}
+		}
+	}
+	pending := func(fresh bool) int {
+		t.Helper()
+		n, err := store.Pending(ctx, player, fresh)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	waitFor("not listening", func() bool { store.counts.mu.Lock(); defer store.counts.mu.Unlock(); return store.counts.live })
+	if pending(false) != 0 {
+		t.Fatal("nothing given yet")
+	}
+	_, _, kept := store.counts.get(player)
+	if !kept {
+		t.Fatal("the count was not kept")
+	}
+
+	// Another connection gives a title: the kept count is dropped and the next answer counts it.
+	exec(`INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'a')`, player)
+	waitFor("the change was not heard", func() bool { _, _, ok := store.counts.get(player); return !ok })
+	if pending(false) != 1 {
+		t.Fatal("not counted after the change")
+	}
+	// A request that may have given something counts afresh, before any word arrives.
+	if _, err := pool.Exec(ctx, `INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'b')`, player); err != nil {
+		t.Fatal(err)
+	}
+	if pending(true) != 2 {
+		t.Fatal("a fresh count read the kept one")
+	}
+
+	// Marked seen: dropped at once.
+	var ids []int64
+	rows, _ := pool.Query(ctx, `SELECT id FROM net.rewards WHERE user_id=$1`, player)
+	for rows.Next() {
+		var id int64
+		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	if n, err := store.Seen(ctx, player, ids); err != nil || n != 2 {
+		t.Fatal(n, err)
+	}
+	if pending(false) != 0 {
+		t.Fatal("still counted after being seen")
+	}
+
+	// Pruned: seen long ago only.
+	exec(`INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'c')`, player)
+	exec(`UPDATE net.rewards SET seen_at=now()-interval '91 days' WHERE id=$1`, ids[0])
+	if n, err := store.Prune(ctx); err != nil || n != 1 {
+		t.Fatal("pruned", n, err)
+	}
+	var left int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.rewards`).Scan(&left); err != nil || left != 2 {
+		t.Fatal("left", left, err)
+	}
+}

@@ -1,9 +1,10 @@
-// Package titlerules gives titles by rule: a player who clears a certain chart, clears enough
+// Package titlerules gives items by rule: a player who clears a certain chart, clears enough
 // charts of a category, is seen signed in on the website or in the game, or has uploaded
-// enough charts gets the title the rule names (net.title_rules).
+// enough charts gets the item the rule names (net.title_rules). An item is a title or a part of
+// the 3D Don; each kind of item says how it is given (target), and nothing else here knows it.
 //
-// A rule gives a player its title once. What it gave is an award of the service "rule" whose
-// request_key is "<rule id>:<user id>", so asking again gives nothing, and a title an
+// A rule gives a player its item once. What it gave is an award of the service "rule" whose
+// request_key is "<rule id>:<user id>", so asking again gives nothing, and an item an
 // administrator took back is not given again by the same rule.
 //
 // Every statement names its schemas: the callers' connections differ in search_path.
@@ -35,8 +36,11 @@ var Courses = []string{"Easy", "Normal", "Hard", "Oni", "Edit"}
 
 // Rule is one row of net.title_rules. Which fields a kind has is the table's title_rules_shape.
 type Rule struct {
-	ID           int64   `json:"id"`
-	TitleID      string  `json:"titleId"`
+	ID int64 `json:"id"`
+	// The item: a title, or a Don part and its number (one or the other).
+	TitleID      *string `json:"titleId"`
+	DonPart      *string `json:"donPart"`
+	DonItem      *int    `json:"donItem"`
 	Kind         string  `json:"kind"`
 	Source       *string `json:"source"`
 	ChartID      *string `json:"chartId"`
@@ -47,12 +51,12 @@ type Rule struct {
 }
 
 // Columns are a rule's columns as Scan reads them, of a table named r.
-const Columns = `r.id,r.title_id,r.kind,r.source,r.chart_id,r.category_flag,r.course,r.clear,r.count`
+const Columns = `r.id,r.title_id,r.don_part,r.don_item,r.kind,r.source,r.chart_id,r.category_flag,r.course,r.clear,r.count`
 
 // Scan reads a rule selected by Columns; more receives what was selected after them.
 func Scan(row interface{ Scan(...any) error }, more ...any) (Rule, error) {
 	var r Rule
-	err := row.Scan(append([]any{&r.ID, &r.TitleID, &r.Kind, &r.Source, &r.ChartID, &r.CategoryFlag, &r.Course, &r.Clear, &r.Count}, more...)...)
+	err := row.Scan(append([]any{&r.ID, &r.TitleID, &r.DonPart, &r.DonItem, &r.Kind, &r.Source, &r.ChartID, &r.CategoryFlag, &r.Course, &r.Clear, &r.Count}, more...)...)
 	return r, err
 }
 
@@ -65,9 +69,57 @@ func schema(source string) (string, bool) {
 	return source, source == "fanmade" || source == "official"
 }
 
+// target is how a rule's item is given: the insert into the item's own table of the players in
+// CTE a (user_id and the award's id), with the item's arguments from $first, and what the award
+// says it granted. A new kind of item is a new case here.
+type target struct {
+	insert  func(first int) string
+	args    []any
+	granted func(first int) string
+	key     string
+}
+
+var donParts = map[string]bool{"cos": true, "head": true, "body": true, "puchi": true, "paint": true}
+
+func (r Rule) target() (target, bool) {
+	switch {
+	case r.TitleID != nil && *r.TitleID != "" && r.DonPart == nil && r.DonItem == nil:
+		return target{
+			insert: func(first int) string {
+				return fmt.Sprintf(`INSERT INTO net.user_titles(user_id,title_id,award_id) SELECT a.user_id,$%d::text,a.id FROM a`, first)
+			},
+			args: []any{*r.TitleID}, key: "title:" + *r.TitleID,
+			granted: func(first int) string {
+				return fmt.Sprintf(`jsonb_build_object('titles',jsonb_build_array($%d::text))`, first)
+			},
+		}, true
+	case r.TitleID == nil && r.DonPart != nil && donParts[*r.DonPart] && r.DonItem != nil && *r.DonItem > 0:
+		return target{
+			insert: func(first int) string {
+				return fmt.Sprintf(`INSERT INTO net.user_don_items(user_id,part,item_id,award_id) SELECT a.user_id,$%d::text,$%d::int,a.id FROM a`, first, first+1)
+			},
+			args: []any{*r.DonPart, *r.DonItem},
+			granted: func(first int) string {
+				return fmt.Sprintf(`jsonb_build_object('donItems',jsonb_build_array(jsonb_build_object('part',$%d::text,'id',$%d::int)))`, first, first+1)
+			},
+			key: "don:" + *r.DonPart + ":" + strconv.Itoa(*r.DonItem),
+		}, true
+	}
+	return target{}, false
+}
+
+// Item names what the rule gives, as "title:<id>" or "don:<part>:<number>".
+func (r Rule) Item() string {
+	t, _ := r.target()
+	return t.key
+}
+
 // Valid says whether r is a rule the table takes (title_rules_shape) and this package can
 // judge. It does not look at whether the title or the chart exist.
 func (r Rule) Valid() bool {
+	if _, ok := r.target(); !ok {
+		return false
+	}
 	source := r.Source != nil
 	if source {
 		if _, ok := schema(*r.Source); !ok {
@@ -147,19 +199,25 @@ func (r Rule) met() (string, []any, error) {
 	}
 }
 
-// give gives r's title to the players the query set selects (one column user_id, its
-// arguments from $2) who have not had it from r, and returns them. One statement: it needs no
-// transaction of its own.
+// give gives r's item to the players the query set selects (one column user_id, its arguments
+// from $2) who have not had it from r, and returns them. One statement: it needs no transaction
+// of its own.
 func (r Rule) give(ctx context.Context, db DB, set string, user string, args []any) ([]string, error) {
+	t, ok := r.target()
+	if !ok {
+		return nil, errors.New("titlerules: rule " + strconv.FormatInt(r.ID, 10) + " gives nothing")
+	}
 	n := len(args) + 1
-	all := append(append([]any{user}, args...), r.ID, r.TitleID, r.Kind)
+	all := append(append(append([]any{user}, args...), r.ID, r.Kind), t.args...)
+	rule, kind, item := n+1, n+2, n+3
+	granted := t.granted(item)
 	rows, err := db.Query(ctx, fmt.Sprintf(`WITH met AS (%s),
  a AS (INSERT INTO net.awards(service,request_key,user_id,granted)
-  SELECT '`+Service+`',$%d::bigint||':'||m.user_id,m.user_id,jsonb_build_object('titles',jsonb_build_array($%d::text),'rule',$%d::bigint,'kind',$%d::text)
+  SELECT '`+Service+`',$%d::bigint||':'||m.user_id,m.user_id,%s||jsonb_build_object('rule',$%d::bigint,'kind',$%d::text)
   FROM met m JOIN net.users u ON u.id=m.user_id
   ON CONFLICT(service,request_key) DO NOTHING RETURNING id,user_id),
- t AS (INSERT INTO net.user_titles(user_id,title_id,award_id) SELECT a.user_id,$%d::text,a.id FROM a ON CONFLICT DO NOTHING RETURNING user_id)
- SELECT user_id FROM t ORDER BY user_id`, set, n+1, n+2, n+1, n+3, n+2), all...)
+ t AS (%s ON CONFLICT DO NOTHING RETURNING user_id)
+ SELECT user_id FROM t ORDER BY user_id`, set, rule, granted, rule, kind, t.insert(item)), all...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +245,8 @@ func pending(ctx context.Context, db DB, user, where string, args ...any) ([]Rul
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Rule, error) { return Scan(row) })
 }
 
-// judge gives user the titles of those of rules they meet, and returns the titles they did
-// not hold before.
+// judge gives user the items of those of rules they meet, and returns the items (Rule.Item)
+// they did not hold before.
 func judge(ctx context.Context, db DB, user string, rules []Rule) ([]string, error) {
 	titles := []string{}
 	for _, r := range rules {
@@ -201,7 +259,7 @@ func judge(ctx context.Context, db DB, user string, rules []Rule) ([]string, err
 			return titles, err
 		}
 		if len(got) > 0 {
-			titles = append(titles, r.TitleID)
+			titles = append(titles, r.Item())
 		}
 	}
 	return titles, nil
@@ -209,7 +267,7 @@ func judge(ctx context.Context, db DB, user string, rules []Rule) ([]string, err
 
 // Played judges the rules a score on a chart can have met: those of the chart, and those of
 // its categories. Call it once the score is saved, in its transaction or after. It returns
-// the titles the player got.
+// the items the player got (Rule.Item).
 func Played(ctx context.Context, db DB, source, user, chart string) ([]string, error) {
 	s, ok := schema(source)
 	if !ok || user == "" {
@@ -253,7 +311,7 @@ func Seen(ctx context.Context, db DB, kind, user string) ([]string, error) {
 			return titles, err
 		}
 		if len(got) > 0 {
-			titles = append(titles, r.TitleID)
+			titles = append(titles, r.Item())
 		}
 	}
 	return titles, nil
