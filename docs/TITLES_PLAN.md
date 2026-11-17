@@ -99,7 +99,7 @@ No behaviour changes; goes with any release of the backend.
 
 ## Releasing `feat/titles`
 
-- It carries migrations `0008_title_rules`, `0009_rewards` and `0010_don_items`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
+- It carries migrations `0009_title_rules`, `0010_rewards` and `0011_don_items`. Once released, an image from before it refuses to start on the database: there is no rolling back past it without restoring.
 - Releasing the backend closes every Multi-Enso room.
-- `feat/story` has a migration numbered `0003`, which `main` has since used. Whichever of the two branches is merged second renumbers its migration (this branch already moved its own from 0006 to 0008 when it took in `main`).
+- `feat/story` has a migration numbered `0003`, which `main` has since used. Whichever of the two branches is merged second renumbers its migration (this branch moved its own from 0006 to 0008 when it took in `main`, and to 0009–0011 when `main` took 0008 for the visits' times).
 - After release, make the first rules by hand in `/manage/titles` and check the number the page reports for each against what is expected.

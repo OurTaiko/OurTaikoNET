@@ -2,34 +2,45 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
 
 // How much the website is visited (package visits). The website tells the page it shows;
 // everyone may read the totals, which the foot of every page shows, and the site's
-// administrator the days and pages behind them.
+// administrator the days, hours and pages behind them. Whoever reads names their time zone
+// (?tz=Asia/Shanghai, as their browser gives it; UTC without one), and its days are the days
+// they are given.
 
 const (
-	// How long the totals are answered from memory.
-	visitSummaryKept = 30 * time.Second
+	// How long the totals of a time zone are answered from memory, and of how many zones at
+	// most; the memory is emptied when more are asked for.
+	visitSummaryKept, visitSummaryZones = 30 * time.Second, 64
 	// How many pages one visitor is counted for in a minute; more are dropped without a word.
 	visitsAMinute = 60
 	// How many pages a report lists.
 	visitReportPages = 50
 )
 
+// keptVisits is the summary of a time zone as read at at.
+type keptVisits struct {
+	summary visits.Summary
+	at      time.Time
+}
+
 func (s *Server) visitStore() visits.Store { return visits.Store{DB: s.DB, Now: s.Config.Now} }
 
-// RunVisitUpkeep closes the days that are over (their visitors are counted and what told
-// them apart is deleted) now and every hour until ctx ends.
+// RunVisitUpkeep deletes the salts that are over (after which what told visitors apart tells
+// nobody who they were) now and every hour until ctx ends.
 func (s *Server) RunVisitUpkeep(ctx context.Context) {
-	s.visitStore().RunClose(ctx, func(err error) { log.Printf("closing the days of the visit count: %v", err) })
+	s.visitStore().RunClose(ctx, func(err error) { log.Printf("closing the spans of the visit count: %v", err) })
 }
 
 // visitAllowed counts a view against its visitor's visitsAMinute.
@@ -75,27 +86,57 @@ func (s *Server) countVisit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// visitSummary is GET /api/v1/visits, public: {"total": {"views", "visitors"}, "today": {…},
-// "since": "2026-11-16"}. Kept for visitSummaryKept and given to everyone who asks meanwhile.
+// visitZone is the time zone the request names (?tz=), or false once it has answered 400.
+func visitZone(w http.ResponseWriter, r *http.Request) (*time.Location, bool) {
+	loc, err := visits.Zone(r.URL.Query().Get("tz"))
+	if err != nil {
+		problem(w, 400, "QUERY_INVALID", "tz 需要是时区名，例如 Asia/Shanghai")
+		return nil, false
+	}
+	return loc, true
+}
+
+// unknownZone reports whether the database did not know a time zone the program knew.
+func unknownZone(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "22023"
+}
+
+// visitSummary is GET /api/v1/visits?tz=Asia/Shanghai, public: {"total": {"views",
+// "visitors"}, "today": {…}, "since": "2026-11-16"}, today and since being of that time zone.
+// Kept for visitSummaryKept and given to everyone who asks for that zone meanwhile.
 func (s *Server) visitSummary(w http.ResponseWriter, r *http.Request) {
+	loc, ok := visitZone(w, r)
+	if !ok {
+		return
+	}
 	s.visitMu.Lock()
 	defer s.visitMu.Unlock()
-	if s.visitAt.IsZero() || time.Since(s.visitAt) > visitSummaryKept {
+	kept, ok := s.visits[loc.String()]
+	if !ok || time.Since(kept.at) > visitSummaryKept {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		summary, err := s.visitStore().Summary(ctx)
+		summary, err := s.visitStore().Summary(ctx, loc)
+		if unknownZone(err) {
+			problem(w, 400, "QUERY_INVALID", "tz 需要是时区名，例如 Asia/Shanghai")
+			return
+		}
 		if err != nil {
 			internal(w, err)
 			return
 		}
-		s.visit, s.visitAt = summary, time.Now()
+		if len(s.visits) >= visitSummaryZones {
+			clear(s.visits)
+		}
+		kept = keptVisits{summary, time.Now()}
+		s.visits[loc.String()] = kept
 	}
-	web.Respond(w, 200, s.visit)
+	web.Respond(w, 200, kept.summary)
 }
 
-// visitReport is GET /api/v1/admin/visits?days=30 (1 to visits.MaxDays), for the site's
-// administrator: the summary, each of the last days (oldest first, today last) and the pages
-// seen most in them.
+// visitReport is GET /api/v1/admin/visits?days=30&tz=Asia/Shanghai (days 1 to visits.MaxDays),
+// for the site's administrator: the summary, each of the last days of that time zone (oldest
+// first, today last), the views in each of its hours over them, and the pages seen most.
 func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
 		return
@@ -109,16 +150,22 @@ func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 		}
 		days = n
 	}
+	loc, ok := visitZone(w, r)
+	if !ok {
+		return
+	}
 	store := s.visitStore()
-	summary, err := store.Summary(r.Context())
-	if err != nil {
-		internal(w, err)
+	summary, err := store.Summary(r.Context(), loc)
+	if err == nil {
+		var report visits.Report
+		if report, err = store.Report(r.Context(), loc, days, visitReportPages); err == nil {
+			web.Respond(w, 200, map[string]any{"zone": loc.String(), "total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "hours": report.Hours, "pages": report.Pages})
+			return
+		}
+	}
+	if unknownZone(err) {
+		problem(w, 400, "QUERY_INVALID", "tz 需要是时区名，例如 Asia/Shanghai")
 		return
 	}
-	report, err := store.Report(r.Context(), days, visitReportPages)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	web.Respond(w, 200, map[string]any{"total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "pages": report.Pages})
+	internal(w, err)
 }

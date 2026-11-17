@@ -35,7 +35,9 @@ export const endpoints = {
   groups: `${API_ROOT}/admin/groups`,
   groupMembers: `${API_ROOT}/admin/users`,
   findPlayers: (text: string) => `${API_ROOT}/admin/users?q=${encodeURIComponent(text)}`,
-  // How much the site is visited, for its administrator: the last days and the pages seen most.
-  visitReport: (days: number) => `${API_ROOT}/admin/visits?days=${days}`,
+  // How much the site is visited, for its administrator: the last days of the time zone `tz`
+  // (UTC when empty), their hours and the pages seen most.
+  visitReport: (days: number, tz: string) =>
+    `${API_ROOT}/admin/visits?days=${days}${tz ? `&tz=${encodeURIComponent(tz)}` : ''}`,
   userGroups: (id: string) => `${API_ROOT}/admin/users/${encodeURIComponent(id)}/groups`,
 }

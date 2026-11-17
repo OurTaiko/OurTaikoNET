@@ -16,7 +16,6 @@ import (
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/chat"
 	"ourtaiko.dev/net/internal/kit/distribution"
-	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -75,11 +74,10 @@ type Server struct {
 	nameplateMu     sync.Mutex
 	nameplateArt    nameplateSlot
 	nameplateMirror nameplateSlot
-	// The visit count (visits.go): the totals as last read, and each visitor's views this
-	// minute (under mu).
+	// The visit count (visits.go): the totals of each time zone as last read, and each
+	// visitor's views this minute (under mu).
 	visitMu     sync.Mutex
-	visit       visits.Summary
-	visitAt     time.Time
+	visits      map[string]keptVisits
 	visitLimits map[string]window
 	// Who waits for news of their chats (chats.go).
 	chats *chat.Hub
@@ -93,7 +91,7 @@ func New(pool *pgxpool.Pool, cfg Config) *Server {
 	if cfg.Distribution == nil {
 		cfg.Distribution = distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
 	}
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
+	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
 }
 
 func (s *Server) sessionCookie() string {

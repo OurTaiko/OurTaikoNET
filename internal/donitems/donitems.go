@@ -1,5 +1,5 @@
 // Package donitems keeps which parts of the 3D Don each player owns, and which parts must be
-// owned to be worn (net.user_don_items, net.don_item_locks; migration 0010).
+// owned to be worn (net.user_don_items, net.don_item_locks; migration 0011).
 //
 // Every part may be worn by anyone unless it is locked. Locking a part gives it to everyone who
 // wears it at that moment, so nobody's Don changes; taking a part back from a player takes it off
@@ -125,7 +125,7 @@ func Unlock(ctx context.Context, db DB, it Item) error {
 }
 
 // Give gives a player an item, recorded as an award of the service (such as "admin") with what
-// the award should say it granted; the reward follows from it (migration 0010). It returns whether
+// the award should say it granted; the reward follows from it (migration 0011). It returns whether
 // the player did not have it already. Call it in a transaction.
 func Give(ctx context.Context, db DB, user string, it Item, service, key string, granted map[string]any) (bool, error) {
 	if !it.Valid() {

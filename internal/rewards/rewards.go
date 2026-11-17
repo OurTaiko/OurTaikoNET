@@ -10,7 +10,7 @@
 //
 // The package does not know what a reward is. A reward is a row of net.rewards, a kind and the
 // data a client shows, written by the database's triggers on what can be given (migration
-// 0009_rewards). Nor does it know how a request is signed in: Routes is given that.
+// 0010_rewards). Nor does it know how a request is signed in: Routes is given that.
 package rewards
 
 import (
@@ -240,7 +240,7 @@ type Listener interface {
 }
 
 // Run keeps the store's counts right and its table small until ctx ends: it listens for the
-// database saying a player's rewards changed (migration 0009's net_rewards), and counts are kept
+// database saying a player's rewards changed (migration 0010's net_rewards), and counts are kept
 // only while it does; every hour it deletes what was seen more than Retention ago. connect gives
 // a connection to listen on and a function to give it back; when the connection fails, counts
 // stop being kept until another is listening.

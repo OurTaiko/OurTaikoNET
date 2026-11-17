@@ -47,19 +47,20 @@ The state machine (`room.go`, `manager.go`) does no I/O and is tested on a clock
 
 ## Visits
 
-How much the website is visited (`internal/visits`, migration `0005_visits`). The website tells the server each page it shows (`web/src/kit/shell/visits.ts`, from the frame, once a page has stayed 0.6 s); nothing is counted from the requests themselves, so the game and programs reading the API are not visitors.
+How much the website is visited (`internal/visits`, migrations `0005_visits` and `0008_visit_times`). The website tells the server each page it shows (`web/src/kit/shell/visits.ts`, from the frame, once a page has stayed 0.6 s); nothing is counted from the requests themselves, so the game and programs reading the API are not visitors. Every view is kept with the moment it was made, and whoever reads the count names their time zone (`?tz=`, the browser's IANA name; UTC without one): days, "today" and hours are those of that zone.
 
-- **What is kept.** `net.visit_days (day, views, visitors, salt)`, `net.visit_pages (day, page, views)` and, for the day that is still open, `net.visit_visitors (day, visitor)`. A day is a day of UTC+8. A page is an address with every part that is not a plain word replaced by `:id` (`/fanmade/charts/:id`); a day has at most 300 pages, the rest go to `(other)`.
-- **Visitors.** No cookie and no stored address: a visitor is `sha256(the day's random salt || IP and User-Agent)`, so the same person is one visitor a day and cannot be followed from one day to the next. Every hour the days that are over are closed: the hashes are counted into `visit_days.visitors` and deleted with the salt. Over several days "visitors" is the sum of each day's.
+- **What is kept.** `net.visit_views (at, page, visitor_even, visitor_odd)`, one row a view, and `net.visit_salts (span, salt)`. A page is an address with every part that is not a plain word replaced by `:id` (`/fanmade/charts/:id`).
+- **Visitors.** No cookie and no stored address. A salt belongs to a span of two UTC days, and a span begins every day, so every moment lies in two spans: one beginning on an even day (counted from 1970-01-01), one on an odd day. Each view keeps `sha256(salt || IP and User-Agent)` under both. A day of any time zone (up to 24 h from UTC) lies inside the span beginning on the UTC day it begins on, so its visitors are the distinct hashes of that span's column. Every hour the salts of spans that are over (begun two days ago or more) are deleted: from then on the hashes still tell that span's visitors apart but nobody can tell who they were, and the same person cannot be followed from one span to the next. Over several days "visitors" is the sum of each day's. A 25-hour day at the end of daylight saving time may stick out of its span by the extra hour at most; a visitor in that hour can be counted twice.
+- **Before 2026-11-17.** The first count (`0005`) kept only totals per day of UTC+8: `net.visit_days`, `net.visit_pages` (`net.visit_visitors` is empty). Nothing is added there any more; its views and visitors are in the totals, not in the days, hours or pages.
 - `POST /api/v1/visits` `{"path": "/fanmade/charts/…"}` → 204, with or without a session. Not counted, and still 204: a User-Agent that is a program's or missing, more than 60 a minute from one address, a path that is no address of the site. It does not count against the 40 writes a minute.
-- `GET /api/v1/visits`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s. The footer of every page shows it.
-- `GET /api/v1/admin/visits?days=30` (1–366), the site's administrator → the same, plus `days` (each day, oldest first, with the days nobody came) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator.
+- `GET /api/v1/visits?tz=Asia/Shanghai`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s per time zone (64 zones at most). The footer of every page shows it. A `tz` that is no time zone → 400.
+- `GET /api/v1/admin/visits?days=30&tz=Asia/Shanghai` (days 1–366), the site's administrator → the same, plus `zone`, `days` (each day of that zone, oldest first, with the days nobody came), `hours` (views in each hour of the day 0–23 over those days) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator, in the browser's time zone.
 
 ## Titles by rule
 
 A rule gives one item: a title, or a part of the 3D Don (see "Parts of the Don to earn"); everything below holds for both. A rule has `titleId`, or `donPart` and `donItem`; each kind of item says in `titlerules.target` how it is given, and nothing else in the package knows it. A rule for a part is made at `POST /api/v1/admin/don/items/{part}/{id}/rules` with the same body, and the part must be in the catalog.
 
-Besides a 段位 course and an administrator's hand, a title is given by rule (`internal/titlerules`, table `net.title_rules`, migration `0008_title_rules`). A title may have several rules; meeting any one gives it. Only a title of the catalog's own (no `owner_id`) takes rules.
+Besides a 段位 course and an administrator's hand, a title is given by rule (`internal/titlerules`, table `net.title_rules`, migration `0009_title_rules`). A title may have several rules; meeting any one gives it. Only a title of the catalog's own (no `owner_id`) takes rules.
 
 | `kind` | Met by | Fields |
 |---|---|---|
@@ -82,7 +83,7 @@ The website shows each title's rules in the catalog (`/titles`) and edits them a
 
 ## Rewards
 
-What a player was given (a title, by any of the three ways; a 段位 badge that gets better), told the same way to the website and the game and for every request (`internal/rewards`, migration `0009_rewards`). No answer's body says what was given; the score's answer does not either.
+What a player was given (a title, by any of the three ways; a 段位 badge that gets better), told the same way to the website and the game and for every request (`internal/rewards`, migration `0010_rewards`). No answer's body says what was given; the score's answer does not either.
 
 - **The header.** Every answer to a request whose player is known carries `X-Pending-Rewards: <n>`, the rewards not seen yet: from both sources and the players' part, on the old domains too, file downloads included. Without a signed-in player there is no header. The count is read as the answer starts, after the handler ran, so the answer to the request that gave something already counts it. If the count cannot be read the header is left out.
 - **Fetching.** `GET /api/v1/me/rewards` (website session) or `GET /api/v1/game/rewards` (game token) → `{"rewards": [{"id","kind","data","createdAt"}]}`, the unseen ones, oldest first, at most 50. Then `POST …/seen {"ids": [...]}` (the website with its CSRF token) → `{"marked": n}`; ids of others' rewards, or of seen ones, are passed over.
@@ -106,7 +107,7 @@ Players writing to each other (`internal/chat`, migration `0006_chats`; the rout
 
 ## Parts of the Don to earn
 
-Every part of the 3D Don's catalog may be worn by anyone unless an administrator **locks** it (`internal/donitems`, migration `0010_don_items`). A locked part is worn only by players who own it.
+Every part of the 3D Don's catalog may be worn by anyone unless an administrator **locks** it (`internal/donitems`, migration `0011_don_items`). A locked part is worn only by players who own it.
 
 - **Tables.** `net.don_item_locks (part, item_id)`: the locked parts. `net.user_don_items (user_id, part, item_id, award_id, acquired_at)`: what each player owns, with the award that gave it (none when given on locking). Parts are `cos`, `head`, `body`, `puchi`, `paint`; number 0 (taken off, or none) is never locked or owned. The catalog is the bucket's, so `item_id` has no foreign key; the routes check it against the catalog.
 - **Locking** gives the part to everyone wearing it at that moment, so nobody's Don changes; it is not a reward. Unlocking leaves owners as they are.
