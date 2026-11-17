@@ -222,17 +222,21 @@ directory for an exact snapshot.
    parameter in the cache key for asset requests so changed objects get a new cache entry.
    Allow cross-origin GET requests from the website's origin for the browser's Don renderer.
 3. Fetch the mirrored catalogs and test an uncached model and icon with their versioned URLs.
-   Verify the response bytes against the catalog, then point `DON_CATALOG_URL` at the mirror's
-   `3dchara/catalog.json`. The API builds its Don asset URLs relative to this catalog. Check
-   the resulting API URLs, load an uncached outfit in the game, and check the website's Don
-   preview from the configured site origin.
+   Verify the response bytes against the catalog. For the regional rollout, keep
+   `DON_CATALOG_URL` on the canonical CloudFront catalog and configure the regional mirror
+   separately once that backend support is deployed. Check the resulting API URLs, load an
+   uncached outfit in the game, and check the website's Don preview from the configured site
+   origin. The production OSS/ESA paths, cache policy and publishing requirements are in
+   [aliyun-mirror.md](aliyun-mirror.md).
 4. Already shipped game clients fetch `https://distrib.ourtaiko.org/nameplate/catalog.json`
    directly. To move their nameplate traffic, keep that public URL and route its prefix to the
    mirror. Using a different nameplate hostname requires a game build that requests it.
 
 Run staging and upload again after publishing new Don or nameplate art to the canonical bucket.
-To roll back Don downloads, restore the previous `DON_CATALOG_URL`. Chart downloads use the
-separate `FANMADE_S3_PUBLIC_BASE_URL` and `OFFICIAL_S3_PUBLIC_BASE_URL` settings.
+To roll back regional Don downloads, clear `DON_MIRROR_CATALOG_URL` and recreate the container.
+Chart downloads use the separate `FANMADE_S3_PUBLIC_BASE_URL` and
+`OFFICIAL_S3_PUBLIC_BASE_URL` settings; keep those canonical until regional chart routing is
+implemented.
 
 ## Files before the switch
 
