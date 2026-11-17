@@ -18,7 +18,8 @@ import { cn } from '@sitekit/lib/utils'
 import {
   DonPreview,
   catalogItem,
-  catalogUrl,
+  donImage,
+  donSource,
   type DonCatalog,
   type DonCatalogItem,
   type DonLook,
@@ -139,6 +140,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
               baseUrl={catalog.baseUrl}
               look={draft}
               motion={motion}
+              repeatMotion
               className="absolute inset-0"
             />
           </div>
@@ -390,18 +392,18 @@ function IconGrid({
               onClick={() => onPick(item.id)}
               style={kind === 'paint' ? { backgroundColor: faceColor } : undefined}
             >
-              {kind === 'puchi' || kind === 'paint' ? (
+              {(kind === 'puchi' || kind === 'paint') && !item.icon ? (
                 // The first of its frames (stacked top to bottom: a puchichara has two, a
                 // makeup sheet one per face).
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.file)}
+                  {...donImage(donSource(catalog.baseUrl, item.file, catalog))}
                   alt=""
                   loading="lazy"
                   className="absolute inset-x-0 top-0 w-full"
                 />
               ) : item.icon ? (
                 <img
-                  src={catalogUrl(catalog.baseUrl, item.icon)}
+                  {...donImage(donSource(catalog.baseUrl, item.icon, catalog))}
                   alt=""
                   loading="lazy"
                   className="size-full object-contain p-1"

@@ -132,6 +132,52 @@ Each step touches production and is done with the owner's go-ahead.
 6. **Release** the backend, then the website (then still OurTaikoNetWeb). **Done on 2026-11-14**,
    before steps 3 and 5.
 
+## Regional resource mirror rollout
+
+Keep `DON_CATALOG_URL` on the canonical CloudFront catalog. Prepare and verify the mirror
+using [aliyun-mirror.md](aliyun-mirror.md), which documents the staging tool, permanent
+OSS/ESA paths, cache rules and publication order. Publish the mirror catalog only after its
+objects are verified. The canonical catalog remains authoritative for every region.
+
+Put a GeoLite2 Country or compatible MMDB file in `/opt/ourtaiko-net/geoip`, readable by the
+container. Set these in the server's `api.env` and recreate the container:
+
+```dotenv
+DON_GEOIP_DB=/srv/geoip/GeoLite2-Country.mmdb
+DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko/3dchara/catalog.json
+```
+
+With `DON_MIRROR_CATALOG_URL` set, the server refuses to start if it is not a plain HTTPS URL
+or the country database cannot be opened; check `docker logs` after recreating.
+
+The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP and
+`TRUSTED_PROXY_CIDRS` must identify the proxy. Mainland China (`CN`) requests get mirror URLs
+for exact Don/nameplate catalog matches, and for public content-addressed chart media
+after a bounded mirror HEAD check. Overseas, Hong Kong, Macao, Taiwan and unknown locations get
+canonical URLs. Unlisted or changed art stays canonical; failed refreshes retain the last
+good mirror catalog. New public song files can use OSS missing-object back-to-origin.
+While both settings are in effect, the per-user Don answer is `private, no-store` and the
+website catalog `private, max-age=60`, so shared caches never hand one region's addresses to
+another; otherwise the catalog stays `public, max-age=60`.
+
+Check the same outfit from one mainland and one overseas connection. Inspect both
+`/api/v1/users/{id}/don` and `/api/v1/don/catalog`, then load the outfit with a fresh game cache
+and in the browser. Check `/api/v1/nameplate-art/catalog`, source chart `resources`
+responses and GET/HEAD media redirects too. Download from a cold mirror and exercise a failed
+mirror (including wrong size/hash): updated web/Play clients retry canonical resource URLs.
+File routes accept `?origin=1` for an explicit canonical retry. Include an outfit whose mirror
+file is missing or outdated. To disable the
+rollout, clear `DON_MIRROR_CATALOG_URL` and recreate the container. Restart after replacing the
+country database. Keep Fanmade and official S3 public bases canonical: only mainland requests
+are selected for ESA. Signed/private URLs and other CDN origins keep their existing route.
+
+The existing Don mirror/GeoIP/trusted-proxy settings are shared by all collections; no second
+IP database or new environment variable is required. The mirror URL must end in
+`/3dchara/catalog.json` to infer sibling collections. A nonstandard custom Don catalog remains
+Don-only. Release the NET backend and website together, then a Play update: older Play builds
+can use routed song URLs, but retain their canonical nameplate source and lack per-file
+canonical retry. HTTPS distribution is still served by the upstream CDN outside mainland China.
+
 ## Multi-Enso (gRPC)
 
 **On since 2026-11-14.** The steps below were done that day, in the order 2, 3, 1, 4, and

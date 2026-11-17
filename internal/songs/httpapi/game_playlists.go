@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/objectstore"
@@ -122,6 +124,7 @@ func (s *Server) gamePlaylistList(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
+	s.routePlaylistCovers(r, playlists)
 	web.Respond(w, 200, map[string]any{"playlists": playlists, "playlistVersion": 1})
 }
 
@@ -150,4 +153,17 @@ func (s *Server) gamePlaylistDetails(ctx context.Context, items []GamePlaylist) 
 		}
 	}
 	return nil
+}
+
+func (s *Server) routePlaylistCovers(r *http.Request, items []GamePlaylist) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	request := r.WithContext(ctx)
+	var wait sync.WaitGroup
+	for i := range items {
+		if items[i].Cover != nil {
+			wait.Go(func() { link := s.routeResource(request, *items[i].Cover); items[i].Cover = &link })
+		}
+	}
+	wait.Wait()
 }

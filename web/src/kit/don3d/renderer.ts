@@ -39,23 +39,28 @@ import {
   partPixels,
   type DonBase,
 } from './assets'
-import { catalogUrl, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
+import { catalogUrl, donSource, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
 import {
   DonAnim,
   DonAnimator,
   modelMatrix,
   parseHexColor,
   recolorPixels,
+  donMotionNames,
+  mirrorOffset,
   scale720,
   type DonMotionName,
 } from './chara'
 import { drawStage, type DonPartData } from './part'
+import { otanimClipFor, otanimMesh, OtanimPlayer, type Otanim } from './otanim'
 import {
   compositeFragment,
   modelFragment,
   modelVertex,
   outlineFragment,
   outlineVertex,
+  puchiAnimFragment,
+  puchiAnimVertex,
   puchiFragment,
   puchiVertex,
   screenVertex,
@@ -90,6 +95,9 @@ export type DonRendererOptions = {
   // Keeps the canvas's picture readable after it is shown (toBlob / toDataURL), at some cost.
   preserveDrawingBuffer?: boolean
   onStateChange?: (state: DonRendererState) => void
+  // A one-shot motion (Combo, FullCombo, Miss…) plays over and over instead of going back to the
+  // loop it interrupted: a preview showing one state at a time.
+  repeatMotion?: boolean
 }
 
 export type DonRenderer = {
@@ -141,6 +149,8 @@ type Outfit = {
   // faces in the sheet the face plates show (the base one's or the makeup's)
   faceCount: number
   puchi: Texture | null
+  // the puchichara's animation when it is an .otanim (puchi is then its texture)
+  puchiAnim: Otanim | null
   key: string
 }
 
@@ -199,6 +209,24 @@ export function createDonRenderer(
     ...premultipliedBlending(),
   })
   const puchiScene = new Scene().add(noCull(new Mesh(quad, puchiMaterial)))
+  // An animated puchichara: its triangles rebuilt each frame, in clip space.
+  const puchiAnimGeometry = new BufferGeometry()
+  const puchiAnimMaterial = new ShaderMaterial({
+    uniforms: { map: { value: null }, premultiplied: { value: 0 } },
+    vertexShader: puchiAnimVertex,
+    fragmentShader: puchiAnimFragment,
+    // mirrored, its triangles turn the other way
+    side: DoubleSide,
+    depthTest: false,
+    depthWrite: false,
+    ...premultipliedBlending(),
+  })
+  const puchiAnimMesh = noCull(new Mesh(puchiAnimGeometry, puchiAnimMaterial))
+  puchiAnimMesh.frustumCulled = false
+  const puchiAnimScene = new Scene().add(puchiAnimMesh)
+  let puchiPlayer: OtanimPlayer | null = null
+  // the motion asked for is a one-shot (and repeatMotion plays it again when it ends)
+  let motionIsOneShot = false
 
   let target: WebGLRenderTarget | null = null
   let cssWidth = 0
@@ -251,6 +279,7 @@ export function createDonRenderer(
     animator.bpm = bpm
     animator.setMirror(mirrored, t)
     animator.setAnim(DonAnim[motion], t)
+    motionIsOneShot = !animator.isLooping
     applyFrozen()
     dirty = true
     return loaded
@@ -354,16 +383,18 @@ export function createDonRenderer(
     setState({ loading: true, error: null })
     try {
       const resolved = resolveDonLook(catalog, look)
-      const [loadedBase, datas, puchiBitmap, paintBitmap] = await Promise.all([
+      const [loadedBase, datas, puchiFile, paintBitmap] = await Promise.all([
         ensureBase(),
         Promise.all(
-          resolved.parts.map((p) => loadPart(catalogUrl(baseUrl, p.item.file), p.normalizeFace)),
+          resolved.parts.map((p) =>
+            loadPart(donSource(baseUrl, p.item.file, catalog), p.normalizeFace),
+          ),
         ),
         resolved.puchi
-          ? loadPuchi(catalogUrl(baseUrl, resolved.puchi.file))
+          ? loadPuchi(donSource(baseUrl, resolved.puchi.file, catalog))
           : Promise.resolve(null),
         resolved.paint
-          ? loadPaint(catalogUrl(baseUrl, resolved.paint.file))
+          ? loadPaint(donSource(baseUrl, resolved.paint.file, catalog))
           : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
@@ -376,12 +407,13 @@ export function createDonRenderer(
       const textures = await Promise.all(gpus.map((gpu) => recolored(gpu, resolved.colors)))
       if (disposed || token !== lookToken) return
       let puchi: Texture | null = null
-      if (resolved.puchi && puchiBitmap) {
+      if (resolved.puchi && puchiFile) {
+        // textures are kept by the canonical address, as the files are (assets.ts)
         const url = catalogUrl(baseUrl, resolved.puchi.file)
         puchi = puchiTextures.get(url) ?? null
         if (!puchi) {
           // drawn straight onto the canvas: no colour space
-          puchi = imageTexture(puchiBitmap, 1)
+          puchi = imageTexture(puchiFile.bitmap, 1)
           puchi.colorSpace = NoColorSpace
           puchi.wrapS = puchi.wrapT = ClampToEdgeWrapping
           puchiTextures.set(url, puchi)
@@ -407,7 +439,7 @@ export function createDonRenderer(
         JSON.stringify(resolved.parts.map((p) => [p.kind, p.item.id])) +
         resolved.colors +
         (resolved.paint?.id ?? 0)
-      dress(gpus, textures, puchi, face, key)
+      dress(gpus, textures, puchi, puchiFile?.anim ?? null, face, key)
       trimParts()
     } catch (error) {
       if (token === lookToken) failure = error instanceof Error ? error : new Error(String(error))
@@ -421,6 +453,7 @@ export function createDonRenderer(
     parts: PartGpu[],
     textures: (Texture | null)[][],
     puchi: Texture | null,
+    puchiAnim: Otanim | null,
     face: { texture: Texture | null; count: number },
     key: string,
   ) {
@@ -493,7 +526,9 @@ export function createDonRenderer(
     })
     // each part's meshes, then every part's outline hull
     scene.add(...meshes, ...outlines)
-    outfit = { parts, scene, materials, faceRects, faceCount: face.count, puchi, key }
+    outfit = { parts, scene, materials, faceRects, faceCount: face.count, puchi, puchiAnim, key }
+    if (puchiPlayer?.file !== puchiAnim)
+      puchiPlayer = puchiAnim ? new OtanimPlayer(puchiAnim) : null
     posed = { anim: -1, frame: -1, outfit: null }
     shownFace = -1
     dirty = true
@@ -638,7 +673,8 @@ export function createDonRenderer(
       renderer.render(compositeScene, screenCamera)
     }
     const puchi = outfit?.puchi
-    if (puchi) {
+    if (puchi && outfit?.puchiAnim) drawPuchiAnim(outfit.puchiAnim, puchi, t, x, y, ppu)
+    else if (puchi) {
       // YataiDON Chara3D::draw_puchi: 150 px square, 90 px to the Don's back side and 120 up, two
       // frames 850 ms each, bobbing 6 px over two frames.
       const s = layoutScale * frame.drawScale * ppu
@@ -662,12 +698,84 @@ export function createDonRenderer(
     }
   }
 
+  // An animated puchichara: the same 150 px square as the two-frame one (without its bob: it moves
+  // by itself), playing the clip the Don's motion asks for (the game's PuchiAnimGraphic).
+  function drawPuchiAnim(
+    anim: Otanim,
+    texture: Texture,
+    t: number,
+    x: number,
+    y: number,
+    ppu: number,
+  ) {
+    const name = donMotionNames[(animator?.animIndex ?? DonAnim.Normal) % mirrorOffset]
+    if (puchiPlayer?.file !== anim) puchiPlayer = new OtanimPlayer(anim)
+    const { clip, seconds } = puchiPlayer.update(t, otanimClipFor(anim, name))
+    const s = layoutScale * frame.drawScale * ppu
+    const half = (150 * s) / 2
+    const px = x + (mirrored ? 90 : -90) * s
+    const py = y - 120 * s
+    // The box in canvas pixels (y up): fitted there, the clip keeps its aspect whatever the
+    // canvas's is (in clip space a wide canvas would squash it, a tall one narrow it); turned into
+    // clip space below.
+    const box: [number, number, number, number] = [
+      px - half,
+      height - (py + half),
+      px + half,
+      height - (py - half),
+    ]
+    const mesh = otanimMesh(anim, clip, seconds, box, mirrored)
+    const n = mesh.positions.length / 2
+    // Buffers kept and refilled; larger ones made (and the old freed) only when a frame needs more.
+    let position = puchiAnimGeometry.getAttribute('position') as BufferAttribute | undefined
+    let index = puchiAnimGeometry.getIndex()
+    if (!position || position.count < n || !index || index.count < mesh.indices.length) {
+      puchiAnimGeometry.dispose()
+      const vertices = Math.max(n, 1024)
+      const indices = Math.max(mesh.indices.length, 3072)
+      const attr = (size: number) =>
+        new BufferAttribute(new Float32Array(vertices * size), size).setUsage(DynamicDrawUsage)
+      puchiAnimGeometry.setAttribute('position', attr(3))
+      puchiAnimGeometry.setAttribute('uv', attr(2))
+      puchiAnimGeometry.setAttribute('tint', attr(4))
+      puchiAnimGeometry.setIndex(
+        new BufferAttribute(new Uint32Array(indices), 1).setUsage(DynamicDrawUsage),
+      )
+      position = puchiAnimGeometry.getAttribute('position') as BufferAttribute
+      index = puchiAnimGeometry.getIndex()!
+    }
+    const pos = position.array as Float32Array
+    for (let i = 0; i < n; i++) {
+      pos[3 * i] = (mesh.positions[2 * i] / width) * 2 - 1
+      pos[3 * i + 1] = (mesh.positions[2 * i + 1] / height) * 2 - 1
+    }
+    ;(puchiAnimGeometry.getAttribute('uv').array as Float32Array).set(mesh.uvs)
+    ;(puchiAnimGeometry.getAttribute('tint').array as Float32Array).set(mesh.colors)
+    ;(index.array as Uint32Array).set(mesh.indices)
+    for (const a of [
+      position,
+      puchiAnimGeometry.getAttribute('uv'),
+      puchiAnimGeometry.getAttribute('tint'),
+      index,
+    ]) {
+      ;(a as BufferAttribute).clearUpdateRanges()
+      ;(a as BufferAttribute).needsUpdate = true
+    }
+    puchiAnimGeometry.setDrawRange(0, mesh.indices.length)
+    puchiAnimMaterial.uniforms.map.value = texture
+    puchiAnimMaterial.uniforms.premultiplied.value = anim.premultiplied ? 1 : 0
+    renderer.render(puchiAnimScene, screenCamera)
+  }
+
   function tick() {
     raf = requestAnimationFrame(tick)
     if (width <= 0 || height <= 0) return
     const t = now()
     if (animator && base) {
       animator.update(t, t)
+      // the one-shot went back to its loop: again, when the preview shows one state
+      if (options.repeatMotion && motionIsOneShot && frozenAt === null && animator.isLooping)
+        animator.setAnim(DonAnim[motion], t)
       const anim = animator.animIndex
       const frameIndex = animator.poseFrame
       if (
@@ -700,6 +808,7 @@ export function createDonRenderer(
       motion = name
       if (animator) {
         animator.setAnim(DonAnim[name], now())
+        motionIsOneShot = !animator.isLooping
         applyFrozen()
       }
     },
@@ -747,6 +856,8 @@ export function createDonRenderer(
       quad.dispose()
       compositeMaterial.dispose()
       puchiMaterial.dispose()
+      puchiAnimMaterial.dispose()
+      puchiAnimGeometry.dispose()
       renderer.dispose()
       // frees the context now rather than at garbage collection (browsers keep only a few)
       renderer.forceContextLoss()

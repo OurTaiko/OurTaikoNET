@@ -14,6 +14,10 @@ export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi' | 'paint'
 
 export type DonCatalog = {
   version: number
+  // Added by the API for a mainland visitor: the files to fetch from the mirror, at
+  // mirrorBaseUrl + path + "?v=..." like the canonical ones.
+  mirrorBaseUrl?: string
+  mirrorPaths?: string[]
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
   defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
   // paint: absent from catalogs written before makeup was added
@@ -32,9 +36,48 @@ export type DonLook = {
   colors: [string, string, string] | null
 }
 
-export function catalogUrl(baseUrl: string, file: DonCatalogFile): string {
+export type DonMirror = Pick<DonCatalog, 'mirrorBaseUrl' | 'mirrorPaths'>
+
+const mirrored = new WeakMap<string[], Set<string>>()
+
+// A file's address: on the mirror when the API listed it there, else under baseUrl.
+export function catalogUrl(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): string {
+  const paths = mirror?.mirrorPaths
+  if (mirror?.mirrorBaseUrl && paths) {
+    let set = mirrored.get(paths)
+    if (!set) {
+      set = new Set(paths)
+      mirrored.set(paths, set)
+    }
+    if (set.has(file.path)) baseUrl = mirror.mirrorBaseUrl
+  }
   const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
   return base + file.path + '?v=' + file.sha256.slice(0, 12)
+}
+
+// Where a file is fetched: its canonical address, and the mirror's when the API listed one. The
+// mirror is someone else's bucket, so its bytes are checked against sha256 (assets.ts
+// fetchDonFile) and the canonical address is used when it fails.
+export type DonSource = { url: string; mirror: string | null; sha256: string }
+
+export function donSource(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): DonSource {
+  const url = catalogUrl(baseUrl, file)
+  const mirrored = catalogUrl(baseUrl, file, mirror)
+  return { url, mirror: mirrored === url ? null : mirrored, sha256: file.sha256 }
+}
+
+// An <img> of a catalog picture: the mirror's, back on the canonical one if it fails to load.
+export function donImage(source: DonSource): {
+  src: string
+  onError?: (event: { currentTarget: HTMLImageElement }) => void
+} {
+  if (!source.mirror) return { src: source.url }
+  return {
+    src: source.mirror,
+    onError: ({ currentTarget }) => {
+      if (currentTarget.getAttribute('src') !== source.url) currentTarget.src = source.url
+    },
+  }
 }
 
 export function catalogItem(

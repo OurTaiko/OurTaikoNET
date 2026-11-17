@@ -2,10 +2,20 @@ import { downloadZip } from 'client-zip'
 import { endpoints } from './api/endpoints'
 import type { ChartBase } from './api/types'
 import { withChartTitles } from './tja-titles'
+import { verifiedResource } from './resource-download'
 
-type PackageFile = { url: string; name: string; sha256?: string; size?: number; tja?: boolean }
+type PackageFile = {
+  url: string
+  fallbackUrl?: string
+  name: string
+  sha256?: string
+  size?: number
+  tja?: boolean
+}
 type Manifest = {
-  resources: Partial<Record<string, { url: string; sha256: string; size: number }>>
+  resources: Partial<
+    Record<string, { url: string; fallbackUrl?: string; sha256: string; size: number }>
+  >
 }
 
 /** Stored files that make up a chart package, in archive order. */
@@ -73,11 +83,6 @@ async function packageFiles(chart: ChartBase, signal: AbortSignal): Promise<Pack
   })
 }
 
-async function sha256(data: ArrayBuffer) {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data))
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
 /**
  * Download the chart's stored files and pack them in the browser. Every file
  * is checked against the hash the API published before it enters the archive.
@@ -85,15 +90,19 @@ async function sha256(data: ArrayBuffer) {
 export async function buildChartPackage(chart: ChartBase, signal: AbortSignal): Promise<Blob> {
   const files = await packageFiles(chart, signal)
   const entries = await Promise.all(
-    files.map(async ({ url, name, sha256: expected, size, tja }) => {
-      const response = await fetch(url, { signal, credentials: 'omit' })
-      if (!response.ok) throw new Error('PACKAGE_DOWNLOAD_FAILED')
-      const input = await response.arrayBuffer()
-      if (
-        (size !== undefined && input.byteLength !== size) ||
-        (expected !== undefined && (await sha256(input)) !== expected)
-      )
-        throw new Error('PACKAGE_INTEGRITY_FAILED')
+    files.map(async ({ url, fallbackUrl, name, sha256: expected, size, tja }) => {
+      let input: ArrayBuffer
+      try {
+        input = await verifiedResource({ url, fallbackUrl, sha256: expected, size }, signal)
+      } catch (error) {
+        if (signal.aborted) throw error
+        throw new Error(
+          error instanceof Error && error.message === 'RESOURCE_INTEGRITY_FAILED'
+            ? 'PACKAGE_INTEGRITY_FAILED'
+            : 'PACKAGE_DOWNLOAD_FAILED',
+          { cause: error },
+        )
+      }
       // After the check, the TJA's headers get the chart's own names; the
       // stored file keeps what was uploaded.
       if (tja) {

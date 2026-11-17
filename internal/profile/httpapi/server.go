@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/chat"
+	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/visits"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -42,6 +43,12 @@ type Config struct {
 	// reads it (nil: http.DefaultClient; tests give their own).
 	DonCatalogURL string
 	DonClient     *http.Client
+	// Optional inventory of the published mirror and an IP-to-country lookup for routing Don files.
+	DonMirrorCatalogURL string
+	DonIPCountry        func(netip.Addr) string
+	Distribution        *distribution.Router
+	// Override the canonical nameplate catalog in tests or a separate distribution.
+	NameplateCatalogURL string
 	// Now is the clock of the visit count (visits.go); nil: time.Now. Tests move it.
 	Now func() time.Time
 }
@@ -58,6 +65,16 @@ type Server struct {
 	donMu sync.Mutex
 	don   *donCatalog
 	donAt time.Time
+	// The mirror catalog as last read (don_mirror.go); donMirrorDone is open while a refresh runs.
+	donMirrorMu    sync.Mutex
+	donMirror      *donMirror
+	donMirrorUntil time.Time
+	donMirrorDone  chan struct{}
+	donMirrorPaths *donMirrorPaths
+	// The nameplate art catalogs as last read (nameplate_art.go), under nameplateMu.
+	nameplateMu     sync.Mutex
+	nameplateArt    nameplateSlot
+	nameplateMirror nameplateSlot
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
@@ -73,6 +90,9 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
+	if cfg.Distribution == nil {
+		cfg.Distribution = distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
+	}
 	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, chats: &chat.Hub{}}
 }
 
@@ -119,6 +139,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/me/don", s.myDon)
 	mux.HandleFunc("PUT /api/v1/me/don", s.wearDon)
 	mux.HandleFunc("GET /api/v1/don/catalog", s.donCatalogAnswer)
+	mux.HandleFunc("GET /api/v1/nameplate-art/catalog", s.nameplateArtAnswer)
 	mux.HandleFunc("GET /api/v1/nameplates", s.nameplates)
 	mux.HandleFunc("GET /api/v1/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/v1/users/{id}/titles", s.userTitles)

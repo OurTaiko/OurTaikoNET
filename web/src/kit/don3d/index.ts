@@ -12,11 +12,14 @@ export {
 export {
   catalogItem,
   catalogUrl,
+  donImage,
+  donSource,
   resolveDonLook,
   type DonCatalog,
   type DonCatalogFile,
   type DonCatalogItem,
   type DonLook,
   type DonPartKind,
+  type DonSource,
 } from './catalog'
 export { donMotionNames, type DonMotionName } from './chara'

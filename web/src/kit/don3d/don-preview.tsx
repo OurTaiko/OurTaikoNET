@@ -21,6 +21,8 @@ export type DonPreviewProps = {
   // Holds the motion at a point of its loop (0..1).
   frozenAt?: number | null
   frame?: Partial<DonFrame>
+  // A one-shot motion plays over and over (the dressing room shows one state at a time).
+  repeatMotion?: boolean
   className?: string
 }
 
@@ -35,6 +37,7 @@ export function DonPreview({
   bpm = 120,
   frozenAt = null,
   frame,
+  repeatMotion = false,
   className,
 }: DonPreviewProps) {
   const { t } = useTranslation()
@@ -56,6 +59,7 @@ export function DonPreview({
         catalog,
         baseUrl,
         frame: JSON.parse(frameKey) as Partial<DonFrame>,
+        repeatMotion,
         onStateChange: setState,
       })
     } catch (error) {
@@ -90,7 +94,7 @@ export function DonPreview({
       created.dispose()
       canvas.remove()
     }
-  }, [catalog, baseUrl, frameKey])
+  }, [catalog, baseUrl, frameKey, repeatMotion])
 
   const lookKey = JSON.stringify([
     look.costume,

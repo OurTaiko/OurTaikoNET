@@ -9,6 +9,7 @@ import {
 import { Button } from './ui/button'
 import { Slider } from './ui/slider'
 import { cn } from '../lib/utils'
+import { retryResourceOrigin } from '../resource-download'
 
 function time(seconds: number) {
   const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0
@@ -154,7 +155,11 @@ function AudioPlayerContent({
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
-        onError={() => {
+        onError={(event) => {
+          if (retryResourceOrigin(event.currentTarget)) {
+            if (playing) void event.currentTarget.play().catch(() => setPlaying(false))
+            return
+          }
           setPlaying(false)
           setError(t('messages.failedToLoadAudioCheckYourConnectionAndRetry'))
         }}
