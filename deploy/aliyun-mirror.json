@@ -1,0 +1,67 @@
+{
+  "publicBaseUrl": "https://static.sakura-bot.cn/ourtaiko/",
+  "oss": {
+    "bucket": "sigaer",
+    "endpoint": "oss-cn-hangzhou.aliyuncs.com",
+    "prefix": "ourtaiko/",
+    "originBaseUrl": "https://distrib.ourtaiko.org/",
+    "mirrorCollections": [
+      "fanmade",
+      "database"
+    ],
+    "mirrorSuffixes": [
+      ".tja",
+      ".ogg",
+      ".mp3"
+    ],
+    "mirrorSni": true,
+    "mirrorAllowHeadObject": true,
+    "mirrorPassQueryString": false,
+    "mirrorFollowRedirect": false,
+    "mirrorCheckMd5": true
+  },
+  "esa": {
+    "siteName": "sakura-bot.cn",
+    "cacheRules": [
+      {
+        "ruleName": "OurTaiko content-addressed songs",
+        "sequence": 1,
+        "ruleEnable": "on",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\"})",
+        "bypassCache": "cache_all",
+        "edgeCacheMode": "override_origin",
+        "edgeCacheTtl": "31536000",
+        "browserCacheMode": "override_origin",
+        "browserCacheTtl": "31536000",
+        "queryStringMode": "reserve_all",
+        "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
+      },
+      {
+        "ruleName": "OurTaiko versioned art",
+        "sequence": 2,
+        "ruleEnable": "on",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/3dchara/\") or starts_with(http.request.uri.path, \"/ourtaiko/nameplate/\")) and http.request.uri.path.extension in {\"glb\" \"png\" \"jpg\" \"jpeg\" \"webp\"} and (starts_with(http.request.uri.query, \"v=\") or http.request.uri.query contains \"&v=\"))",
+        "bypassCache": "cache_all",
+        "edgeCacheMode": "override_origin",
+        "edgeCacheTtl": "31536000",
+        "browserCacheMode": "override_origin",
+        "browserCacheTtl": "31536000",
+        "queryStringMode": "reserve_all",
+        "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
+      },
+      {
+        "ruleName": "OurTaiko catalogs and mutable assets",
+        "sequence": 3,
+        "ruleEnable": "on",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and starts_with(http.request.uri.path, \"/ourtaiko/\"))",
+        "bypassCache": "cache_all",
+        "edgeCacheMode": "override_origin",
+        "edgeCacheTtl": "60",
+        "browserCacheMode": "override_origin",
+        "browserCacheTtl": "60",
+        "queryStringMode": "reserve_all",
+        "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
+      }
+    ]
+  }
+}
