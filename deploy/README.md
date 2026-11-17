@@ -146,7 +146,7 @@ container. Set these in the server's `api.env` and recreate the container:
 
 ```dotenv
 DON_GEOIP_DB=/srv/geoip/GeoLite2-Country.mmdb
-DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko-mirror-staging/1.0.1-525/3dchara/catalog.json
+DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko/3dchara/catalog.json
 ```
 
 The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP and
