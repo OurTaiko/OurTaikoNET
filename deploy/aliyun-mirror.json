@@ -40,7 +40,7 @@
         "ruleName": "OurTaiko versioned art",
         "sequence": 2,
         "ruleEnable": "on",
-        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/3dchara/\") or starts_with(http.request.uri.path, \"/ourtaiko/nameplate/\")) and http.request.uri.path.extension in {\"glb\" \"png\" \"jpg\" \"jpeg\" \"webp\"} and (starts_with(http.request.uri.query, \"v=\") or http.request.uri.query contains \"&v=\"))",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/3dchara/\") or starts_with(http.request.uri.path, \"/ourtaiko/nameplate/\")) and http.request.uri.path.extension in {\"glb\" \"otanim\" \"json\" \"png\" \"jpg\" \"jpeg\" \"webp\"} and (starts_with(http.request.uri.query, \"v=\") or http.request.uri.query contains \"&v=\"))",
         "bypassCache": "cache_all",
         "edgeCacheMode": "override_origin",
         "edgeCacheTtl": "31536000",

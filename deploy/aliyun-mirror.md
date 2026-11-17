@@ -64,7 +64,7 @@ unrelated settings.
 | Requests | Edge TTL | Browser TTL |
 | --- | --- | --- |
 | Fanmade/database `.tja`, `.ogg`, `.mp3` with content-hash filenames | 1 year | 1 year |
-| Don/nameplate model or image requests with a `v` parameter | 1 year | 1 year |
+| Don/nameplate `.glb`, `.otanim`, `.json`, `.png`, `.jpg`, `.jpeg`, `.webp` with a `v` parameter | 1 year | 1 year |
 | Catalogs and unversioned resource requests | 60 seconds | 60 seconds |
 
 Retain all query parameters in the cache key, including `v`. Cache 4xx and 5xx responses for
