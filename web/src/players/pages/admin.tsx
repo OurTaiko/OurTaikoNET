@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
@@ -12,6 +12,11 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { Nameplate } from '@players/components/nameplate'
+import { DonItemsCard } from '@players/components/don-items-card'
+import { TitleRulesCard } from '@players/components/title-rules-card'
+import { readDonCatalog, type Catalog } from '@players/don-catalog'
+import { useDonItems } from '@players/don-items'
+import { catalogItem, donItemName } from '@sitekit/don3d'
 import { Notice } from '@players/notice'
 import { useSession } from '@players/session-context'
 import { useTitles } from './titles'
@@ -21,9 +26,9 @@ const languages = ['en', 'ja', 'ko'] as const
 
 // Administrators of the Profile application keep the title catalog and grant titles by hand.
 export function AdminPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const session = useSession()
-  const { titles, error: loadError, reload } = useTitles()
+  const { titles, rules, error: loadError, reload } = useTitles()
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -36,14 +41,22 @@ export function AdminPage() {
   })
   const [grant, setGrant] = useState({ userId: '', titleId: '' })
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
+  // The Don's parts: the catalog names them, the backend says which are locked.
+  const [catalog, setCatalog] = useState<Catalog | null>(null)
+  const donItems = useDonItems(false)
+  useEffect(() => {
+    readDonCatalog().then(setCatalog, () => setCatalog(null))
+  }, [])
+  const language = i18n.resolvedLanguage ?? 'zh-Hans'
   if (session.loading) return null
   if (!session.user?.isAdmin) return <Navigate to="/" replace />
-  const run = async (work: () => Promise<unknown>, done: string) => {
+  const run = async <T,>(work: () => Promise<T>, done: string | ((result: T) => string)) => {
     setMessage(null)
     try {
-      await work()
-      setMessage({ kind: 'info', text: done })
+      const result = await work()
+      setMessage({ kind: 'info', text: typeof done === 'string' ? done : done(result) })
       reload()
+      donItems?.reload()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     }
@@ -235,6 +248,56 @@ export function AdminPage() {
           </ul>
         </CardContent>
       </Card>
+      <DonItemsCard
+        catalog={catalog}
+        items={donItems}
+        onLock={(part, id, locked) =>
+          void run(
+            () =>
+              api<{ given: number }>(
+                endpoints.adminDonLock(part, id),
+                jsonRequest('PUT', { locked }, session.csrfToken),
+              ),
+            (result) =>
+              locked ? t('donItems.lockedDone', { n: result.given }) : t('donItems.unlockedDone'),
+          )
+        }
+        onGrant={(part, id, userId, give) =>
+          void run(
+            () =>
+              api(
+                endpoints.adminDonGrants,
+                jsonRequest(give ? 'POST' : 'DELETE', { userId, part, id }, session.csrfToken),
+              ),
+            give ? t('admin.granted') : t('admin.revoked'),
+          )
+        }
+      />
+      <TitleRulesCard
+        titles={titles ?? []}
+        rules={rules}
+        donName={(part, id) =>
+          donItemName(catalog ? catalogItem(catalog, part, id) : undefined, language, id)
+        }
+        onAdd={(target, rule) =>
+          void run(
+            () =>
+              api<{ granted: number }>(
+                'title' in target
+                  ? endpoints.adminTitleRules(target.title)
+                  : endpoints.adminDonRules(target.donPart, target.donItem),
+                jsonRequest('POST', rule, session.csrfToken),
+              ),
+            (result) => t('rules.added', { n: result.granted }),
+          )
+        }
+        onDelete={(rule) =>
+          void run(
+            () => api(endpoints.adminRule(rule.id), jsonRequest('DELETE', {}, session.csrfToken)),
+            t('rules.deleted'),
+          )
+        }
+      />
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('admin.grant')}</CardTitle>

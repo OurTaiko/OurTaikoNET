@@ -1041,5 +1041,23 @@
     "playlists": "プレイヤーが作った太鼓譜面のプレイリストと、サイトのプレイリスト。",
     "dans": "公式とコミュニティの段位道場。ゲームで挑戦できます。",
     "register": "アカウント登録"
+  },
+  "rewards": {
+    "heading": "新しいごほうび",
+    "title": "新しい称号",
+    "dan": "段位",
+    "fromCourse": "段位「{{course}}」で獲得",
+    "fromRule": "条件達成で獲得",
+    "fromAdmin": "管理者が付与",
+    "wear": "つける",
+    "gotIt": "OK",
+    "donItem": "新しい着せ替え",
+    "donPart": {
+      "cos": "きぐるみ",
+      "head": "あたま",
+      "body": "からだ",
+      "puchi": "ぷちキャラ",
+      "paint": "メイク"
+    }
   }
 }

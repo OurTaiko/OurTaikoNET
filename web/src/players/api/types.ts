@@ -115,6 +115,29 @@ export type ScorePage = {
   sort: ScoreSort
   sources: (Source & { count: number; truncated: boolean; error?: string })[]
 }
+// A rule that gives a title by itself. Which fields are set goes by kind; a category rule
+// without a count asks for every song of the category.
+export type TitleRule = {
+  id: number
+  // The item it gives: a title, or a part of the Don and its number (one or the other).
+  titleId: string | null
+  donPart: 'cos' | 'head' | 'body' | 'puchi' | 'paint' | null
+  donItem: number | null
+  kind: 'chart_clear' | 'category_clear' | 'site_login' | 'game_login' | 'charts_uploaded'
+  source: 'fanmade' | 'official' | null
+  chartId: string | null
+  chart: {
+    id: string
+    title: string
+    titleTranslations: Record<string, string>
+    gone: boolean
+  } | null
+  category: string | null
+  course: Course | null
+  // The lowest crown that counts: 1 cleared, 2 full combo, 3 all good.
+  clear: number | null
+  count: number | null
+}
 export type HeldTitle = { title: Title; grantedAt: string; service: string; courseTitle: string }
 export type AwardRecord = {
   service: string

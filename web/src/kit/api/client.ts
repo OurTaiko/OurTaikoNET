@@ -3,6 +3,7 @@ import { t } from '../i18n'
 import { endpoints } from './endpoints'
 import type { ChartBase } from './types'
 import type { ReplacementPreview } from '../replacement-diff'
+import { noticeRewards } from '../rewards/store'
 
 export class ApiError extends Error {
   constructor(
@@ -17,6 +18,8 @@ export class ApiError extends Error {
 }
 export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...init })
+  // Any answer may say the player was given something (../rewards).
+  noticeRewards(response)
   const data = await response.json().catch((e: unknown) => {
     // A request given up while its answer was still arriving has no answer: the caller gets
     // the abort, not a made-up one (which, on a 200, would pass for the data asked for).

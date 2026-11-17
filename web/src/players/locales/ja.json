@@ -157,7 +157,8 @@
     "keptStyles": "虹色と紫は公式称号用です。",
     "save": "保存",
     "createButton": "作成",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "byRule": "条件達成で獲得"
   },
   "dans": {
     "badges": "段位バッジ",
@@ -310,6 +311,90 @@
       "EntryLoop": "エントリー",
       "FullCombo": "フルコンボ",
       "Miss": "ミス"
-    }
+    },
+    "locked": "未獲得"
+  },
+  "rules": {
+    "heading": "自動付与の条件",
+    "howTo": "獲得方法",
+    "none": "条件はまだありません。",
+    "title": "称号",
+    "kind": "条件",
+    "source": "曲ソース",
+    "chart": "曲 ID または曲ページのアドレス",
+    "category": "ジャンル",
+    "course": "最低難易度",
+    "anyCourse": "難易度不問",
+    "clear": "必要な結果",
+    "count": "曲数",
+    "countAll": "空欄で全曲",
+    "add": "条件を追加",
+    "added": "追加しました。すでに達成していた {{n}} 人に付与しました。",
+    "delete": "削除",
+    "confirmDelete": "この条件を削除しますか？すでに付与した称号はそのままです。",
+    "deleted": "削除しました。",
+    "chartGone": "（曲は公開終了）",
+    "kinds": {
+      "chart_clear": "特定の曲をクリア",
+      "category_clear": "ジャンルの曲をクリア",
+      "site_login": "サイトにログイン",
+      "game_login": "ゲームにログイン",
+      "charts_uploaded": "譜面の投稿数"
+    },
+    "clears": {
+      "1": "クリア",
+      "2": "フルコンボ",
+      "3": "全良"
+    },
+    "atLeast": "（{{course}}以上）",
+    "text": {
+      "site_login": "サイトにログイン",
+      "game_login": "ゲームにログイン",
+      "chart_clear": "{{source}}の「{{title}}」を{{clear}}{{course}}",
+      "category_all": "{{source}}の「{{category}}」の全曲を{{clear}}{{course}}",
+      "category_count": "{{source}}の「{{category}}」を {{count}} 曲{{clear}}{{course}}",
+      "charts_uploaded": "{{source}}に譜面を {{count}} 個投稿"
+    },
+    "categories": {
+      "fanmade": {
+        "game": "ゲーム",
+        "virtual-singer": "バーチャルシンガー",
+        "pop": "ポップス",
+        "classic": "クラシック",
+        "variety": "バラエティ",
+        "anime": "アニメ"
+      },
+      "official": {
+        "namco": "ナムコオリジナル",
+        "pop": "ポップス",
+        "game": "ゲームミュージック",
+        "anime": "アニメ",
+        "vocaloid": "ボーカロイド",
+        "variety": "バラエティ",
+        "kids": "キッズ",
+        "classics": "クラシック"
+      }
+    },
+    "target": "付与するもの",
+    "targets": {
+      "title": "称号",
+      "don": "どんちゃんの着せ替え"
+    },
+    "donPart": "部位",
+    "donItem": "番号"
+  },
+  "donItems": {
+    "heading": "獲得が必要な着せ替え",
+    "part": "部位",
+    "id": "番号",
+    "notInCatalog": "カタログにありません",
+    "locked": "ロック中：獲得すると着られます",
+    "free": "だれでも着られます",
+    "lock": "ロックする",
+    "unlock": "ロックを解除",
+    "lockedDone": "ロックしました。着ていた {{n}} 人に付与しました。",
+    "unlockedDone": "ロックを解除しました。だれでも着られます。",
+    "lockedList": "ロック中の着せ替え",
+    "noneLocked": "ロック中の着せ替えはありません。"
   }
 }

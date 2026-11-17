@@ -1,4 +1,5 @@
 import { i18n, t } from '../i18n'
+import { noticeRewards } from '@sitekit/rewards/store'
 
 export class ApiError extends Error {
   constructor(
@@ -20,6 +21,8 @@ function errorMessage(data: { code?: string; message?: string }, status: number)
 
 export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...init })
+  // Any answer may say the player was given something (../rewards).
+  noticeRewards(response)
   const data = await response.json().catch((e: unknown) => {
     // Given up while the answer was arriving: the caller gets the abort, not an empty answer.
     if (init.signal?.aborted) throw e

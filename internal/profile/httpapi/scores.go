@@ -24,6 +24,9 @@ type Source struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Site string `json:"site"`
+	// Categories are the source's categories, each ID with its bit in charts.category_flags:
+	// what a title rule of a category is written with (title_rules.go).
+	Categories map[string]int `json:"-"`
 }
 
 // SourceScore is one row of a player's list: a play (or, in the best view, the best play of a
