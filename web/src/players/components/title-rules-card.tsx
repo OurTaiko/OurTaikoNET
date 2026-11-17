@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Title, TitleRule } from '@players/api/types'
+import type { DonPartKind } from '@sitekit/don3d'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { titleName } from '@players/dan'
 import {
@@ -31,23 +32,34 @@ export type RuleDraft = {
   count?: number
 }
 
-// What gives a title by itself: the rules there are, and a form for one more. Only the
-// catalog's own titles take rules, not the ones players made.
+/** What a rule gives: a title, or a part of the 3D Don and its number. */
+export type RuleTarget = { title: string } | { donPart: DonPartKind; donItem: number }
+
+const donParts: DonPartKind[] = ['cos', 'head', 'body', 'puchi', 'paint']
+
+// What gives an item by itself: the rules there are, and a form for one more. The item is a title
+// (only the catalog's own, not the ones players made) or a part of the Don.
 export function TitleRulesCard({
   titles,
   rules,
+  donName,
   onAdd,
   onDelete,
 }: {
   titles: Title[]
   rules: TitleRule[]
-  onAdd: (titleId: string, rule: RuleDraft) => void
+  // A Don part's name, from the catalog.
+  donName: (part: DonPartKind, id: number) => string
+  onAdd: (target: RuleTarget, rule: RuleDraft) => void
   onDelete: (rule: TitleRule) => void
 }) {
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const [form, setForm] = useState({
+    target: 'title' as 'title' | 'don',
     titleId: '',
+    donPart: 'cos' as DonPartKind,
+    donItem: '',
     kind: 'chart_clear' as Kind,
     source: 'fanmade' as SourceId,
     chart: '',
@@ -71,12 +83,27 @@ export function TitleRulesCard({
       if (form.course) rule.course = form.course
     }
     if (counted && form.count.trim()) rule.count = Number(form.count)
-    onAdd(form.titleId, rule)
+    onAdd(
+      form.target === 'title'
+        ? { title: form.titleId }
+        : { donPart: form.donPart, donItem: Number(form.donItem) },
+      rule,
+    )
   }
-  const name = (id: string) => {
-    const title = titles.find((candidate) => candidate.id === id)
-    return title ? titleName(title, language) : id
+  // What a rule gives, by name, and its key.
+  const item = (rule: TitleRule): [string, string] => {
+    if (rule.donPart && rule.donItem !== null)
+      return [
+        `${t(`don.kinds.${rule.donPart}`)} · ${donName(rule.donPart, rule.donItem)}`,
+        `${rule.donPart}:${rule.donItem}`,
+      ]
+    const title = titles.find((candidate) => candidate.id === rule.titleId)
+    return [title ? titleName(title, language) : (rule.titleId ?? ''), rule.titleId ?? '']
   }
+  const ready =
+    form.target === 'title'
+      ? form.titleId !== ''
+      : Number.isInteger(Number(form.donItem)) && Number(form.donItem) > 0
   return (
     <Card className="rounded-3xl">
       <CardHeader>
@@ -89,8 +116,8 @@ export function TitleRulesCard({
           <ul className="divide-y" data-testid="rule-list">
             {rules.map((rule) => (
               <li key={rule.id} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="font-medium">{name(rule.titleId)}</span>
-                <code className="text-xs">{rule.titleId}</code>
+                <span className="font-medium">{item(rule)[0]}</span>
+                <code className="text-xs">{item(rule)[1]}</code>
                 <span className="text-sm">{ruleText(rule, t, language)}</span>
                 <Button
                   className="ml-auto"
@@ -108,17 +135,60 @@ export function TitleRulesCard({
         )}
         <form className="flex flex-wrap items-end gap-3 rounded-2xl border p-4" onSubmit={submit}>
           <div className="space-y-2">
-            <Label>{t('rules.title')}</Label>
+            <Label>{t('rules.target')}</Label>
             <ChoiceSelect
-              label={t('rules.title')}
-              value={form.titleId}
-              onValueChange={(titleId) => setForm({ ...form, titleId })}
-              items={eligible.map((title) => ({
-                value: title.id,
-                label: `${title.name} (${title.id})`,
-              }))}
+              label={t('rules.target')}
+              value={form.target}
+              onValueChange={(target) => setForm({ ...form, target: target as 'title' | 'don' })}
+              items={[
+                { value: 'title', label: t('rules.targets.title') },
+                { value: 'don', label: t('rules.targets.don') },
+              ]}
             />
           </div>
+          {form.target === 'title' ? (
+            <div className="space-y-2">
+              <Label>{t('rules.title')}</Label>
+              <ChoiceSelect
+                label={t('rules.title')}
+                value={form.titleId}
+                onValueChange={(titleId) => setForm({ ...form, titleId })}
+                items={eligible.map((title) => ({
+                  value: title.id,
+                  label: `${title.name} (${title.id})`,
+                }))}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>{t('rules.donPart')}</Label>
+                <ChoiceSelect
+                  label={t('rules.donPart')}
+                  value={form.donPart}
+                  onValueChange={(donPart) => setForm({ ...form, donPart: donPart as DonPartKind })}
+                  items={donParts.map((part) => ({ value: part, label: t(`don.kinds.${part}`) }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rule-don-item">{t('rules.donItem')}</Label>
+                <Input
+                  id="rule-don-item"
+                  className="w-28"
+                  type="number"
+                  min={1}
+                  value={form.donItem}
+                  onChange={(e) => setForm({ ...form, donItem: e.target.value })}
+                  required
+                />
+                {Number(form.donItem) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {donName(form.donPart, Number(form.donItem))}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
           <div className="space-y-2">
             <Label>{t('rules.kind')}</Label>
             <ChoiceSelect
@@ -223,7 +293,7 @@ export function TitleRulesCard({
               />
             </div>
           )}
-          <Button type="submit" disabled={!form.titleId}>
+          <Button type="submit" disabled={!ready}>
             {t('rules.add')}
           </Button>
         </form>

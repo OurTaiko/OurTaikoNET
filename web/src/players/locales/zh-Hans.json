@@ -309,7 +309,8 @@
       "EntryLoop": "入场",
       "FullCombo": "全连",
       "Miss": "失误"
-    }
+    },
+    "locked": "未获得"
   },
   "rules": {
     "heading": "自动发放条件",
@@ -371,6 +372,27 @@
         "kids": "儿童",
         "classics": "古典"
       }
-    }
+    },
+    "target": "发放什么",
+    "targets": {
+      "title": "称号",
+      "don": "咚酱装扮"
+    },
+    "donPart": "部位",
+    "donItem": "编号"
+  },
+  "donItems": {
+    "heading": "需要获得的咚酱装扮",
+    "part": "部位",
+    "id": "编号",
+    "notInCatalog": "目录里没有这件",
+    "locked": "已锁定：要获得才能穿",
+    "free": "所有人都能穿",
+    "lock": "锁定",
+    "unlock": "解除锁定",
+    "lockedDone": "已锁定，正在穿它的 {{n}} 位玩家自动获得了它。",
+    "unlockedDone": "已解除锁定，所有人都能穿了。",
+    "lockedList": "已锁定的装扮",
+    "noneLocked": "还没有锁定的装扮，所有装扮都能穿。"
   }
 }

@@ -80,6 +80,17 @@ export function donImage(source: DonSource): {
   }
 }
 
+/** An item's name in the reader's language, else Japanese (the cabinet's), else its number. */
+export function donItemName(
+  item: DonCatalogItem | undefined,
+  language: string,
+  id: number,
+): string {
+  if (!item) return `#${id}`
+  const short = language.split('-')[0]
+  return item.name[language] ?? item.name[short] ?? item.name.ja ?? `#${id}`
+}
+
 export function catalogItem(
   catalog: DonCatalog,
   kind: DonPartKind,

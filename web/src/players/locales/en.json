@@ -309,7 +309,8 @@
       "EntryLoop": "Entry",
       "FullCombo": "Full combo",
       "Miss": "Miss"
-    }
+    },
+    "locked": "not earned"
   },
   "rules": {
     "heading": "Conditions that give titles",
@@ -371,6 +372,27 @@
         "kids": "Kids",
         "classics": "Classical"
       }
-    }
+    },
+    "target": "Gives",
+    "targets": {
+      "title": "A title",
+      "don": "A Don part"
+    },
+    "donPart": "Part",
+    "donItem": "Number"
+  },
+  "donItems": {
+    "heading": "Don parts to earn",
+    "part": "Part",
+    "id": "Number",
+    "notInCatalog": "Not in the catalog",
+    "locked": "Locked: earned to be worn",
+    "free": "Anyone can wear it",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "lockedDone": "Locked; the {{n}} players wearing it were given it.",
+    "unlockedDone": "Unlocked; anyone can wear it.",
+    "lockedList": "Locked parts",
+    "noneLocked": "Nothing is locked; every part can be worn."
   }
 }

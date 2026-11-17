@@ -1050,6 +1050,14 @@
     "fromRule": "条件達成で獲得",
     "fromAdmin": "管理者が付与",
     "wear": "つける",
-    "gotIt": "OK"
+    "gotIt": "OK",
+    "donItem": "新しい着せ替え",
+    "donPart": {
+      "cos": "きぐるみ",
+      "head": "あたま",
+      "body": "からだ",
+      "puchi": "ぷちキャラ",
+      "paint": "メイク"
+    }
   }
 }

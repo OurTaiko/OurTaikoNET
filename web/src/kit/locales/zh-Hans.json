@@ -1050,6 +1050,14 @@
     "fromRule": "达成条件获得",
     "fromAdmin": "管理员授予",
     "wear": "去佩戴",
-    "gotIt": "知道了"
+    "gotIt": "知道了",
+    "donItem": "新装扮",
+    "donPart": {
+      "cos": "着装",
+      "head": "头",
+      "body": "身体",
+      "puchi": "小伙伴",
+      "paint": "妆容"
+    }
   }
 }

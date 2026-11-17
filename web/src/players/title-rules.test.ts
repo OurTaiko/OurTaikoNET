@@ -19,6 +19,8 @@ const translator = (words: object) =>
 const rule = (fields: Partial<TitleRule>): TitleRule => ({
   id: 1,
   titleId: 't',
+  donPart: null,
+  donItem: null,
   kind: 'site_login',
   source: null,
   chartId: null,

@@ -119,7 +119,10 @@ export type ScorePage = {
 // without a count asks for every song of the category.
 export type TitleRule = {
   id: number
-  titleId: string
+  // The item it gives: a title, or a part of the Don and its number (one or the other).
+  titleId: string | null
+  donPart: 'cos' | 'head' | 'body' | 'puchi' | 'paint' | null
+  donItem: number | null
   kind: 'chart_clear' | 'category_clear' | 'site_login' | 'game_login' | 'charts_uploaded'
   source: 'fanmade' | 'official' | null
   chartId: string | null

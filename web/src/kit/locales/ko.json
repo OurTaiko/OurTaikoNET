@@ -1050,6 +1050,14 @@
     "fromRule": "조건 달성으로 획득",
     "fromAdmin": "관리자 지급",
     "wear": "착용하기",
-    "gotIt": "확인"
+    "gotIt": "확인",
+    "donItem": "새 꾸미기",
+    "donPart": {
+      "cos": "의상",
+      "head": "머리",
+      "body": "몸",
+      "puchi": "푸치캐릭터",
+      "paint": "메이크업"
+    }
   }
 }

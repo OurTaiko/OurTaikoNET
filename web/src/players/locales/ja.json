@@ -309,7 +309,8 @@
       "EntryLoop": "エントリー",
       "FullCombo": "フルコンボ",
       "Miss": "ミス"
-    }
+    },
+    "locked": "未獲得"
   },
   "rules": {
     "heading": "自動付与の条件",
@@ -371,6 +372,27 @@
         "kids": "キッズ",
         "classics": "クラシック"
       }
-    }
+    },
+    "target": "付与するもの",
+    "targets": {
+      "title": "称号",
+      "don": "どんちゃんの着せ替え"
+    },
+    "donPart": "部位",
+    "donItem": "番号"
+  },
+  "donItems": {
+    "heading": "獲得が必要な着せ替え",
+    "part": "部位",
+    "id": "番号",
+    "notInCatalog": "カタログにありません",
+    "locked": "ロック中：獲得すると着られます",
+    "free": "だれでも着られます",
+    "lock": "ロックする",
+    "unlock": "ロックを解除",
+    "lockedDone": "ロックしました。着ていた {{n}} 人に付与しました。",
+    "unlockedDone": "ロックを解除しました。だれでも着られます。",
+    "lockedList": "ロック中の着せ替え",
+    "noneLocked": "ロック中の着せ替えはありません。"
   }
 }

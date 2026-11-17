@@ -12,6 +12,7 @@ export {
 export {
   catalogItem,
   catalogUrl,
+  donItemName,
   donImage,
   donSource,
   resolveDonLook,

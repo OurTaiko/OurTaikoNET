@@ -1062,6 +1062,14 @@
     "fromRule": "For meeting its condition",
     "fromAdmin": "Given by an administrator",
     "wear": "Wear it",
-    "gotIt": "Got it"
+    "gotIt": "Got it",
+    "donItem": "New Don part",
+    "donPart": {
+      "cos": "Costume",
+      "head": "Head",
+      "body": "Body",
+      "puchi": "Puchichara",
+      "paint": "Makeup"
+    }
   }
 }

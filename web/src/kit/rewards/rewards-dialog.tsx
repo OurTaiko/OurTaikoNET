@@ -3,7 +3,7 @@
 //
 // Each kind of reward is drawn by its entry in `views`; a kind with no entry is not drawn, and
 // is still marked seen with the rest. A new kind of reward is one more entry here.
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import {
@@ -15,6 +15,8 @@ import {
 } from '../components/ui/dialog'
 import { DanEmblem, TitleBandArt, type TitleStyle } from '../components/nameplate-art'
 import { danNames } from '../components/profile-plate'
+import { catalogItem, donImage, donItemName, donSource, type DonPartKind } from '../don3d'
+import { readDonCatalog, type ServedDonCatalog } from '../don3d/catalog-request'
 import { visit } from '../navigation'
 import { titleText, type ProfileTitle } from '../profile-titles'
 import { dismissRewards, useRewards, type Reward } from './store'
@@ -23,8 +25,9 @@ type View = (reward: Reward, language: string) => { node: ReactNode; wear?: bool
 
 type TitleData = { title?: ProfileTitle; service?: string; courseTitle?: string }
 type DanData = { index?: number; gold?: boolean; combo?: number }
+type DonItemData = { part?: DonPartKind; itemId?: number; service?: string; courseTitle?: string }
 
-function useViews(): Record<string, View> {
+function useViews(catalog: ServedDonCatalog | null): Record<string, View> {
   const { t } = useTranslation()
   return {
     title: (reward, language) => {
@@ -46,6 +49,30 @@ function useViews(): Record<string, View> {
             <TitleBandArt style={title.style as TitleStyle} name={name} className="h-9" />
             {title.description && <p>{title.description}</p>}
             {from && <p className="text-xs text-muted-foreground">{from}</p>}
+          </div>
+        ),
+      }
+    },
+    // A part of the 3D Don, drawn from the catalog (its picture when it has one).
+    don_item: (reward, language) => {
+      const { part, itemId } = reward.data as DonItemData
+      if (!part || typeof itemId !== 'number') return null
+      const item = catalog ? catalogItem(catalog, part, itemId) : undefined
+      const file = item?.icon ?? (part === 'puchi' || part === 'paint' ? item?.file : undefined)
+      return {
+        node: (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-xs text-muted-foreground">{t('rewards.donItem')}</span>
+            {file && catalog ? (
+              <img
+                {...donImage(donSource(catalog.baseUrl, file, catalog))}
+                alt=""
+                className="size-20 rounded-xl border object-contain"
+              />
+            ) : null}
+            <span className="font-medium">
+              {t(`rewards.donPart.${part}`)} · {donItemName(item, language, itemId)}
+            </span>
           </div>
         ),
       }
@@ -76,7 +103,13 @@ function useViews(): Record<string, View> {
 export function RewardsDialog() {
   const { t, i18n } = useTranslation()
   const { rewards, player } = useRewards()
-  const views = useViews()
+  // The Don's catalog, read only when a part of it is to be shown.
+  const [catalog, setCatalog] = useState<ServedDonCatalog | null>(null)
+  const needsCatalog = rewards.some((reward) => reward.kind === 'don_item')
+  useEffect(() => {
+    if (needsCatalog && !catalog) readDonCatalog().then(setCatalog, () => {})
+  }, [needsCatalog, catalog])
+  const views = useViews(catalog)
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const shown = rewards
     .map((reward) => ({ reward, view: views[reward.kind]?.(reward, language) ?? null }))

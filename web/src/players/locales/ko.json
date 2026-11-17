@@ -309,7 +309,8 @@
       "EntryLoop": "엔트리",
       "FullCombo": "풀콤보",
       "Miss": "미스"
-    }
+    },
+    "locked": "미획득"
   },
   "rules": {
     "heading": "자동 지급 조건",
@@ -371,6 +372,27 @@
         "kids": "키즈",
         "classics": "클래식"
       }
-    }
+    },
+    "target": "지급 대상",
+    "targets": {
+      "title": "칭호",
+      "don": "동짱 꾸미기"
+    },
+    "donPart": "부위",
+    "donItem": "번호"
+  },
+  "donItems": {
+    "heading": "획득이 필요한 꾸미기",
+    "part": "부위",
+    "id": "번호",
+    "notInCatalog": "카탈로그에 없습니다",
+    "locked": "잠김: 획득해야 입을 수 있음",
+    "free": "누구나 입을 수 있음",
+    "lock": "잠그기",
+    "unlock": "잠금 해제",
+    "lockedDone": "잠갔습니다. 입고 있던 {{n}}명에게 지급했습니다.",
+    "unlockedDone": "잠금을 해제했습니다. 누구나 입을 수 있습니다.",
+    "lockedList": "잠긴 꾸미기",
+    "noneLocked": "잠긴 꾸미기가 없습니다."
   }
 }
