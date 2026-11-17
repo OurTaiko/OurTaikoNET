@@ -23,6 +23,9 @@ type donMirror struct {
 	files map[string]donFileRef
 }
 
+// How long a failed mirror catalog read waits before the next try.
+const donMirrorRetry = 30 * time.Second
+
 func (c *donCatalog) fileRefs(yield func(donFileRef) bool) {
 	for _, ref := range c.Base {
 		if !yield(ref) {
@@ -94,23 +97,52 @@ func (s *Server) mirrorForDonRequest(r *http.Request) *donMirror {
 	if err != nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || cfg.DonIPCountry(ip) != "CN" {
 		return nil
 	}
+	return s.donMirrorNow(r.Context())
+}
+
+// donMirrorNow is the mirror as last read. When it is due, one refresh runs on its own; requests
+// keep the last good mirror meanwhile, and only wait when there has never been one.
+func (s *Server) donMirrorNow(ctx context.Context) *donMirror {
 	s.donMirrorMu.Lock()
-	defer s.donMirrorMu.Unlock()
+	mirror := s.donMirror
 	if time.Now().Before(s.donMirrorUntil) {
-		return s.donMirror
+		s.donMirrorMu.Unlock()
+		return mirror
 	}
-	mirror, err := s.readDonMirror(r.Context(), cfg.DonMirrorCatalogURL)
-	if r.Context().Err() != nil {
+	done := s.donMirrorDone
+	if done == nil {
+		done = make(chan struct{})
+		s.donMirrorDone = done
+		go s.refreshDonMirror(done)
+	}
+	s.donMirrorMu.Unlock()
+	if mirror != nil {
+		return mirror
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
 		return nil
 	}
-	s.donMirror = mirror
+	s.donMirrorMu.Lock()
+	defer s.donMirrorMu.Unlock()
+	return s.donMirror
+}
+
+func (s *Server) refreshDonMirror(done chan struct{}) {
+	mirror, err := s.readDonMirror(context.Background(), s.Config.DonMirrorCatalogURL)
+	s.donMirrorMu.Lock()
 	ttl := donCatalogTTL
 	if err != nil {
-		// A failed refresh leaves every URL on the canonical origin. Retry soon without
-		// making every request wait on an unavailable mirror.
-		ttl = 30 * time.Second
+		// Keep the last good mirror (every file is still checked against the canonical
+		// catalog) and try again soon.
+		ttl = donMirrorRetry
 		log.Printf("reading Don mirror catalog: %v", err)
+	} else {
+		s.donMirror = mirror
 	}
 	s.donMirrorUntil = time.Now().Add(ttl)
-	return mirror
+	s.donMirrorDone = nil
+	s.donMirrorMu.Unlock()
+	close(done)
 }

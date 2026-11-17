@@ -140,10 +140,37 @@ func TestDonMirrorRouting(t *testing.T) {
 	if got := mirrorReads.Load(); got != 1 {
 		t.Fatalf("mirror catalog fetched %d times", got)
 	}
+	refreshed := func(server *Server) {
+		server.donMirrorMu.Lock()
+		done := server.donMirrorDone
+		server.donMirrorMu.Unlock()
+		if done != nil {
+			<-done
+		}
+	}
+	// A due refresh runs on its own; the last good mirror is kept while it runs and after it fails.
 	mirrorDown.Store(true)
+	s.donMirrorMu.Lock()
 	s.donMirrorUntil = time.Time{}
-	if urls, _ := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 0 {
-		t.Fatalf("failed refresh kept mirror URLs: %v", urls)
+	s.donMirrorMu.Unlock()
+	for range 2 {
+		if urls, _ := catalogAnswer(t, s, "203.0.113.1"); len(urls) != 3 {
+			t.Fatalf("failed refresh dropped mirror URLs: %v", urls)
+		}
+		refreshed(s)
+	}
+	if got := mirrorReads.Load(); got != 2 {
+		t.Fatalf("mirror catalog fetched %d times after a failed refresh", got)
+	}
+	// Without a good mirror ever read, everything stays canonical.
+	fresh := New(nil, cfg)
+	for range 2 {
+		if urls, _ := catalogAnswer(t, fresh, "203.0.113.1"); len(urls) != 0 {
+			t.Fatalf("first failed read gave mirror URLs: %v", urls)
+		}
+	}
+	if got := mirrorReads.Load(); got != 3 {
+		t.Fatalf("mirror catalog fetched %d times after a first failed read", got)
 	}
 	cfg.DonMirrorCatalogURL = ""
 	if urls, cache := catalogAnswer(t, New(nil, cfg), "203.0.113.1"); len(urls) != 0 || cache != "public, max-age=60" {

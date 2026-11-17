@@ -58,12 +58,14 @@ type Server struct {
 	feed   []Activity
 	feedAt time.Time
 	// The 3D Don's catalog as last read (don.go).
-	donMu          sync.Mutex
-	don            *donCatalog
-	donAt          time.Time
+	donMu sync.Mutex
+	don   *donCatalog
+	donAt time.Time
+	// The mirror catalog as last read (don_mirror.go); donMirrorDone is open while a refresh runs.
 	donMirrorMu    sync.Mutex
 	donMirror      *donMirror
 	donMirrorUntil time.Time
+	donMirrorDone  chan struct{}
 	// The visit count (visits.go): the totals as last read, and each visitor's views this
 	// minute (under mu).
 	visitMu     sync.Mutex
