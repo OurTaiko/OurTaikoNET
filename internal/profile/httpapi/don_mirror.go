@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -114,16 +113,27 @@ func (s *Server) readDonMirror(ctx context.Context, address string) (*donMirror,
 	if err != nil {
 		return nil, err
 	}
+	// A bad entry costs only its own file, and two different entries for one path that path.
 	m := &donMirror{base: u.ResolveReference(&url.URL{Path: "."}).String(), files: make(map[string]donFileRef)}
+	conflicts := make(map[string]bool)
+	var invalid []string
 	for ref := range c.fileRefs {
 		if _, err = hex.DecodeString(ref.SHA256); !fs.ValidPath(ref.Path) || ref.Path == "." ||
 			strings.ContainsAny(ref.Path, "\\\x00") || ref.Size <= 0 || len(ref.SHA256) != 64 || err != nil {
-			return nil, fmt.Errorf("invalid Don mirror entry for %q", ref.Path)
+			invalid = append(invalid, ref.Path)
+			continue
 		}
 		if previous, exists := m.files[ref.Path]; exists && previous != ref {
-			return nil, fmt.Errorf("conflicting Don mirror entries for %q", ref.Path)
+			conflicts[ref.Path] = true
 		}
 		m.files[ref.Path] = ref
+	}
+	for path := range conflicts {
+		delete(m.files, path)
+	}
+	if len(invalid) > 0 || len(conflicts) > 0 {
+		log.Printf("Don mirror catalog: skipped %d invalid entries (first %q) and %d conflicting paths",
+			len(invalid), append(invalid, "")[0], len(conflicts))
 	}
 	return m, nil
 }

@@ -189,3 +189,37 @@ func TestDonMirrorRouting(t *testing.T) {
 		t.Fatalf("disabled mirror catalog paths = %v, cache = %q", paths, cache)
 	}
 }
+
+func TestDonMirrorEntries(t *testing.T) {
+	face := donFileRef{"base/face.png", 9, strings.Repeat("d", 64)}
+	head := donFileRef{"head/3.glb", 4, strings.Repeat("a", 64)}
+	otherHead := head
+	otherHead.SHA256 = strings.Repeat("b", 64)
+	empty := donFileRef{"puchi/1.png", 0, strings.Repeat("c", 64)}
+	badHash := donFileRef{"paint/2.png", 8, strings.Repeat("z", 64)}
+	mirrored := donCatalog{
+		Version: 1,
+		Base:    map[string]donFileRef{"face": face},
+		Items: map[string][]donItem{
+			"head":  {{ID: 3, File: head}, {ID: 4, File: otherHead}},
+			"puchi": {{ID: 1, File: empty}},
+			"paint": {{ID: 2, File: badHash}},
+		},
+	}
+	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(mirrored)
+	}))
+	defer origin.Close()
+	s := New(nil, Config{DonClient: origin.Client()})
+	m, err := s.readDonMirror(t.Context(), origin.URL+"/3dchara/catalog.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// invalid entries and the conflicting path are left out; the rest of the mirror is kept
+	if len(m.files) != 1 || !m.has(face) || m.has(head) || m.has(otherHead) || m.has(empty) || m.has(badHash) {
+		t.Fatalf("mirror files = %v", m.files)
+	}
+	if got, want := m.url(face), origin.URL+"/3dchara/base/face.png?v="+face.SHA256[:12]; got != want {
+		t.Fatalf("mirror URL = %q, want %q", got, want)
+	}
+}

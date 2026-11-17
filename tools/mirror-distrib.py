@@ -50,7 +50,7 @@ def objects(collection, catalog):
         if (not isinstance(path, str) or path.lower() == "catalog.json"
                 or not all(re.fullmatch(r"[a-zA-Z0-9_-][a-zA-Z0-9_.-]*", part) and not part.endswith(".")
                            for part in path.split("/"))
-                or type(size) is not int or size < 0
+                or type(size) is not int or size < 1
                 or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)):
             raise ValueError(f"invalid {collection} catalog entry: {entry!r}")
         if result.setdefault(path, (size, digest)) != (size, digest):
