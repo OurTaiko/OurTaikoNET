@@ -94,9 +94,34 @@ After a canonical publication succeeds:
 4. Use the new SHA-based `v` value for changed art. Refresh previously cached unversioned art
    URLs if immediate visibility is required; otherwise their maximum TTL is 60 seconds.
 
-This hook is still to be integrated with the upstream publishing workflow; cloud mirroring
-does not automatically update inventories. No recurring synchronization job is installed by
-these cloud settings.
+`tools/sync-distribution-mirror.py` now refreshes 3D art (including `.otanim` and icons),
+nameplate art, and the entire web-player file inventory. It validates source SHA-256 and
+uploaded bytes, rechecks that the canonical catalog has not changed, then publishes the
+mirror catalog last. A failed transfer leaves the previous catalog in place. Old player
+versions and other business data are never deleted.
+
+On the mirror host, Python 3.11+, `requests`, `oss2`, and the existing private ossutil
+credential file are required. Run `tools/install-mirror-sync.sh` as root after committing
+the reviewed change. It installs an immutable source release under `/opt/ourtaiko-mirror`,
+and enables `ourtaiko-mirror-sync.timer` every 15 minutes. The worker has a 256 MiB memory
+limit and 15-minute runtime, uses two transfers, and shares the host maintenance lock.
+An optional `/etc/ourtaiko-mirror-sync.env` can set `OURTAIKO_MIRROR_PROXY` for this worker.
+Inspect `journalctl -u ourtaiko-mirror-sync` and `/var/lib/ourtaiko-mirror/last-success.json`.
+
+Apply cloud scopes with `tools/configure-distribution-mirror.py --backup FILE --apply`
+and `tools/configure-esa-mirror.cjs --backup FILE --apply` (the latter needs the Alibaba ESA
+Node SDK in the operator tooling or NODE_PATH). Both commands default to read-only plans,
+back up existing configuration, and preserve unrelated settings. New OSS mirror scopes are
+`sso/avatars/*.webp` and public web-player files under `player/`. The player uses one prefix
+rule so the bucket stays within OSS's routing-rule limit (18 rules total). The mutable
+`player-build.json` is published only by the verified synchronization worker, never by
+unverified mirror back-to-origin. Versioned player files and immutable avatars cache for
+one year; catalogs cache for 60 seconds; errors are not cached. Existing CORS rules cover
+all these public prefixes, including cached HEAD and Range responses.
+
+The existing ESA rule named `OurTaiko content-addressed songs` also covers immutable
+avatar and player static-file extensions. Reusing it keeps the current plan's rule count
+unchanged; catalogs and JSON still use the short-lived catch-all policy.
 
 For regional routing, keep `DON_CATALOG_URL` canonical and set:
 
@@ -117,6 +142,22 @@ verify files, and retry the canonical source on mirror errors. Older NET servers
 by falling back to the canonical nameplate catalog. Deploy NET and its website, then release
 Play so nameplate routing and download recovery reach game clients. Do not globally replace
 canonical S3 public bases.
+
+`GET /api/v1/distribution/avatar?url=...` accepts only canonical content-addressed SSO
+avatar URLs, uses the same country/trusted-proxy policy and a successful mirror HEAD, and
+returns `url` plus the original `fallbackUrl`. `redirect=1` supports ordinary browser images.
+Both variants send `Cache-Control: no-store` so region selection is never shared by a CDN.
+The website's common avatar component and Play's common account/multiplayer picture loader
+use this endpoint, retain the original URL, and fall back if the mirror is unavailable.
+Signed, private, and custom-origin pictures keep their original route.
+
+`GET /api/v1/distribution/player-build` compares the canonical and mirror manifests,
+including every file hash, before selecting the mirror for mainland visitors. The website
+preserves the OSS prefix and exact build version, falls back to the canonical manifest when
+the API is unavailable, and retries the canonical iframe if mirror startup fails or stalls.
+Non-mainland visitors always retain the canonical base. Deploy the updated NET backend and
+website together; game avatar routing also needs the updated Play build. Syncing the OSS
+files alone does not change already released application code.
 
 Before rollout, test mainland and overseas clients, a cold HEAD followed by full GET, audio
 Range 206, CORS, SHA-256 and mirror failure behavior. The former

@@ -27,6 +27,7 @@ type Router struct {
 	checks         map[string]check
 	flights        map[string]chan struct{}
 	probes         chan struct{}
+	player         playerCache
 }
 
 type check struct {

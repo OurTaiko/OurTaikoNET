@@ -23,7 +23,21 @@
     "mirrorAllowHeadObject": true,
     "mirrorPassQueryString": false,
     "mirrorFollowRedirect": false,
-    "mirrorCheckMd5": true
+    "mirrorCheckMd5": true,
+    "additionalMirrorCollections": [
+      {
+        "collection": "sso/avatars",
+        "suffixes": [
+          ".webp"
+        ]
+      },
+      {
+        "collection": "player",
+        "suffixes": [
+          ""
+        ]
+      }
+    ]
   },
   "esa": {
     "siteName": "sakura-bot.cn",
@@ -32,7 +46,7 @@
         "ruleName": "OurTaiko content-addressed songs",
         "sequence": 1,
         "ruleEnable": "on",
-        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\" \"webp\" \"png\" \"jpg\" \"jpeg\" \"mp4\"})",
+        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\") or starts_with(http.request.uri.path, \"/ourtaiko/sso/avatars/\") or starts_with(http.request.uri.path, \"/ourtaiko/player/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\" \"webp\" \"png\" \"jpg\" \"jpeg\" \"mp4\" \"html\" \"js\" \"wasm\" \"data\" \"unityweb\" \"txt\" \"map\"})",
         "bypassCache": "cache_all",
         "edgeCacheMode": "override_origin",
         "edgeCacheTtl": "31536000",

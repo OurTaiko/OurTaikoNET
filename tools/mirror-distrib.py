@@ -7,11 +7,11 @@ import hashlib
 from http.client import HTTPException
 import json
 from pathlib import Path
-import re
 import sys
 from tempfile import NamedTemporaryFile
 import time
 from urllib.request import urlopen
+from distribution_mirror.catalogs import objects
 
 
 DISTRIB = "https://distrib.ourtaiko.org"
@@ -27,37 +27,6 @@ def fetch(url, consume):
             if attempt == 2:
                 raise RuntimeError(f"{url}: {error}") from error
             time.sleep(attempt + 1)
-
-
-def references(collection, catalog):
-    if type(catalog["version"]) is not int or catalog["version"] != 1:
-        raise ValueError(f"unsupported {collection} catalog version")
-    if collection == "nameplate":
-        yield from catalog["files"].values()
-        return
-    yield from catalog["base"].values()
-    for items in catalog["items"].values():
-        for item in items:
-            yield item["file"]
-            if "icon" in item:
-                yield item["icon"]
-
-
-def objects(collection, catalog):
-    result = {}
-    for entry in references(collection, catalog):
-        path, size, digest = entry["path"], entry["size"], entry["sha256"]
-        if (not isinstance(path, str) or path.lower() == "catalog.json"
-                or not all(re.fullmatch(r"[a-zA-Z0-9_-][a-zA-Z0-9_.-]*", part) and not part.endswith(".")
-                           for part in path.split("/"))
-                or type(size) is not int or size < 1
-                or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)):
-            raise ValueError(f"invalid {collection} catalog entry: {entry!r}")
-        if result.setdefault(path, (size, digest)) != (size, digest):
-            raise ValueError(f"conflicting catalog entries for {collection}/{path}")
-    if not result:
-        raise ValueError(f"empty {collection} catalog")
-    return result
 
 
 def matches(path, size, digest):

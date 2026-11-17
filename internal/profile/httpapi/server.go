@@ -140,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/me/don", s.wearDon)
 	mux.HandleFunc("GET /api/v1/don/catalog", s.donCatalogAnswer)
 	mux.HandleFunc("GET /api/v1/nameplate-art/catalog", s.nameplateArtAnswer)
+	mux.HandleFunc("GET /api/v1/distribution/", s.Config.Distribution.Public)
 	mux.HandleFunc("GET /api/v1/nameplates", s.nameplates)
 	mux.HandleFunc("GET /api/v1/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/v1/users/{id}/titles", s.userTitles)

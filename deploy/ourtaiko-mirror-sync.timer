@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh verified OurTaiko mirror catalogs every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+RandomizedDelaySec=30s
+Persistent=true
+Unit=ourtaiko-mirror-sync.service
+
+[Install]
+WantedBy=timers.target

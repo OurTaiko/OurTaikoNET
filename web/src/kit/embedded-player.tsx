@@ -5,7 +5,8 @@ import { Slider } from './components/ui/slider'
 import { endpoints } from './api/endpoints'
 import type { ChartBase, ScoreReplay } from './api/types'
 import { formatLocale } from './i18n'
-import { resolvePlayerUrl } from './embedded-player-source'
+import { canonicalPlayerUrl, resolvePlayerUrl } from './embedded-player-source'
+import { SITE_API_ROOT } from './api/config'
 import { PlayerAudioLoad } from './embedded-player-audio'
 import {
   defaultDrumVolume,
@@ -17,7 +18,7 @@ import {
   type PlayerReplayResult,
 } from './embedded-player-protocol'
 
-const playerManifestUrl = 'https://distrib.ourtaiko.org/player-build.json'
+const playerManifestUrl = `${SITE_API_ROOT}/distribution/player-build`
 
 // `replay`: a recorded play of this block to show instead of practice or the chart alone; the
 // other two modes close it (onReplayClose).
@@ -72,6 +73,7 @@ export default function EmbeddedPlayer({
       try {
         const url = await resolvePlayerUrl({
           manifestUrl: playerManifestUrl,
+          fallbackManifestUrl: 'https://distrib.ourtaiko.org/player-build.json',
           parentOrigin: window.location.origin,
           signal: controller.signal,
         })
@@ -93,6 +95,19 @@ export default function EmbeddedPlayer({
       window.clearTimeout(timeout)
     }
   }, [opened, attempt])
+  const retryPlayerOrigin = useCallback(() => {
+    if (!playerUrl) return false
+    const canonical = canonicalPlayerUrl(playerUrl)
+    if (canonical === playerUrl) return false
+    setPlayerUrl(canonical)
+    setReady(false)
+    return true
+  }, [playerUrl])
+  useEffect(() => {
+    if (!opened || !playerUrl || ready || canonicalPlayerUrl(playerUrl) === playerUrl) return
+    const timeout = window.setTimeout(retryPlayerOrigin, 30_000)
+    return () => window.clearTimeout(timeout)
+  }, [opened, playerUrl, ready, retryPlayerOrigin])
   const send = useCallback(
     (type: string) => {
       iframe.current?.contentWindow?.postMessage(
@@ -125,6 +140,7 @@ export default function EmbeddedPlayer({
       if (data.requestId && data.requestId !== request.current) return
       if (audioLoad.current?.receive(data)) return
       if (data.type === 'error') {
+        if (!ready && retryPlayerOrigin()) return
         setError(
           data.payload?.detail
             ? `${data.payload.code}: ${data.payload.detail}`
@@ -144,7 +160,7 @@ export default function EmbeddedPlayer({
     }
     window.addEventListener('message', receive)
     return () => window.removeEventListener('message', receive)
-  }, [playerOrigin, sendDrumVolume])
+  }, [playerOrigin, sendDrumVolume, ready, retryPlayerOrigin])
 
   useEffect(() => {
     if (!ready || !mode || !source || (mode === 'replay' && !replayData)) return
@@ -303,6 +319,7 @@ export default function EmbeddedPlayer({
       )}
       {mode && playerUrl ? (
         <iframe
+          onError={retryPlayerOrigin}
           key={attempt}
           ref={iframe}
           src={playerUrl}
