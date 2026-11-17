@@ -85,7 +85,7 @@ func TestLockedPartsOfTheDonAreEarned(t *testing.T) {
 	}
 	// A puchichara is its own picture.
 	raw = string(app.DescribeReward(ask, "don_item", []byte(`{"part":"puchi","itemId":1}`)))
-	if !strings.Contains(raw, `"picture":"`+bucket.URL+`/3dchara/puchi/1.png?v=p1p1p1p1p1p1"`) {
+	if !strings.Contains(raw, `"picture":"`+bucket.URL+`/3dchara/puchi/1.png"`) {
 		t.Fatal(raw)
 	}
 	// A part the catalog does not have is answered as it is.

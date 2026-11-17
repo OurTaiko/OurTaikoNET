@@ -164,9 +164,14 @@ describe('chart package', () => {
       '/api/v1/sources/fanmade/charts/song/tja': tja,
       '/api/v1/sources/fanmade/charts/song/audio': audio,
       '/api/v1/sources/fanmade/charts/song/movie': 'ftyp movie',
-      [`/api/v1/sources/fanmade/charts/song/cover?v=${hash(cover)}`]: cover,
+      [`${cdn}/${hash(cover)}.webp`]: cover,
     })
-    const withMovie = { ...chart, movieHash: hash('ftyp movie') }
+    // A cover is read from its bucket address only; the API has no route for it.
+    const withMovie = {
+      ...chart,
+      movieHash: hash('ftyp movie'),
+      coverUrl: `${cdn}/${hash(cover)}.webp`,
+    }
     const archive = await buildChartPackage(withMovie, new AbortController().signal)
     // Without a manifest the TJA keeps its uploaded name: the API no longer tells its hash.
     expect(await entries(archive)).toEqual({

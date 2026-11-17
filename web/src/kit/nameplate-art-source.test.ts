@@ -18,8 +18,8 @@ it('uses only the server-approved mirror paths and retains canonical fallbacks',
     ),
   )
   const sources = await nameplateArtSources()
-  expect(sources.shadow.url).toBe(mirrorBaseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
-  expect(sources.shadow.fallbackUrl).toBe(baseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
+  expect(sources.shadow.url).toBe(mirrorBaseUrl + 'shadow.png')
+  expect(sources.shadow.fallbackUrl).toBe(baseUrl + 'shadow.png')
   expect(sources.outline.url).toContain(baseUrl)
   expect(sources.outline.fallbackUrl).toBeUndefined()
 })
@@ -48,8 +48,8 @@ it('reads the catalog from the mirror without the nameplate API', async () => {
   vi.stubGlobal('fetch', fetch)
   const sources = await nameplateArtSources()
   expect(fetch.mock.calls[2][0]).toBe(mirrorBaseUrl + 'catalog.json')
-  expect(sources.shadow.url).toBe(mirrorBaseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
-  expect(sources.shadow.fallbackUrl).toBe(baseUrl + 'shadow.png?v=' + sha256.slice(0, 12))
+  expect(sources.shadow.url).toBe(mirrorBaseUrl + 'shadow.png')
+  expect(sources.shadow.fallbackUrl).toBe(baseUrl + 'shadow.png')
 })
 it('verifies all art before exposing blob URLs', async () => {
   vi.stubGlobal(

@@ -42,6 +42,7 @@ import {
   PlaylistGridSkeleton,
   emptyStateClassName,
 } from './components/playlist-card'
+import { useCardCover } from './components/card-cover'
 import { PlaylistDialog, PlaylistCoverDialog } from './playlist-dialogs'
 
 const sorts = ['updated', 'newest', 'favorites'] as const
@@ -446,7 +447,8 @@ export function PlaylistPage() {
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState<'' | 'edit' | 'cover' | 'delete' | 'songs'>('')
   const [arranging, setArranging] = useState(false)
-  const [failedCover, setFailedCover] = useState('')
+  // Called before the early returns below, like every hook here.
+  const cover = useCardCover(playlist ? playlistCoverSource(playlist) : undefined)
   const userId = session.user?.id
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -495,7 +497,6 @@ export function PlaylistPage() {
   const text = playlistText(playlist)
   const charts = playlist.charts ?? []
   const owned = !playlist.system && !!userId && playlist.ownerId === userId
-  const source = playlistCoverSource(playlist)
   // Each change is sent at once; a failure restores what the server holds.
   const change = async (next: ChartBase[], request: () => Promise<unknown>) => {
     setBusy(true)
@@ -574,12 +575,12 @@ export function PlaylistPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24">
           <div className="flex aspect-square w-44 items-center justify-center overflow-hidden rounded-[28px] bg-secondary text-secondary-foreground shadow-elev-1 sm:w-56 lg:w-full">
-            {source && failedCover !== source ? (
+            {cover.source ? (
               <img
-                src={source}
+                src={cover.source}
                 alt={t('playlists.coverAlt', { name: text.name })}
                 className="size-full object-cover"
-                onError={() => setFailedCover(source)}
+                onError={cover.onError}
               />
             ) : (
               <PlaylistIcon className="size-1/3" aria-hidden="true" />
@@ -718,7 +719,13 @@ export function PlaylistPage() {
         <PlaylistCoverDialog
           playlist={playlist}
           onDismiss={() => setDialog('')}
-          onSaved={(coverHash) => setPlaylist({ ...playlist, coverHash: coverHash || undefined })}
+          onSaved={({ coverHash, coverUrl }) =>
+            setPlaylist({
+              ...playlist,
+              coverHash: coverHash || undefined,
+              coverUrl: coverUrl || undefined,
+            })
+          }
         />
       )}
       {dialog === 'delete' && (

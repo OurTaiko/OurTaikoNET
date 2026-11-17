@@ -1,5 +1,6 @@
 // The 3dchara folder's catalog.json (written by tools/3dchara/catalog.py): every file with its
-// path, size and SHA-256, so a file is asked for as "<path>?v=<first 12 of the hash>".
+// path, size and SHA-256. A published file is never replaced (a changed file gets a new path), so
+// a file is asked for by its path alone.
 
 export type DonCatalogFile = { path: string; size: number; sha256: string }
 
@@ -15,7 +16,7 @@ export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi' | 'paint'
 export type DonCatalog = {
   version: number
   // Added by the API for a mainland visitor: the files to fetch from the mirror, at
-  // mirrorBaseUrl + path + "?v=..." like the canonical ones.
+  // mirrorBaseUrl + path like the canonical ones.
   mirrorBaseUrl?: string
   mirrorPaths?: string[]
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
@@ -52,7 +53,7 @@ export function catalogUrl(baseUrl: string, file: DonCatalogFile, mirror?: DonMi
     if (set.has(file.path)) baseUrl = mirror.mirrorBaseUrl
   }
   const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
-  return base + file.path + '?v=' + file.sha256.slice(0, 12)
+  return base + file.path
 }
 
 // Where a file is fetched: its canonical address, and the mirror's when the API listed one. The

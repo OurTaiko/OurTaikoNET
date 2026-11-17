@@ -38,7 +38,7 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
       {/* The title below is the link a keyboard and a screen reader get; this one is for the pointer. */}
       <a href={page} tabIndex={-1} aria-hidden="true" className="group @xl:row-span-2 self-start">
         <SongCover
-          image={cover ? coverOf(source, chart) : undefined}
+          image={cover ? coverOf(chart) : undefined}
           categoryIds={chart.categoryIds}
           className="rounded-[16px] @xl:rounded-none"
         />

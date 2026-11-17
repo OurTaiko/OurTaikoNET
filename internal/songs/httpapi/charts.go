@@ -62,6 +62,9 @@ type Chart struct {
 	AudioHash string `json:"audioHash"`
 	AudioSize int64  `json:"audioSize"`
 	CoverHash string `json:"coverHash,omitempty"`
+	// CoverURL is the cover's address in the public bucket (coverURL), the only place it is read
+	// from; empty when the bucket has no public address.
+	CoverURL string `json:"coverUrl,omitempty"`
 	// HasFiles is false for a song registered without a TJA and audio, which only the
 	// official source accepts: it has no blocks, no duration, and the file fields are empty.
 	// Official source only.
@@ -151,7 +154,7 @@ const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',d.id,'course',d.course,'side',d.side,'level',d.level,'maker',d.maker,'branching',d.branching,'chartHash',d.content_hash) ORDER BY ` + slotOrder + `) FROM chart_difficulties d WHERE d.chart_id=c.id),'[]'),
  COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),
  c.movie_offset,COALESCE(mf.sha256,''),COALESCE(mf.byte_size,0),COALESCE(mf.storage_key,''),
- COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,'')
+ COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,'')
  FROM charts c LEFT JOIN chart_resources tf ON tf.id=c.tja_file LEFT JOIN chart_resources af ON af.id=c.audio_file
  LEFT JOIN chart_resources cf ON cf.id=c.cover_file LEFT JOIN chart_resources pf ON pf.id=c.preview_file
  LEFT JOIN chart_resources mf ON mf.id=c.movie_file LEFT JOIN chart_resources bf ON bf.id=c.bgimage_file `
@@ -161,12 +164,14 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 	c := Chart{official: s.source().Official}
 	var difficulties []byte
 	var flags CategoryFlags
+	var coverKey string
 	e := row.Scan(&c.ID, &c.NumberID, &c.NijiiroID, &c.OfficialID, &c.OwnerIDs, &c.Description, &c.CreatedAt, &c.UpdateAt, &c.Duration, &c.DemoEnd, &flags,
 		&c.TJAName, &c.AudioName, &c.TJAHash, &c.TJASize, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.CoverHash, &c.PreviewPath,
 		&c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties,
 		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
-		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey)
+		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey)
 	if e == nil {
+		c.CoverURL = s.coverURL(coverKey)
 		c.OwnerID = c.OwnerIDs[0]
 		c.Score = c.Upvotes - c.Downvotes
 		c.HasFiles = c.TJAKey != ""

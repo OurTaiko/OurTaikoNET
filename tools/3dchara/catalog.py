@@ -18,8 +18,9 @@ The folder:
     names.json                 {"cos": {"12": {"ja": "...", "en": "...", "zh": "..."}}, ...} (optional)
 
 Every file is listed with its path (relative to the catalog), size and SHA-256, so the game can
-cache by content and the website can ask for "<path>?v=<first 12 of the hash>". A new costume is
-a new file (and a name); run this again and upload the folder with publish.sh.
+cache by content. A published file is never replaced: clients and the mirror keep it by its path
+alone, so a changed model or picture gets a new path. A new costume is a new file (and a name);
+run this again and upload the folder with publish.sh.
 
 Usage: catalog.py <folder>   (writes <folder>/catalog.json)
 """

@@ -41,7 +41,7 @@ func TestPlayersDressTheirDon(t *testing.T) {
 	var answer DonAnswer
 	c.json("GET", "/api/v1/users/"+other+"/don", "", 200, &answer)
 	if !answer.Look.Costume || answer.Look.Cos != 0 || answer.Look.Colors != nil || len(answer.Files) != 1 ||
-		answer.Files[0].URL != base+"cos/0.glb?v=c0c0c0c0c0c0" || answer.Files[0].Size != 1 {
+		answer.Files[0].URL != base+"cos/0.glb" || answer.Files[0].Size != 1 {
 		t.Fatalf("plain Don %+v", answer)
 	}
 	c.json("GET", "/api/v1/users/not-an-id/don", "", 404, nil)
@@ -94,7 +94,7 @@ func TestPlayersDressTheirDon(t *testing.T) {
 	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":3}`, 422, nil)
 	c.json("PUT", "/api/v1/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":2}`, 200, &answer)
 	if answer.Look.Paint != 2 || len(answer.Files) != 2 || answer.Files[1].Kind != "paint" ||
-		answer.Files[1].URL != base+"paint/2.png?v=m2m2m2m2m2m2" {
+		answer.Files[1].URL != base+"paint/2.png" {
 		t.Fatalf("makeup %+v", answer)
 	}
 	c.json("GET", "/api/v1/users/"+player+"/don", "", 200, &answer)

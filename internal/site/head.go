@@ -223,7 +223,7 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 		TitleTranslations map[string]string `json:"titleTranslations"`
 		Description       string            `json:"description"`
 		Maker             string            `json:"maker"`
-		CoverHash         string            `json:"coverHash"`
+		CoverURL          string            `json:"coverUrl"`
 		Difficulties      []struct {
 			Course string `json:"course"`
 			Side   string `json:"side"`
@@ -265,8 +265,9 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 		}
 	}
 	meta := pageMeta{title: title, description: description, kind: "music.song"}
-	if c.CoverHash != "" {
-		meta.image = "/api/v1/sources/" + source + "/charts/" + url.PathEscape(c.ID) + "/cover?" + url.Values{"v": {c.CoverHash}}.Encode()
+	// The cover's address in the public bucket; there is no API route for it.
+	if c.CoverURL != "" {
+		meta.image = c.CoverURL
 	}
 	return meta, true
 }
@@ -280,7 +281,7 @@ func playlistMeta(source string, body []byte) (pageMeta, bool) {
 		Description string `json:"description"`
 		Public      bool   `json:"public"`
 		System      bool   `json:"system"`
-		CoverHash   string `json:"coverHash"`
+		CoverURL    string `json:"coverUrl"`
 		ChartCount  int    `json:"chartCount"`
 		Owner       *struct {
 			Nickname string `json:"nickname"`
@@ -304,8 +305,9 @@ func playlistMeta(source string, body []byte) (pageMeta, bool) {
 		}
 	}
 	meta := pageMeta{title: name, description: description, kind: "music.playlist"}
-	if p.CoverHash != "" {
-		meta.image = "/api/v1/sources/" + source + "/playlists/" + url.PathEscape(p.ID) + "/cover?" + url.Values{"v": {p.CoverHash}}.Encode()
+	// The cover's address in the public bucket; there is no API route for it.
+	if p.CoverURL != "" {
+		meta.image = p.CoverURL
 	}
 	return meta, true
 }

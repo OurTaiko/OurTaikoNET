@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 import { CoverPicker } from './cover-picker'
 import { Modal } from '../notifications'
 import { useSession } from '../session-context'
+import type { SavedCover } from '../cover'
 
 // Uploads a cover to `endpoint` (PUT, multipart field "cover"). With
 // `removeLabel` it also offers to remove the current cover (DELETE); both
@@ -19,7 +20,7 @@ export function CoverUploadDialog({
   title: string
   endpoint: string
   removeLabel?: string
-  onSaved: (coverHash: string) => void
+  onSaved: (saved: SavedCover) => void
   onDismiss: () => void
 }) {
   const { t } = useTranslation()
@@ -32,11 +33,11 @@ export function CoverUploadDialog({
     setBusy(true)
     setError('')
     try {
-      const result = await api<{ coverHash: string }>(endpoint, {
+      const result = await api<SavedCover>(endpoint, {
         ...init,
         headers: { 'X-CSRF-Token': csrfToken },
       })
-      onSaved(result.coverHash)
+      onSaved(result)
       onDismiss()
     } catch (e) {
       setError((e as Error).message)

@@ -66,10 +66,11 @@ unrelated settings.
 | Requests | Edge TTL | Browser TTL |
 | --- | --- | --- |
 | Fanmade/database `.tja`, `.ogg`, `.mp3`, `.webp`, `.png`, `.jpg`, `.jpeg`, `.mp4` with content-hash filenames | 1 year | 1 year |
-| Don/nameplate `.glb`, `.otanim`, `.json`, `.png`, `.jpg`, `.jpeg`, `.webp` with a `v` parameter | 1 year | 1 year |
+| Don/nameplate `.glb`, `.otanim`, `.png`, `.jpg`, `.jpeg`, `.webp` (never replaced in place; JSON excluded) | 1 year | 1 year |
 | Catalogs and unversioned resource requests | 60 seconds | 60 seconds |
 
-Retain all query parameters in the cache key, including `v`. Cache 4xx and 5xx responses for
+Retain all query parameters in the cache key (older game builds still add `v` to nameplate
+art). Cache 4xx and 5xx responses for
 zero seconds. Keep Range support enabled. Install the scoped ESA-to-client response header
 rule in `responseHeaderRules` as well: **Add** `Access-Control-Allow-Origin: *` and the listed
 read methods/exposed headers. ESA's Add operation overwrites an existing header; Modify only
@@ -91,8 +92,9 @@ After a canonical publication succeeds:
    checks HEAD status/size and updated clients verify SHA-256 before caching or packaging.
 3. Publish each mirror catalog last. Preserve the canonical art catalog format; set the song
    inventory `baseUrl` to its permanent public collection URL.
-4. Use the new SHA-based `v` value for changed art. Refresh previously cached unversioned art
-   URLs if immediate visibility is required; otherwise their maximum TTL is 60 seconds.
+4. Files other than JSON are never replaced in place: changed art is published under a new path.
+   The mirror keeps the first copy of a path it reads and ESA keeps art for a year, so a file
+   replaced in place would stay old there.
 
 `tools/sync-distribution-mirror.py` now refreshes 3D art (including `.otanim` and icons),
 nameplate art, and the entire web-player file inventory. It validates source SHA-256 and

@@ -106,7 +106,7 @@ func TestDonMirrorRouting(t *testing.T) {
 			}
 			for i, w := range want {
 				file := answer.Files[i]
-				if file.URL != origin.URL+w.prefix+w.ref.Path+"?v="+w.ref.SHA256[:12] || file.Size != w.ref.Size || file.SHA256 != w.ref.SHA256 {
+				if file.URL != origin.URL+w.prefix+w.ref.Path || file.Size != w.ref.Size || file.SHA256 != w.ref.SHA256 {
 					t.Fatalf("got %+v, want %s%s", file, w.prefix, w.ref.Path)
 				}
 			}

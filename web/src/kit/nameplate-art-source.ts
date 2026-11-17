@@ -48,7 +48,7 @@ export async function nameplateArtSources(): Promise<Record<string, ResourceFile
         file.size > 8 * 1024 * 1024
       )
         throw new Error('NAMEPLATE_CATALOG_INVALID')
-      const suffix = file.path + '?v=' + file.sha256.slice(0, 12)
+      const suffix = file.path
       const original = (catalog.baseUrl ?? canonical) + suffix
       const mirrored =
         catalog.mirrorBaseUrl && paths.has(file.path) ? catalog.mirrorBaseUrl + suffix : original

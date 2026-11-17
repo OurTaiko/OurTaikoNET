@@ -54,9 +54,9 @@ function apiFiles(chart: ChartBase): PackageFile[] {
       name: `${chart.movieHash}.mp4`,
       sha256: chart.movieHash,
     })
-  if (chart.coverHash)
+  if (chart.coverHash && chart.coverUrl)
     files.push({
-      url: endpoints.cover(chart.id, chart.coverHash),
+      url: chart.coverUrl,
       name: `${chart.coverHash}.webp`,
       sha256: chart.coverHash,
     })

@@ -315,7 +315,7 @@ describe('resolveDonLook', () => {
 
   it('builds versioned URLs', () => {
     expect(catalogUrl('https://distrib.ourtaiko.org/3dchara', file('cos/0.glb'))).toBe(
-      'https://distrib.ourtaiko.org/3dchara/cos/0.glb?v=abcdef012345',
+      'https://distrib.ourtaiko.org/3dchara/cos/0.glb',
     )
   })
 
@@ -326,10 +326,10 @@ describe('resolveDonLook', () => {
       mirrorPaths: ['head/3.glb'],
     }
     expect(catalogUrl(base, file('head/3.glb'), mirror)).toBe(
-      'https://static.sakura-bot.cn/3dchara/head/3.glb?v=abcdef012345',
+      'https://static.sakura-bot.cn/3dchara/head/3.glb',
     )
-    expect(catalogUrl(base, file('body/4.glb'), mirror)).toBe(base + 'body/4.glb?v=abcdef012345')
-    expect(catalogUrl(base, file('head/3.glb'), {})).toBe(base + 'head/3.glb?v=abcdef012345')
+    expect(catalogUrl(base, file('body/4.glb'), mirror)).toBe(base + 'body/4.glb')
+    expect(catalogUrl(base, file('head/3.glb'), {})).toBe(base + 'head/3.glb')
   })
 })
 

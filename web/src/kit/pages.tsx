@@ -1017,8 +1017,10 @@ export function Detail() {
         <CoverDialog
           chart={chart}
           onDismiss={() => setCoverEditing(false)}
-          onSaved={(coverHash) =>
-            setChart((current) => (current?.id === chart.id ? { ...current, coverHash } : current))
+          onSaved={({ coverHash, coverUrl }) =>
+            setChart((current) =>
+              current?.id === chart.id ? { ...current, coverHash, coverUrl } : current,
+            )
           }
         />
       )}

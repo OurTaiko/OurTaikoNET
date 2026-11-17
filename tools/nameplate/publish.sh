@@ -2,9 +2,10 @@
 # Uploads the game's nameplate art to the public bucket (s3://ourtaiko-public/nameplate/, read at
 # https://distrib.ourtaiko.org/nameplate/), as tools/3dchara/publish.sh does for the 3D Don: the
 # PNGs unchanged first, the catalog last, so the catalog never names a file that is not there yet.
-# Files may be cached for a day, the catalog for five minutes; the website asks for each file with
-# "?v=<hash>" from the catalog, and the upload ends by invalidating /nameplate/* on CloudFront
-# (distrib.ourtaiko.org keys its cache on the path alone). Needs `aws login` with write access to
+# Files may be cached for a day, the catalog for five minutes, and the upload ends by invalidating
+# /nameplate/* on CloudFront (distrib.ourtaiko.org keys its cache on the path alone). A published
+# PNG is never replaced in place (the mirror keeps the first copy it reads): changed art gets a new
+# file name in the catalog. Needs `aws login` with write access to
 # the bucket and to that distribution.
 #
 # The folder holds the 12 PNGs catalog.py lists. The game no longer carries them (2026-11-15: it

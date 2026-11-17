@@ -83,7 +83,7 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 		}
 	}
 	for _, method := range []string{"GET", "HEAD"} {
-		for _, path := range []string{"audio", "tja", "cover"} {
+		for _, path := range []string{"audio", "tja"} {
 			w = httptest.NewRecorder()
 			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/charts/cdn-song/"+path, nil))
 			// A redirect by chart ID is never cached: a replaced or removed chart is asked about again.
@@ -92,15 +92,24 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 			}
 		}
 	}
-	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/cover?v=obsolete", nil))
-	if w.Code != 404 {
-		t.Fatal(w.Code)
+	// A cover is given as its bucket address, whatever its key; no API route reads it.
+	if _, err := pool.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file,cover_file) VALUES('cdn-hashed',ARRAY['owner'],'CDN',120,100,
+ test_file('objects/hashed/tja','song.tja',repeat('a',64),12),test_file('objects/hashed/audio','audio.ogg',repeat('b',64),20),
+ test_file(repeat('e',64)||'.webp','cover.webp',repeat('e',64),14));`); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"cdn-song": "https://cdn.example/fanmade/covers/song/cover.webp", "cdn-hashed": "https://cdn.example/fanmade/" + strings.Repeat("e", 64) + ".webp"} {
+		w = httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+id+"?by=id", nil))
+		var detail Chart
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &detail) != nil || detail.CoverURL != want {
+			t.Fatalf("%s: %d coverUrl %q", id, w.Code, detail.CoverURL)
+		}
 	}
 	if _, err := pool.Exec(ctx, `UPDATE charts SET status='deleted' WHERE id='cdn-song'`); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"audio", "tja", "download", "cover", "resources"} {
+	for _, path := range []string{"audio", "tja", "download", "resources"} {
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/"+path, nil))
 		if w.Code != 404 {

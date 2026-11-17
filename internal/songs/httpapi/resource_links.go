@@ -148,3 +148,26 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	resources = routed
 	web.Respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }
+
+// coverURL is a cover's address in the public bucket, the only place a cover is read from (there
+// is no API route for it). A stored file is never replaced in place, so the address can be cached
+// for good; clients move it to their regional root. "" when the bucket has no public address
+// (files kept on this server's disk in development, or a private bucket): no cover is shown then.
+func (s *Server) coverURL(key string) string {
+	remote, ok := s.Config.Objects.(*objectstore.S3)
+	if !ok || key == "" {
+		return ""
+	}
+	address, err := remote.PublicURL(key)
+	if err != nil {
+		return ""
+	}
+	return address
+}
+
+// withCoverURLs fills each playlist's CoverURL.
+func (s *Server) withCoverURLs(playlists []Playlist) {
+	for i := range playlists {
+		playlists[i].CoverURL = s.coverURL(playlists[i].coverKey)
+	}
+}

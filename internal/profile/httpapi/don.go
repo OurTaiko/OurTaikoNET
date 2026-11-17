@@ -88,12 +88,10 @@ func (c *donCatalog) item(kind string, id int) (donItem, bool) {
 	return donItem{}, false
 }
 
+// url is a file's address. A published file is never replaced (a changed file gets a new path),
+// so the path alone names its bytes.
 func (c *donCatalog) url(ref donFileRef) string {
-	v := ref.SHA256
-	if len(v) > 12 {
-		v = v[:12]
-	}
-	return c.baseURL + ref.Path + "?v=" + v
+	return c.baseURL + ref.Path
 }
 
 var errNoDonCatalog = errors.New("the 3dchara catalog cannot be read")
@@ -288,7 +286,7 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	base, _ := json.Marshal(c.baseURL)
 	all["baseUrl"] = base
 	// mirrorBaseUrl and mirrorPaths: the files a mainland visitor fetches from the mirror, at
-	// mirrorBaseUrl + path + "?v=" + the first 12 of the hash, like baseUrl's.
+	// mirrorBaseUrl + path, like baseUrl's.
 	delete(all, "mirrorBaseUrl")
 	delete(all, "mirrorPaths")
 	if s.donRegional() {

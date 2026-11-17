@@ -3,13 +3,16 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 	"ourtaiko.dev/net/internal/account"
@@ -271,4 +274,29 @@ func (c testClient) raw(user, path string) (int, []byte) {
 	w := httptest.NewRecorder()
 	c.handler.ServeHTTP(w, r)
 	return w.Code, w.Body.Bytes()
+}
+
+// storedCover is what the cover file of a chart or playlist (table "charts" or "playlists")
+// holds in the store, read there because no API route serves covers; nil when it has none.
+func storedCover(t *testing.T, s *Server, table, id string) []byte {
+	t.Helper()
+	ctx := context.Background()
+	var key string
+	err := s.DB.QueryRow(ctx, `SELECT r.storage_key FROM `+table+` x JOIN chart_resources r ON r.id=x.cover_file WHERE x.id=$1`, id).Scan(&key)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.Config.Objects.Open(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

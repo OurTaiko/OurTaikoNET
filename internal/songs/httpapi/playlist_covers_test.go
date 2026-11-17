@@ -61,16 +61,11 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if code := c.do("", "GET", "/api/v1/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
 		t.Fatal("cover hash", code, p.CoverHash)
 	}
-	get := func(query string) *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		c.handler.ServeHTTP(rec, httptest.NewRequest("GET", path+query, nil))
-		return rec
-	}
-	if rec := get("?v=" + result.CoverHash); rec.Code != 200 || rec.Header().Get("Content-Type") != "image/webp" || web.Hash(rec.Body.String()) != result.CoverHash {
-		t.Fatal("served cover", rec.Code)
-	}
-	if rec := get(""); rec.Code != 404 {
-		t.Fatal("cover without its hash", rec.Code)
+	// Covers are read from the bucket only: there is no API route to read one.
+	rec = httptest.NewRecorder()
+	c.handler.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+	if rec.Code != 404 || web.Hash(string(storedCover(t, s, "playlists", p.ID))) != result.CoverHash {
+		t.Fatal("stored cover", rec.Code)
 	}
 
 	// Only the WebP is stored: the game is given the same file.
@@ -154,8 +149,8 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if code := c.do("owner", "DELETE", path, `{}`, nil); code != 200 || covers() != 1 {
 		t.Fatal("removing a cover a song shares", code, covers())
 	}
-	if rec := get("?v=" + result.CoverHash); rec.Code != 404 {
-		t.Fatal("removed cover served", rec.Code)
+	if storedCover(t, s, "playlists", p.ID) != nil {
+		t.Fatal("removed cover still named")
 	}
 	if rec := upload("owner", picture.Bytes()); rec.Code != 200 || covers() != 1 {
 		t.Fatal("cover again", rec.Code, covers())

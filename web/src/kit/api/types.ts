@@ -91,6 +91,8 @@ export type ChartBase = {
   audioHash: string
   audioSize: number
   coverHash?: string
+  /** The cover's address in the public bucket, the only place a cover is read from. */
+  coverUrl?: string
   /** Transcoded background movie; absent when the chart has none. */
   movieHash?: string
   movieSize?: number
@@ -282,6 +284,8 @@ export type Playlist<C extends ChartBase = ChartBase> = {
   ownerId?: string
   owner: { id: string; nickname: string; avatarUrl?: string } | null
   coverHash?: string
+  /** As ChartBase.coverUrl. */
+  coverUrl?: string
   chartCount: number
   favoriteCount: number
   favorited: boolean

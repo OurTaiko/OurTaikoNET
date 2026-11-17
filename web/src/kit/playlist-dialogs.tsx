@@ -6,6 +6,7 @@ import { endpoints } from './api/endpoints'
 import type { ChartBase, MyPlaylists, Playlist } from './api/types'
 import { CategorySelect } from './categories'
 import { CoverUploadDialog } from './components/cover-dialog'
+import type { SavedCover } from './cover'
 import { ToggleRow } from './components/toggle-row'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
@@ -126,7 +127,7 @@ export function PlaylistCoverDialog({
   onDismiss,
 }: {
   playlist: Playlist
-  onSaved: (coverHash: string) => void
+  onSaved: (saved: SavedCover) => void
   onDismiss: () => void
 }) {
   const { t } = useTranslation()

@@ -62,7 +62,7 @@ def stage_object(base, root, path, size, digest):
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
-    fetch(f"{base}/{path}?v={digest[:12]}", write)
+    fetch(f"{base}/{path}", write)
 
 
 def stage(collection, destination):

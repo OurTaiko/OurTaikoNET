@@ -44,13 +44,16 @@ type Playlist struct {
 	Public      bool   `json:"public"`
 	System      bool   `json:"system"`
 	// The category's genre selects the folder artwork in the game.
-	CategoryID    string         `json:"categoryId"`
-	Genre         string         `json:"genre"`
-	OwnerID       string         `json:"ownerId,omitempty"`
-	Owner         *PlaylistOwner `json:"owner"`
-	CoverHash     string         `json:"coverHash,omitempty"`
-	ChartCount    int            `json:"chartCount"`
-	FavoriteCount int            `json:"favoriteCount"`
+	CategoryID string         `json:"categoryId"`
+	Genre      string         `json:"genre"`
+	OwnerID    string         `json:"ownerId,omitempty"`
+	Owner      *PlaylistOwner `json:"owner"`
+	CoverHash  string         `json:"coverHash,omitempty"`
+	// CoverURL is as a chart's (Chart.CoverURL).
+	CoverURL      string `json:"coverUrl,omitempty"`
+	coverKey      string
+	ChartCount    int `json:"chartCount"`
+	FavoriteCount int `json:"favoriteCount"`
 	// Favorited is only filled for a signed-in viewer.
 	Favorited bool       `json:"favorited"`
 	CreatedAt *time.Time `json:"createdAt"`
@@ -90,7 +93,7 @@ const playlistChartCount = `(SELECT count(*) FROM playlist_items i JOIN charts c
 
 // $1 is the viewer, empty for a guest.
 const playlistSelect = `SELECT p.id,p.owner_id,p.name,p.description,p.is_public,p.category_flag,
- COALESCE((SELECT sha256 FROM chart_resources WHERE id=p.cover_file),''),p.created_at,p.updated_at,` + playlistChartCount + `,
+ COALESCE((SELECT sha256 FROM chart_resources WHERE id=p.cover_file),''),COALESCE((SELECT storage_key FROM chart_resources WHERE id=p.cover_file),''),p.created_at,p.updated_at,` + playlistChartCount + `,
  (SELECT count(*) FROM playlist_favorites f WHERE f.playlist_id=p.id),
  EXISTS(SELECT 1 FROM playlist_favorites f WHERE f.playlist_id=p.id AND f.user_id=$1)
  FROM playlists p `
@@ -99,7 +102,7 @@ func (src *Source) readPlaylist(row pgx.Row) (Playlist, error) {
 	var p Playlist
 	var flag CategoryFlags
 	var created, updated time.Time
-	e := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.Description, &p.Public, &flag, &p.CoverHash, &created, &updated, &p.ChartCount, &p.FavoriteCount, &p.Favorited)
+	e := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.Description, &p.Public, &flag, &p.CoverHash, &p.coverKey, &created, &updated, &p.ChartCount, &p.FavoriteCount, &p.Favorited)
 	category := src.categoryByFlag(flag)
 	p.CategoryID, p.Genre, p.CreatedAt, p.UpdatedAt = category.ID, category.Genre, &created, &updated
 	return p, e
@@ -147,6 +150,10 @@ func (s *Server) profiles(ctx context.Context, ids []string) map[string]account.
 // playlistOwners fills the owners' public profiles; call it after the database
 // work is done, because it contacts SSO.
 func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
+	// Every playlist answer passes here, so the cover addresses are filled here too.
+	for _, items := range lists {
+		s.withCoverURLs(items)
+	}
 	ids, seen := []string{}, map[string]bool{}
 	for _, items := range lists {
 		for _, p := range items {

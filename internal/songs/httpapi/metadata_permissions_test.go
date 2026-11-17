@@ -40,7 +40,8 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		t.Fatal(err)
 	}
 	storage := t.TempDir()
-	handler := testServer(t, pool, Config{Storage: storage, Origin: "http://127.0.0.1:5173"}).Handler()
+	app := testServer(t, pool, Config{Storage: storage, Origin: "http://127.0.0.1:5173"})
+	handler := app.Handler()
 	call := func(actor, csrf, body string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("PATCH", "/api/v1/charts/chart", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
@@ -118,9 +119,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	if detailResponse.Code != http.StatusOK || json.Unmarshal(detailResponse.Body.Bytes(), &detail) != nil || detail.CoverHash != edited.CoverHash || detail.TitleTranslations["zh"] != "新译名" {
 		t.Fatalf("GET/PATCH metadata mismatch: %s", detailResponse.Body.String())
 	}
-	storedCover := httptest.NewRecorder()
-	handler.ServeHTTP(storedCover, httptest.NewRequest("GET", "/api/v1/charts/chart/cover?v="+edited.CoverHash, nil))
-	if storedCover.Code != http.StatusOK || !bytes.Equal(storedCover.Body.Bytes(), coverBytes) {
+	if !bytes.Equal(storedCover(t, app, "charts", "chart"), coverBytes) {
 		t.Fatal("metadata edit changed cover bytes")
 	}
 

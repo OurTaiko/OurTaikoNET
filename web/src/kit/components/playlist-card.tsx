@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { HeartIcon, LockSimpleIcon, MusicNotesIcon, PlaylistIcon } from '@phosphor-icons/react'
-import { endpoints } from '../api/endpoints'
 import type { Playlist } from '../api/types'
 import { CategoryLabels } from '../categories'
 import { Badge } from './ui/badge'
@@ -27,8 +26,9 @@ export function usePlaylistText() {
   }
 }
 
-export const playlistCoverSource = (playlist: Pick<Playlist, 'id' | 'coverHash'>) =>
-  playlist.coverHash ? endpoints.playlistCover(playlist.id, playlist.coverHash) : undefined
+// As coverSource (cover.ts).
+export const playlistCoverSource = (playlist: Pick<Playlist, 'coverUrl'>) =>
+  playlist.coverUrl || undefined
 
 export function PlaylistFacts({ playlist }: { playlist: Playlist }) {
   const { t } = useTranslation()

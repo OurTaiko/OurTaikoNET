@@ -2,20 +2,17 @@ import { chartText } from '../chart-language'
 import { i18n } from '../i18n'
 import { useTranslation } from 'react-i18next'
 import { endpoints } from '../api/endpoints'
-import { useState } from 'react'
 import { cn } from '../lib/utils'
 import { CoverUploadDialog } from './cover-dialog'
 import type { ChartBase } from '../api/types'
-import { coverSource } from '../cover'
+import { coverSource, type SavedCover } from '../cover'
 import { categoryStripeColor } from '../category-colors'
-import { retryResourceOrigin } from '../resource-download'
+import { useCardCover } from './card-cover'
 
 export function ChartCover({ chart, className }: { chart: ChartBase; className?: string }) {
   const { t } = useTranslation()
-
-  const [failedSource, setFailedSource] = useState('')
   const source = coverSource(chart)
-  const available = source && failedSource !== source
+  const cover = useCardCover(source)
   return (
     <div
       className={cn(
@@ -23,16 +20,14 @@ export function ChartCover({ chart, className }: { chart: ChartBase; className?:
         className,
       )}
     >
-      {available ? (
+      {cover.source ? (
         <img
-          src={source}
+          src={cover.source}
           alt={t('messages.songCoverAlt', {
             title: chartText(chart, i18n.resolvedLanguage).title,
           })}
           className="size-full object-contain"
-          onError={(event) => {
-            if (!retryResourceOrigin(event.currentTarget)) setFailedSource(source)
-          }}
+          onError={cover.onError}
         />
       ) : (
         <div
@@ -59,7 +54,7 @@ export function CoverDialog({
   onDismiss,
 }: {
   chart: ChartBase
-  onSaved: (coverHash: string) => void
+  onSaved: (saved: SavedCover) => void
   onDismiss: () => void
 }) {
   const { t } = useTranslation()

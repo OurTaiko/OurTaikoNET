@@ -92,7 +92,7 @@ export function originResource(value: string): string | null {
   const url = new URL(value, origin)
   if (
     url.origin !== origin ||
-    !/^\/api\/v1\/sources\/(fanmade|official)\/(charts|playlists)\/[^/]+\/(tja|audio|preview|cover|bgimage|movie)$/.test(
+    !/^\/api\/v1\/sources\/(fanmade|official)\/(charts|playlists)\/[^/]+\/(tja|audio|preview|bgimage|movie)$/.test(
       url.pathname,
     ) ||
     url.searchParams.get('origin') === '1'
