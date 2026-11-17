@@ -102,6 +102,11 @@ export class DonAnimator {
     return index >= 0 && index < this.count ? this.motions.names[index] : ''
   }
 
+  // Whether the running motion loops (a one-shot goes back to the loop it interrupted when it ends).
+  get isLooping(): boolean {
+    return this.looping
+  }
+
   // The frame of the running motion to draw.
   get poseFrame(): number {
     return Math.min(this.animFrame, (this.motions.frameCounts[this.animIndex] ?? 1) - 1)

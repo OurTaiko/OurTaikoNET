@@ -9,9 +9,12 @@ The folder:
     cos/<id>.glb               whole costumes
     head/<id>.glb, body/<id>.glb
     puchi/<id>.png             puchichara: two frames stacked top to bottom
+    puchi/<id>.otanim          or an animated one (spine2otanim, format in SPEC.md, both in the
+                               otanim folder beside this repository), best with an icon
+                               (spine2otanim -icon) at icons/puchi/<id>.png
     paint/<id>.png             makeup: a face sheet like base/face.png, drawn instead of it on a
                                face plate a third larger (YataiDON's Models/paint/paint_<id>000.png)
-    icons/cos/<id>.png, icons/head/<id>.png, icons/body/<id>.png   (optional)
+    icons/cos/<id>.png, icons/head/<id>.png, icons/body/<id>.png, icons/puchi/<id>.png   (optional)
     names.json                 {"cos": {"12": {"ja": "...", "en": "...", "zh": "..."}}, ...} (optional)
 
 Every file is listed with its path (relative to the catalog), size and SHA-256, so the game can
@@ -26,7 +29,7 @@ import os
 import re
 import sys
 
-KINDS = {"cos": ".glb", "head": ".glb", "body": ".glb", "puchi": ".png", "paint": ".png"}
+KINDS = {"cos": (".glb",), "head": (".glb",), "body": (".glb",), "puchi": (".png", ".otanim"), "paint": (".png",)}
 BASE = {"animations": "base/animations.glb", "face": "base/face.png", "faceAnimations": "base/face_animations.json"}
 # YataiDON chara_default_color_1/2 and the rim: 1P's Don, and 2P's with the two swapped.
 DEFAULT_COLORS = {"p1": ["#68BFC0", "#F94728", "#F9F0E1"], "p2": ["#F94728", "#68BFC0", "#F9F0E1"]}
@@ -51,15 +54,22 @@ def main(root):
             sys.exit("missing " + path)
         base[key] = describe(root, path)
     items = {}
-    for kind, ext in KINDS.items():
+    for kind, exts in KINDS.items():
         folder = os.path.join(root, kind)
-        ids = sorted(int(m.group(1)) for f in (os.listdir(folder) if os.path.isdir(folder) else [])
-                     if (m := re.fullmatch(r"(\d+)" + re.escape(ext), f)))
+        found = {}
+        for f in sorted(os.listdir(folder) if os.path.isdir(folder) else []):
+            m = re.fullmatch(r"(\d+)(" + "|".join(map(re.escape, exts)) + ")", f)
+            if not m:
+                continue
+            i = int(m.group(1))
+            if i in found:
+                sys.exit(f"{kind}/{i}: both {found[i]} and {f}; keep one")
+            found[i] = f
         listed = []
-        for i in ids:
+        for i in sorted(found):
             if kind in ("puchi", "paint") and i == 0:
                 continue  # 0 is "no puchichara", "no makeup"
-            entry = {"id": i, "name": names.get(kind, {}).get(str(i), {}), "file": describe(root, f"{kind}/{i}{ext}")}
+            entry = {"id": i, "name": names.get(kind, {}).get(str(i), {}), "file": describe(root, f"{kind}/{found[i]}")}
             icon = f"icons/{kind}/{i}.png"
             if os.path.exists(os.path.join(root, icon)):
                 entry["icon"] = describe(root, icon)

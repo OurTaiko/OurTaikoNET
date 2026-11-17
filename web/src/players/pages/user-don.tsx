@@ -139,6 +139,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
               baseUrl={catalog.baseUrl}
               look={draft}
               motion={motion}
+              repeatMotion
               className="absolute inset-0"
             />
           </div>
@@ -390,7 +391,7 @@ function IconGrid({
               onClick={() => onPick(item.id)}
               style={kind === 'paint' ? { backgroundColor: faceColor } : undefined}
             >
-              {kind === 'puchi' || kind === 'paint' ? (
+              {(kind === 'puchi' || kind === 'paint') && !item.icon ? (
                 // The first of its frames (stacked top to bottom: a puchichara has two, a
                 // makeup sheet one per face).
                 <img

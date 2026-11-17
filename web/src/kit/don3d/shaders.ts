@@ -114,6 +114,32 @@ void main() {
 }
 `
 
+// An animated (.otanim) puchichara: positions already in clip space, colours premultiplied; a
+// vertex whose u has 2 added belongs to an additive part (alpha 0, so the blend adds it).
+export const puchiAnimVertex = /* glsl */ `
+attribute vec4 tint;
+varying vec2 vUv;
+varying vec4 vTint;
+void main() {
+  vUv = uv;
+  vTint = tint;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`
+
+export const puchiAnimFragment = /* glsl */ `
+uniform sampler2D map;
+uniform float premultiplied;
+varying vec2 vUv;
+varying vec4 vTint;
+void main() {
+  float additive = step(1.5, vUv.x);
+  vec4 t = texture2D(map, vec2(vUv.x - additive * 2.0, vUv.y));
+  if (premultiplied < 0.5) t.rgb *= t.a;
+  gl_FragColor = vec4(t.rgb * vTint.rgb, t.a * vTint.a * (1.0 - additive));
+}
+`
+
 export const puchiFragment = /* glsl */ `
 uniform sampler2D map;
 varying vec2 vUv;

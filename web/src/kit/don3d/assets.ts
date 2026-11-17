@@ -1,6 +1,7 @@
 import { catalogUrl, type DonCatalog, type DonCatalogFile } from './catalog'
 import { parseFaceTimelines, type FaceTimeline } from './face'
 import { DonMotions } from './motions'
+import { isOtanim, parseOtanim, type Otanim } from './otanim'
 import { loadDonPart, type DonImage, type DonPartData } from './part'
 
 // What every Don on the page shares, fetched once and kept: the motions, the face sheet and its
@@ -112,7 +113,10 @@ export function partPixels(image: DonImage): Promise<ImageData> {
   return promise
 }
 
-const puchis = new Map<string, Promise<ImageBitmap>>()
+// A puchichara: a two-frame picture, or an animated one (.otanim; bitmap is then its texture).
+export type DonPuchi = { bitmap: ImageBitmap; anim: Otanim | null }
+
+const puchis = new Map<string, Promise<DonPuchi>>()
 const paints = new Map<string, Promise<ImageBitmap>>()
 
 // A makeup's face sheet (square faces stacked top to bottom, like the base one).
@@ -120,6 +124,12 @@ export function loadPaint(url: string): Promise<ImageBitmap> {
   return remember(paints, url, async () => decodeImage(await (await fetchOk(url)).blob()))
 }
 
-export function loadPuchi(url: string): Promise<ImageBitmap> {
-  return remember(puchis, url, async () => decodeImage(await (await fetchOk(url)).blob()))
+// The file says which it is: an .otanim starts with "OTAN".
+export function loadPuchi(url: string): Promise<DonPuchi> {
+  return remember(puchis, url, async () => {
+    const bytes = new Uint8Array(await (await fetchOk(url)).arrayBuffer())
+    if (!isOtanim(bytes)) return { bitmap: await decodeImage(bytes), anim: null }
+    const anim = await parseOtanim(bytes)
+    return { bitmap: await decodeImage(anim.texture), anim }
+  })
 }
