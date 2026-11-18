@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { XIcon } from '@phosphor-icons/react'
-import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
-import type { ChartBase, CollaborationHistory, PublicUser, UserDirectory } from './api/types'
+import type { ChartBase, CollaborationHistory, PublicUser } from './api/types'
 import { isChartOwner } from './chart-owners'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -13,6 +13,7 @@ import { UserAvatar } from './components/user-avatar'
 import { formatLocale } from './i18n'
 import { cn } from './lib/utils'
 import { Modal, Notice } from './notifications'
+import { directoryQuery } from './queries/directory'
 import { useSession } from './session'
 import { useNotification } from './notification-context'
 import { queryClient } from './query/client'
@@ -26,15 +27,6 @@ function historyQuery(chartId: string) {
     queryKey: [SOURCE, 'collaborations', chartId] as const,
     queryFn: ({ signal }) =>
       api<CollaborationHistory>(address, { signal }).then((page) => page.items),
-  })
-}
-
-function directoryQuery(q: string, page: number) {
-  const address = endpoints.users({ q, sort: 'active', page })
-  return queryOptions({
-    queryKey: [SOURCE, 'users', 'directory', { q, page }] as const,
-    queryFn: ({ signal }) => api<UserDirectory>(address, { signal }),
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -322,7 +314,7 @@ export function UserSearch({
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pending, setPending] = useState(false)
-  const directory = useQuery(directoryQuery(query, page))
+  const directory = useQuery(directoryQuery({ q: query, sort: 'active', page: page }))
   const result = directory.data
   const error = result ? '' : (directory.error?.message ?? '')
   const changePending = useCallback(

@@ -58,12 +58,11 @@ func (s *Server) totalsColumns() string {
 			continue
 		}
 		schema := pgx.Identifier{source.ID}.Sanitize()
-		charts = append(charts, `(SELECT count(*) FROM `+schema+`.charts c WHERE c.owner_ids @> ARRAY[u.id] AND c.status='published')`)
+		charts = append(charts, `(SELECT count(*) FROM `+schema+`.charts c WHERE c.owner_ids @> ARRAY[u.id] AND `+netdb.PublishedChart+`)`)
 		scores = append(scores, `(SELECT count(*) FROM `+schema+`.scores sc JOIN `+schema+`.chart_difficulties d ON d.id=sc.difficulty_id JOIN `+schema+`.charts c ON c.id=d.chart_id
- WHERE sc.user_id=u.id AND c.status='published')`)
+ WHERE sc.user_id=u.id AND `+netdb.PublishedChart+`)`)
 		comments = append(comments, `(SELECT count(*) FROM `+schema+`.comments m LEFT JOIN `+schema+`.charts c ON c.id=m.chart_id LEFT JOIN `+schema+`.dan_courses d ON d.id=m.dan_id
- WHERE m.author_id=u.id AND m.deleted_at IS NULL AND m.removed_at IS NULL
- AND ((m.chart_id IS NOT NULL AND c.status='published') OR (m.dan_id IS NOT NULL AND d.status='published')))`)
+ WHERE m.author_id=u.id AND `+netdb.VisibleComment+`)`)
 		karma = append(karma,
 			`(SELECT COALESCE(sum(v.value),0) FROM `+schema+`.comment_votes v JOIN `+schema+`.comments m ON m.id=v.comment_id WHERE m.author_id=u.id AND v.user_id<>u.id)`,
 			`(SELECT COALESCE(sum(v.value),0) FROM `+schema+`.chart_votes v JOIN `+schema+`.charts c ON c.id=v.chart_id WHERE c.owner_ids @> ARRAY[u.id] AND v.user_id<>u.id)`,

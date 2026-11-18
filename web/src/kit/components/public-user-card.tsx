@@ -71,7 +71,7 @@ export function PublicUserCard({
           <dd>{date(user.firstLoginAt)}</dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-muted-foreground">{t('messages.lastFanmadeActivity')}</dt>
+          <dt className="text-muted-foreground">{t('messages.lastActive')}</dt>
           <dd>{date(user.lastActiveAt)}</dd>
         </div>
       </dl>

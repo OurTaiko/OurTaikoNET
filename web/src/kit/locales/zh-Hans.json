@@ -317,7 +317,7 @@
     "unknownMember": "未知用户",
     "noActivityRecord": "暂无记录",
     "publicScoreCount": "公开成绩记录",
-    "lastFanmadeActivity": "最近活跃",
+    "lastActive": "最近活跃",
     "viewMemberCharts": "查看 {{nickname}} 的公开作品",
     "viewPublicCharts": "查看公开作品",
     "refreshUsers": "刷新",

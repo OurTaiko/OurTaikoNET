@@ -82,6 +82,11 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 	comment("fanmade", "c1", mine)
 	comment("fanmade", "c2", hidden)
 	comment("official", "c3", official)
+	// What was deleted or taken down is not counted.
+	comment("fanmade", "c4", mine)
+	comment("fanmade", "c5", mine)
+	exec(`UPDATE fanmade.comments SET deleted_at=now(),body='' WHERE id='c4'`)
+	exec(`UPDATE fanmade.comments SET removed_at=now(),body='' WHERE id='c5'`)
 	// Others' votes count, the player's own do not.
 	exec(`INSERT INTO fanmade.chart_votes(chart_id,user_id,value) VALUES ($1,$2,1),($1,$3,1)`, mine, other, player)
 	exec(`INSERT INTO official.comment_votes(comment_id,user_id,value) VALUES ('c3',$1,1)`, other)

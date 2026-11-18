@@ -16,6 +16,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/tja"
+	"ourtaiko.dev/net/internal/netdb"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -135,7 +136,7 @@ func audioPreview(c Chart) *AudioPreview {
 	}
 }
 
-const publishedChart = `c.status='published'`
+const publishedChart = netdb.PublishedChart
 
 // playableChart is a published chart with files: what the game can play.
 const playableChart = publishedChart + ` AND c.tja_file IS NOT NULL`

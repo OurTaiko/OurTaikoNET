@@ -317,7 +317,7 @@
     "unknownMember": "不明なユーザー",
     "noActivityRecord": "記録なし",
     "publicScoreCount": "公開スコア記録",
-    "lastFanmadeActivity": "最終アクティブ",
+    "lastActive": "最終アクティブ",
     "viewMemberCharts": "{{nickname}} の公開譜面を見る",
     "viewPublicCharts": "公開譜面を見る",
     "refreshUsers": "更新",

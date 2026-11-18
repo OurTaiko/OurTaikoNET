@@ -1,26 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowClockwiseIcon, UsersIcon } from '@phosphor-icons/react'
-import { api } from './api/client'
-import { endpoints } from './api/endpoints'
-import type { UserDirectory } from './api/types'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
 import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-type DirectoryQuery = { q: string; sort: string; page: number }
-
-const directoryQuery = (query: DirectoryQuery) =>
-  queryOptions({
-    queryKey: ['users', query] as const,
-    queryFn: ({ signal }) => api<UserDirectory>(endpoints.users(query), { signal }),
-    placeholderData: keepPreviousData,
-  })
-
+import { directoryQuery } from './queries/directory'
 /** The site's players, whichever source they play. */
 export function UsersPage() {
   const { t } = useTranslation()
