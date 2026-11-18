@@ -45,4 +45,10 @@ describe('API addresses', () => {
       '/api/v2/sources/fanmade/charts?page=1',
     )
   })
+
+  it('asks for the number of charts in a page when told to', () => {
+    expect(endpoints.chartList({ q: '', page: 2, pageSize: 24 })).toBe(
+      '/api/v2/sources/fanmade/charts?page=2&pageSize=24',
+    )
+  })
 })

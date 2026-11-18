@@ -16,6 +16,8 @@ const playlistPath = (id: string) => `${API_ROOT}/playlists/${encodeURIComponent
 export type ChartQuery = {
   q: string
   page: number
+  /** Charts in a page, 1 to 100; left out, 24. */
+  pageSize?: number
   order?: string
   /** Charts a user owns (their user page). */
   owner?: string

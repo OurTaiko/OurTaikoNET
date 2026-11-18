@@ -8,7 +8,6 @@ var Fanmade = &Source{
 	SessionCookie: "ourtaiko_session",
 	OIDCCookie:    "ourtaiko_oidc",
 	DefaultReturn: "/upload",
-	PageSize:      12,
 	Categories: []categoryEntry{
 		{1, Category{ID: "game", Title: "Game", Genre: "GAME"}},
 		{2, Category{ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"}},
@@ -30,7 +29,6 @@ var Official = &Source{
 	SessionCookie: "ourtaiko_db_session",
 	OIDCCookie:    "ourtaiko_db_oidc",
 	DefaultReturn: "/",
-	PageSize:      24,
 	// In the order of the bits.
 	Categories: []categoryEntry{
 		{0x01, Category{ID: "namco", Title: "Namco", Genre: "ナムコオリジナル"}},
