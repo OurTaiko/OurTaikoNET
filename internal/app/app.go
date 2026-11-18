@@ -19,6 +19,7 @@ import (
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/api/mount"
 	apiv1 "ourtaiko.dev/net/internal/api/v1"
+	apiv2 "ourtaiko.dev/net/internal/api/v2"
 	"ourtaiko.dev/net/internal/awards"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
@@ -103,8 +104,9 @@ type App struct {
 	// rewards tells players what they were given (Handler); shared is the pool it listens on (Start).
 	rewards rewards.Store
 	shared  *pgxpool.Pool
-	// v1 is what version 1 of the API needs (package apiv1).
+	// v1 and v2 are what each version of the API needs (packages apiv1, apiv2).
 	v1 apiv1.Config
+	v2 apiv2.Config
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -257,6 +259,11 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 			a.roomsSite.URL = cfg.Origin
 		}
 	}
+	// Version 2 gives paths; in development the files on disk are served under its own root.
+	a.v2 = apiv2.Config{Router: a.v1.Router, Origin: cfg.Origin}
+	if !bucket {
+		a.v2.OnDisk = map[string]objectstore.Store{songs.Fanmade.Folder: a.Fanmade.Config.Objects, songs.Official.Folder: a.Official.Config.Objects}
+	}
 	return a, nil
 }
 
@@ -275,7 +282,11 @@ func (a *App) Handler() http.Handler {
 	ready := a.Fanmade.Handler()
 	routes := http.NewServeMux()
 	routes.Handle("/readyz", ready)
-	routes.Handle("/", a.versions(a.withRewards(current), ""))
+	// The website and new clients use version 2; released games, version 1. The old hosts
+	// (a.legacy) only ever had version 1.
+	api := a.withRewards(current)
+	v1 := apiv1.Handler(api, a.v1)
+	routes.Handle("/", mount.Serve(map[string]http.Handler{apiv1.Version: v1, apiv2.Version: apiv2.Handler(api, a.v2)}, api))
 	// Every answer, the old domains' too, says how many rewards its player has not seen.
 	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
 }

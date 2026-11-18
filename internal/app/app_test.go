@@ -93,6 +93,46 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 			t.Fatalf("following %s: %d %s", want, w.Code, w.Body.String())
 		}
 	}
+	// Version 2 names the same files by their paths; in development its root is this site's,
+	// which serves the files on disk and sends the rest to the canonical root.
+	get := func(host, path string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", path, nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	w := get("net.ourtaiko.org", "/api/v2/sources/fanmade/charts/"+strings.Repeat("f", 32)+"/resources")
+	var paths struct {
+		Resources map[string]map[string]any `json:"resources"`
+	}
+	tja := "fanmade/" + strings.Repeat("1", 64) + ".tja"
+	if json.Unmarshal(w.Body.Bytes(), &paths) != nil || w.Code != 200 || paths.Resources["tja"]["path"] != tja || paths.Resources["tja"]["url"] != nil {
+		t.Fatalf("v2 resources: %d %s", w.Code, w.Body.String())
+	}
+	var source struct {
+		Mirror  bool   `json:"mirror"`
+		BaseURL string `json:"baseUrl"`
+	}
+	if w = get("net.ourtaiko.org", "/api/v2/distribution/source"); json.Unmarshal(w.Body.Bytes(), &source) != nil || source.Mirror || source.BaseURL != "http://localhost/api/v2/files/" {
+		t.Fatalf("v2 source: %s", w.Body.String())
+	}
+	if w = get("net.ourtaiko.org", "/api/v2/files/"+tja); w.Code != 200 || w.Body.String() != "TITLE:Fan" || !strings.Contains(w.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("v2 file on disk: %d %s", w.Code, w.Body.String())
+	}
+	if w = get("net.ourtaiko.org", "/api/v2/files/3dchara/cos/0.glb"); w.Code != 302 || w.Header().Get("Location") != "https://distrib.ourtaiko.org/3dchara/cos/0.glb" {
+		t.Fatalf("v2 file elsewhere: %d %s", w.Code, w.Header().Get("Location"))
+	}
+	// Nothing outside the folders, no API without a version or of an unknown one, and the old
+	// hosts only ever had version 1.
+	for _, asked := range []struct{ host, path string }{
+		{"net.ourtaiko.org", "/api/v2/files/fanmade/%2e%2e/x"}, {"net.ourtaiko.org", "/api/charts"}, {"net.ourtaiko.org", "/api/v3/charts"},
+		{"fanmade.ourtaiko.org", "/api/v2/charts/" + strings.Repeat("f", 32)},
+	} {
+		if w = get(asked.host, asked.path); w.Code != 404 {
+			t.Fatalf("%s%s: %d", asked.host, asked.path, w.Code)
+		}
+	}
 	titles := func(host, path string) (int, []string) {
 		t.Helper()
 		r := httptest.NewRequest("GET", path, nil)

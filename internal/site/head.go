@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"ourtaiko.dev/net/internal/files"
 	"sort"
 	"strconv"
 	"strings"
@@ -198,12 +199,12 @@ func lookupFor(p string) (pageLookup, bool) {
 	commented := len(parts) == 3 || (len(parts) == 5 && parts[3] == "comments")
 	switch {
 	case len(parts) == 2 && parts[0] == "players":
-		return pageLookup{"players", "/api/v1/users/" + url.PathEscape(parts[1]), playerMeta}, true
+		return pageLookup{"players", "/api/v2/users/" + url.PathEscape(parts[1]), playerMeta}, true
 	case parts[0] != "fanmade" && parts[0] != "official" || len(parts) < 3:
 		return pageLookup{}, false
 	}
 	source, kind, id := parts[0], parts[1], parts[2]
-	api := "/api/v1/sources/" + source + "/" + kind + "/" + url.PathEscape(id)
+	api := "/api/v2/sources/" + source + "/" + kind + "/" + url.PathEscape(id)
 	switch {
 	case kind == "charts" && commented:
 		return pageLookup{source, api, func(b []byte) (pageMeta, bool) { return chartMeta(source, b) }}, true
@@ -223,7 +224,7 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 		TitleTranslations map[string]string `json:"titleTranslations"`
 		Description       string            `json:"description"`
 		Maker             string            `json:"maker"`
-		CoverURL          string            `json:"coverUrl"`
+		SongCoverPath     string            `json:"songCoverPath"`
 		Difficulties      []struct {
 			Course string `json:"course"`
 			Side   string `json:"side"`
@@ -266,8 +267,8 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 	}
 	meta := pageMeta{title: title, description: description, kind: "music.song"}
 	// The cover's address in the public bucket; there is no API route for it.
-	if c.CoverURL != "" {
-		meta.image = c.CoverURL
+	if c.SongCoverPath != "" {
+		meta.image = files.URL("", c.SongCoverPath)
 	}
 	return meta, true
 }
@@ -276,14 +277,14 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 // is not told at all.
 func playlistMeta(source string, body []byte) (pageMeta, bool) {
 	var p struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Public      bool   `json:"public"`
-		System      bool   `json:"system"`
-		CoverURL    string `json:"coverUrl"`
-		ChartCount  int    `json:"chartCount"`
-		Owner       *struct {
+		ID                string `json:"id"`
+		Name              string `json:"name"`
+		Description       string `json:"description"`
+		Public            bool   `json:"public"`
+		System            bool   `json:"system"`
+		SongListCoverPath string `json:"songListCoverPath"`
+		ChartCount        int    `json:"chartCount"`
+		Owner             *struct {
 			Nickname string `json:"nickname"`
 		} `json:"owner"`
 	}
@@ -306,8 +307,8 @@ func playlistMeta(source string, body []byte) (pageMeta, bool) {
 	}
 	meta := pageMeta{title: name, description: description, kind: "music.playlist"}
 	// The cover's address in the public bucket; there is no API route for it.
-	if p.CoverURL != "" {
-		meta.image = p.CoverURL
+	if p.SongListCoverPath != "" {
+		meta.image = files.URL("", p.SongListCoverPath)
 	}
 	return meta, true
 }
@@ -370,15 +371,15 @@ func danMeta(body []byte) (pageMeta, bool) {
 func playerMeta(body []byte) (pageMeta, bool) {
 	var p struct {
 		User struct {
-			ID        string `json:"id"`
-			Nickname  string `json:"nickname"`
-			AvatarURL string `json:"avatarUrl"`
+			ID         string `json:"id"`
+			Nickname   string `json:"nickname"`
+			AvatarPath string `json:"avatarPath"`
 		} `json:"user"`
 	}
 	if json.Unmarshal(body, &p) != nil || p.User.ID == "" {
 		return pageMeta{}, false
 	}
-	meta := pageMeta{image: p.User.AvatarURL, kind: "profile"}
+	meta := pageMeta{image: files.URL("", p.User.AvatarPath), kind: "profile"}
 	if name := p.User.Nickname; name != "" {
 		meta.title, meta.description = name, word("meta.player", "name", name)
 	}
