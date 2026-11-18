@@ -461,7 +461,7 @@ func (s *Server) answeredUpload(w http.ResponseWriter, r *http.Request, user, ke
 		problem(w, 409, "CHART_FILES_CHANGED", "该次上传已被后续更新替换，请重新打开谱面页面")
 		return true
 	}
-	web.Respond(w, 200, c)
+	s.respondChart(w, r, 200, c)
 	return true
 }
 
@@ -523,7 +523,7 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 	if existing != nil {
 		status = 200
 	}
-	web.Respond(w, status, result.chart)
+	s.respondChart(w, r, status, result.chart)
 	return true
 }
 

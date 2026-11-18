@@ -272,3 +272,91 @@ func testDifficultyConstants(t *testing.T, w interactionWorld) {
 		t.Fatal("a maker change no longer touches the chart")
 	}
 }
+
+// Every write that answers with a chart answers with the chart GET /charts/{id} gives: the
+// chart page replaces what it shows with such an answer. The whole body is compared, so a field
+// added to the detail later is held to this without a change here.
+func TestChartAnswersMatchDetail(t *testing.T) { bothSources(t, testChartAnswersMatchDetail) }
+
+func testChartAnswersMatchDetail(t *testing.T, w interactionWorld) {
+	if !tja.Available() {
+		t.Skip("tjaparser not found: set TJAPARSER_BIN or put it on PATH")
+	}
+	ctx := context.Background()
+	audio, err := os.ReadFile("../../kit/audio/testdata/cbr.mp3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	send := func(method, path, key, title string, withAudio bool) (int, []byte) {
+		t.Helper()
+		var form bytes.Buffer
+		parts := multipart.NewWriter(&form)
+		tf, _ := parts.CreateFormFile("tja", "chart.tja")
+		tf.Write([]byte("TITLE:" + title + "\nBPM:120\nWAVE:cbr.mp3\nCOURSE:Oni\nLEVEL:8\n#START\n1020,\n1122,\n#END\n"))
+		if withAudio {
+			af, _ := parts.CreateFormFile("audio", "cbr.mp3")
+			af.Write(audio)
+		} else {
+			parts.WriteField("confirmReset", "true")
+		}
+		parts.Close()
+		r := httptest.NewRequest(method, path, &form)
+		r.Header.Set("Content-Type", parts.FormDataContentType())
+		r.Header.Set("Origin", "http://localhost")
+		r.Header.Set("X-CSRF-Token", "csrf")
+		r.Header.Set("Idempotency-Key", key)
+		r.AddCookie(&http.Cookie{Name: w.c.cookie, Value: w.c.tokens["admin"]})
+		rec := httptest.NewRecorder()
+		w.c.handler.ServeHTTP(rec, r)
+		return rec.Code, rec.Body.Bytes()
+	}
+	same := func(name string, code, want int, body []byte, id string) {
+		t.Helper()
+		if code != want {
+			t.Fatalf("%s: %d %s", name, code, body)
+		}
+		_, detail := w.c.raw("admin", w.chart(id)+"?by=id")
+		if !bytes.Equal(body, detail) {
+			t.Fatalf("%s differs from the detail:\n%s\n%s", name, body, detail)
+		}
+	}
+
+	// The first upload gives the calibration something to rate; the next ones are rated at once.
+	first, body := send("POST", "/api/charts", web.NewID(), "First", true)
+	if first != 201 {
+		t.Fatal(first, string(body))
+	}
+	if _, err = constants.Recalibrate(ctx, w.s.DB); err != nil {
+		t.Fatal(err)
+	}
+
+	key := web.NewID()
+	code, body := send("POST", "/api/charts", key, "Second", true)
+	var chart Chart
+	if code != 201 || json.Unmarshal(body, &chart) != nil {
+		t.Fatal(code, string(body))
+	}
+	same("upload", code, 201, body, chart.ID)
+	if len(chart.Difficulties) != 1 || len(chart.Difficulties[0].Constants) != 1 {
+		t.Fatalf("the upload has no constants: %+v", chart.Difficulties)
+	}
+
+	if code := w.c.do("admin", "PUT", w.chart(chart.ID)+"/vote", `{"value":1}`, nil); code != 200 {
+		t.Fatal("vote", code)
+	}
+	code, body = send("POST", "/api/charts", key, "Second", true)
+	same("repeated upload", code, 200, body, chart.ID)
+
+	var saved json.RawMessage
+	code = w.c.do("admin", "PATCH", w.chart(chart.ID), `{}`, &saved)
+	same("saved information", code, 200, append(bytes.Clone(saved), '\n'), chart.ID)
+	var vote struct {
+		MyVote int `json:"myVote"`
+	}
+	if json.Unmarshal(saved, &vote) != nil || vote.MyVote != 1 {
+		t.Fatalf("the saved chart lost the vote: %s", saved)
+	}
+
+	code, body = send("PUT", w.chart(chart.ID)+"/files", web.NewID(), "Second", false)
+	same("replaced files", code, 200, body, chart.ID)
+}

@@ -152,7 +152,7 @@ func (s *Server) replaceMovie(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	web.Respond(w, 200, result.chart)
+	s.respondChart(w, r, 200, result.chart)
 }
 
 // processMovie transcodes a job's movie and makes it the chart's, unlike an upload rejecting

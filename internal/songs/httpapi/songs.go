@@ -94,7 +94,7 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 			internal(w, e)
 			return
 		}
-		web.Respond(w, 200, c)
+		s.respondChart(w, r, 200, c)
 		return
 	}
 	var coverFile *int64
@@ -136,5 +136,5 @@ func (s *Server) createSong(w http.ResponseWriter, r *http.Request, u session, k
 		internal(w, e)
 		return
 	}
-	web.Respond(w, 201, c)
+	s.respondChart(w, r, 201, c)
 }

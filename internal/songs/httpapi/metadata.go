@@ -17,7 +17,6 @@ import (
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
-	"ourtaiko.dev/net/internal/web"
 )
 
 // editMetadata changes the site's own description of a chart; the stored
@@ -222,7 +221,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	web.Respond(w, 200, updated)
+	s.respondChart(w, r, 200, updated)
 }
 
 type metadataPatch struct {

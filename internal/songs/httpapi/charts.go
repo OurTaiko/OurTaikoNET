@@ -426,15 +426,31 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	// The difficulty constants, for the chart page only (lists and the game catalog go without).
+	s.respondChart(w, r, 200, c)
+}
+
+// respondChart answers a request with one chart. Every route that answers with a single chart
+// ends here, reads and writes alike, so a client can take any of those answers as the chart:
+// they are the representation GET /charts/{id} gives (TestChartAnswersMatchDetail), plus an
+// upload's own failedFiles. Lists and the game catalog have their own, smaller form.
+func (s *Server) respondChart(w http.ResponseWriter, r *http.Request, status int, c Chart) {
+	if e := s.addDetail(r, &c); e != nil {
+		internal(w, e)
+		return
+	}
+	web.Respond(w, status, c)
+}
+
+// addDetail adds what a single chart has and a list's do not: the difficulty constants and the
+// viewer's vote.
+func (s *Server) addDetail(r *http.Request, c *Chart) error {
 	ids := make([]int64, len(c.Difficulties))
 	for i, d := range c.Difficulties {
 		ids[i] = d.ID
 	}
 	shown, e := constants.ForBlocks(r.Context(), s.DB, ids)
 	if e != nil {
-		internal(w, e)
-		return
+		return e
 	}
 	for i := range c.Difficulties {
 		c.Difficulties[i].Constants = shown[c.Difficulties[i].ID]
@@ -442,11 +458,10 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	if viewer := s.viewer(r); viewer != "" {
 		e = s.DB.QueryRow(r.Context(), `SELECT value FROM chart_votes WHERE chart_id=$1 AND user_id=$2`, c.ID, viewer).Scan(&c.MyVote)
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-			internal(w, e)
-			return
+			return e
 		}
 	}
-	web.Respond(w, 200, c)
+	return nil
 }
 
 // canManage: a song's owners and whoever manages this source may change or delete it.
