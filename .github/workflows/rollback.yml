@@ -2,7 +2,9 @@ name: Roll back OurTaikoNet
 
 # Puts an earlier release of one part back. The backend: republishes an image from
 # ourtaiko-private (archived by deploy.yml); the database is not rolled back, so an older
-# image runs on the current schema only if nothing it needs has changed since. The website:
+# image runs on the current schema only if nothing it needs has changed since. The game's
+# online rooms stay as they are; an image from before they had a container of their own has no
+# internal API for them, so with it the game cannot enter a room. The website:
 # points the server back at one of the five builds it keeps; for an older one, run the deploy
 # workflow on that commit instead. Builds published before the website moved into this
 # repository are named by OurTaikoNetWeb's commits.

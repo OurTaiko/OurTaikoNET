@@ -12,15 +12,19 @@ import (
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
 
-// Multi-Enso (internal/multiplay), the game's online rooms, runs in this program on a port
-// of its own. This file is what it is given of the rest: who a game session belongs to, and
-// the songs of both sources.
+// Multi-Enso (internal/multiplay), the game's online rooms, runs either in this program on a
+// port of its own (development) or as the program cmd/rooms (production), which then asks this
+// one over package roomsapi. This file is what it is given of the rest: who a game session
+// belongs to, and the songs of both sources.
 
-// Multiplay configures Multi-Enso. With an empty ListenAddr the service is off.
+// Multiplay configures Multi-Enso. With both addresses empty the service is off.
 type Multiplay struct {
-	// ListenAddr is the host:port the gRPC service listens on, in clear text; the reverse
-	// proxy in front of it ends TLS.
+	// ListenAddr is the host:port the gRPC service listens on in this program, in clear text;
+	// the reverse proxy in front of it ends TLS.
 	ListenAddr string
+	// InternalAddr is the host:port cmd/rooms asks for players and songs, when the service
+	// runs there. Never give it to the reverse proxy. Not both this and ListenAddr.
+	InternalAddr string
 	// PublicURL is what the game is told to dial (GET /api/v1/game/multiplay); empty is the
 	// site's Origin.
 	PublicURL string

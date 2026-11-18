@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,6 +29,7 @@ import (
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/legacy"
 	"ourtaiko.dev/net/internal/multiplay"
+	"ourtaiko.dev/net/internal/multiplay/roomsapi"
 	"ourtaiko.dev/net/internal/netdb"
 	profile "ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/rewards"
@@ -96,11 +99,14 @@ type App struct {
 	// sso is the account center's client when there is one; Start refreshes its copy of
 	// players' profiles.
 	sso *account.Client
-	// rooms is Multi-Enso when it is on, listening at roomsAddr once Start ran; roomsSite is
-	// what the game is told about it.
-	rooms     *multiplay.Server
-	roomsAddr string
-	roomsSite site.Multiplay
+	// rooms is Multi-Enso when it runs in this program, listening at roomsAddr once Start ran.
+	// roomsAPI is what cmd/rooms asks when it runs there, listening at roomsAPIAddr. roomsSite
+	// is what the game is told about either, nil when the service is off.
+	rooms        *multiplay.Server
+	roomsAddr    string
+	roomsAPI     *http.Server
+	roomsAPIAddr net.Addr
+	roomsSite    *site.Multiplay
 	// rewards tells players what they were given (Handler); shared is the pool it listens on (Start).
 	rewards rewards.Store
 	shared  *pgxpool.Pool
@@ -243,18 +249,24 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	if cfg.LegacyProfileHost != "" {
 		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.versions(a.Players.Handler(), "")), Page: legacy.Players(cfg.Origin)}
 	}
-	if cfg.Multiplay.ListenAddr != "" {
-		timings := multiplay.DefaultTimings
-		if cfg.Multiplay.MinPlayers != 0 {
-			timings.MinPlayers = cfg.Multiplay.MinPlayers
-		}
-		if timings.MinPlayers < 1 || timings.MinPlayers > timings.MaxMembers {
+	if cfg.Multiplay.ListenAddr != "" && cfg.Multiplay.InternalAddr != "" {
+		a.Close()
+		return nil, errors.New("Multi-Enso runs in this program (MULTIPLAY_LISTEN_ADDR) or in cmd/rooms (MULTIPLAY_INTERNAL_ADDR), not both")
+	}
+	if cfg.Multiplay.ListenAddr != "" || cfg.Multiplay.InternalAddr != "" {
+		timings, err := multiplay.TimingsWith(cfg.Multiplay.MinPlayers)
+		if err != nil {
 			a.Close()
-			return nil, fmt.Errorf("a Multi-Enso round needs between 1 and %d players, not %d", timings.MaxMembers, timings.MinPlayers)
+			return nil, err
 		}
-		a.rooms = multiplay.NewServer(multiplay.ServerConfig{Catalog: newRoomSongs(a.Fanmade, a.Official), Authenticate: gamePlayer(a.Fanmade), Timings: timings})
-		a.roomsAddr = cfg.Multiplay.ListenAddr
-		a.roomsSite = site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.MinProtocol, MaxProtocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
+		catalog, identify := newRoomSongs(a.Fanmade, a.Official), gamePlayer(a.Fanmade)
+		if cfg.Multiplay.ListenAddr != "" {
+			a.rooms = multiplay.NewServer(multiplay.ServerConfig{Catalog: catalog, Authenticate: identify, Timings: timings})
+			a.roomsAddr = cfg.Multiplay.ListenAddr
+		} else {
+			a.roomsAPI = &http.Server{Addr: cfg.Multiplay.InternalAddr, Handler: roomsapi.Handler(catalog, identify), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+		}
+		a.roomsSite = &site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.MinProtocol, MaxProtocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
 		if a.roomsSite.URL == "" {
 			a.roomsSite.URL = cfg.Origin
 		}
@@ -270,8 +282,8 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 // Handler serves the new address, and the old ones for the hosts configured.
 func (a *App) Handler() http.Handler {
 	var options []site.Option
-	if a.rooms != nil {
-		options = append(options, site.WithMultiplay(a.roomsSite))
+	if a.roomsSite != nil {
+		options = append(options, site.WithMultiplay(*a.roomsSite))
 	}
 	current := site.Handler([]site.Source{
 		{ID: "fanmade", Name: "OurTaiko Fanmade", API: a.Fanmade.Handler()},
@@ -356,9 +368,23 @@ func (a *App) Start(ctx context.Context) error {
 	return nil
 }
 
-// startRooms makes Multi-Enso listen, when it is on. A port that cannot be had is a
-// deployment error, found as the program starts.
+// startRooms makes Multi-Enso listen, or what cmd/rooms asks, when it is on. A port that cannot
+// be had is a deployment error, found as the program starts.
 func (a *App) startRooms() error {
+	if a.roomsAPI != nil {
+		l, err := net.Listen("tcp", a.roomsAPI.Addr)
+		if err != nil {
+			return fmt.Errorf("the rooms' internal API cannot listen on %s: %w", a.roomsAPI.Addr, err)
+		}
+		a.roomsAPIAddr = l.Addr()
+		go func() {
+			if err := a.roomsAPI.Serve(l); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("the rooms' internal API stopped: %v", err)
+			}
+		}()
+		log.Printf("the rooms' internal API is listening on %s; the game is told to dial %s", l.Addr(), a.roomsSite.URL)
+		return nil
+	}
 	if a.rooms == nil {
 		return nil
 	}
@@ -377,12 +403,24 @@ func (a *App) RoomsAddr() string {
 	return a.rooms.Addr().String()
 }
 
-// StopRooms ends Multi-Enso: every room is closed, its players are told (ROOM_CLOSED), and
-// the gRPC service stops. Rooms are in memory, so a restart ends them either way; this says
-// so to the players. It does nothing when the service is off or already stopped.
+// RoomsAPIAddr is the address cmd/rooms asks once Start ran; empty when it runs nowhere.
+func (a *App) RoomsAPIAddr() string {
+	if a.roomsAPIAddr == nil {
+		return ""
+	}
+	return a.roomsAPIAddr.String()
+}
+
+// StopRooms ends Multi-Enso when it runs in this program: every room is closed, its players
+// are told (ROOM_CLOSED), and the gRPC service stops. Rooms are in memory, so a restart ends
+// them either way; this says so to the players. Rooms in cmd/rooms go on: only what they ask
+// of this program stops answering. It does nothing when the service is off or already stopped.
 func (a *App) StopRooms() {
 	if a.rooms != nil {
 		a.rooms.Stop()
+	}
+	if a.roomsAPI != nil {
+		a.roomsAPI.Close()
 	}
 }
 

@@ -40,6 +40,9 @@ type Manager struct {
 	// snapshot.
 	dirty  []*Room
 	closed bool
+	// draining: the server is about to be replaced. Rounds under way go on; no room opens, no
+	// new player comes in and no round begins (Drain).
+	draining bool
 	// ctx ends when the manager closes: questions to the catalog stop waiting.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -150,6 +153,10 @@ func (m *Manager) Join(player Player, target JoinTarget, conn Conn) (*Room, erro
 		return nil, refuse("ROOM_CLOSED", "The server is shutting down")
 	}
 	current := m.roomOf(player.UserID)
+	// A member coming back to their room is the one thing a server about to restart still does.
+	if m.draining && (target.Kind != ByCode || current == nil || current.code != strings.TrimSpace(target.Code)) {
+		return nil, refuse("SERVER_FULL", "The server is about to restart; try again in a moment")
+	}
 	var room *Room
 	switch target.Kind {
 	case ByCode:
@@ -224,6 +231,43 @@ func (m *Manager) create(public bool) (*Room, error) {
 	r := &Room{m: m, code: code, public: public, phase: pb.Phase_LOBBY}
 	m.rooms[code] = r
 	return r, nil
+}
+
+// DrainState is how far a server about to be replaced has come.
+type DrainState struct {
+	Draining bool `json:"draining"`
+	// Rooms are open; Busy of them are in a round, which replacing the server would cut short.
+	Rooms int `json:"rooms"`
+	Busy  int `json:"busy"`
+}
+
+// Drain makes the server ready to be replaced (on), or takes that back (off), when a full room
+// that was kept waiting begins its round.
+func (m *Manager) Drain(on bool) {
+	m.mu.Lock()
+	defer m.unlock()
+	if m.draining == on {
+		return
+	}
+	m.draining = on
+	if !on {
+		for _, r := range m.rooms {
+			r.maybeStartFull()
+		}
+	}
+}
+
+// DrainState says whether the server is draining and what is still going on.
+func (m *Manager) DrainState() DrainState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	state := DrainState{Draining: m.draining, Rooms: len(m.rooms)}
+	for _, r := range m.rooms {
+		if r.phase != pb.Phase_LOBBY {
+			state.Busy++
+		}
+	}
+	return state
 }
 
 // Close closes every room (each member is told ROOM_CLOSED) and refuses new ones.

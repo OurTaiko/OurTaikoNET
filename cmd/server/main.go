@@ -124,9 +124,10 @@ func main() {
 			return country
 		}
 	}
-	// Multi-Enso, the game's online rooms: a gRPC service on its own port. Off without
-	// MULTIPLAY_LISTEN_ADDR.
-	cfg.Multiplay = app.Multiplay{ListenAddr: os.Getenv("MULTIPLAY_LISTEN_ADDR"), PublicURL: strings.TrimRight(os.Getenv("MULTIPLAY_PUBLIC_URL"), "/")}
+	// Multi-Enso, the game's online rooms: a gRPC service on its own port in this program
+	// (MULTIPLAY_LISTEN_ADDR), or the program cmd/rooms, which asks this one at
+	// MULTIPLAY_INTERNAL_ADDR. Off without either.
+	cfg.Multiplay = app.Multiplay{ListenAddr: os.Getenv("MULTIPLAY_LISTEN_ADDR"), InternalAddr: os.Getenv("MULTIPLAY_INTERNAL_ADDR"), PublicURL: strings.TrimRight(os.Getenv("MULTIPLAY_PUBLIC_URL"), "/")}
 	if raw := os.Getenv("MULTIPLAY_MIN_PLAYERS"); raw != "" {
 		if cfg.Multiplay.MinPlayers, err = strconv.Atoi(raw); err != nil || cfg.Multiplay.MinPlayers < 1 {
 			log.Fatal("MULTIPLAY_MIN_PLAYERS must be a number from 1 up")
@@ -148,6 +149,9 @@ func main() {
 		// The development game session opens Multi-Enso as well.
 		if cfg.Multiplay.ListenAddr != "" && !loopback(cfg.Multiplay.ListenAddr) {
 			log.Fatal("DEV_USER_ID needs a loopback MULTIPLAY_LISTEN_ADDR")
+		}
+		if cfg.Multiplay.InternalAddr != "" && !loopback(cfg.Multiplay.InternalAddr) {
+			log.Fatal("DEV_USER_ID needs a loopback MULTIPLAY_INTERNAL_ADDR")
 		}
 		cfg.DevUserID = devUser
 		log.Printf("development sign-in enabled for user %s; never use this outside local development", devUser)

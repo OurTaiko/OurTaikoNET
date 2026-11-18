@@ -73,7 +73,7 @@ repositories; this one was added on 2026-11-14.
 `ourtaiko-ci` on the server (`deploy/server/create-ci-user.sh`, run on 2026-11-14) is used by
 nothing else. It has no password and one key, which forwards nothing; it owns
 `/opt/ourtaiko-net`; it cannot read the settings files; and it may run as root only the docker
-commands `publish.sh` runs, on images named `ourtaiko-net` and the one Compose file
+commands `publish.sh` runs (`deploy/server/update-ci-sudoers.sh` is the list), on images named `ourtaiko-net` and `ourtaiko-net-rooms` and the one Compose file
 (`/etc/sudoers.d/ourtaiko-ci`). The private key exists only as the `DEPLOY_KEY` secret of this
 repository (and of OurTaikoNetWeb, archived, where no workflow runs): to replace it, make a new pair, put the new
 public half in the account's `authorized_keys` and set the secret again.
@@ -186,9 +186,9 @@ are kept for a server set up anew. Where the service is off the site answers
 not available.
 
 Multi-Enso (the game's online rooms, `internal/multiplay`; root `README.md`, "Multi-Enso") is
-a gRPC service inside the same container. `compose.production.yml` sets
-`MULTIPLAY_LISTEN_ADDR=0.0.0.0:8081`, so the container listens there in clear text (h2c), and
-maps it to `127.0.0.1:8097` on the server. The game is told to dial `MULTIPLAY_PUBLIC_URL`,
+the container `ourtaiko-net-rooms`, the program `ourtaiko-rooms` of the site's image. It
+listens on 8081 in clear text (h2c), mapped to `127.0.0.1:8097` on the server, and asks the
+site at `http://net:8082` on the private network `rooms`. The game is told to dial `MULTIPLAY_PUBLIC_URL`,
 by default `APP_ORIGIN`: `https://net.ourtaiko.org`, port 443, where the proxy ends TLS and
 passes the one path of the service on:
 
@@ -201,12 +201,12 @@ stay one location for the panel to read it.
 
 1. **Switch it on and release the backend.** Check first that nothing on the server listens
    on 8097 (`ss -ltn 'sport = :8097'`): a port that is taken stops the container from
-   starting, and the site with it. Then, in `compose.production.yml`, set
-   `MULTIPLAY_LISTEN_ADDR` and map 8097 in `ports`, and push to `main`.
-   Afterwards `docker port ourtaiko-net` shows `8081/tcp -> 127.0.0.1:8097`, the log says
+   starting. Then, in `compose.production.yml`, set `MULTIPLAY_INTERNAL_ADDR` on `net` and
+   keep the service `rooms`, and push to `main`.
+   Afterwards `docker port ourtaiko-net-rooms` shows `8081/tcp -> 127.0.0.1:8097`, its log says
    `Multi-Enso (gRPC, h2c) listening on …`, and
    `curl https://net.ourtaiko.org/api/v1/game/multiplay` answers
-   `{"url":"https://net.ourtaiko.org","protocol":1,"maxMembers":5}`. From here on the game
+   `{"url":"https://net.ourtaiko.org","protocol":1,"maxProtocol":2,"maxMembers":5}`. From here on the game
    tries to connect, so do steps 2 and 3 right after (or before: they do no harm while the
    port is closed).
 2. **HTTP/2.** gRPC is HTTP/2: the 443 listener of the site `net.ourtaiko.org` must have it
@@ -238,11 +238,36 @@ stay one location for the panel to read it.
    means the request went to the website's location: step 3 is not in effect. The same
    check without grpcurl: `go run ./tools/multiplay-smoke -do probe -site https://net.ourtaiko.org`.
 
-Rooms are in memory, so every release of the backend closes them: players in a room are told
-`ROOM_CLOSED` as the old container stops. `MULTIPLAY_PUBLIC_URL` and `MULTIPLAY_MIN_PLAYERS`
-may be set in `api.env`; neither is needed. To switch the service off again, comment
-`MULTIPLAY_LISTEN_ADDR` out in the Compose file: the site then answers
-`404 MULTIPLAY_UNAVAILABLE` and the game does not try.
+### Releasing
+
+Rooms are in memory, so their container is replaced only when a push changes `cmd/rooms`,
+`internal/multiplay` (tests and Markdown aside) or `deploy/compose.production.yml`; a run of
+the deploy workflow by hand does so only with its `rooms` input. Every other release of the
+backend leaves rooms playing. When the rooms are replaced, `publish.sh` first runs
+`ourtaiko-rooms drain` in the container: rounds under way go on, nothing new begins, and it
+goes ahead when none is left or after 20 minutes. Then the rooms still waiting in their lobby
+are told `ROOM_CLOSED`. A publish that dies meanwhile does not leave the rooms refusing players:
+they take rounds again by themselves 5 minutes after the wait.
+
+`rollback.yml` puts the site back and leaves the rooms as they are. An image from before the
+rooms had a container of their own has no `MULTIPLAY_INTERNAL_ADDR`: with it the game can enter
+no room.
+
+`MULTIPLAY_PUBLIC_URL` may be set in `api.env`. `MULTIPLAY_MIN_PLAYERS` is set on the service
+`rooms` in the Compose file. To switch the service off, comment `MULTIPLAY_INTERNAL_ADDR` out
+in the Compose file: the site then answers `404 MULTIPLAY_UNAVAILABLE` and the game does not
+try.
+
+### Moving to the container of its own (once)
+
+1. **Before merging,** on the server, as an administrator: copy
+   `deploy/server/update-ci-sudoers.sh` there and run it. Without it the publish stops before
+   changing anything and says so.
+2. If `api.env` sets `MULTIPLAY_MIN_PLAYERS`, move the value to the service `rooms`.
+3. Push to `main`. That one release closes the rooms open at the time: the site gives up port
+   8097 and then the rooms' container takes it, a few seconds without rooms.
+4. Check as in steps 1 and 4 above, then release something of the site alone and see that a
+   room stays open through it.
 
 ## Files before the switch
 

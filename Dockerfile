@@ -37,17 +37,18 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY db/ ./db/
 COPY internal/ ./internal/
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags='-s -w' -o /out/ourtaiko-net ./cmd/server
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags='-s -w' -o /out/ourtaiko-net ./cmd/server \
+    && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags='-s -w' -o /out/ourtaiko-rooms ./cmd/rooms
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates ffmpeg libwebp-tools curl libstdc++ libgcc \
     && addgroup -g 10001 app && adduser -D -u 10001 -G app app \
     && mkdir -p /data/files && chown -R app:app /data
-COPY --from=build /out/ourtaiko-net /usr/local/bin/ourtaiko-net
+COPY --from=build /out/ourtaiko-net /out/ourtaiko-rooms /usr/local/bin/
 COPY --from=tjaparser /out/tjaparser /usr/local/bin/tjaparser
 USER 10001:10001
 ENV LISTEN_ADDR=0.0.0.0:8080 STORAGE_DIR=/data/files
 # 8080: the API and the website. 8081: Multi-Enso, the game's online rooms (gRPC in clear
-# text), where MULTIPLAY_LISTEN_ADDR says so; off without it.
+# text), served by the same image with the entrypoint ourtaiko-rooms (deploy/compose.production.yml).
 EXPOSE 8080 8081
 ENTRYPOINT ["ourtaiko-net"]

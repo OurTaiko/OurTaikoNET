@@ -1,5 +1,7 @@
-# The one OurTaikoNet container on the production server. The publish script puts this file
-# at /opt/ourtaiko-net/compose.production.yml with every release.
+# The OurTaikoNet containers on the production server: the site (net) and the game's online
+# rooms (rooms), one image with two programs. The publish script puts this file at
+# /opt/ourtaiko-net/compose.production.yml with every release, and replaces each container only
+# when its part changed: rooms live in memory, so the site is released without touching them.
 name: ourtaiko-net
 services:
   net:
@@ -20,19 +22,20 @@ services:
       # The website's current release (deploy/publish-web.sh puts releases beside each other
       # and points `current` at one).
       WEB_DIR: /srv/web/current
-      # Multi-Enso, the game's online rooms: gRPC in clear text on a port of its own. The
-      # proxy passes /ourtaiko.multiplay.v1.MultiEnso/ on to it (deploy/net.multiplay.conf).
-      # The game is told to dial MULTIPLAY_PUBLIC_URL, by default APP_ORIGIN.
+      # Multi-Enso, the game's online rooms, is the container below. The site answers its
+      # questions here, on the private network `rooms` (nothing maps this port), and tells the
+      # game to dial MULTIPLAY_PUBLIC_URL, by default APP_ORIGIN.
       #
-      # On since 2026-11-14 (deploy/README.md, "Multi-Enso (gRPC)"). To switch it off, comment
-      # the next line out: the site then answers 404 at /api/v1/game/multiplay and the game
-      # does not try. The second port may stay mapped.
-      MULTIPLAY_LISTEN_ADDR: 0.0.0.0:8081
+      # To switch the rooms off, comment the next line out: the site then answers 404 at
+      # /api/v1/game/multiplay and the game does not try.
+      MULTIPLAY_INTERNAL_ADDR: 0.0.0.0:8082
+      # Not in this container any more, whatever api.env says.
+      MULTIPLAY_LISTEN_ADDR: ''
     # On this server 8080 is Fanmade's, 8081 Database's, 8090 the account center's, 8093
     # Profile's and 8094-8095 another site's. 8096 is the API and the website; 8097 is
-    # Multi-Enso (nothing else listened there on 2026-11-14). A port that is taken on the
-    # server stops the container from starting.
-    ports: ['127.0.0.1:8096:8080', '127.0.0.1:8097:8081']
+    # Multi-Enso (the container below). A port that is taken on the server stops the container
+    # from starting.
+    ports: ['127.0.0.1:8096:8080']
     volumes:
       - /opt/ourtaiko-net/web:/srv/web:ro
       # Optional GeoIP files for the regional Don mirror. Enabled via api.env.
@@ -47,9 +50,35 @@ services:
       timeout: 5s
       retries: 20
       start_period: 20s
-    networks: [shared]
+    networks: [shared, rooms]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  # Multi-Enso. No database and no secrets: it asks the site (internal/multiplay/roomsapi). The
+  # proxy passes /ourtaiko.multiplay.v1.MultiEnso/ on to 8097 (deploy/net.multiplay.conf).
+  rooms:
+    image: ourtaiko-net-rooms:release
+    container_name: ourtaiko-net-rooms
+    entrypoint: [ourtaiko-rooms]
+    restart: unless-stopped
+    environment:
+      MULTIPLAY_LISTEN_ADDR: 0.0.0.0:8081
+      MULTIPLAY_ADMIN_ADDR: 127.0.0.1:8083
+      MULTIPLAY_SITE_INTERNAL_URL: http://net:8082
+    ports: ['127.0.0.1:8097:8081']
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:8083/healthz']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks: [rooms]
     logging:
       driver: json-file
       options: {max-size: 10m, max-file: '3'}
 networks:
   shared: {external: true, name: ourtaiko-shared}
+  rooms: {}

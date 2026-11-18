@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 	"ourtaiko.dev/net/internal/multiplay"
 	pb "ourtaiko.dev/net/internal/multiplay/multiplaypb"
+	"ourtaiko.dev/net/internal/multiplay/roomsapi"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 )
 
@@ -83,23 +84,23 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if song.Source != "fanmade" || song.ChartID != fan || song.Title != "Fan song" || song.Subtitle != "--Fan song" || courses(song) != `[{"Name":"Easy","Level":3},{"Name":"Oni","Level":8}]` {
+	if song.Source != "fanmade" || song.ChartID != fan || song.Title != "Fan song" || song.Subtitle != "--Fan song" || courses(song) != `[{"name":"Easy","level":3},{"name":"Oni","level":8}]` {
 		t.Fatalf("%+v %s", song, courses(song))
 	}
 	if status, body := get("/api/v1/sources/fanmade/charts/" + fan); status != 200 || string(song.ChartJSON) != body {
 		t.Fatalf("a room is given\n%s\nand the source answers %d\n%s", song.ChartJSON, status, body)
 	}
-	if song, err = songs.Get(ctx, "official", official); err != nil || song.Title != "Official song" || courses(song) != `[{"Name":"Oni","Level":9},{"Name":"Edit","Level":10}]` {
+	if song, err = songs.Get(ctx, "official", official); err != nil || song.Title != "Official song" || courses(song) != `[{"name":"Oni","level":9},{"name":"Edit","level":10}]` {
 		t.Fatalf("%+v, %v", song, err)
 	}
 	if status, body := get("/api/v1/sources/official/charts/" + official); status != 200 || string(song.ChartJSON) != body {
 		t.Fatalf("a room is given\n%s\nand the source answers %d\n%s", song.ChartJSON, status, body)
 	}
 	// A chart in no category can be picked, though chance never draws it.
-	if song, err = songs.Get(ctx, "official", extra); err != nil || courses(song) != `[{"Name":"Normal","Level":4}]` {
+	if song, err = songs.Get(ctx, "official", extra); err != nil || courses(song) != `[{"name":"Normal","level":4}]` {
 		t.Fatalf("%+v, %v", song, err)
 	}
-	if song, err = songs.Get(ctx, "fanmade", unlisted); err != nil || song.Title != "Unlisted" || courses(song) != `[{"Name":"Hard","Level":6}]` {
+	if song, err = songs.Get(ctx, "fanmade", unlisted); err != nil || song.Title != "Unlisted" || courses(song) != `[{"name":"Hard","level":6}]` {
 		t.Fatalf("%+v, %v", song, err)
 	}
 	for name, asked := range map[string][2]string{
@@ -283,5 +284,45 @@ func TestMultiEnsoIsOffUnlessConfigured(t *testing.T) {
 			bad.Close()
 			t.Fatalf("a round of at least %d players was accepted", players)
 		}
+	}
+}
+
+// In production the rooms are a program of their own: the site tells the game about them and
+// answers their questions on the internal address, and runs no rooms itself.
+func TestTheSiteAnswersRoomsThatRunElsewhere(t *testing.T) {
+	_, url := netdbtest.NewURL(t, "fanmade")
+	ctx := context.Background()
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "https://net.example", StorageDir: t.TempDir(), Multiplay: Multiplay{InternalAddr: "127.0.0.1:0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	if err = a.startRooms(); err != nil {
+		t.Fatal(err)
+	}
+	if a.RoomsAddr() != "" || a.RoomsAPIAddr() == "" {
+		t.Fatalf("rooms at %q, their API at %q", a.RoomsAddr(), a.RoomsAPIAddr())
+	}
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxProtocol":2,"maxMembers":5}` {
+		t.Fatalf("%d %s", w.Code, w.Body.String())
+	}
+	client := roomsapi.NewClient("http://" + a.RoomsAPIAddr())
+	asking, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if _, err = client.Authenticate(asking, strings.Repeat("0", 64)); !errors.Is(err, multiplay.ErrUnauthenticated) {
+		t.Fatalf("a session nobody has: %v", err)
+	}
+	if _, err = client.Get(asking, "fanmade", strings.Repeat("0", 32)); !errors.Is(err, multiplay.ErrChartNotFound) {
+		t.Fatalf("a chart nobody has: %v", err)
+	}
+	if song, err := client.Random(asking); err != nil || song != nil {
+		t.Fatalf("a draw on an empty site: %v, %v", song, err)
+	}
+
+	if both, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), Multiplay: Multiplay{ListenAddr: "127.0.0.1:0", InternalAddr: "127.0.0.1:0"}}); err == nil {
+		both.Close()
+		t.Fatal("rooms were accepted in this program and elsewhere at once")
 	}
 }

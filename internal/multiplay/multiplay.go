@@ -5,6 +5,8 @@
 // proto/ourtaiko/multiplay/v1/multiplay.proto.
 //
 // Rooms live in memory: a restart closes them, and only one instance of the server can run.
+// In production the service is a program of its own (cmd/rooms), so that releasing the site
+// does not restart it; it asks the site for players and songs over package roomsapi.
 //
 // The room state machine (room.go, manager.go) does no I/O. Time, timers, randomness and the
 // song catalog come in through Deps, connections are Conns. One mutex, the Manager's, guards
@@ -19,6 +21,7 @@ package multiplay
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"slices"
@@ -86,25 +89,37 @@ var DefaultTimings = Timings{
 	MaxPlay:        15 * time.Minute,
 }
 
+// TimingsWith are DefaultTimings with the fewest players a round needs; zero keeps the default.
+func TimingsWith(minPlayers int) (Timings, error) {
+	timings := DefaultTimings
+	if minPlayers != 0 {
+		timings.MinPlayers = minPlayers
+	}
+	if timings.MinPlayers < 1 || timings.MinPlayers > timings.MaxMembers {
+		return Timings{}, fmt.Errorf("a Multi-Enso round needs between 1 and %d players, not %d", timings.MaxMembers, timings.MinPlayers)
+	}
+	return timings, nil
+}
+
 // Course is one course of a song and its star level.
 type Course struct {
 	// Easy, Normal, Hard, Oni or Edit.
-	Name  string
-	Level int
+	Name  string `json:"name"`
+	Level int    `json:"level"`
 }
 
 // Song is a chart a room can play.
 type Song struct {
 	// Source is the site's song source the chart is in ("fanmade", "official").
-	Source  string
-	ChartID string
-	Title   string
+	Source  string `json:"source"`
+	ChartID string `json:"chartId"`
+	Title   string `json:"title"`
 	// Subtitle may be empty.
-	Subtitle string
+	Subtitle string `json:"subtitle"`
 	// Courses are the chart's courses, easiest first. Never empty.
-	Courses []Course
+	Courses []Course `json:"courses"`
 	// ChartJSON is the chart as the source's API describes it (GET /charts/{id}).
-	ChartJSON []byte
+	ChartJSON []byte `json:"chartJson"`
 }
 
 // ErrChartNotFound is a Catalog's answer for a chart that does not exist or cannot be played.
@@ -172,10 +187,10 @@ type Conn interface {
 
 // Player is who a connection belongs to, as the account center describes them.
 type Player struct {
-	UserID   string
-	Nickname string
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
 	// AvatarURL may be empty.
-	AvatarURL string
+	AvatarURL string `json:"avatarUrl"`
 }
 
 // Error is a request a room refuses. Code is what the game shows in the player's language

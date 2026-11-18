@@ -2,11 +2,18 @@ name: Deploy OurTaikoNet
 
 # Tests what a push changed and publishes it. The backend is an image, kept in ourtaiko-private
 # for rollback; the website (web/) is a build the backend serves from the server's disk. A push
-# that changes both publishes the backend first and the website only after it.
+# that changes both publishes the backend first and the website only after it. The game's online
+# rooms are part of the backend's image, and their container is replaced only when their own code
+# changed: rooms live in memory.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      rooms:
+        description: Replace the rooms' container too (waits for the rounds under way)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,6 +30,7 @@ jobs:
     outputs:
       backend: ${{ steps.parts.outputs.backend }}
       website: ${{ steps.parts.outputs.website }}
+      rooms: ${{ steps.parts.outputs.rooms }}
     steps:
       - name: Check out the triggering commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -35,13 +43,22 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          ROOMS_ASKED: ${{ inputs.rooms }}
         run: |
-          # A run started by hand, or a push whose previous commit is not known, does both.
-          backend=true website=true
+          # A run started by hand, or a push whose previous commit is not known, does both. The
+          # rooms are replaced by hand only when asked; a push of unknown extent may hold them.
+          backend=true website=true rooms=true
+          if [[ "$EVENT" != push && "$ROOMS_ASKED" != true ]]; then rooms=false; fi
           if [[ "$EVENT" == push && "$BEFORE" =~ ^[0-9a-f]{40}$ && "$BEFORE" != 0000000000000000000000000000000000000000 ]] \
             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            backend=false website=false
+            backend=false website=false rooms=false
             while IFS= read -r file; do
+              # What cmd/rooms is built from, and how its container is defined. cmd/rooms has a
+              # test that it depends on nothing else of this repository.
+              case "$file" in
+                *_test.go | *.md) ;;
+                cmd/rooms/* | internal/multiplay/* | deploy/compose.production.yml) rooms=true ;;
+              esac
               case "$file" in
                 *.md | .github/workflows/rollback.yml) ;;
                 contracts/* | .github/workflows/deploy.yml) backend=true website=true ;;
@@ -52,7 +69,8 @@ jobs:
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "website=$website" >> "$GITHUB_OUTPUT"
-          echo "Backend: $backend, website: $website"
+          echo "rooms=$rooms" >> "$GITHUB_OUTPUT"
+          echo "Backend: $backend, website: $website, rooms: $rooms"
 
   test-backend:
     needs: changes
@@ -231,6 +249,7 @@ jobs:
           DEPLOY_REVISION: ${{ github.sha }}
           DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH }}
           DEPLOY_IMAGE_SHA256: ${{ steps.image.outputs.sha256 }}
+          DEPLOY_ROOMS: ${{ needs.changes.outputs.rooms }}
         with:
           host: ${{ secrets.SERVER_ADDR }}
           port: ${{ secrets.DEPLOY_PORT || '22' }}
@@ -238,8 +257,9 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
           version: '1.8.1'
+          # Up to 20 minutes of it is the rounds under way ending, when the rooms are replaced.
           command_timeout: 30m
-          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_IMAGE_SHA256
+          envs: DEPLOY_REVISION,DEPLOY_BASE_PATH,DEPLOY_IMAGE_SHA256,DEPLOY_ROOMS
           script_path: ${{ runner.temp }}/publish-net.sh
 
   deploy-website:

@@ -388,6 +388,9 @@ func (r *Room) LockMembers(userID string) error {
 	if r.phase != pb.Phase_LOBBY {
 		return refuse("BAD_PHASE", "A round cannot begin now")
 	}
+	if r.m.draining {
+		return refuse("BAD_PHASE", "The server is about to restart")
+	}
 	// Whoever presses start is at the room's screen, whether or not `returned` has come yet.
 	if host := r.find(userID); host.away {
 		host.away = false
@@ -426,7 +429,7 @@ func (r *Room) inRoom() int {
 // maybeStartFull begins a round by itself once the room is full and every member is in it.
 // Besides the host's start this is the only way a round begins.
 func (r *Room) maybeStartFull() {
-	if r.phase == pb.Phase_LOBBY && !r.closed && r.full() && r.inRoom() == len(r.members) {
+	if r.phase == pb.Phase_LOBBY && !r.closed && !r.m.draining && r.full() && r.inRoom() == len(r.members) {
 		r.startSongSelect()
 	}
 }
