@@ -132,35 +132,26 @@ DON_MIRROR_CATALOG_URL=https://static.sakura-bot.cn/ourtaiko/3dchara/catalog.jso
 ```
 
 The existing GeoIP database and trusted proxy settings apply to every collection, and the
-country alone decides: NET never probes mirror objects or compares catalogs. Mainland requests receive ESA song URLs for every public canonical content-hash
-file; a missing object is fetched by OSS back-to-origin on first request.
-Manifests retain canonical `fallbackUrl`; signed/private/custom-origin URLs are unchanged.
-GET/HEAD media redirects use the same policy, and `?origin=1` bypasses the mirror.
+country alone decides: NET never probes mirror objects or reads the mirror's catalogs. Every
+file a mainland visitor asks for that the mirror does not hold yet is fetched by OSS
+back-to-origin on first request.
 
-`GET /api/v1/nameplate-art/catalog` carries canonical `files`/`baseUrl` and, for mainland
-requests, the mirror's own `nameplate/catalog.json` (re-read every 60 seconds, as long as ESA
-keeps it) with `mirrorBaseUrl`/`mirrorPaths` listing every file in it; `baseUrl` stays canonical
-for fallback. The 3D Don catalog and `/users/{id}/don` do the same with
-`3dchara/catalog.json` (an item the mirror's catalog does not list yet keeps its canonical
-file). Until a mirror catalog has been read once, the canonical one is answered. The website and updated Play use this API,
-verify files, and retry the canonical source on mirror errors. Mirror catalogs and the files
-they list are pulled from the origin on demand by back-to-origin (ESA keeps catalogs 60
-seconds); nothing in this path waits for the synchronization worker. Older NET servers are supported
-by falling back to the canonical nameplate catalog. Deploy NET and its website, then release
-Play so nameplate routing and download recovery reach game clients. Do not globally replace
+API version 2 (`/api/v2/`, the website's) answers every public file as a path under the
+distribution root and the same answer for everyone. `GET /api/v2/distribution/source` answers
+`mirror`, `baseUrl` and `canonicalBaseUrl` for the visitor (`Cache-Control: no-store`); the
+client joins `baseUrl` and each path, and retries `canonicalBaseUrl` with the same path when the
+mirror's copy fails. The website asks it once per page load and shows the root in the footer.
+
+API version 1 (`/api/v1/`, released games) makes the choice in its answers: song files in
+resource manifests, file redirects and the game's folder covers move to the mirror for a
+mainland visitor with the canonical `fallbackUrl`, and `?origin=1` keeps the canonical address;
+`/users/{id}/don` files and reward icons are on the mirror's root; the 3D Don and nameplate
+catalogs carry `baseUrl` and, for a mainland visitor, `mirrorBaseUrl` with `mirrorPaths` listing
+every file. `GET /api/v1/distribution/avatar?url=...` accepts only canonical content-addressed
+SSO avatar URLs and returns `url` plus the original `fallbackUrl` (`redirect=1` for a plain
+image); `GET /api/v1/distribution/source` is version 2's. Both send `Cache-Control: no-store`.
+Play's account and multiplayer picture loader uses the avatar route. Do not globally replace
 canonical S3 public bases.
-
-`GET /api/v1/distribution/avatar?url=...` accepts only canonical content-addressed SSO
-avatar URLs, uses the same country/trusted-proxy policy (no probe), and returns `url` plus the original `fallbackUrl`. `redirect=1` supports ordinary browser images.
-Both variants send `Cache-Control: no-store` so region selection is never shared by a CDN.
-Play's common account/multiplayer picture loader uses this endpoint, retains the original URL,
-and falls back if the mirror is unavailable.
-
-`GET /api/v1/distribution/source` answers `mirror`, `baseUrl` and `canonicalBaseUrl` for the
-visitor (same country policy, `no-store`, no probe). The website asks it once per page load,
-builds public avatar addresses on that root itself, falls back to the original address when
-the mirror copy fails to load, and shows the root in the footer. Signed, private, and
-custom-origin pictures keep their original route.
 
 The website reads `player-build.json` from the visitor's root in the source answer (the mirror's
 copy for mainland visitors, cached 60 seconds by ESA) and loads that build from the same root,
