@@ -6,77 +6,29 @@
     "prefix": "ourtaiko/",
     "originBaseUrl": "https://distrib.ourtaiko.org/",
     "mirrorCollections": [
-      "fanmade",
-      "database"
+      ""
     ],
     "mirrorSuffixes": [
-      ".tja",
-      ".ogg",
-      ".mp3",
-      ".webp",
-      ".png",
-      ".jpg",
-      ".jpeg",
-      ".mp4"
+      ""
     ],
     "mirrorSni": true,
     "mirrorAllowHeadObject": true,
     "mirrorPassQueryString": false,
     "mirrorFollowRedirect": false,
-    "mirrorCheckMd5": true,
-    "additionalMirrorCollections": [
-      {
-        "collection": "sso/avatars",
-        "suffixes": [
-          ".webp"
-        ]
-      },
-      {
-        "collection": "player",
-        "suffixes": [
-          ""
-        ]
-      }
-    ]
+    "mirrorCheckMd5": true
   },
   "esa": {
     "siteName": "sakura-bot.cn",
     "cacheRules": [
       {
-        "ruleName": "OurTaiko content-addressed songs",
+        "ruleName": "OurTaiko mirror follows origin",
         "sequence": 1,
-        "ruleEnable": "on",
-        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/fanmade/\") or starts_with(http.request.uri.path, \"/ourtaiko/database/\") or starts_with(http.request.uri.path, \"/ourtaiko/sso/avatars/\") or starts_with(http.request.uri.path, \"/ourtaiko/player/\")) and http.request.uri.path.extension in {\"tja\" \"ogg\" \"mp3\" \"webp\" \"png\" \"jpg\" \"jpeg\" \"mp4\" \"html\" \"js\" \"wasm\" \"data\" \"unityweb\" \"txt\" \"map\"})",
-        "bypassCache": "cache_all",
-        "edgeCacheMode": "override_origin",
-        "edgeCacheTtl": "31536000",
-        "browserCacheMode": "override_origin",
-        "browserCacheTtl": "31536000",
-        "queryStringMode": "reserve_all",
-        "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
-      },
-      {
-        "ruleName": "OurTaiko versioned art",
-        "sequence": 2,
-        "ruleEnable": "on",
-        "rule": "(http.host eq \"static.sakura-bot.cn\" and (starts_with(http.request.uri.path, \"/ourtaiko/3dchara/\") or starts_with(http.request.uri.path, \"/ourtaiko/nameplate/\")) and http.request.uri.path.extension in {\"glb\" \"otanim\" \"png\" \"jpg\" \"jpeg\" \"webp\"})",
-        "bypassCache": "cache_all",
-        "edgeCacheMode": "override_origin",
-        "edgeCacheTtl": "31536000",
-        "browserCacheMode": "override_origin",
-        "browserCacheTtl": "31536000",
-        "queryStringMode": "reserve_all",
-        "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"
-      },
-      {
-        "ruleName": "OurTaiko catalogs and mutable assets",
-        "sequence": 3,
         "ruleEnable": "on",
         "rule": "(http.host eq \"static.sakura-bot.cn\" and starts_with(http.request.uri.path, \"/ourtaiko/\"))",
         "bypassCache": "cache_all",
-        "edgeCacheMode": "override_origin",
+        "edgeCacheMode": "follow_origin",
         "edgeCacheTtl": "60",
-        "browserCacheMode": "override_origin",
+        "browserCacheMode": "follow_origin",
         "browserCacheTtl": "60",
         "queryStringMode": "reserve_all",
         "edgeStatusCodeCacheTtl": "4xx=0,5xx=0"

@@ -28,8 +28,10 @@ def desired(current, config):
     number = max((int(rule.findtext('RuleNumber', '0')) for rule in rules), default=0)
     for collection in collections:
         for suffix in collection['suffixes']:
-            prefix = config['prefix'] + collection['collection'] + '/'
-            origin = config['originBaseUrl'] + collection['collection'] + '/'
+            # An empty collection is the whole prefix: one rule for every path under it.
+            folder = collection['collection'] + '/' if collection['collection'] else ''
+            prefix = config['prefix'] + folder
+            origin = config['originBaseUrl'] + folder
             old = existing.get((prefix, suffix or None))
             if old is not None:
                 if old.findtext('Condition/HttpErrorCodeReturnedEquals') != '404' or old.findtext('Redirect/MirrorURL') != origin:

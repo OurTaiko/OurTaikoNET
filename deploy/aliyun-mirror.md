@@ -39,35 +39,36 @@ resources, upload to OSS or install a recurring job.
 
 ## Missing-object back-to-origin
 
-In OSS, Bucket `sigaer`, Data Management > Mirroring-based back-to-origin, configure sixteen
-rules: each combination of prefix `ourtaiko/fanmade/` or `ourtaiko/database/` and suffix
-`.tja`, `.ogg`, `.mp3`, `.webp`, `.png`, `.jpg`, `.jpeg` or `.mp4`, with HTTP error condition `404`. Strip the matching OSS prefix and
-use the corresponding origin `https://distrib.ourtaiko.org/fanmade/` or
-`https://distrib.ourtaiko.org/database/`. Enable HTTPS SNI, HEAD back-to-origin and MD5
-checking; disable query-string forwarding, redirect following and arbitrary header
-forwarding. Preserve other bucket routing rules if any are added later.
+In OSS, Bucket `sigaer`, Data Management > Mirroring-based back-to-origin, there is one rule
+(since 2026-11-18): prefix `ourtaiko/`, any suffix, HTTP error condition `404`, stripping the
+prefix and fetching from `https://distrib.ourtaiko.org/`. HTTPS SNI, HEAD back-to-origin and MD5
+checking are on; query-string forwarding, redirect following and arbitrary header forwarding
+are off. The bucket has no other routing rules; preserve any added later.
 
 GET of a missing object fetches and stores its body. HEAD can check the upstream object
 without proving that its body has been stored. Check persistence with ListObjects and verify
 the full GET against the authoritative size and SHA-256 before adding a file to a mirror
 inventory. OSS's optional Content-MD5 check does not verify the catalog's SHA-256.
 
-These rules supplement publication, not update it: existing objects are never refreshed by a
-missing-object rule. Catalogs, same-path model files and same-path images must be explicitly
-published. Do not mirror the entire shared bucket or mirror `catalog.json` on demand.
+OSS keeps what it fetched, with the origin's `Cache-Control`, and never fetches a stored object
+again: OSS has no pass-through option and does not follow origin updates
+([back-to-origin overview](https://www.alibabacloud.com/help/zh/oss/back-to-origin-rules-overview)).
+Files other than JSON are never replaced in place, so that is right for them. JSON is not:
+the mirror's `player-build.json`, `3dchara/catalog.json` and `nameplate/catalog.json` stay
+current only because the synchronization worker below rewrites them every 15 minutes; any
+other JSON on the mirror keeps the copy first fetched. Delete such an object to have it
+fetched again.
 
 ## ESA cache rules
 
-The three rules in `aliyun-mirror.json` apply only to host `static.sakura-bot.cn` and path
-`/ourtaiko/`. Put the content-addressed song and versioned-art rules before the general
-OurTaiko rule, and all three before the site's generic PNG/MP3 rule. Preserve the site's
-unrelated settings.
-
-| Requests | Edge TTL | Browser TTL |
-| --- | --- | --- |
-| Fanmade/database `.tja`, `.ogg`, `.mp3`, `.webp`, `.png`, `.jpg`, `.jpeg`, `.mp4` with content-hash filenames | 1 year | 1 year |
-| Don/nameplate `.glb`, `.otanim`, `.png`, `.jpg`, `.jpeg`, `.webp` (never replaced in place; JSON excluded) | 1 year | 1 year |
-| Catalogs and unversioned resource requests | 60 seconds | 60 seconds |
+One rule (since 2026-11-18), `OurTaiko mirror follows origin`, applies to host
+`static.sakura-bot.cn` and path `/ourtaiko/`: edge and browser caching follow the origin's
+`Cache-Control`, which OSS stored from `https://distrib.ourtaiko.org/` (or the worker wrote),
+and last 60 seconds when there is none. Content-addressed song files and avatars carry one
+year from the origin, 3D Don and nameplate files a day, catalogs written by the worker 60
+seconds. 4xx and 5xx are not cached by it. The site's own rules after it (`静态缓存`,
+`构建文件缓存`) are not OurTaiko's; `静态缓存` also applies to OurTaiko's PNG, MP3, JPEG and
+WebP files and caches them a year, which their never-replaced paths allow.
 
 Retain all query parameters in the cache key (older game builds still add `v` to nameplate
 art). Cache 4xx and 5xx responses for
@@ -113,17 +114,8 @@ Inspect `journalctl -u ourtaiko-mirror-sync` and `/var/lib/ourtaiko-mirror/last-
 Apply cloud scopes with `tools/configure-distribution-mirror.py --backup FILE --apply`
 and `tools/configure-esa-mirror.cjs --backup FILE --apply` (the latter needs the Alibaba ESA
 Node SDK in the operator tooling or NODE_PATH). Both commands default to read-only plans,
-back up existing configuration, and preserve unrelated settings. New OSS mirror scopes are
-`sso/avatars/*.webp` and public web-player files under `player/`. The player uses one prefix
-rule so the bucket stays within OSS's routing-rule limit (18 rules total). Mutable JSON
-(`player-build.json` and the catalogs) is pulled by back-to-origin like every other object
-and kept 60 seconds by ESA; clients never depend on the synchronization worker. Versioned player files and immutable avatars cache for
-one year; catalogs cache for 60 seconds; errors are not cached. Existing CORS rules cover
-all these public prefixes, including cached HEAD and Range responses.
-
-The existing ESA rule named `OurTaiko content-addressed songs` also covers immutable
-avatar and player static-file extensions. Reusing it keeps the current plan's rule count
-unchanged; catalogs and JSON still use the short-lived catch-all policy.
+back up existing configuration, and preserve unrelated settings. Existing CORS rules cover
+the whole prefix, including cached HEAD and Range responses.
 
 For regional routing, keep `DON_CATALOG_URL` canonical and set:
 
