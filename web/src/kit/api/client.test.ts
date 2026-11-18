@@ -39,5 +39,7 @@ it('preserves API retry information and non-JSON upload size errors', async () =
     retryAfter: 12,
     status: 429,
   })
-  await expect(api(endpoints.charts)).rejects.toEqual(new ApiError('文件超过上传大小限制', 0, 413))
+  await expect(api(endpoints.charts)).rejects.toEqual(
+    new ApiError('文件超过上传大小限制', 0, 413, 'FILE_TOO_LARGE'),
+  )
 })

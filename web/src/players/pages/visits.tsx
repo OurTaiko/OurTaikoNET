@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
-import { api } from '@players/api/client'
-import { endpoints } from '@players/api/endpoints'
-import type { VisitReport } from '@players/api/types'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import {
@@ -16,6 +14,7 @@ import {
 } from '@sitekit/components/ui/table'
 import { cn } from '@sitekit/lib/utils'
 import { Notice } from '@players/notice'
+import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
 import { browserZone } from '@sitekit/shell/visits'
 
@@ -122,26 +121,11 @@ export function VisitsPage() {
   const session = useSession()
   const allowed = !!session.user?.siteAdmin
   const [period, setPeriod] = useState(30)
-  const [answer, setAnswer] = useState<{ period: number; report: VisitReport } | null>(null)
-  const [error, setError] = useState('')
   const [zone] = useState(browserZone)
-
-  useEffect(() => {
-    if (!allowed) return
-    let dropped = false
-    api<VisitReport>(endpoints.visitReport(period, zone))
-      .then((report) => {
-        if (dropped) return
-        setAnswer({ period, report })
-        setError('')
-      })
-      .catch((e: Error) => {
-        if (!dropped) setError(e.message)
-      })
-    return () => {
-      dropped = true
-    }
-  }, [allowed, period, zone])
+  const visits = useQuery({ ...playerQueries.visits(period, zone), enabled: allowed })
+  const answer = visits.data
+  // What was read before stays on show when reading it again fails.
+  const error = answer ? '' : (visits.error?.message ?? '')
 
   if (session.loading) return null
   if (!allowed) return <Navigate to="/" replace />

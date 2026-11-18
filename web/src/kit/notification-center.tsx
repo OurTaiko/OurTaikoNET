@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { keepPreviousData, queryOptions, useQueries, useQuery } from '@tanstack/react-query'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -25,6 +26,7 @@ import { UserAvatar } from './components/user-avatar'
 import { RelativeTime, commentPath, danCommentPath } from './comments'
 import { danTitle } from './dan-title'
 import { cn } from './lib/utils'
+import { queryClient } from './query/client'
 import { Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session'
@@ -52,9 +54,9 @@ const addresses = {
 const when = (n: AppNotification) => Date.parse(n.createdAt)
 const newestFirst = (a: AppNotification, b: AppNotification) => when(b) - when(a)
 
+const noticeCountKey = ['notices', 'unread'] as const
 // Any change to read state anywhere refreshes the bell's count.
-const changedEvent = 'ourtaiko:notifications-changed'
-export const announceChange = () => window.dispatchEvent(new Event(changedEvent))
+export const announceChange = () => void queryClient.invalidateQueries({ queryKey: noticeCountKey })
 
 /** Goes to a page of a source, or of none (''). */
 export const useGo = () => (area: SourceId | '', path: string) =>
@@ -232,37 +234,37 @@ const settingLabels = {
 
 // What to be told about. The choice is one for the whole site: it is written to both sources,
 // and a kind counts as on only while both have it on.
+const together = (answers: { items: NotificationSetting[] }[]) =>
+  answers[0].items.map((setting) => ({
+    kind: setting.kind,
+    enabled: answers.every(
+      (answer) => answer.items.find((other) => other.kind === setting.kind)?.enabled ?? true,
+    ),
+  }))
+const settingsQuery = queryOptions({
+  queryKey: ['notices', 'settings'],
+  queryFn: async ({ signal }) =>
+    together(
+      await Promise.all(
+        ids.map((source) =>
+          api<{ items: NotificationSetting[] }>(addresses.settings(source), { signal }),
+        ),
+      ),
+    ),
+})
+
 function NotificationSettings() {
   const { t } = useTranslation()
   const { csrfToken } = useSession()
   const { notify } = useNotification()
-  const [items, setItems] = useState<NotificationSetting[] | null>(null)
-  const [error, setError] = useState('')
-  const together = (answers: { items: NotificationSetting[] }[]) =>
-    answers[0].items.map((setting) => ({
-      kind: setting.kind,
-      enabled: answers.every(
-        (answer) => answer.items.find((other) => other.kind === setting.kind)?.enabled ?? true,
-      ),
-    }))
-  useEffect(() => {
-    const controller = new AbortController()
-    Promise.all(
-      ids.map((source) =>
-        api<{ items: NotificationSetting[] }>(addresses.settings(source), {
-          signal: controller.signal,
-        }),
-      ),
-    )
-      .then((answers) => setItems(together(answers)))
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [])
+  const { data: items, error } = useQuery(settingsQuery)
   const toggle = async (kind: string, enabled: boolean) => {
-    const previous = items
-    setItems((current) => current?.map((s) => (s.kind === kind ? { ...s, enabled } : s)) ?? null)
+    // An answer asked for before this choice would put the box back.
+    await queryClient.cancelQueries({ queryKey: settingsQuery.queryKey })
+    const previous = queryClient.getQueryData(settingsQuery.queryKey)
+    queryClient.setQueryData(settingsQuery.queryKey, (current) =>
+      current?.map((s) => (s.kind === kind ? { ...s, enabled } : s)),
+    )
     try {
       const answers = await Promise.all(
         ids.map((source) =>
@@ -272,16 +274,16 @@ function NotificationSettings() {
           ),
         ),
       )
-      setItems(together(answers))
+      queryClient.setQueryData(settingsQuery.queryKey, together(answers))
     } catch (e) {
-      setItems(previous)
+      queryClient.setQueryData(settingsQuery.queryKey, previous)
       notify((e as Error).message, 'error')
     }
   }
   return (
     <div>
-      {error ? (
-        <Notice>{error}</Notice>
+      {error && !items ? (
+        <Notice>{error.message}</Notice>
       ) : !items ? (
         <Skeleton className="h-40 rounded-xl" />
       ) : (
@@ -305,67 +307,65 @@ function NotificationSettings() {
   )
 }
 
-// The count last seen, so the next area's bell starts from it and not from nothing.
-let lastCount = 0
-const countListeners = new Set<(count: number) => void>()
-let countTimer = 0
-let countUsers = 0
-
-/** Asks both sources how many notices are unread; a source that does not answer counts none. */
-function refreshNoticeCount() {
-  void Promise.all(
-    ids.map((source) =>
-      api<{ count: number }>(addresses.unread(source))
-        .then((r) => r.count)
-        .catch(() => 0),
-    ),
-  ).then((counts) => {
-    lastCount = counts.reduce((a, b) => a + b, 0)
-    for (const listener of countListeners) listener(lastCount)
+/**
+ * How many of the site's notices are unread, over both sources: read again every minute while
+ * the page is shown, when the window comes back, and whenever read state changes anywhere on the
+ * page. A source that does not answer keeps the count it last gave.
+ */
+export function useNoticeCount() {
+  const { user } = useSession()
+  return useQueries({
+    queries: ids.map((source) => ({
+      queryKey: [...noticeCountKey, source],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        api<{ count: number }>(addresses.unread(source), { signal }),
+      enabled: !!user,
+      refetchInterval: 60_000,
+    })),
+    combine: (answers) => answers.reduce((total, answer) => total + (answer.data?.count ?? 0), 0),
   })
 }
 
 /**
- * How many of the site's notices are unread, over both sources: read again every minute, when
- * the window comes back, and whenever read state changes anywhere on the page.
+ * The latest notice of either source; null when there is none, no data when unknown. Read again
+ * whenever the count of unread notices changes, and each time something that shows it opens.
  */
-export function useNoticeCount() {
-  const { user } = useSession()
-  const [count, setCount] = useState(lastCount)
-  useEffect(() => {
-    if (!user) {
-      lastCount = 0
-      setCount(0)
-      return
-    }
-    countListeners.add(setCount)
-    if (countUsers++ === 0) {
-      refreshNoticeCount()
-      countTimer = window.setInterval(refreshNoticeCount, 60000)
-      window.addEventListener('focus', refreshNoticeCount)
-      window.addEventListener(changedEvent, refreshNoticeCount)
-    }
-    return () => {
-      countListeners.delete(setCount)
-      if (--countUsers === 0) {
-        window.clearInterval(countTimer)
-        window.removeEventListener('focus', refreshNoticeCount)
-        window.removeEventListener(changedEvent, refreshNoticeCount)
-      }
-    }
-  }, [user])
-  return user ? count : 0
-}
+export const latestNoticeQuery = (count: number) =>
+  queryOptions({
+    queryKey: ['notices', 'latest', count],
+    queryFn: async ({ signal }): Promise<Sourced | null> => {
+      const answers = await Promise.all(
+        ids.map((source) => loadSource(source, 'all', 1, signal).catch(() => null)),
+      )
+      const loaded = answers.flatMap((answer) => answer ?? [])
+      if (!loaded.length) throw new Error('NOTICES_UNAVAILABLE')
+      return loaded.flatMap((l) => l.items).sort(newestFirst)[0] ?? null
+    },
+    staleTime: 0,
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
 
-/** The latest notice of either source; null when there is none, undefined when unknown. */
-export async function latestNotice(): Promise<Sourced | null | undefined> {
-  const answers = await Promise.all(
-    ids.map((source) => loadSource(source, 'all', 1).catch(() => null)),
-  )
-  const loaded = answers.flatMap((answer) => answer ?? [])
-  if (!loaded.length) return undefined
-  return loaded.flatMap((l) => l.items).sort(newestFirst)[0] ?? null
-}
+// Opening the chat reads the notices, so each opening asks again and nothing is kept for the next:
+// a kept answer would show as new what has been read since. How many pages is part of the question.
+const noticeListQuery = (depth: number) =>
+  queryOptions({
+    queryKey: ['notices', 'list', depth],
+    queryFn: async ({ signal }) => {
+      // What one source gives is shown even when the other does not answer.
+      const answers = await Promise.allSettled(
+        ids.map((source) => loadSource(source, 'all', depth, signal)),
+      )
+      const failed = answers.find((answer) => answer.status === 'rejected')
+      return {
+        loaded: answers.flatMap((answer) => (answer.status === 'fulfilled' ? answer.value : [])),
+        failed: failed ? (failed.reason as Error).message : '',
+      }
+    },
+    staleTime: 0,
+    gcTime: 0,
+    placeholderData: keepPreviousData,
+  })
 
 /** A notice in a line, for the list of chats. */
 export function NoticeLine({ n }: { n: AppNotification }) {
@@ -417,46 +417,31 @@ export function SystemChat({ header }: { header: ReactNode }) {
   const count = useNoticeCount()
   // How many pages of each source are loaded.
   const [depth, setDepth] = useState(1)
-  const [data, setData] = useState<Loaded[] | null>(null)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [attempt, setAttempt] = useState(0)
+  const { data: answer, isFetching: busy, refetch } = useQuery(noticeListQuery(depth))
+  const data = answer?.loaded ?? null
+  const error = busy ? '' : (answer?.failed ?? '')
   const [responding, setResponding] = useState<string | null>(null)
   const [settings, setSettings] = useState(false)
   // Notices that were unread when they were first shown here.
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set())
   const scroller = useRef<HTMLDivElement>(null)
+  // What has come is on screen, and so has been read.
   useEffect(() => {
-    const controller = new AbortController()
-    setError('')
-    setBusy(true)
-    // What one source gives is shown even when the other does not answer.
-    Promise.allSettled(ids.map((source) => loadSource(source, 'all', depth, controller.signal)))
-      .then((answers) => {
-        if (controller.signal.aborted) return
-        const failed = answers.find((answer) => answer.status === 'rejected')
-        setError(failed ? (failed.reason as Error).message : '')
-        const loaded = answers.flatMap((answer) =>
-          answer.status === 'fulfilled' ? answer.value : [],
-        )
-        setData(loaded)
-        const unread = loaded.flatMap((l) => l.items).filter((n) => !n.read)
-        if (unread.length)
-          setFresh((seen) => new Set([...seen, ...unread.map((n) => `${n.source}/${n.id}`)]))
-        if (loaded.some((l) => l.unread))
-          void markAllRead(csrfToken)
-            .then(announceChange)
-            .catch(() => {})
-      })
-      .finally(() => !controller.signal.aborted && setBusy(false))
-    return () => controller.abort()
-  }, [depth, attempt, csrfToken])
+    if (!answer) return
+    const unread = answer.loaded.flatMap((l) => l.items).filter((n) => !n.read)
+    if (unread.length)
+      setFresh((seen) => new Set([...seen, ...unread.map((n) => `${n.source}/${n.id}`)]))
+    if (answer.loaded.some((l) => l.unread))
+      void markAllRead(csrfToken)
+        .then(announceChange)
+        .catch(() => {})
+  }, [answer, csrfToken])
   // New notices arrive by the count: read them as they come.
   const seenCount = useRef(count)
   useEffect(() => {
-    if (count > seenCount.current) setAttempt((n) => n + 1)
+    if (count > seenCount.current) void refetch()
     seenCount.current = count
-  }, [count])
+  }, [count, refetch])
   const items = data ? merge(data).reverse() : []
   const key = (n: Sourced) => `${n.source}/${n.id}`
   const onScroll = useChatScroll(scroller, items[0] && key(items[0]), items.length)
@@ -465,7 +450,7 @@ export function SystemChat({ header }: { header: ReactNode }) {
     try {
       await request
       announceChange()
-      setAttempt((n) => n + 1)
+      void refetch()
     } catch (e) {
       notify((e as Error).message, 'error')
     }
@@ -513,7 +498,7 @@ export function SystemChat({ header }: { header: ReactNode }) {
         {error && (
           <div className="flex flex-col items-start gap-3">
             <Notice>{error}</Notice>
-            <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
+            <Button variant="outline" onClick={() => void refetch()}>
               {t('messages.retry')}
             </Button>
           </div>

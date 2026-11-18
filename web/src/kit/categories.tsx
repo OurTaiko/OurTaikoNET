@@ -5,49 +5,34 @@ import { Label } from './components/ui/label'
 import { Checkbox } from './components/ui/checkbox'
 import { Badge } from './components/ui/badge'
 import { ChoiceSelect } from './components/choice-select'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useQuery, type QueryFunctionContext } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { api } from './api/client'
 import { categoryColor } from './category-colors'
 import type { Category, CategoryList } from './api/types'
 import { i18n } from './i18n'
+import { SOURCE } from './source'
 
-const CategoryContext = createContext<{
-  items: Category[] | null
-  chartCount: number
-  error: string
-  retry: () => void
-}>({ items: null, chartCount: 0, error: '', retry: () => {} })
+// The address is taken while the page of its source is shown: the source may change meanwhile.
+const categoriesOf =
+  (address: string) =>
+  ({ signal }: QueryFunctionContext) =>
+    api<CategoryList>(address, { signal })
 
-export function CategoryProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<CategoryList | null>(null)
-  const [error, setError] = useState('')
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    const controller = new AbortController()
-    api<CategoryList>(endpoints.categories, { signal: controller.signal })
-      .then((list) => {
-        if (!controller.signal.aborted) setData(list)
-      })
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [attempt])
-  const retry = () => {
-    setError('')
-    setAttempt((n) => n + 1)
-  }
-  return (
-    <CategoryContext.Provider
-      value={{ items: data?.items ?? null, chartCount: data?.chartCount ?? 0, error, retry }}
-    >
-      {children}
-    </CategoryContext.Provider>
-  )
-}
+/** The catalog of the source being shown, and how many charts it has published. */
 export function useCategories() {
-  return useContext(CategoryContext)
+  const { data, error, refetch } = useQuery({
+    queryKey: [SOURCE, 'categories'],
+    queryFn: categoriesOf(endpoints.categories),
+    staleTime: 5 * 60_000,
+  })
+  return {
+    items: data?.items ?? null,
+    chartCount: data?.chartCount ?? 0,
+    // What was read before stays good when reading it again fails.
+    error: data ? '' : (error?.message ?? ''),
+    retry: () => void refetch(),
+  }
 }
 // Category names are the site's text, categories.<id>; the API's title is the fallback.
 export function categoryName(category: Pick<Category, 'id' | 'title'>): string {
@@ -56,7 +41,7 @@ export function categoryName(category: Pick<Category, 'id' | 'title'>): string {
 }
 export function CategoryLabels({ ids = [], children }: { ids?: string[]; children?: ReactNode }) {
   const { t } = useTranslation()
-  const { items } = useContext(CategoryContext)
+  const { items } = useCategories()
   if (ids.length === 0 && !children) return null
   const uniqueIds = [...new Set(ids)]
   return (
@@ -92,7 +77,7 @@ export function CategoryPicker({
   disabled?: boolean
 }) {
   const { t } = useTranslation()
-  const { items, error, retry } = useContext(CategoryContext)
+  const { items, error, retry } = useCategories()
   return (
     <fieldset
       className="min-w-0 space-y-3 [&>legend]:mb-2 [&>legend]:text-sm [&>legend]:font-medium"
@@ -146,7 +131,7 @@ export function CategorySelect({
   onChange: (id: string) => void
   disabled?: boolean
 }) {
-  const { items } = useContext(CategoryContext)
+  const { items } = useCategories()
   return (
     <ChoiceSelect
       label={label}

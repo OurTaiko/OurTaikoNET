@@ -1,39 +1,27 @@
-import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { api } from '@sitekit/api/client'
-import type { ChartBase, ChartList } from '@sitekit/api/types'
-import { supportsChart } from '@sitekit/courses'
+import { useQueries } from '@tanstack/react-query'
+import type { ChartBase } from '@sitekit/api/types'
 import type { SourceId } from '@sitekit/source'
 import { newestOf } from '@players/newest'
 import { Notice } from '@players/notice'
 import { CommunityActivity } from '@players/components/community-activity'
 import { Friends } from '@players/components/friends'
 import { RecentWorks } from '@players/components/recent-works'
-import { sourceApi, sources } from '@players/components/song-tile'
+import { sources } from '@players/components/song-tile'
+import { playerQueries } from '@players/queries'
 
 type Library = { total: number; items: ChartBase[] }
 
-/** Each source's newest songs and how many it has; null while loading, 'failed' when it broke. */
+/** Each source's newest songs and how many it has; absent while loading, 'failed' when it broke. */
 function useLibraries() {
-  const [libraries, setLibraries] = useState<Partial<Record<SourceId, Library | 'failed'>>>({})
-  useEffect(() => {
-    const controller = new AbortController()
-    for (const source of sources)
-      api<ChartList>(`${sourceApi(source)}/charts`, { signal: controller.signal })
-        .then((list) =>
-          setLibraries((current) => ({
-            ...current,
-            [source]: { total: list.total, items: list.items.filter(supportsChart) },
-          })),
-        )
-        .catch(
-          () =>
-            !controller.signal.aborted &&
-            setLibraries((current) => ({ ...current, [source]: 'failed' })),
-        )
-    return () => controller.abort()
-  }, [])
+  const answers = useQueries({ queries: sources.map((source) => playerQueries.library(source)) })
+  const libraries: Partial<Record<SourceId, Library | 'failed'>> = {}
+  sources.forEach((source, index) => {
+    const answer = answers[index]
+    if (answer.data) libraries[source] = answer.data
+    else if (answer.isError) libraries[source] = 'failed'
+  })
   return libraries
 }
 

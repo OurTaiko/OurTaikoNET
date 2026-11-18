@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
 import { ArrowClockwiseIcon, UsersIcon } from '@phosphor-icons/react'
 import { api } from './api/client'
 import { endpoints, withQuery } from './api/endpoints'
@@ -12,7 +13,22 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-import type { SourceId } from './source'
+import { SOURCE, type SourceId } from './source'
+
+type DirectoryQuery = { q: string; sort: string; page: number }
+
+// The address is taken when the query is made: by the time the answer comes the visitor may be in
+// another area.
+function directoryQuery(source: SourceId | undefined, query: DirectoryQuery) {
+  const address = source
+    ? withQuery(`${SITE_API_ROOT}/sources/${source}/users`, query)
+    : endpoints.users(query)
+  return queryOptions({
+    queryKey: [source ?? SOURCE, 'users', query] as const,
+    queryFn: ({ signal }) => api<UserDirectory>(address, { signal }),
+    placeholderData: keepPreviousData,
+  })
+}
 
 /** source: whose players to list; the page's own source when left out. */
 export function UsersPage({ source }: { source?: SourceId }) {
@@ -25,11 +41,13 @@ export function UsersPage({ source }: { source?: SourceId }) {
   const sort = params.get('sort') === 'newest' ? 'newest' : 'active'
   const rawPage = Number(params.get('page'))
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 10000 ? rawPage : 1
-  const [result, setResult] = useState<UserDirectory | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const directory = useQuery(directoryQuery(source, { q, sort, page }))
+  const result = directory.data
+  // What was read before stays on show when reading it again fails.
+  const error = result ? '' : (directory.error?.message ?? '')
+  // The list of another page or search is on its way; the one before is not shown meanwhile.
+  const loading = directory.isPending || directory.isPlaceholderData
   const [searchPending, setSearchPending] = useState(false)
-  const [refresh, setRefresh] = useState(0)
   const search = useCallback(
     (query: string) => {
       setParams(
@@ -45,27 +63,6 @@ export function UsersPage({ source }: { source?: SourceId }) {
     },
     [setParams],
   )
-  useEffect(() => {
-    const controller = new AbortController()
-    setLoading(true)
-    setError('')
-    api<UserDirectory>(
-      source
-        ? withQuery(`${SITE_API_ROOT}/sources/${source}/users`, { q, sort, page })
-        : endpoints.users({ q, sort, page }),
-      { signal: controller.signal },
-    )
-      .then((data) => {
-        if (!controller.signal.aborted) setResult(data)
-      })
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
-    return () => controller.abort()
-  }, [q, sort, page, refresh, source])
   const update = (values: Record<string, string>) => setParams({ q, sort, page: '1', ...values })
   const busy = loading || searchPending
   return (
@@ -78,8 +75,8 @@ export function UsersPage({ source }: { source?: SourceId }) {
         </div>
         <Button
           variant="outline"
-          onClick={() => setRefresh((n) => n + 1)}
-          disabled={loading}
+          onClick={() => void directory.refetch()}
+          disabled={directory.isFetching}
           className="self-start sm:self-auto"
         >
           <ArrowClockwiseIcon aria-hidden="true" />

@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowSquareOutIcon,
   CaretLeftIcon,
@@ -12,11 +13,8 @@ import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type {
   Course,
-  Dans,
-  HeldTitle,
   Nameplate as Plate,
   PublicProfile,
-  ScorePage,
   ScoreSort,
   ScoreView,
 } from '@players/api/types'
@@ -41,6 +39,7 @@ import {
   TableRow,
 } from '@sitekit/components/ui/table'
 import { Notice } from '@players/notice'
+import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
 import { danName, offeredDans, titleName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
@@ -57,6 +56,7 @@ import {
 import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
 import { usePageMeta } from '@sitekit/head'
+import { queryClient } from '@sitekit/query/client'
 import { canonicalFileUrl } from '@sitekit/distribution'
 
 // The Don tab draws with three.js: loaded when it is opened, not with every page.
@@ -84,18 +84,11 @@ export function UserPage() {
   const works = useSourceProfiles(id)
   const count = (field: 'chartCount' | 'playlistCount' | 'commentCount', of = sources) =>
     of.reduce((total, source) => total + (works[source]?.[field] ?? 0), 0)
-  const [profile, setProfile] = useState<PublicProfile | null>(null)
-  const [error, setError] = useState('')
+  const read = useQuery(playerQueries.profile(id))
+  const profile = read.data
+  // What was read before stays on show when reading it again fails.
+  const error = profile ? '' : (read.error?.message ?? '')
   const mine = session.user?.id === id
-  useEffect(() => {
-    const controller = new AbortController()
-    setProfile(null)
-    setError('')
-    api<PublicProfile>(endpoints.user(id), { signal: controller.signal })
-      .then(setProfile)
-      .catch((e) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id])
   const nickname = profile?.user.nickname
   usePageMeta({
     title: nickname || undefined,
@@ -132,7 +125,8 @@ export function UserPage() {
         </CardContent>
       </Card>
       <SourceStats profiles={works} />
-      <Tabs value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
+      {/* Another player starts afresh: their tabs show nothing of the one before. */}
+      <Tabs key={id} value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
         {/* Eight tabs are wider than a phone: the row scrolls sideways there. */}
         <div className="-m-1 p-1 max-w-full overflow-x-auto">
           <TabsList aria-label={t('profile.sections')}>
@@ -171,7 +165,12 @@ export function UserPage() {
             id={id}
             mine={mine}
             plate={plate}
-            onPlate={(next) => setProfile({ ...profile, nameplate: next })}
+            onPlate={(next) =>
+              queryClient.setQueryData(
+                playerQueries.profile(id).queryKey,
+                (current) => current && { ...current, nameplate: next },
+              )
+            }
           />
         </TabsContent>
         <TabsContent value="dans">
@@ -205,18 +204,10 @@ function ScoresTab({ id, profile }: { id: string; profile: PublicProfile }) {
   const [source, setSource] = useState('all')
   const [course, setCourse] = useState('')
   const [page, setPage] = useState(1)
-  const [result, setResult] = useState<ScorePage | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    const query = new URLSearchParams({ view, sort, source, page: String(page) })
-    if (course) query.set('course', course)
-    setError('')
-    api<ScorePage>(endpoints.userScores(id, query), { signal: controller.signal })
-      .then(setResult)
-      .catch((e) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id, view, sort, source, course, page])
+  const scores = useQuery(playerQueries.scores(id, { view, sort, source, course, page }))
+  const result = scores.data
+  // What was read before stays on show when reading it again fails.
+  const error = result ? '' : (scores.error?.message ?? '')
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const date = new Intl.DateTimeFormat(formatLocale(language), {
     dateStyle: 'medium',
@@ -444,19 +435,14 @@ function TitlesTab({
 }) {
   const { t, i18n } = useTranslation()
   const session = useSession()
-  const [held, setHeld] = useState<HeldTitle[] | null>(null)
-  const [error, setError] = useState('')
+  const titles = useQuery(playerQueries.heldTitles(id))
+  const held = titles.data?.titles
+  const [failure, setFailure] = useState('')
   const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    const controller = new AbortController()
-    api<{ titles: HeldTitle[] }>(endpoints.userTitles(id), { signal: controller.signal })
-      .then((r) => setHeld(r.titles))
-      .catch((e) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id])
+  const error = failure || (held ? '' : (titles.error?.message ?? ''))
   const wear = async (titleId: string | null, showDan: boolean) => {
     setSaving(true)
-    setError('')
+    setFailure('')
     try {
       const next = await api<Plate>(
         endpoints.nameplate,
@@ -464,7 +450,7 @@ function TitlesTab({
       )
       onPlate({ ...next, nickname: plate.nickname, avatarPath: plate.avatarPath })
     } catch (e) {
-      setError((e as Error).message)
+      setFailure((e as Error).message)
     } finally {
       setSaving(false)
     }
@@ -555,15 +541,9 @@ function TitlesTab({
 
 function DansTab({ id }: { id: string }) {
   const { t, i18n } = useTranslation()
-  const [dans, setDans] = useState<Dans | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    api<Dans>(endpoints.userDans(id), { signal: controller.signal })
-      .then(setDans)
-      .catch((e) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id])
+  const read = useQuery(playerQueries.dans(id))
+  const dans = read.data
+  const error = dans ? '' : (read.error?.message ?? '')
   const date = new Intl.DateTimeFormat(formatLocale(i18n.resolvedLanguage), { dateStyle: 'medium' })
   if (error) return <Notice>{error}</Notice>
   if (!dans) return <Skeleton className="h-64 w-full rounded-3xl" />

@@ -1,24 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '@sitekit/api/client'
-import type { ChartBase, ChartList } from '@sitekit/api/types'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { RelativeTime } from '@sitekit/comments'
 import { difficultyColors } from '@sitekit/components/difficulty-badges'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
-import { supportsChart } from '@sitekit/courses'
 import { cn } from '@sitekit/lib/utils'
 import type { SourceId } from '@sitekit/source'
-import { endpoints } from '@players/api/endpoints'
-import type { Dans, HeldTitle, Nameplate as Plate, ScorePage } from '@players/api/types'
+import type { Nameplate as Plate } from '@players/api/types'
 import { Crown } from '@players/components/crown'
 import { TitleBand } from '@players/components/nameplate'
-import { SongTile, SourceTag, sourceApi, sources } from '@players/components/song-tile'
+import { SongTile, SourceTag, sources } from '@players/components/song-tile'
 import { chartSources } from '@players/pages/user-works'
 import { danName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
 import { Notice } from '@players/notice'
+import { playerQueries } from '@players/queries'
 
 export type Section = 'scores' | 'charts' | 'titles' | 'dans'
 const isSource = (id: string): id is SourceId => sources.some((source) => source === id)
@@ -56,28 +54,13 @@ function Panel({
   )
 }
 
-/** What a request gave: undefined while it runs, an Error when it failed. */
-function useAnswer<T>(address: string) {
-  const [answer, setAnswer] = useState<{ address: string; value: T | Error } | null>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    api<T>(address, { signal: controller.signal })
-      .then((value) => setAnswer({ address, value }))
-      .catch((e: Error) => !controller.signal.aborted && setAnswer({ address, value: e }))
-    return () => controller.abort()
-  }, [address])
-  return answer?.address === address ? answer.value : undefined
-}
-
 function RecentPlays({ id, onMore }: { id: string; onMore: () => void }) {
   const { t, i18n } = useTranslation()
   const [source, setSource] = useState<'all' | SourceId>('all')
-  const plays = useAnswer<ScorePage>(
-    endpoints.userScores(
-      id,
-      new URLSearchParams({ view: 'all', sort: 'recent', source, page: '1' }),
-    ),
+  const recent = useQuery(
+    playerQueries.scores(id, { view: 'all', sort: 'recent', source, page: 1 }),
   )
+  const plays = recent.data
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   return (
     <Panel
@@ -105,9 +88,11 @@ function RecentPlays({ id, onMore }: { id: string; onMore: () => void }) {
         ))}
       </div>
       {plays === undefined ? (
-        <Skeleton className="rounded-[14px] w-full h-48" />
-      ) : plays instanceof Error ? (
-        <Notice>{plays.message}</Notice>
+        recent.error ? (
+          <Notice>{recent.error.message}</Notice>
+        ) : (
+          <Skeleton className="rounded-[14px] w-full h-48" />
+        )
       ) : plays.items.length === 0 ? (
         <p className="py-8 text-muted-foreground text-sm text-center">{t('scores.empty')}</p>
       ) : (
@@ -162,13 +147,16 @@ function RecentPlays({ id, onMore }: { id: string; onMore: () => void }) {
 
 function Titles({ id, plate, onMore }: { id: string; plate: Plate; onMore: () => void }) {
   const { t } = useTranslation()
-  const held = useAnswer<{ titles: HeldTitle[] }>(endpoints.userTitles(id))
+  const answer = useQuery(playerQueries.heldTitles(id))
+  const held = answer.data
   return (
     <Panel title={t('profile.tabs.titles')} more={t('profile.overview.allTitles')} onMore={onMore}>
       {held === undefined ? (
-        <Skeleton className="rounded-[14px] w-full h-16" />
-      ) : held instanceof Error ? (
-        <Notice>{held.message}</Notice>
+        answer.error ? (
+          <Notice>{answer.error.message}</Notice>
+        ) : (
+          <Skeleton className="rounded-[14px] w-full h-16" />
+        )
       ) : held.titles.length === 0 ? (
         <p className="py-4 text-muted-foreground text-sm text-center">{t('titles.none')}</p>
       ) : (
@@ -194,20 +182,20 @@ function Titles({ id, plate, onMore }: { id: string; plate: Plate; onMore: () =>
 
 function DanRanks({ id, onMore }: { id: string; onMore: () => void }) {
   const { t, i18n } = useTranslation()
-  const dans = useAnswer<Dans>(endpoints.userDans(id))
+  const answer = useQuery(playerQueries.dans(id))
+  const dans = answer.data
   const date = new Intl.DateTimeFormat(formatLocale(i18n.resolvedLanguage ?? 'zh-Hans'), {
     dateStyle: 'medium',
   })
-  const highest =
-    dans && !(dans instanceof Error)
-      ? [...dans.badges].sort((a, b) => b.index - a.index)[0]
-      : undefined
+  const highest = dans && [...dans.badges].sort((a, b) => b.index - a.index)[0]
   return (
     <Panel title={t('profile.overview.dans')} more={t('profile.overview.allDans')} onMore={onMore}>
       {dans === undefined ? (
-        <Skeleton className="rounded-[14px] w-full h-20" />
-      ) : dans instanceof Error ? (
-        <Notice>{dans.message}</Notice>
+        answer.error ? (
+          <Notice>{answer.error.message}</Notice>
+        ) : (
+          <Skeleton className="rounded-[14px] w-full h-20" />
+        )
       ) : !highest && dans.history.length === 0 ? (
         <p className="py-4 text-muted-foreground text-sm text-center">{t('dans.noHistory')}</p>
       ) : (
@@ -249,32 +237,16 @@ function DanRanks({ id, onMore }: { id: string; onMore: () => void }) {
 /** The newest charts the player uploaded (to Fanmade); nothing when they made none. */
 function Charts({ id, onMore }: { id: string; onMore: () => void }) {
   const { t } = useTranslation()
-  const [charts, setCharts] = useState<{ source: SourceId; chart: ChartBase }[] | null>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    setCharts(null)
-    // A source that does not answer leaves the other's charts showing.
-    void Promise.all(
-      chartSources.map((source) =>
-        api<ChartList>(`${sourceApi(source)}/charts?owner=${encodeURIComponent(id)}`, {
-          signal: controller.signal,
-        })
-          .then((list) => list.items.filter(supportsChart).map((chart) => ({ source, chart })))
-          .catch(() => []),
-      ),
-    ).then(
-      (lists) =>
-        !controller.signal.aborted &&
-        setCharts(
-          lists
-            .flat()
-            .sort((a, b) => Date.parse(b.chart.createdAt) - Date.parse(a.chart.createdAt))
-            .slice(0, 6),
-        ),
-    )
-    return () => controller.abort()
-  }, [id])
-  if (!charts?.length) return null
+  const lists = useQueries({
+    queries: chartSources.map((source) => playerQueries.ownerCharts(source, id)),
+  })
+  if (lists.some((list) => list.isPending)) return null
+  // A source that does not answer leaves the other's charts showing.
+  const charts = lists
+    .flatMap((list) => list.data ?? [])
+    .sort((a, b) => Date.parse(b.chart.createdAt) - Date.parse(a.chart.createdAt))
+    .slice(0, 6)
+  if (!charts.length) return null
   return (
     <Panel
       title={t('profile.overview.charts')}

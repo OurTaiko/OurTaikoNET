@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { slotFromKey, slotKey } from './courses'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { CommentSection, danSubject } from './comments'
 import { danTitle } from './dan-title'
 export { danTitle }
@@ -22,7 +23,6 @@ import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
 import type {
   ChartBase,
-  ChartList,
   Dan,
   DanExam,
   DanInput,
@@ -53,6 +53,9 @@ import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { usePageMeta } from './head'
+import { chartQueries } from './queries/charts'
+import { danKeys, danQueries, invalidateDanList, invalidateDans } from './queries/dans'
+import { queryClient } from './query/client'
 
 // 段位 courses as OurTaikoPlay plays them (one to three songs with conditions). The game reads
 // them from this server; passing an official one gives a 段位 badge on OurTaikoProfile.
@@ -288,15 +291,10 @@ function DanCard({ dan }: { dan: Dan }) {
 export function DansPage() {
   const { t } = useTranslation()
   const session = useSession()
-  const [dans, setDans] = useState<Dan[] | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    api<{ dans: Dan[] }>(endpoints.dans, { signal: controller.signal })
-      .then((r) => setDans(r.dans))
-      .catch((e: Error) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [])
+  const list = useQuery(danQueries.list())
+  const dans = list.data
+  // What was read before stays on show when reading it again fails.
+  const error = dans ? '' : (list.error?.message ?? '')
   usePageMeta({ title: t('dans.heading'), description: t('meta.dans') })
   return (
     <div className="space-y-6">
@@ -330,21 +328,28 @@ export function DansPage() {
 }
 
 export function DanPage() {
+  const { id = '' } = useParams()
+  // What went wrong on one course is not carried to the next.
+  return <DanView key={id} id={id} />
+}
+
+function DanView({ id }: { id: string }) {
   const { t, i18n } = useTranslation()
-  const { id = '', commentId } = useParams()
+  const { commentId } = useParams()
   const session = useSession()
   const navigate = useNavigate()
-  const [dan, setDan] = useState<Dan | null>(null)
-  const [error, setError] = useState('')
+  const [actionError, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleted, setDeleted] = useState(false)
   const { titles: profileTitles } = useProfileTitles()
-  useEffect(() => {
-    const controller = new AbortController()
-    api<Dan>(endpoints.dan(id), { signal: controller.signal })
-      .then(setDan)
-      .catch((e: Error) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id])
+  const read = useQuery({ ...danQueries.detail(id), enabled: !deleted })
+  const dan = read.data ?? null
+  // What was read before stays on show when reading it again fails.
+  const error = actionError || (dan ? '' : (read.error?.message ?? ''))
+  const setDan = (change: (current: Dan) => Dan) => {
+    queryClient.setQueryData<Dan>(danKeys.detail(id), (current) => current && change(current))
+    void invalidateDanList()
+  }
   const metaTitle = dan ? danTitle(dan.title, i18n.resolvedLanguage) : undefined
   usePageMeta({
     title: metaTitle,
@@ -466,11 +471,7 @@ export function DanPage() {
                     jsonRequest('PUT', { value }, session.csrfToken),
                   )
                 }
-                onResult={(result) =>
-                  setDan((current) =>
-                    current?.id === dan.id ? { ...current, ...result } : current,
-                  )
-                }
+                onResult={(result) => setDan((current) => ({ ...current, ...result }))}
               />
               <a
                 href="#comments"
@@ -557,7 +558,7 @@ export function DanPage() {
                           endpoints.danOfficial(dan.id),
                           jsonRequest('PUT', { official: !dan.official }, session.csrfToken),
                         )
-                        setDan({ ...dan, official: !dan.official })
+                        setDan((current) => ({ ...current, official: !dan.official }))
                       })
                     }
                   >
@@ -575,6 +576,10 @@ export function DanPage() {
                         await api(endpoints.dan(dan.id), {
                           ...jsonRequest('DELETE', {}, session.csrfToken),
                         })
+                        // Nothing more is asked of it, and no later visit is shown it from memory.
+                        setDeleted(true)
+                        queryClient.removeQueries({ queryKey: danKeys.detail(id) })
+                        void invalidateDanList()
                         navigate('/dans')
                       })
                     }}
@@ -592,11 +597,10 @@ export function DanPage() {
         subject={danSubject(dan)}
         focusId={commentId}
         onCountChange={(delta) =>
-          setDan((current) =>
-            current?.id === dan.id
-              ? { ...current, commentCount: Math.max(0, current.commentCount + delta) }
-              : current,
-          )
+          setDan((current) => ({
+            ...current,
+            commentCount: Math.max(0, current.commentCount + delta),
+          }))
         }
       />
     </div>
@@ -627,17 +631,10 @@ function SongPicker({
 }) {
   const { t, i18n } = useTranslation()
   const [query, setQuery] = useState('')
-  const [result, setResult] = useState<ChartList | null>(null)
-  const [error, setError] = useState('')
   const search = useCallback((value: string) => setQuery(value), [])
-  useEffect(() => {
-    const controller = new AbortController()
-    setResult(null)
-    api<ChartList>(endpoints.chartList({ q: query, page: 1 }), { signal: controller.signal })
-      .then(setResult)
-      .catch((e: Error) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [query])
+  const list = useQuery(chartQueries.list({ q: query, page: 1 }))
+  const result = list.data
+  const error = result ? '' : (list.error?.message ?? '')
   return (
     <Modal title={t('dans.pickSong')} onDismiss={onDismiss}>
       <SearchInput value={query} onSearch={search} onPendingChange={() => {}} />
@@ -647,7 +644,12 @@ function SongPicker({
         </p>
       )}
       {!result && !error && <p role="status">{t('dans.loading')}</p>}
-      <ul className="max-h-80 space-y-2 overflow-y-auto">
+      <ul
+        className={cn(
+          'max-h-80 space-y-2 overflow-y-auto transition-opacity',
+          list.isPlaceholderData && 'opacity-60',
+        )}
+      >
         {result?.items.map((chart) => {
           const text = chartText(chart, i18n.resolvedLanguage)
           return (
@@ -729,8 +731,13 @@ function fromExamRows(rows: ExamRow[], songs: number): DanExam[] {
 }
 
 export function DanEditorPage() {
-  const { t, i18n } = useTranslation()
   const { id } = useParams()
+  // Each course is edited in a form of its own.
+  return <DanEditor key={id ?? ''} id={id} />
+}
+
+function DanEditor({ id }: { id?: string }) {
+  const { t, i18n } = useTranslation()
   const session = useSession()
   const navigate = useNavigate()
   const [titles, setTitles] = useState<Record<string, string>>({ ja: '' })
@@ -745,45 +752,54 @@ export function DanEditorPage() {
   // Who made the course being changed (its titles must be theirs) and whether it is official.
   const [made, setMade] = useState<{ owner: string; official: boolean } | null>(null)
   const [picking, setPicking] = useState<number | null>(null)
-  const [error, setError] = useState('')
+  const [saveError, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const profile = useProfileTitles()
   usePageMeta({ title: t(id ? 'dans.editHeading' : 'dans.createHeading'), noindex: true })
-  useEffect(() => {
-    if (!id) return
-    const controller = new AbortController()
-    api<Dan>(endpoints.dan(id), { signal: controller.signal })
-      .then(async (dan) => {
-        setMade({ owner: dan.ownerId, official: dan.official })
-        setTitles(dan.title)
-        setColor(dan.color)
-        setCode(dan.code)
-        setExams(toExamRows(dan.exams, dan.songs.length))
-        setRewardDan(dan.rewards.dan === undefined ? 'none' : String(dan.rewards.dan))
-        setRewardTitles(dan.rewards.titles ?? [])
-        const charts = await Promise.all(
-          dan.songs.map((s) =>
-            api<ChartBase>(endpoints.chartDetail(s.chart.id), { signal: controller.signal }).catch(
-              () => null,
-            ),
-          ),
-        )
-        setSongs(
-          dan.songs.map((s, i) => ({
-            chartId: String(s.chart.id),
-            title: s.title,
-            blocks: charts[i]
-              ? slotBlocks(charts[i])
-              : [{ course: s.chart.course, side: s.chart.side, level: s.level }],
-            course: s.chart.course,
-            side: s.chart.side,
-            hidden: s.hidden,
-          })),
-        )
-      })
-      .catch((e: Error) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id])
+  // The form starts from what the server holds now, not from what an earlier page remembers, and
+  // once filled it is the maker's: nothing read later is written over it.
+  const [seeded, setSeeded] = useState(false)
+  const read = useQuery({
+    ...danQueries.detail(id ?? ''),
+    enabled: !!id,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  const dan = read.isSuccess && read.isFetchedAfterMount ? read.data : undefined
+  // A chart that cannot be read leaves its song with the one block the course names.
+  const charts = useQueries({
+    queries: (dan?.songs ?? []).map((song) => ({
+      ...chartQueries.detail<ChartBase>(song.chart.id),
+      retry: false,
+    })),
+  })
+  if (dan && !seeded && charts.every((chart) => !chart.isPending)) {
+    setSeeded(true)
+    setMade({ owner: dan.ownerId, official: dan.official })
+    setTitles(dan.title)
+    setColor(dan.color)
+    setCode(dan.code)
+    setExams(toExamRows(dan.exams, dan.songs.length))
+    setRewardDan(dan.rewards.dan === undefined ? 'none' : String(dan.rewards.dan))
+    setRewardTitles(dan.rewards.titles ?? [])
+    setSongs(
+      dan.songs.map((s, i) => {
+        const chart = charts[i].data
+        return {
+          chartId: String(s.chart.id),
+          title: s.title,
+          blocks: chart
+            ? slotBlocks(chart)
+            : [{ course: s.chart.course, side: s.chart.side, level: s.level }],
+          course: s.chart.course,
+          side: s.chart.side,
+          hidden: s.hidden,
+        }
+      }),
+    )
+  }
+  const error = saveError || (seeded ? '' : (read.error?.message ?? ''))
   if (session.loading) return null
   if (!session.user) return <Notice>{t('dans.signInToEdit')}</Notice>
   const owner = made?.owner ?? session.user.id
@@ -840,6 +856,8 @@ export function DanEditorPage() {
         id ? endpoints.dan(id) : endpoints.dans,
         jsonRequest(id ? 'PUT' : 'POST', body, session.csrfToken),
       )
+      queryClient.setQueryData(danKeys.detail(saved.id), saved)
+      void invalidateDans()
       navigate(`/dans/${saved.id}`)
     } catch (e) {
       setError((e as Error).message)

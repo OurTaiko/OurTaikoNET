@@ -1,6 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
 import { endpoints } from './api/endpoints'
-import { useEffect, useState } from 'react'
 import { fetchWithFallback, fileUrls } from './distribution'
+import { chartKeys } from './queries/charts'
 
 /** One of a chart's stored files as its manifest lists it: a path under the distribution root. */
 export type ChartResource = { path: string; sha256: string; size: number; contentType: string }
@@ -11,13 +12,15 @@ export type ChartResources = Partial<
 /**
  * A chart's stored files (GET .../charts/{id}/resources), or null when the API has no manifest
  * for it (404). Reading them from their paths lets a mainland visitor take them from the mirror;
- * the API's own file routes always send the canonical root.
+ * the API's own file routes always send the canonical root. A query gives the `address` it took
+ * when it was made, since the source on show can change before it runs.
  */
 export async function readChartResources(
   chartId: string,
   signal?: AbortSignal,
+  address = endpoints.resources(chartId),
 ): Promise<ChartResources | null> {
-  const response = await fetch(endpoints.resources(chartId), { signal })
+  const response = await fetch(address, { signal })
   if (response.status === 404) return null
   if (!response.ok) throw new Error('RESOURCES_UNAVAILABLE')
   const { resources } = (await response.json()) as { resources?: ChartResources }
@@ -35,8 +38,9 @@ export async function chartFile(
   chartId: string,
   kind: ChartFileKind,
   signal?: AbortSignal,
+  address?: string,
 ): Promise<{ url: string; fallbackUrl: string } | null> {
-  const resource = (await readChartResources(chartId, signal))?.[kind]
+  const resource = (await readChartResources(chartId, signal, address))?.[kind]
   return resource ? fileUrls(resource.path) : null
 }
 
@@ -45,8 +49,9 @@ export async function fetchChartFile(
   chartId: string,
   kind: ChartFileKind,
   init?: RequestInit,
+  address?: string,
 ): Promise<Response> {
-  const file = await chartFile(chartId, kind, init?.signal ?? undefined)
+  const file = await chartFile(chartId, kind, init?.signal ?? undefined, address)
   if (!file) return new Response(null, { status: 404 })
   return fetchWithFallback(file.url, file.fallbackUrl, init)
 }
@@ -61,24 +66,16 @@ export function useChartFile(
   kind: ChartFileKind,
   version?: string,
 ): { url: string; fallbackUrl: string } {
-  const [file, setFile] = useState({ key: '', url: '', fallbackUrl: '' })
-  const key = chartId ? `${chartId}/${kind}/${version ?? ''}` : ''
-  useEffect(() => {
-    if (!chartId) return
-    const controller = new AbortController()
-    chartFile(chartId, kind, controller.signal)
-      .then((found) => {
-        if (!controller.signal.aborted)
-          setFile({ key, url: found?.url ?? '', fallbackUrl: found?.fallbackUrl ?? '' })
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setFile({ key, url: '', fallbackUrl: '' })
-      })
-    return () => controller.abort()
-  }, [chartId, kind, key])
-  return file.key === key
-    ? { url: file.url, fallbackUrl: file.fallbackUrl }
-    : { url: '', fallbackUrl: '' }
+  const address = chartId ? endpoints.resources(chartId) : ''
+  const { data: file } = useQuery({
+    queryKey: [...chartKeys.all(), 'file', chartId, kind, version ?? ''],
+    queryFn: ({ signal }) => chartFile(chartId!, kind, signal, address),
+    enabled: !!chartId,
+    // Another address while it plays would start the audio over.
+    staleTime: Infinity,
+    retry: false,
+  })
+  return { url: file?.url ?? '', fallbackUrl: file?.fallbackUrl ?? '' }
 }
 
 /** A file to download: its address, and the address to try once that fails (if any). */

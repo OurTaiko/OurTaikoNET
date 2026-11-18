@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { PlayerLink } from './components/player-link'
 import { useTranslation } from 'react-i18next'
 import { PlayIcon } from '@phosphor-icons/react'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import { endpoints } from './api/endpoints'
 import type { ChartBase, Leaderboard } from './api/types'
 import { formatLocale } from './i18n'
+import { cn } from './lib/utils'
+import { chartKeys } from './queries/charts'
 import { Button } from './components/ui/button'
 import { UserAvatar } from './components/user-avatar'
 import { ProfilePlate } from './components/profile-plate'
@@ -22,6 +25,20 @@ import { blockName, slotKey } from './courses'
 import { Notice } from './notifications'
 import { useSession } from './session'
 
+// Another page keeps the one before on show until it comes; another chart or block does not.
+function leaderboardQuery(id: string, difficultyId: number | undefined, page: number) {
+  const address = endpoints.leaderboard(id, { ...(difficultyId ? { difficultyId } : {}), page })
+  const block = difficultyId ?? 0
+  return queryOptions({
+    queryKey: [...chartKeys.all(), 'leaderboard', id, block, page] as const,
+    queryFn: ({ signal }) => api<Leaderboard>(address, { signal }),
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[3] === id && previousQuery.queryKey[4] === block
+        ? previous
+        : undefined,
+  })
+}
+
 // One block's leaderboard: every player once, with their
 // best play on the chart's current files.
 // `onReplay` adds a button to each play whose recording is kept.
@@ -36,36 +53,19 @@ export function ChartLeaderboard({
 }) {
   const { t, i18n } = useTranslation()
   const [page, setPage] = useState(1)
-  const [data, setData] = useState<Leaderboard | null>(null)
-  const [error, setError] = useState('')
-  const [attempt, setAttempt] = useState(0)
   const { user } = useSession()
   const { id } = chart
   const difficultyId = chart.difficulties.find((d) => slotKey(d) === course)?.id
   const locale = formatLocale(i18n.resolvedLanguage)
-  useEffect(() => {
-    const controller = new AbortController()
-    setData(null)
-    setError('')
-    api<Leaderboard>(
-      endpoints.leaderboard(id, { ...(difficultyId ? { difficultyId } : {}), page }),
-      {
-        signal: controller.signal,
-      },
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) setData(response)
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [id, difficultyId, page, attempt])
+  const board = useQuery(leaderboardQuery(id, difficultyId, page))
+  const data = board.data
+  // What was read before stays on show when reading it again fails; asking again shows the wait.
+  const error = data || board.isFetching ? '' : (board.error?.message ?? '')
   if (error)
     return (
       <div className="flex min-h-40 flex-col items-center justify-center gap-3 py-6 text-center">
         <Notice>{error}</Notice>
-        <Button variant="outline" size="default" onClick={() => setAttempt((n) => n + 1)}>
+        <Button variant="outline" size="default" onClick={() => void board.refetch()}>
           {t('messages.retry')}
         </Button>
       </div>
@@ -97,7 +97,10 @@ export function ChartLeaderboard({
         </div>
       ) : (
         <div
-          className="min-w-0 overflow-x-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(
+            'min-w-0 overflow-x-auto rounded-xl outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring',
+            board.isPlaceholderData && 'opacity-60',
+          )}
           tabIndex={0}
           role="region"
           aria-label={t('messages.scoreRankings')}

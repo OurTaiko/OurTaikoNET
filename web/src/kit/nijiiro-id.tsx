@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { endpoints } from './api/endpoints'
+import { useQuery } from '@tanstack/react-query'
+import { ApiError } from './api/client'
 import type { ChartBase } from './api/types'
 import { chartText } from './chart-language'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { i18n } from './i18n'
+import { chartQueries } from './queries/charts'
 
 /** Reads the field: `null` when empty, `undefined` when not a Nijiiro ID. */
 export function parseNijiiroId(value: string): number | null | undefined {
@@ -32,34 +34,27 @@ export const nijiiroIdBlocks = (check: NijiiroIdCheck) =>
 /** Looks the typed Nijiiro ID up, shortly after typing stops. `chartId` is the edited chart. */
 export function useNijiiroIdCheck(value: string, chartId = ''): NijiiroIdCheck {
   const parsed = parseNijiiroId(value)
-  const [found, setFound] = useState<{ id: number; check: NijiiroIdCheck } | null>(null)
+  const [settled, setSettled] = useState(parsed)
   useEffect(() => {
-    if (!parsed) return
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      fetch(endpoints.chartDetail(String(parsed), 'nijiiro'), {
-        credentials: 'include',
-        signal: controller.signal,
-      })
-        .then(async (response): Promise<NijiiroIdCheck> => {
-          if (response.status === 404) return { state: 'free' }
-          if (!response.ok) return { state: 'unknown' }
-          const chart = (await response.json()) as ChartBase
-          return chart.id === chartId ? { state: 'own' } : { state: 'taken', chart }
-        })
-        .catch((): NijiiroIdCheck => ({ state: 'unknown' }))
-        .then((check) => {
-          if (!controller.signal.aborted) setFound({ id: parsed, check })
-        })
-    }, 350)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [parsed, chartId])
+    const timer = setTimeout(() => setSettled(parsed), 350)
+    return () => clearTimeout(timer)
+  }, [parsed])
+  const lookup = useQuery({
+    ...chartQueries.detail<ChartBase>(String(settled), 'nijiiro'),
+    enabled: !!settled,
+    // A failed lookup is said at once: the server still checks on save.
+    retry: false,
+    // Whether an ID is free can change at any moment, so what was read is only a first answer.
+    staleTime: 0,
+  })
   if (parsed === null) return { state: 'empty' }
   if (parsed === undefined) return { state: 'invalid' }
-  return found?.id === parsed ? found.check : { state: 'checking' }
+  if (settled !== parsed || lookup.isPending) return { state: 'checking' }
+  if (lookup.isError)
+    return lookup.error instanceof ApiError && lookup.error.status === 404
+      ? { state: 'free' }
+      : { state: 'unknown' }
+  return lookup.data.id === chartId ? { state: 'own' } : { state: 'taken', chart: lookup.data }
 }
 
 export function NijiiroIdField({

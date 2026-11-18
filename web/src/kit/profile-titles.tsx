@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { PLAYERS_API } from './components/profile-plate'
 import { normalizeLanguage } from './i18n'
 import { TitleBandArt, type TitleStyle } from './components/nameplate-art'
@@ -20,39 +20,29 @@ export type ProfileTitle = {
 
 export const profileTitlesPage = '/titles'
 
-let catalog: Promise<ProfileTitle[]> | null = null
-
 async function readCatalog(): Promise<ProfileTitle[]> {
   const response = await fetch(`${PLAYERS_API}/titles`)
   if (!response.ok) throw new Error(String(response.status))
   return ((await response.json()) as { titles: ProfileTitle[] }).titles
 }
 
-// The catalog, read once per page load; fresh reads it again (after making a title on Profile).
+// The catalog is the same whichever song source is shown.
+const catalogQuery = queryOptions({
+  queryKey: ['profile-titles'],
+  queryFn: readCatalog,
+  staleTime: Infinity,
+  gcTime: Infinity,
+  retry: false,
+})
+
+// The catalog, read once per page load; reload reads it again (after making a title on Profile).
 export function useProfileTitles() {
-  const [titles, setTitles] = useState<ProfileTitle[] | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [revision, setRevision] = useState(0)
-  useEffect(() => {
-    let live = true
-    if (!catalog || revision > 0) catalog = readCatalog()
-    const reading = catalog
-    reading.then(
-      (found) => {
-        if (!live) return
-        setTitles(found)
-        setFailed(false)
-      },
-      () => {
-        if (catalog === reading) catalog = null
-        if (live) setFailed(true)
-      },
-    )
-    return () => {
-      live = false
-    }
-  }, [revision])
-  return { titles, failed, reload: () => setRevision((r) => r + 1) }
+  const catalog = useQuery(catalogQuery)
+  return {
+    titles: catalog.data ?? null,
+    failed: catalog.isError,
+    reload: () => void catalog.refetch(),
+  }
 }
 
 // Whether a course made by owner can give the title (official ones once it is official).

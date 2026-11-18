@@ -8,6 +8,7 @@
 // comes only with a signed-in player; it draws nothing until the catalog and look are read.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FileTextIcon, PlaylistIcon, UserIcon } from '@phosphor-icons/react'
 import { api } from '../api/client'
@@ -58,19 +59,22 @@ const within = (value: number, most: number) => Math.min(Math.max(value, 0), Mat
 
 type Look = { catalog: ServedDonCatalog; look: DonLook }
 // The same for every area's frame (the frame is drawn anew when the area changes).
-const looks = new Map<string, Promise<Look>>()
-function readLook(userId: string): Promise<Look> {
-  let found = looks.get(userId)
-  if (!found) {
-    found = Promise.all([
-      readDonCatalog(),
-      api<{ look: DonLook }>(`${SITE_API_ROOT}/users/${encodeURIComponent(userId)}/don`),
-    ]).then(([catalog, answer]) => ({ catalog, look: answer.look }))
-    found.catch(() => looks.delete(userId))
-    looks.set(userId, found)
-  }
-  return found
-}
+const lookQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ['don', 'look', userId],
+    queryFn: async ({ signal }): Promise<Look> => {
+      const [catalog, answer] = await Promise.all([
+        readDonCatalog(),
+        api<{ look: DonLook }>(`${SITE_API_ROOT}/users/${encodeURIComponent(userId)}/don`, {
+          signal,
+        }),
+      ])
+      return { catalog, look: answer.look }
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false, // an extra on every page: without it the page is as it was
+  })
 
 type Viewport = { width: number; height: number; wide: boolean }
 function useViewport(): Viewport {
@@ -96,7 +100,7 @@ export default function DonBuddy({
   source: SourceId
 }) {
   const { t, i18n } = useTranslation()
-  const [don, setDon] = useState<Look | null>(null)
+  const { data: don } = useQuery(lookQuery(user.id))
   const [open, setOpen] = useState(false)
   const [motion, setMotion] = useState<DonMotionName>('SelectLoop')
   const plate = usePlate(user.id)
@@ -116,18 +120,6 @@ export default function DonBuddy({
   const dragged = useRef(false) // the click that ends a drag is not a click
   const still =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  useEffect(() => {
-    let current = true
-    setDon(null)
-    readLook(user.id).then(
-      (found) => current && setDon(found),
-      () => undefined, // an extra on every page: without it the page is as it was
-    )
-    return () => {
-      current = false
-    }
-  }, [user.id])
 
   // A jump there and back, then a happy loop in the middle or the idle one in the corner.
   const moved = useRef(false)

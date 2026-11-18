@@ -8,6 +8,7 @@ import { Card } from './components/ui/card'
 import { Progress } from './components/ui/progress'
 import { ChoiceSelect } from './components/choice-select'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { queryOptions, skipToken, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowCounterClockwiseIcon,
@@ -15,7 +16,7 @@ import {
   FloppyDiskIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
-import { api, previewReplacement, uploadChart } from './api/client'
+import { previewReplacement, uploadChart } from './api/client'
 import type { ChartBase, Side } from './api/types'
 import { baseCourse, blockName, slotKey } from './courses'
 import { isChartOwner } from './chart-owners'
@@ -23,6 +24,8 @@ import { useSession } from './session'
 import { Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { parsePreviewTja } from './preview-tja'
+import { chartWritten, useChartSeed, useFirst } from './queries/chart-writes'
+import { chartKeys } from './queries/charts'
 import { maxTja } from './tja-limits'
 import { withChartTitles } from './tja-titles'
 import { replacementFields, reviewReplacement } from './replacement-diff'
@@ -44,6 +47,58 @@ function errorLine(e: unknown): number | undefined {
   return typeof line === 'number' && line > 0 ? line : undefined
 }
 
+// The text a chart is edited from. It is read once for each opening of the editor: what is being
+// typed starts from this, so nothing may bring a newer one.
+function chartSource(chart: ChartBase | null) {
+  const address = chart ? endpoints.resources(chart.id) : ''
+  return queryOptions({
+    queryKey: [...chartKeys.all(), 'tja', chart?.id ?? ''],
+    queryFn: chart
+      ? async ({ signal }) => {
+          const response = await fetchChartFile(
+            chart.id,
+            'tja',
+            { signal, credentials: 'omit' },
+            address,
+          )
+          if (!response.ok)
+            throw new Error(i18n.t('messages.chartHttpError', { status: response.status }))
+          const bytes = await response.arrayBuffer()
+          if (bytes.byteLength > maxTja)
+            throw new Error(i18n.t('messages.chartExceedsThePreviewSizeLimit'))
+          // The editor keeps lines apart by "\n", so other line breaks are
+          // normalized before anything compares. The title headers are the
+          // chart's own names, so saving keeps them.
+          return withChartTitles(
+            new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\r\n?/g, '\n'),
+            chart,
+          )
+        }
+      : skipToken,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+}
+
+/** Reads the chart and its text once; the editor below keeps them from then on. */
+export function ChartEditorPage() {
+  const { t } = useTranslation()
+  const { id } = useParams()
+  const session = useSession()
+  const { chart, error } = useChartSeed<ChartBase>(id)
+  const read = useQuery(chartSource(chart))
+  const source = useFirst(chart?.id, read.data)
+  if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
+  if (chart && source !== undefined) return <ChartEditor key={id} loaded={chart} source={source} />
+  if (session.loading) return <p role="status">{t('messages.loadingAccount')}</p>
+  if (error) return <Notice>{error}</Notice>
+  if (read.error) return <Notice>{read.error.message || t('messages.failedToLoadChart')}</Notice>
+  return <p className="text-sm text-muted-foreground">{t('editor.loading')}</p>
+}
+
 /**
  * Edits a chart's TJA in the browser with a live rendering. Saving sends the
  * text as the new TJA through the same replacement as the update page, with
@@ -51,16 +106,14 @@ function errorLine(e: unknown): number | undefined {
  * the new text no longer has go with their scores, and older scores leave the
  * leaderboard.
  */
-export function ChartEditorPage() {
+function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) {
   const { t } = useTranslation()
   const { notify } = useNotification()
-  const { id } = useParams()
   const session = useSession()
-  const [chart, setChart] = useState<ChartBase | null>(null)
-  const [error, setError] = useState('')
-  const [original, setOriginal] = useState<string | null>(null)
-  const [text, setText] = useState('')
-  const [preview, setPreview] = useState('')
+  const [chart, setChart] = useState(loaded)
+  const [original, setOriginal] = useState(source)
+  const [text, setText] = useState(source)
+  const [preview, setPreview] = useState(source)
   const [course, setCourse] = useState('')
   // Open while the server reads the text (review null) and until the update is confirmed.
   const [reviewing, setReviewing] = useState<{
@@ -77,48 +130,7 @@ export function ChartEditorPage() {
   const [jump, setJump] = useState<{ line: number; at: number } | null>(null)
   const requestKey = useRef(createRequestKey())
   const controller = useRef<AbortController | null>(null)
-  const dirty = original !== null && text !== original
-
-  useEffect(() => {
-    const aborter = new AbortController()
-    setChart(null)
-    setError('')
-    setOriginal(null)
-    setText('')
-    setPreview('')
-    if (!id) return
-    async function load() {
-      try {
-        const loaded = await api<ChartBase>(endpoints.chartDetail(id!), { signal: aborter.signal })
-        const response = await fetchChartFile(loaded.id, 'tja', {
-          signal: aborter.signal,
-          credentials: 'omit',
-        })
-        if (!response.ok)
-          throw new Error(i18n.t('messages.chartHttpError', { status: response.status }))
-        const bytes = await response.arrayBuffer()
-        if (bytes.byteLength > maxTja)
-          throw new Error(i18n.t('messages.chartExceedsThePreviewSizeLimit'))
-        // The editor keeps lines apart by "\n", so other line breaks are
-        // normalized before anything compares. The title headers are the
-        // chart's own names, so saving keeps them.
-        const source = withChartTitles(
-          new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\r\n?/g, '\n'),
-          loaded,
-        )
-        if (aborter.signal.aborted) return
-        setChart(loaded)
-        setOriginal(source)
-        setText(source)
-        setPreview(source)
-      } catch (e) {
-        if (!aborter.signal.aborted)
-          setError(e instanceof Error ? e.message : i18n.t('messages.failedToLoadChart'))
-      }
-    }
-    void load()
-    return () => aborter.abort()
-  }, [id])
+  const dirty = text !== original
 
   // The rendering follows the text after a short pause in typing.
   useEffect(() => {
@@ -146,19 +158,18 @@ export function ChartEditorPage() {
   // Keep the chosen block while it exists; otherwise show the first one.
   const shownCourse = blocks.keys.includes(course) ? course : (blocks.keys[0] ?? '')
   const previewChart = useMemo(
-    () =>
-      chart && {
-        ...chart,
-        difficulties: blocks.keys.map(
-          (key) =>
-            chart.difficulties.find((d) => slotKey(d) === key) ?? {
-              course: baseCourse(key),
-              side: (key.endsWith('_1p') ? 'p1' : key.endsWith('_2p') ? 'p2' : 'single') as Side,
-              level: 0,
-              maker: '',
-            },
-        ),
-      },
+    () => ({
+      ...chart,
+      difficulties: blocks.keys.map(
+        (key) =>
+          chart.difficulties.find((d) => slotKey(d) === key) ?? {
+            course: baseCourse(key),
+            side: (key.endsWith('_1p') ? 'p1' : key.endsWith('_2p') ? 'p2' : 'single') as Side,
+            level: 0,
+            maker: '',
+          },
+      ),
+    }),
     [chart, blocks.keys],
   )
 
@@ -177,7 +188,7 @@ export function ChartEditorPage() {
     if (line) setJump({ line, at: Date.now() })
   }
   const startReview = async () => {
-    if (!chart || !dirty || busy) return
+    if (!dirty || busy) return
     setSaveError('')
     const abort = new AbortController()
     controller.current = abort
@@ -210,7 +221,7 @@ export function ChartEditorPage() {
     }
   }
   const save = async (kept: Set<string>) => {
-    if (!chart || !reviewing?.preview || busy) return
+    if (!reviewing?.preview || busy) return
     const { file, preview } = reviewing
     setReviewing(null)
     setBusy(true)
@@ -248,6 +259,7 @@ export function ChartEditorPage() {
       attempted.current = ''
       setChart(updated)
       setOriginal(text)
+      void chartWritten(updated.id, updated)
       notify(t('editor.saved'), 'success')
     } catch (e) {
       fail(e)
@@ -256,11 +268,7 @@ export function ChartEditorPage() {
     }
   }
 
-  if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
   if (session.loading) return <p role="status">{t('messages.loadingAccount')}</p>
-  if (error) return <Notice>{error}</Notice>
-  if (!chart || original === null)
-    return <p className="text-sm text-muted-foreground">{t('editor.loading')}</p>
   const canManage = isChartOwner(chart, session.user?.id) || !!session.user?.isAdmin
   if (!canManage) return <Notice>{t('editor.onlyManagers')}</Notice>
   const title = chartText(chart, i18n.resolvedLanguage).title
@@ -353,7 +361,7 @@ export function ChartEditorPage() {
           </div>
           {blocks.error ? (
             <Notice>{blocks.error}</Notice>
-          ) : !previewChart || !shownCourse ? (
+          ) : !shownCourse ? (
             <p className="text-sm text-muted-foreground">{t('editor.noBlocks')}</p>
           ) : (
             <Suspense

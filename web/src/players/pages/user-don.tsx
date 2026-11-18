@@ -3,17 +3,20 @@
 // the puchichara and the makeup; below them the three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
 // models come from the public bucket's 3dchara folder, which the catalog names by
 // path under the distribution root.
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import { readDonCatalog, type Catalog } from '@players/don-catalog'
+import type { Catalog } from '@players/don-catalog'
 import { useDonItems } from '@players/don-items'
 import { ruleText } from '@players/title-rules'
 import { LockSimpleIcon } from '@phosphor-icons/react'
 import { Notice } from '@players/notice'
+import { donCatalogQuery, playerQueries, type DonAnswer } from '@players/queries'
 import { useSession } from '@players/session'
+import { queryClient } from '@sitekit/query/client'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
@@ -30,8 +33,6 @@ import {
   type DonMotionName,
   type DonPartKind,
 } from '@sitekit/don3d'
-
-type Answer = { look: DonLook }
 
 // The motions the preview offers, in the order they are shown.
 const motions = [
@@ -70,12 +71,41 @@ function normalize(l: DonLook): DonLook {
 export const itemName = donItemName
 
 export function DonTab({ id, mine }: { id: string; mine: boolean }) {
+  const catalog = useQuery(donCatalogQuery)
+  const don = useQuery(playerQueries.don(id, mine))
+  const error = catalog.error ?? don.error
+  if (!catalog.data || !don.data) {
+    if (error) return <Notice>{error.message}</Notice>
+    return <Skeleton className="h-[480px] w-full rounded-3xl" />
+  }
+  // The room starts from what the server said of this player, and is theirs from then on.
+  return (
+    <DonRoom
+      key={`${id}/${mine}`}
+      id={id}
+      mine={mine}
+      catalog={catalog.data}
+      look={don.data.look}
+    />
+  )
+}
+
+function DonRoom({
+  id,
+  mine,
+  catalog,
+  look,
+}: {
+  id: string
+  mine: boolean
+  catalog: Catalog
+  look: DonLook
+}) {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
-  const [catalog, setCatalog] = useState<Catalog | null>(null)
-  const [saved, setSaved] = useState<DonLook | null>(null)
-  const [draft, setDraft] = useState<DonLook | null>(null)
+  const [saved, setSaved] = useState(look)
+  const [draft, setDraft] = useState(look)
   const [motion, setMotion] = useState<(typeof motions)[number]>('Normal')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -88,38 +118,20 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
   const howTo = (kind: DonPartKind) => (itemId: number) =>
     (donItems?.rulesFor(kind, itemId) ?? []).map((rule) => ruleText(rule, t, language)).join(' / ')
 
-  useEffect(() => {
-    const controller = new AbortController()
-    setSaved(null)
-    setDraft(null)
-    setError('')
-    Promise.all([
-      readDonCatalog(),
-      api<Answer>(mine ? endpoints.myDon : endpoints.userDon(id), { signal: controller.signal }),
-    ])
-      .then(([c, answer]) => {
-        setCatalog(c)
-        setSaved(answer.look)
-        setDraft(answer.look)
-      })
-      .catch((e: Error) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [id, mine])
-
-  const dirty = saved !== null && draft !== null && !sameLook(saved, draft)
+  const dirty = !sameLook(saved, draft)
   const change = (next: Partial<DonLook>) => {
     setDone(false)
-    setDraft((d) => (d ? { ...d, ...next } : d))
+    setDraft((d) => ({ ...d, ...next }))
   }
   const save = async () => {
-    if (!draft) return
     setSaving(true)
     setError('')
     try {
-      const answer = await api<Answer>(
+      const answer = await api<DonAnswer>(
         endpoints.myDon,
         jsonRequest('PUT', draft, session.csrfToken),
       )
+      queryClient.setQueryData(playerQueries.don(id, mine).queryKey, answer)
       setSaved(answer.look)
       setDraft(answer.look)
       setDone(true)
@@ -130,8 +142,6 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
     }
   }
 
-  if (error && !draft) return <Notice>{error}</Notice>
-  if (!catalog || !draft) return <Skeleton className="h-[480px] w-full rounded-3xl" />
   const colors = draft.colors ?? catalog.defaultColors.p1
   // a catalog from before makeup has none to offer
   const hasPaint = (catalog.items.paint?.length ?? 0) > 0

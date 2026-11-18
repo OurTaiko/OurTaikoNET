@@ -3,50 +3,18 @@ import { t } from '../i18n'
 import { endpoints } from './endpoints'
 import type { ChartBase } from './types'
 import type { ReplacementPreview } from '../replacement-diff'
-import { noticeRewards } from '../rewards/store'
+import { ApiError, createApi, jsonRequest } from './request'
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly retryAfter = 0,
-    /** The answer's HTTP status; 0 when there was none. */
-    public readonly status = 0,
-  ) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { credentials: 'include', ...init })
-  // Any answer may say the player was given something (../rewards).
-  noticeRewards(response)
-  const data = await response.json().catch((e: unknown) => {
-    // A request given up while its answer was still arriving has no answer: the caller gets
-    // the abort, not a made-up one (which, on a 200, would pass for the data asked for).
-    if (init.signal?.aborted) throw e
-    return {
-      code: response.status === 413 ? 'FILE_TOO_LARGE' : 'SERVICE_UNAVAILABLE',
-      message:
-        response.status === 413
-          ? t('messages.fileExceedsTheUploadSizeLimit')
-          : t('messages.unexpectedServerResponsePleaseTryAgainLater'),
-    }
-  })
-  if (!response.ok)
-    throw new ApiError(
-      apiErrorMessage(data),
-      Number(response.headers.get('Retry-After')) || 0,
-      response.status,
-    )
-  return data as T
-}
-export function jsonRequest(method: string, body: unknown, csrf = ''): RequestInit {
-  return {
-    method,
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-    body: JSON.stringify(body),
-  }
-}
+export { ApiError, jsonRequest }
+
+export const api = createApi(apiErrorMessage, (status) => ({
+  code: status === 413 ? 'FILE_TOO_LARGE' : 'SERVICE_UNAVAILABLE',
+  message:
+    status === 413
+      ? t('messages.fileExceedsTheUploadSizeLimit')
+      : t('messages.unexpectedServerResponsePleaseTryAgainLater'),
+}))
+
 /**
  * Sets a chart's background movie apart from its other files, with `offset` as its
  * MOVIEOFFSET when given. The server transcodes it after replying 202; the outcome arrives as

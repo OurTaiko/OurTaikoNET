@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PlayerLink } from './components/player-link'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowDownIcon,
@@ -14,7 +15,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
-import type { ChartBase, MyPlaylists, Playlist, PlaylistPage as PlaylistList } from './api/types'
+import type { ChartBase, Playlist } from './api/types'
 import { chartText } from './chart-language'
 import { SiteChartCard } from './components/chart-card'
 import { ChoiceSelect } from './components/choice-select'
@@ -30,6 +31,13 @@ import { SOURCE } from './source'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session'
+import {
+  invalidatePlaylistLists,
+  invalidatePlaylists,
+  playlistKeys,
+  playlistQueries,
+} from './queries/playlists'
+import { queryClient } from './query/client'
 import { PlaylistSongSearchDialog } from './playlist-song-search'
 import { usePageMeta, type PageMetaProps } from './head'
 import { canonicalFileUrl } from './distribution'
@@ -53,7 +61,7 @@ const panelClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
 
 // Public playlists, optionally of one user, with search, order and paging kept
 // in the address unless the list is embedded in another page.
-function PublicPlaylists({ ownerId, refresh = 0 }: { ownerId?: string; refresh?: number }) {
+function PublicPlaylists({ ownerId }: { ownerId?: string }) {
   const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const [local, setLocal] = useState({ q: '', sort: 'updated' as Sort, page: 1 })
@@ -85,29 +93,15 @@ function PublicPlaylists({ ownerId, refresh = 0 }: { ownerId?: string; refresh?:
     [ownerId, setParams],
   )
   const search = useCallback((query: string) => update({ q: query }), [update])
-  const [data, setData] = useState<PlaylistList | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const list = useQuery(
+    playlistQueries.list({ q, sort, page, ...(ownerId ? { owner: ownerId } : {}) }),
+  )
+  const data = list.data
+  // What was read before stays on show when reading it again fails.
+  const error = data ? '' : (list.error?.message ?? '')
+  // Another page or search is on its way: what is shown is the one before.
+  const loading = list.isPlaceholderData
   const [searchPending, setSearchPending] = useState(false)
-  useEffect(() => {
-    const controller = new AbortController()
-    setLoading(true)
-    setError('')
-    api<PlaylistList>(
-      endpoints.playlistList({ q, sort, page, ...(ownerId ? { owner: ownerId } : {}) }),
-      { signal: controller.signal },
-    )
-      .then((result) => {
-        if (!controller.signal.aborted) setData(result)
-      })
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
-    return () => controller.abort()
-  }, [q, sort, page, ownerId, refresh])
   const busy = loading || searchPending
   return (
     <>
@@ -148,22 +142,24 @@ function PublicPlaylists({ ownerId, refresh = 0 }: { ownerId?: string; refresh?:
       </p>
       {error ? (
         <Notice>{error}</Notice>
-      ) : busy || !data ? (
+      ) : !data ? (
         <PlaylistGridSkeleton />
       ) : (
         <>
-          <PlaylistGrid
-            items={data.items}
-            empty={
-              <h2 className="text-base font-extrabold">
-                {q
-                  ? t('playlists.emptySearch')
-                  : ownerId
-                    ? t('playlists.emptyUser')
-                    : t('playlists.empty')}
-              </h2>
-            }
-          />
+          <div className={cn('transition-opacity', busy && 'opacity-60')}>
+            <PlaylistGrid
+              items={data.items}
+              empty={
+                <h2 className="text-base font-extrabold">
+                  {q
+                    ? t('playlists.emptySearch')
+                    : ownerId
+                      ? t('playlists.emptyUser')
+                      : t('playlists.empty')}
+                </h2>
+              }
+            />
+          </div>
           {data.total > data.pageSize && (
             <nav
               aria-label={t('playlists.pagination')}
@@ -199,18 +195,14 @@ export function PlaylistsPage() {
   const session = useSession()
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
-  const [systems, setSystems] = useState<Playlist[]>([])
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
   // The personal system playlist appears once the session is known.
-  useEffect(() => {
-    const controller = new AbortController()
-    api<{ items: Playlist[] }>(endpoints.systemPlaylists, { signal: controller.signal })
-      .then(({ items }) => setSystems(items))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [session.user?.id])
+  const { data: systems = [] } = useQuery({
+    ...playlistQueries.system(),
+    enabled: !session.loading,
+  })
   usePageMeta({ title: t('playlists.plaza'), description: t('meta.playlists') })
   return (
     <section className="space-y-8" aria-labelledby="playlists-heading">
@@ -264,22 +256,10 @@ export function MyPlaylistsPage() {
   usePageMeta({ title: t('playlists.mine'), noindex: true })
   const session = useSession()
   const navigate = useNavigate()
-  const [data, setData] = useState<MyPlaylists | null>(null)
-  const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
-  const userId = session.user?.id
-  useEffect(() => {
-    if (!userId) return
-    const controller = new AbortController()
-    setData(null)
-    setError('')
-    api<MyPlaylists>(endpoints.myPlaylists(), { signal: controller.signal })
-      .then(setData)
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [userId])
+  const mine = useQuery({ ...playlistQueries.mine(), enabled: !!session.user })
+  const data = mine.data
+  const error = data ? '' : (mine.error?.message ?? '')
   if (!session.user)
     return (
       <div className={emptyStateClassName}>
@@ -439,36 +419,35 @@ function playlistMeta(
 
 export function PlaylistPage() {
   const { id = '' } = useParams()
+  const userId = useSession().user?.id
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [id])
+  // An open dialog or arrangement belongs to one playlist as one player sees it.
+  return <PlaylistView key={`${id}/${userId ?? ''}`} id={id} />
+}
+
+function PlaylistView({ id }: { id: string }) {
   const { t } = useTranslation()
   const session = useSession()
   const navigate = useNavigate()
   const { notify } = useNotification()
   const playlistText = usePlaylistText()
-  const [playlist, setPlaylist] = useState<Playlist | null>(null)
-  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleted, setDeleted] = useState(false)
   const [dialog, setDialog] = useState<'' | 'edit' | 'cover' | 'delete' | 'songs'>('')
   const [arranging, setArranging] = useState(false)
+  // A private playlist loads once the session is known.
+  const read = useQuery({
+    ...playlistQueries.detail(id),
+    enabled: !session.loading && !deleted,
+  })
+  const playlist = read.data ?? null
+  // What was read before stays on show when reading it again fails.
+  const error = playlist ? '' : (read.error?.message ?? '')
   // Called before the early returns below, like every hook here.
   const cover = useCardCover(playlist ? playlistCoverSource(playlist) : undefined)
   const userId = session.user?.id
-  useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [id])
-  // A private playlist loads once the session is known, hence the user dependency.
-  useEffect(() => {
-    const controller = new AbortController()
-    setPlaylist(null)
-    setError('')
-    setDialog('')
-    setArranging(false)
-    api<Playlist>(endpoints.playlist(id), { signal: controller.signal })
-      .then(setPlaylist)
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [id, userId])
   usePageMeta(playlist ? playlistMeta(playlist, playlistText(playlist), t) : {})
   const back = (
     <Link
@@ -499,17 +478,24 @@ export function PlaylistPage() {
   const text = playlistText(playlist)
   const charts = playlist.charts ?? []
   const owned = !playlist.system && !!userId && playlist.ownerId === userId
+  const key = playlistKeys.detail(id)
+  const setPlaylist = async (next: Playlist) => {
+    // An answer already on its way was read before this change, and must not undo it.
+    await queryClient.cancelQueries({ queryKey: key })
+    queryClient.setQueryData(key, next)
+  }
   // Each change is sent at once; a failure restores what the server holds.
   const change = async (next: ChartBase[], request: () => Promise<unknown>) => {
     setBusy(true)
-    setPlaylist({ ...playlist, charts: next, chartCount: next.length })
+    await setPlaylist({ ...playlist, charts: next, chartCount: next.length })
     try {
       await request()
     } catch (e) {
       notify((e as Error).message, 'error')
-      setPlaylist(playlist)
+      await setPlaylist(playlist)
     } finally {
       setBusy(false)
+      void invalidatePlaylists()
     }
   }
   const move = (index: number, offset: number) => {
@@ -549,7 +535,8 @@ export function PlaylistPage() {
           headers: { 'X-CSRF-Token': session.csrfToken },
         },
       )
-      setPlaylist({ ...playlist, ...result })
+      await setPlaylist({ ...playlist, ...result })
+      void invalidatePlaylistLists()
     } catch (e) {
       notify((e as Error).message, 'error')
     } finally {
@@ -563,6 +550,10 @@ export function PlaylistPage() {
         method: 'DELETE',
         headers: { 'X-CSRF-Token': session.csrfToken },
       })
+      // Nothing more is asked of it, and no later visit is shown it from memory.
+      setDeleted(true)
+      queryClient.removeQueries({ queryKey: key })
+      void invalidatePlaylistLists()
       notify(t('playlists.deleted'), 'success')
       navigate(owned ? '/me/playlists' : '/playlists')
     } catch (e) {
@@ -714,7 +705,7 @@ export function PlaylistPage() {
         <PlaylistDialog
           playlist={playlist}
           onDismiss={() => setDialog('')}
-          onSaved={(saved) => setPlaylist({ ...saved, charts, chartCount: charts.length })}
+          onSaved={(saved) => void setPlaylist({ ...saved, charts, chartCount: charts.length })}
         />
       )}
       {dialog === 'cover' && (
@@ -722,7 +713,7 @@ export function PlaylistPage() {
           playlist={playlist}
           onDismiss={() => setDialog('')}
           onSaved={({ coverHash, songListCoverPath }) =>
-            setPlaylist({
+            void setPlaylist({
               ...playlist,
               coverHash: coverHash || undefined,
               songListCoverPath: songListCoverPath || undefined,

@@ -2,7 +2,6 @@ import { isChartOwner } from '@sitekit/chart-owners'
 import { chartText } from '@sitekit/chart-language'
 import { i18n } from '@sitekit/i18n'
 import { useTranslation } from 'react-i18next'
-import { endpoints } from '@sitekit/api/endpoints'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
 import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { Card } from '@sitekit/components/ui/card'
@@ -35,7 +34,8 @@ import {
 import { CoverPicker } from '@sitekit/components/cover-picker'
 import { MoviePicker } from '@sitekit/components/movie-picker'
 import { CategoryPicker } from '@sitekit/categories'
-import { api, previewReplacement, uploadChart } from '@sitekit/api/client'
+import { previewReplacement, uploadChart } from '@sitekit/api/client'
+import { chartWritten, useChartSeed } from '@sitekit/queries/chart-writes'
 import type { PublicUser } from '@sitekit/api/types'
 import type { Chart } from './api/types'
 import { UploadCollaborators } from '@sitekit/collaborations'
@@ -65,22 +65,7 @@ export function UpdatePage() {
 
   const { id } = useParams()
   const session = useSession()
-  const [chart, setChart] = useState<Chart | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    setChart(null)
-    setError('')
-    if (!id) return
-    api<Chart>(endpoints.chartDetail(id), { signal: controller.signal })
-      .then((loaded) => {
-        if (!controller.signal.aborted) setChart(loaded)
-      })
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [id])
+  const { chart, error } = useChartSeed<Chart>(id)
   if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
   if (error) return <Notice>{error}</Notice>
   if (!chart || session.loading) return <p role="status">{t('messages.loadingSong')}</p>
@@ -395,10 +380,12 @@ export function UploadPage({
         existing?.id,
       )
       if ('status' in chart) {
+        void chartWritten(existing?.id)
         navigate('/me/charts')
         notify(t('messages.uploadAcceptedResultByNotification'), 'success')
         return
       }
+      void chartWritten(chart.id, chart)
       navigate(`/charts/${chart.id}`)
       notify(
         existing

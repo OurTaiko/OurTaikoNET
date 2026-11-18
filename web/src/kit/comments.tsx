@@ -3,6 +3,7 @@ import { PlayerLink } from './components/player-link'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import {
   ArrowBendUpLeftIcon,
   ArrowRightIcon,
@@ -17,17 +18,8 @@ import {
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
 import { planReplies, type FoldPolicy } from './comment-folding'
-import { endpoints } from './api/endpoints'
-import type {
-  ChartBase,
-  Comment,
-  Dan,
-  CommentPage,
-  CommentSort,
-  CommentThread,
-  Vote,
-  VoteResult,
-} from './api/types'
+import { endpoints, withQuery } from './api/endpoints'
+import type { ChartBase, Comment, Dan, CommentSort, Vote, VoteResult } from './api/types'
 import { formatLocale } from './i18n'
 import { cn } from './lib/utils'
 import { Button, buttonVariants } from './components/ui/button'
@@ -41,6 +33,13 @@ import { VoteControl, loginPath } from './components/vote-control'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session'
+import {
+  commentQueries,
+  invalidateSubjectComments,
+  type CommentPages,
+  type CommentsRead,
+} from './queries/comments'
+import { queryClient } from './query/client'
 
 const maxCommentLength = 10000
 // Deeper replies continue on the comment's own page, as on Reddit; a phone has
@@ -78,11 +77,13 @@ export type CommentSubject = {
 }
 
 export function chartSubject(chart: ChartBase): CommentSubject {
+  // Taken now: a later page may be asked for after the visitor has moved to another area.
+  const address = endpoints.newComment(chart.id)
   return {
     path: `/charts/${encodeURIComponent(chart.id)}`,
     commentCount: chart.commentCount,
-    comments: (query) => endpoints.chartComments(chart.id, query),
-    newComment: endpoints.newComment(chart.id),
+    comments: (query) => withQuery(address, query),
+    newComment: address,
     commentPath: (id) => commentPath(chart.id, id),
     isOwner: (userId) => isChartOwner(chart, userId),
     placeholder: 'interactions.commentPlaceholder',
@@ -90,11 +91,13 @@ export function chartSubject(chart: ChartBase): CommentSubject {
 }
 
 export function danSubject(dan: Dan): CommentSubject {
+  // Taken now: a later page may be asked for after the visitor has moved to another area.
+  const address = `${endpoints.dan(dan.id)}/comments`
   return {
     path: `/dans/${encodeURIComponent(dan.id)}`,
     commentCount: dan.commentCount,
-    comments: (query) => endpoints.danComments(dan.id, query),
-    newComment: `${endpoints.dan(dan.id)}/comments`,
+    comments: (query) => withQuery(address, query),
+    newComment: address,
     commentPath: (id) => danCommentPath(dan.id, id),
     isOwner: (userId) => userId === dan.ownerId,
     placeholder: 'interactions.danCommentPlaceholder',
@@ -292,6 +295,14 @@ function purge(items: Comment[], id: string): Comment[] {
         : { ...c, replies, replyCount: c.replyCount - 1 }
     })
     .filter((c) => !((c.deleted || c.removed) && c.replyCount === 0))
+}
+
+// Comments posted meanwhile can shift pages; skip what is already shown.
+function shownComments(pages: CommentsRead[]) {
+  const seen = new Set<string>()
+  return pages
+    .flatMap((page) => page.items)
+    .filter((comment) => !seen.has(comment.id) && !!seen.add(comment.id))
 }
 
 function countTree(items: Comment[]): number {
@@ -655,97 +666,70 @@ export function CommentSection({
   const [sort, setSort] = useState<CommentSort>('best')
   // Read once: rotating a phone does not fold comments already on screen.
   const [narrow] = useState(() => !!window.matchMedia?.(narrowScreen).matches)
-  const [items, setItems] = useState<Comment[] | null>(null)
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
-  const [attempt, setAttempt] = useState(0)
+  const read = commentQueries.section(subject, focusId, sort)
+  const list = useInfiniteQuery(read)
+  const pages = list.data?.pages
+  const items = pages ? shownComments(pages) : null
+  const total = pages?.at(-1)?.total ?? 0
+  const loadingMore = list.isFetchingNextPage
+  // What was read before stays on show when reading it again fails, but more of it that could not
+  // be read is said; asking again shows the wait.
+  const error =
+    list.isFetching || (items && !list.isFetchNextPageError) ? '' : (list.error?.message ?? '')
   const section = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    setItems(null)
-    setError('')
-    setPage(1)
-    const request = focusId
-      ? api<CommentThread>(endpoints.commentThread(focusId, sort), {
-          signal: controller.signal,
-        }).then((r) => ({ items: [r.item], total: 1 }))
-      : api<CommentPage>(subject.comments({ sort, page: 1 }), {
-          signal: controller.signal,
-        })
-    request
-      .then((r) => {
-        if (controller.signal.aborted) return
-        setItems(r.items)
-        setTotal(r.total)
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-    // The subject's identity is its path; its callbacks are rebuilt each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject.path, focusId, sort, attempt])
   useEffect(() => {
     if (location.hash === '#comments') section.current?.scrollIntoView()
   }, [location.hash])
-  const loadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const next = await api<CommentPage>(subject.comments({ sort, page: page + 1 }))
-      // Comments posted meanwhile can shift pages; skip what is already shown.
-      setItems((current) => {
-        const seen = new Set(current?.map((c) => c.id))
-        return [...(current ?? []), ...next.items.filter((c) => !seen.has(c.id))]
-      })
-      setTotal(next.total)
-      setPage(page + 1)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoadingMore(false)
-    }
+  // The server answered each change with what it now holds, so the loaded pages are changed here.
+  const write = async (change: (page: CommentsRead, index: number) => CommentsRead) => {
+    // Nothing is held yet of an order still on its way: what comes will have the change.
+    if (!queryClient.getQueryData(read.queryKey)) return
+    // An answer already on its way was read before this change, and must not undo it.
+    await queryClient.cancelQueries({ queryKey: read.queryKey })
+    queryClient.setQueryData<CommentPages>(
+      read.queryKey,
+      (data) => data && { ...data, pages: data.pages.map(change) },
+    )
+    void invalidateSubjectComments(subject.path)
   }
   const tree: Tree = {
     subject,
     focusId,
     narrow,
     maxDepth: narrow ? maxVisibleDepthNarrow : maxVisibleDepth,
-    update: (id, change) => setItems((current) => current && mapTree(current, id, change)),
+    update: (id, change) =>
+      void write((page) => ({ ...page, items: mapTree(page.items, id, change) })),
     addReply: (parentId, reply) => {
-      setItems(
-        (current) =>
-          current &&
-          mapTree(current, parentId, (c) => ({
-            ...c,
-            replyCount: c.replyCount + 1,
-            replies: [reply, ...c.replies],
-          })),
-      )
+      void write((page) => ({
+        ...page,
+        items: mapTree(page.items, parentId, (c) => ({
+          ...c,
+          replyCount: c.replyCount + 1,
+          replies: [reply, ...c.replies],
+        })),
+      }))
       onCountChange(1)
     },
     remove: (id, purged, removed) => {
       if (!purged) {
-        setItems(
-          (current) =>
-            current &&
-            mapTree(current, id, (c) => ({
-              ...c,
-              body: '',
-              author: '',
-              authorId: '',
-              authorAvatarPath: '',
-              deleted: !removed,
-              removed,
-            })),
-        )
+        void write((page) => ({
+          ...page,
+          items: mapTree(page.items, id, (c) => ({
+            ...c,
+            body: '',
+            author: '',
+            authorId: '',
+            authorAvatarPath: '',
+            deleted: !removed,
+            removed,
+          })),
+        }))
         return
       }
       if (!items) return
       const next = purge(items, id)
-      setItems(next)
-      setTotal((n) => n - (items.length - next.length))
+      const gone = items.length - next.length
+      void write((page) => ({ ...page, items: purge(page.items, id), total: page.total - gone }))
       onCountChange(countTree(next) - countTree(items))
     },
   }
@@ -801,8 +785,11 @@ export function CommentSection({
               subject.newComment,
               jsonRequest('POST', { body }, csrfToken),
             )
-            setItems((current) => [created, ...(current ?? [])])
-            setTotal((n) => n + 1)
+            void write((page, index) => ({
+              ...page,
+              items: index === 0 ? [created, ...page.items] : page.items,
+              total: page.total + 1,
+            }))
             onCountChange(1)
           }}
         />
@@ -817,7 +804,7 @@ export function CommentSection({
       {error ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <Notice>{error}</Notice>
-          <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
+          <Button variant="outline" onClick={() => void list.refetch()}>
             {t('messages.retry')}
           </Button>
         </div>
@@ -832,7 +819,9 @@ export function CommentSection({
         </p>
       ) : (
         <TreeContext.Provider value={tree}>
-          <div className="space-y-6">
+          <div
+            className={cn('space-y-6 transition-opacity', list.isPlaceholderData && 'opacity-60')}
+          >
             {items.map((comment) => (
               <CommentNode key={comment.id} comment={comment} level={0} />
             ))}
@@ -841,7 +830,11 @@ export function CommentSection({
       )}
       {!focusId && items && items.length < total && (
         <div className="flex justify-center">
-          <Button variant="outline" disabled={loadingMore} onClick={loadMore}>
+          <Button
+            variant="outline"
+            disabled={loadingMore || list.isPlaceholderData}
+            onClick={() => void list.fetchNextPage()}
+          >
             {loadingMore ? t('interactions.loadingComments') : t('interactions.loadMoreComments')}
           </Button>
         </div>

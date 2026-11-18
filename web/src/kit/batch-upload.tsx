@@ -15,6 +15,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { Progress } from './components/ui/progress'
 import { CategoryPicker } from './categories'
 import { uploadChart } from './api/client'
+import { invalidateChartLists } from './queries/charts'
 import { useSession } from './session'
 import { t as translate } from './i18n'
 import { validateFiles, validateMovie } from './tja'
@@ -167,6 +168,7 @@ export function BatchUpload({
           )
           update(index, { state: 'sent', progress: 100 })
           setSent((n) => n + 1)
+          void invalidateChartLists()
           break
         } catch (e) {
           const code = ((e as Error).cause as { code?: string } | undefined)?.code ?? ''

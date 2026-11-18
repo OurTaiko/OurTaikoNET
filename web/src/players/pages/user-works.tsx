@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueries } from '@tanstack/react-query'
 import { HeartIcon, MusicNotesIcon, PlaylistIcon } from '@phosphor-icons/react'
-import { api } from '@sitekit/api/client'
-import type { ChartBase, Comment, Playlist, PublicUser, UserSpace } from '@sitekit/api/types'
+import type { ChartBase, Comment, Playlist, PublicUser } from '@sitekit/api/types'
 import { CommentBody, RelativeTime, commentPermalink, commentSubjectPath } from '@sitekit/comments'
 import { supportsChart } from '@sitekit/courses'
 import { danTitle } from '@sitekit/dan-title'
@@ -13,8 +13,8 @@ import type { SourceId } from '@sitekit/source'
 import { formatLocale } from '@players/i18n'
 import { Notice } from '@players/notice'
 import { SongTile, SourceTag, sourceApi, sources } from '@players/components/song-tile'
+import { playerQueries } from '@players/queries'
 
-type Page<T> = { items: T[]; total: number; page: number; pageSize: number }
 export type SourceProfiles = Partial<Record<SourceId, PublicUser | null>>
 
 /**
@@ -22,25 +22,17 @@ export type SourceProfiles = Partial<Record<SourceId, PublicUser | null>>
  * there. Absent while loading; null when that source does not know them or did not answer.
  */
 export function useSourceProfiles(id: string): SourceProfiles {
-  const [profiles, setProfiles] = useState<{ id: string; of: SourceProfiles }>({ id, of: {} })
-  useEffect(() => {
-    const controller = new AbortController()
-    for (const source of sources) {
-      const put = (user: PublicUser | null) =>
-        !controller.signal.aborted &&
-        setProfiles((current) => ({
-          id,
-          of: { ...(current.id === id ? current.of : {}), [source]: user },
-        }))
-      api<UserSpace>(`${sourceApi(source)}/users/${encodeURIComponent(id)}`, {
-        signal: controller.signal,
-      })
-        .then((space) => put(space.user))
-        .catch(() => put(null))
-    }
-    return () => controller.abort()
-  }, [id])
-  return profiles.id === id ? profiles.of : {}
+  const answers = useQueries({
+    queries: sources.map((source) => playerQueries.sourceProfile(source, id)),
+  })
+  const profiles: SourceProfiles = {}
+  sources.forEach((source, index) => {
+    const answer = answers[index]
+    const known: PublicUser | null | undefined = answer.data
+    if (known !== undefined) profiles[source] = known
+    else if (answer.isError) profiles[source] = null
+  })
+  return profiles
 }
 
 // Players upload their own charts to Fanmade only; Official's charts are the official ones.
@@ -114,7 +106,6 @@ function SourceWorks<T extends { id: string }>({
   address,
   layout,
   named,
-  onTotal,
   children,
 }: {
   source: SourceId
@@ -123,45 +114,27 @@ function SourceWorks<T extends { id: string }>({
   layout: string
   /** Head the part with its source and count: for a list that has more than one source. */
   named: boolean
-  onTotal: (total: number) => void
   children: (item: T) => ReactNode
 }) {
   const { t, i18n } = useTranslation()
-  const [list, setList] = useState<Page<T> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const report = useRef(onTotal)
-  report.current = onTotal
-  const load = (page: number, signal?: AbortSignal) => {
-    setLoading(true)
-    setError('')
-    api<Page<T>>(`${address}${address.includes('?') ? '&' : '?'}page=${page}`, { signal })
-      .then((result) => {
-        if (signal?.aborted) return
-        setList((current) => ({
-          items: page === 1 ? result.items : [...(current?.items ?? []), ...result.items],
-          total: result.total,
-          page,
-          pageSize: result.pageSize,
-        }))
-        report.current(result.total)
-      })
-      .catch((e: Error) => {
-        if (signal?.aborted) return
-        setError(e.message)
-        if (page === 1) report.current(0)
-      })
-      .finally(() => !signal?.aborted && setLoading(false))
+  // How many pages the visitor has asked for; each is read, and kept, by itself.
+  const [asked, setAsked] = useState(1)
+  const pages = useQueries({
+    queries: Array.from({ length: asked }, (_, index) =>
+      playerQueries.works<T>(source, address, index + 1),
+    ),
+  })
+  const read = pages.flatMap((page) => page.data ?? [])
+  const last = read.at(-1)
+  const list = last && {
+    items: read.flatMap((page) => page.items),
+    total: last.total,
+    page: read.length,
+    pageSize: last.pageSize,
   }
-  const first = useRef(load)
-  first.current = load
-  useEffect(() => {
-    const controller = new AbortController()
-    setList(null)
-    first.current(1, controller.signal)
-    return () => controller.abort()
-  }, [address])
-  if (!list && !loading && !error) return null
+  const loading = pages.some((page) => !page.data && page.isFetching)
+  const failed = pages.find((page) => !page.data && page.isError)
+  const error = loading ? '' : (failed?.error?.message ?? '')
   if (list && list.total === 0) return null
   const more = !!list && list.page * list.pageSize < list.total
   return (
@@ -184,7 +157,11 @@ function SourceWorks<T extends { id: string }>({
       {error && <Notice>{error}</Notice>}
       {more && (
         <div className="flex justify-center pt-1">
-          <Button variant="outline" disabled={loading} onClick={() => load(list.page + 1)}>
+          <Button
+            variant="outline"
+            disabled={loading}
+            onClick={() => (failed ? void failed.refetch() : setAsked(asked + 1))}
+          >
             {t('profile.more')}
           </Button>
         </div>
@@ -207,7 +184,11 @@ function Works<T extends { id: string }>({
   empty: string
   children: (source: SourceId, item: T) => ReactNode
 }) {
-  const [totals, setTotals] = useState<Partial<Record<SourceId, number>>>({})
+  // The first page of each part says how many it has; one that could not be read counts as none.
+  const firsts = useQueries({
+    queries: of.map((source) => playerQueries.works<T>(source, address(source), 1)),
+  })
+  const none = firsts.every((first) => (first.data ? first.data.total === 0 : first.isError))
   return (
     <div className="space-y-8">
       {of.map((source) => (
@@ -217,18 +198,11 @@ function Works<T extends { id: string }>({
           address={address(source)}
           layout={layout}
           named={of.length > 1}
-          onTotal={(total) =>
-            setTotals((current) =>
-              current[source] === total ? current : { ...current, [source]: total },
-            )
-          }
         >
           {(item) => children(source, item)}
         </SourceWorks>
       ))}
-      {of.every((source) => totals[source] === 0) && (
-        <p className="py-10 text-muted-foreground text-sm text-center">{empty}</p>
-      )}
+      {none && <p className="py-10 text-muted-foreground text-sm text-center">{empty}</p>}
     </div>
   )
 }

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { Group, GroupMember } from '@players/api/types'
+import type { GroupMember } from '@players/api/types'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
@@ -11,6 +12,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Notice } from '@players/notice'
+import { invalidateManage, playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
 
 // A player by the name people know them by: avatar, nickname, and the login name when that
@@ -53,50 +55,37 @@ export function ManagePage() {
   const { t } = useTranslation()
   const session = useSession()
   const allowed = !!session.user?.siteAdmin
-  const [groups, setGroups] = useState<Group[]>([])
-  const [members, setMembers] = useState<GroupMember[]>([])
+  const catalog = useQuery({ ...playerQueries.groups(), enabled: allowed })
+  const listed = useQuery({ ...playerQueries.members(), enabled: allowed })
+  const groups = catalog.data?.groups ?? []
+  const members = listed.data?.users ?? []
   // The player whose groups are being set, and the boxes ticked for them.
   const [editing, setEditing] = useState<{ member: GroupMember; groups: string[] } | null>(null)
-  // What is typed in the search box, and the players the last finished search of it found.
+  // What is typed in the search box, and the text last searched for.
   const [lookup, setLookup] = useState('')
-  const [found, setFound] = useState<{ text: string; users: GroupMember[] } | null>(null)
+  const [asked, setAsked] = useState('')
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
-
-  const reload = useCallback(async () => {
-    const [catalog, listed] = await Promise.all([
-      api<{ groups: Group[] }>(endpoints.groups),
-      api<{ users: GroupMember[] }>(endpoints.groupMembers),
-    ])
-    setGroups(catalog.groups)
-    setMembers(listed.users)
-  }, [])
-  useEffect(() => {
-    if (!allowed) return
-    reload().catch((e: Error) => setMessage({ kind: 'error', text: e.message }))
-  }, [allowed, reload])
 
   // Searching as the administrator types, a moment after they stop; an answer to an earlier
   // text is dropped.
   const text = lookup.trim()
   useEffect(() => {
-    if (!allowed || !text) return
-    let dropped = false
-    const timer = window.setTimeout(() => {
-      api<{ users: GroupMember[] }>(endpoints.findPlayers(text))
-        .then((answer) => {
-          if (!dropped) setFound({ text, users: answer.users })
-        })
-        .catch((e: Error) => {
-          if (!dropped) setMessage({ kind: 'error', text: e.message })
-        })
-    }, 250)
-    return () => {
-      dropped = true
-      window.clearTimeout(timer)
-    }
-  }, [allowed, text])
-  const results = found && found.text === text ? found.users : null
+    const timer = window.setTimeout(() => setAsked(text), 250)
+    return () => window.clearTimeout(timer)
+  }, [text])
+  const current = asked === text
+  const search = useQuery({
+    ...playerQueries.found(asked),
+    enabled: allowed && !!asked && current,
+  })
+  const results = current ? (search.data?.users ?? null) : null
+  // What was read before stays on show when reading it again fails.
+  const unread =
+    (catalog.data ? null : catalog.error) ??
+    (listed.data ? null : listed.error) ??
+    (current && !search.data ? search.error : null)
+  const notice = message ?? (unread && { kind: 'error' as const, text: unread.message })
 
   if (session.loading) return null
   if (!allowed) return <Navigate to="/" replace />
@@ -110,11 +99,10 @@ export function ManagePage() {
         endpoints.userGroups(editing.member.id),
         jsonRequest('PUT', { groups: editing.groups }, session.csrfToken),
       )
-      await reload()
+      await invalidateManage()
       setMessage({ kind: 'info', text: t('manage.saved') })
       setEditing(null)
       setLookup('')
-      setFound(null)
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -135,7 +123,7 @@ export function ManagePage() {
       <div>
         <h1 className="font-semibold text-2xl tracking-tight">{t('manage.heading')}</h1>
       </div>
-      {message && <Notice kind={message.kind}>{message.text}</Notice>}
+      {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
 
       <Card className="rounded-3xl">
         <CardHeader>

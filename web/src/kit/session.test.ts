@@ -59,6 +59,35 @@ describe('the session store', () => {
     expect(currentSession().error).not.toBe('')
   })
 
+  it('keeps the same player when the answer says the same', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => answer(signedIn)),
+    )
+    const { refreshSession, currentSession } = await import('./session')
+    refreshSession()
+    await settle()
+    const before = currentSession().session.user
+    refreshSession()
+    await settle()
+    expect(currentSession().session.user).toBe(before)
+  })
+
+  it('forgets what the server said to the player before', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => answer(signedIn)),
+    )
+    const { refreshSession, signOutOfSite } = await import('./session')
+    const { queryClient } = await import('./query/client')
+    refreshSession()
+    await settle()
+    queryClient.setQueryData(['fanmade', 'charts', 'detail', 'a'], { myVote: 1 })
+    await signOutOfSite()
+    await settle()
+    expect(queryClient.getQueryData(['fanmade', 'charts', 'detail', 'a'])).toBeUndefined()
+  })
+
   it('does not let an answer from before signing out bring the player back', async () => {
     let late: (response: Response) => void = () => {}
     const fetch = vi.fn(async (url: string) =>

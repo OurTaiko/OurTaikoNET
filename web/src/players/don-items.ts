@@ -1,10 +1,11 @@
 // Which parts of the 3D Don must be earned (the backend's internal/donitems): an administrator
 // locks a part, and then it is worn only by the players who own it. Everything else is anyone's.
 // The dressing room asks only `barred` and `rulesFor`; the manage page changes them.
-import { useEffect, useState } from 'react'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { api } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { TitleRule } from '@players/api/types'
+import { playerKeys } from '@players/queries'
 import type { DonPartKind } from '@sitekit/don3d'
 
 export type DonItem = { part: DonPartKind; id: number }
@@ -18,7 +19,6 @@ export type DonItems = {
   barred: (part: DonPartKind, id: number) => boolean
   /** The rules that give a part. */
   rulesFor: (part: DonPartKind, id: number) => TitleRule[]
-  reload: () => void
 }
 
 type Known = Pick<DonItems, 'locked' | 'owned' | 'rules'>
@@ -45,24 +45,22 @@ export async function readDonItems(mine: boolean, signal?: AbortSignal): Promise
 }
 
 /** The questions the pages ask of what is known. */
-export function donItemsOf(known: Known, reload: () => void = () => {}): DonItems {
+export function donItemsOf(known: Known): DonItems {
   return {
     ...known,
     barred: (part, id) =>
       id > 0 && known.locked.has(donItemKey(part, id)) && !known.owned.has(donItemKey(part, id)),
     rulesFor: (part, id) => known.rules.filter((r) => r.donPart === part && r.donItem === id),
-    reload,
   }
 }
 
 /** What is locked and which rules give parts; with `mine`, also what the signed-in player owns. */
 export function useDonItems(mine: boolean): DonItems | null {
-  const [known, setKnown] = useState<Known | null>(null)
-  const [revision, setRevision] = useState(0)
-  useEffect(() => {
-    const controller = new AbortController()
-    readDonItems(mine, controller.signal).then(setKnown, () => {})
-    return () => controller.abort()
-  }, [mine, revision])
-  return known ? donItemsOf(known, () => setRevision((r) => r + 1)) : null
+  const { data: known } = useQuery(
+    queryOptions({
+      queryKey: playerKeys.donItems(mine),
+      queryFn: ({ signal }) => readDonItems(mine, signal),
+    }),
+  )
+  return known ? donItemsOf(known) : null
 }

@@ -2,8 +2,9 @@
 // 系统通知 (./notification-center). The button in the top bar counts what is unread of both and
 // lists the latest; /chats is every chat, and /chats/<id> one of them (/chats/system the
 // notices).
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -15,20 +16,8 @@ import {
   ProhibitIcon,
   UserIcon,
 } from '@phosphor-icons/react'
-import { api, jsonRequest } from './api/client'
 import { SITE_API_ROOT } from './api/config'
-import {
-  chatAddresses,
-  chatPage,
-  chatsPage,
-  maxMessage,
-  onChatUpdate,
-  refreshChatUnread,
-  setChatSession,
-  systemChat,
-  useChatUnread,
-} from './chat'
-import type { Chat, ChatMessage } from './chat'
+import { chatPage, chatsPage, maxMessage, setChatSession, systemChat, useChatUnread } from './chat'
 import { Button, buttonVariants } from './components/ui/button'
 import { Skeleton } from './components/ui/skeleton'
 import { Textarea } from './components/ui/textarea'
@@ -49,11 +38,19 @@ import { useNotification } from './notification-context'
 import {
   NoticeLine,
   SystemChat,
-  latestNotice,
+  latestNoticeQuery,
   useChatScroll,
   useNoticeCount,
 } from './notification-center'
-import type { Sourced } from './notification-center'
+import {
+  chatQueries,
+  markChatRead,
+  openChat,
+  readOlderChatMessages,
+  sendChatMessage,
+  setChatBlocked,
+} from './queries/chats'
+import type { Chat } from './queries/chats'
 import { useSession } from './session'
 import { useHideBuddy } from './shell/buddy'
 
@@ -101,25 +98,18 @@ export function ChatBell() {
   const notices = useNoticeCount()
   const lastLine = useLastLine()
   useEffect(() => setChatSession(user?.id ?? null), [user?.id])
-  const [recent, setRecent] = useState<{
-    notice: Sourced | null | undefined
-    chats: Chat[]
-  } | null>(null)
+  // The menu reads what it lists each time it is opened.
+  const [open, setOpen] = useState(false)
+  const recentChats = useQuery({
+    ...chatQueries.list,
+    select: (answer) => answer.items.slice(0, 5),
+    enabled: open,
+  })
+  const recentNotice = useQuery({ ...latestNoticeQuery(notices), enabled: open })
   if (!user) return null
   const count = chats + notices
   return (
-    <DropdownMenu
-      onOpenChange={(isOpen) => {
-        if (!isOpen) return
-        setRecent(null)
-        void Promise.all([
-          latestNotice().catch(() => undefined),
-          api<{ items: Chat[] }>(chatAddresses.list)
-            .then((r) => r.items.slice(0, 5))
-            .catch(() => []),
-        ]).then(([notice, chats]) => setRecent({ notice, chats }))
-      }}
-    >
+    <DropdownMenu onOpenChange={(isOpen) => setOpen(isOpen)}>
       <DropdownMenuTrigger
         render={
           <Button
@@ -148,7 +138,7 @@ export function ChatBell() {
           )}
         </div>
         <DropdownMenuSeparator />
-        {recent === null ? (
+        {recentChats.isPending || recentNotice.isPending ? (
           <div className="space-y-2 p-2" role="status" aria-label={t('chat.loading')}>
             <Skeleton className="h-12 rounded-xl" />
             <Skeleton className="h-12 rounded-xl" />
@@ -163,12 +153,16 @@ export function ChatBell() {
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{t('chat.system')}</span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {recent.notice ? <NoticeLine n={recent.notice} /> : t('notificationCenter.empty')}
+                  {recentNotice.data ? (
+                    <NoticeLine n={recentNotice.data} />
+                  ) : (
+                    t('notificationCenter.empty')
+                  )}
                 </span>
               </span>
               <Badge count={notices} />
             </DropdownMenuItem>
-            {recent.chats.map((chat) => (
+            {recentChats.data?.map((chat) => (
               <DropdownMenuItem
                 key={chat.id}
                 className="items-center gap-3 rounded-xl p-2"
@@ -216,7 +210,7 @@ export function MessageButton({ userId }: { userId: string }) {
       disabled={busy}
       onClick={() => {
         setBusy(true)
-        api<Chat>(chatAddresses.open, jsonRequest('POST', { userId }, csrfToken))
+        openChat(userId, csrfToken)
           .then((chat) => navigate(chatPage(chat.id)))
           .catch((e) => notify((e as Error).message, 'error'))
           .finally(() => setBusy(false))
@@ -226,23 +220,6 @@ export function MessageButton({ userId }: { userId: string }) {
       {t('chat.message')}
     </Button>
   )
-}
-
-/** Calls reload when anything happens in the player's chats, at most once in a short while. */
-function useOnChatUpdate(reload: () => void) {
-  const latest = useRef(reload)
-  latest.current = reload
-  useEffect(() => {
-    let timer = 0
-    const off = onChatUpdate(() => {
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => latest.current(), 150)
-    })
-    return () => {
-      off()
-      window.clearTimeout(timer)
-    }
-  }, [])
 }
 
 /** /chats and /chats/:id: the list of chats and, beside it or instead of it on a phone, one. */
@@ -271,24 +248,10 @@ function Chats({ open }: { open?: string }) {
   useHideBuddy(!!open)
   const notices = useNoticeCount()
   const lastLine = useLastLine()
-  const [chats, setChats] = useState<Chat[] | null>(null)
-  const [notice, setNotice] = useState<Sourced | null | undefined>(undefined)
-  const [error, setError] = useState('')
-  const reload = useCallback(() => {
-    api<{ items: Chat[] }>(chatAddresses.list)
-      .then((r) => {
-        setChats(r.items)
-        setError('')
-      })
-      .catch((e) => setError((e as Error).message))
-  }, [])
-  useEffect(reload, [reload])
-  useOnChatUpdate(reload)
-  useEffect(() => {
-    void latestNotice()
-      .then(setNotice)
-      .catch(() => setNotice(undefined))
-  }, [notices])
+  const list = useQuery(chatQueries.list)
+  const chats = list.data ?? null
+  const error = list.error?.message ?? ''
+  const { data: notice } = useQuery(latestNoticeQuery(notices))
   const back = (
     <Link
       to={chatsPage}
@@ -409,7 +372,7 @@ function Chats({ open }: { open?: string }) {
             }
           />
         ) : open ? (
-          <DirectChat key={open} id={open} back={back} onChange={reload} />
+          <DirectChat key={open} id={open} back={back} />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
             <ChatsCircleIcon className="size-12 opacity-40" aria-hidden="true" />
@@ -421,59 +384,31 @@ function Chats({ open }: { open?: string }) {
   )
 }
 
-/** Puts new messages after the ones there, each once. */
-function addMessages(list: ChatMessage[], more: ChatMessage[]) {
-  const seen = new Set(list.map((m) => m.seq))
-  const added = more.filter((m) => !seen.has(m.seq))
-  return added.length ? [...list, ...added].sort((a, b) => a.seq - b.seq) : list
-}
-
 /** One chat with another player. */
-function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onChange: () => void }) {
+function DirectChat({ id, back }: { id: string; back: ReactNode }) {
   const { t, i18n } = useTranslation()
   const { user, csrfToken } = useSession()
   const { notify } = useNotification()
   const navigate = useNavigate()
-  const [chat, setChat] = useState<Chat | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[] | null>(null)
-  const [more, setMore] = useState(false)
+  const chatRead = useQuery(chatQueries.one(id))
+  const messagesRead = useQuery(chatQueries.messages(id))
+  // The chat is shown once both have come, and nothing can be sent before that.
+  const ready = !!chatRead.data && !!messagesRead.data
+  const chat = ready ? chatRead.data! : null
+  const messages = ready ? messagesRead.data!.items : null
+  const more = ready && messagesRead.data!.more
+  // A read that fails behind a chat on show leaves the chat as it is.
+  const error =
+    (!chatRead.data && chatRead.error?.message) ||
+    (!messagesRead.data && messagesRead.error?.message) ||
+    ''
   const [older, setOlder] = useState(false)
-  const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [visible, setVisible] = useState(document.visibilityState === 'visible')
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
   const me = user?.id ?? ''
-  useEffect(() => {
-    const controller = new AbortController()
-    Promise.all([
-      api<Chat>(chatAddresses.one(id), { signal: controller.signal }),
-      api<{ items: ChatMessage[]; more: boolean }>(chatAddresses.messages(id), {
-        signal: controller.signal,
-      }),
-    ])
-      .then(([chat, page]) => {
-        setChat(chat)
-        setMessages(page.items)
-        setMore(page.more)
-      })
-      .catch((e) => !controller.signal.aborted && setError((e as Error).message))
-    return () => controller.abort()
-  }, [id])
-  // What is written here arrives by the live connection (./chat); a read or a block, as a change.
-  useEffect(
-    () =>
-      onChatUpdate((update) => {
-        const here = update.messages.filter((m) => m.chatId === id)
-        if (here.length) setMessages((list) => (list ? addMessages(list, here) : list))
-        if (update.changed || here.length)
-          void api<Chat>(chatAddresses.one(id))
-            .then(setChat)
-            .catch(() => {})
-      }),
-    [id],
-  )
   useEffect(() => {
     const watch = () => setVisible(document.visibilityState === 'visible')
     document.addEventListener('visibilitychange', watch)
@@ -483,14 +418,8 @@ function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onCha
   const last = messages?.at(-1)
   useEffect(() => {
     if (!chat || !last || !visible || last.seq <= chat.readSeq) return
-    setChat({ ...chat, readSeq: last.seq, unread: 0 })
-    void api(chatAddresses.read(id), jsonRequest('POST', { seq: last.seq }, csrfToken))
-      .then(() => {
-        onChange()
-        return refreshChatUnread()
-      })
-      .catch(() => {})
-  }, [chat, last, visible, id, csrfToken, onChange])
+    void markChatRead(id, last.seq, csrfToken).catch(() => {})
+  }, [chat, last, visible, id, csrfToken])
   const onScroll = useChatScroll(scroller, messages?.[0]?.seq, messages?.length ?? 0)
 
   const length = Array.from(draft.trim()).length
@@ -499,14 +428,8 @@ function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onCha
     if (!length || length > maxMessage || sending) return
     setSending(true)
     try {
-      const sent = await api<ChatMessage>(
-        chatAddresses.messages(id),
-        jsonRequest('POST', { body: draft }, csrfToken),
-      )
-      setMessages((list) => addMessages(list ?? [], [sent]))
-      setChat((c) => (c ? { ...c, lastMessage: sent, readSeq: sent.seq } : c))
+      await sendChatMessage(id, draft, csrfToken)
       setDraft('')
-      onChange()
     } catch (e) {
       notify((e as Error).message, 'error')
     } finally {
@@ -517,21 +440,12 @@ function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onCha
   const loadOlder = () => {
     if (!messages?.length) return
     setOlder(true)
-    api<{ items: ChatMessage[]; more: boolean }>(chatAddresses.messages(id, messages[0].seq))
-      .then((page) => {
-        setMessages((list) => [...page.items, ...(list ?? [])])
-        setMore(page.more)
-      })
+    readOlderChatMessages(id, messages[0].seq)
       .catch((e) => notify((e as Error).message, 'error'))
       .finally(() => setOlder(false))
   }
   const block = (blocked: boolean) =>
-    api<Chat>(chatAddresses.block(id), jsonRequest('PUT', { blocked }, csrfToken))
-      .then((next) => {
-        setChat(next)
-        onChange()
-      })
-      .catch((e) => notify((e as Error).message, 'error'))
+    setChatBlocked(id, blocked, csrfToken).catch((e) => notify((e as Error).message, 'error'))
 
   if (error)
     return (

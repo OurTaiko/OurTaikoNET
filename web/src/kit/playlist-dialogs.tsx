@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PlusIcon } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
 import type { ChartBase, MyPlaylists, Playlist } from './api/types'
@@ -15,6 +16,8 @@ import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Textarea } from './components/ui/textarea'
 import { Modal } from './notifications'
+import { invalidatePlaylistLists, invalidatePlaylists, playlistQueries } from './queries/playlists'
+import { queryClient } from './query/client'
 import { useSession } from './session'
 
 // Creates a playlist, or edits the one given. C is the site's Chart, so onSaved hands back its Playlist.
@@ -45,6 +48,7 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
         playlist ? endpoints.playlist(playlist.id) : endpoints.playlists,
         jsonRequest(playlist ? 'PATCH' : 'POST', body, csrfToken),
       )
+      void invalidatePlaylistLists()
       onSaved(saved)
       onDismiss()
     } catch (e) {
@@ -136,7 +140,10 @@ export function PlaylistCoverDialog({
       title={t('playlists.changeCover')}
       endpoint={endpoints.playlistCover(playlist.id)}
       removeLabel={playlist.coverHash ? t('playlists.removeCover') : undefined}
-      onSaved={onSaved}
+      onSaved={(saved) => {
+        void invalidatePlaylistLists()
+        onSaved(saved)
+      }}
       onDismiss={onDismiss}
     />
   )
@@ -153,46 +160,41 @@ export function AddToPlaylistDialog({
   const { t } = useTranslation()
   const { csrfToken } = useSession()
   const id = useId()
-  const [data, setData] = useState<MyPlaylists | null>(null)
-  const [error, setError] = useState('')
+  const read = playlistQueries.mine(chart.id)
+  const query = useQuery(read)
+  const data = query.data
+  const [actionError, setActionError] = useState('')
+  const error = actionError || (data ? '' : (query.error?.message ?? ''))
   const [busy, setBusy] = useState(false)
   const [name, setName] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    api<MyPlaylists>(endpoints.myPlaylists(chart.id), { signal: controller.signal })
-      .then(setData)
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [chart.id])
+  const setData = (change: (current: MyPlaylists) => MyPlaylists) =>
+    queryClient.setQueryData(read.queryKey, (current) => current && change(current))
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
-    setError('')
+    setActionError('')
     try {
       await action()
     } catch (e) {
-      setError((e as Error).message)
+      setActionError((e as Error).message)
     } finally {
       setBusy(false)
+      // Even a failure may have changed something: a playlist can be made and the song refused.
+      void invalidatePlaylists()
     }
   }
   const setContained = (playlistId: string, contained: boolean) =>
-    setData(
-      (current) =>
-        current && {
-          ...current,
-          owned: current.owned.map((item) =>
-            item.id === playlistId
-              ? {
-                  ...item,
-                  containsChart: contained,
-                  chartCount: item.chartCount + (contained ? 1 : -1),
-                }
-              : item,
-          ),
-        },
-    )
+    setData((current) => ({
+      ...current,
+      owned: current.owned.map((item) =>
+        item.id === playlistId
+          ? {
+              ...item,
+              containsChart: contained,
+              chartCount: item.chartCount + (contained ? 1 : -1),
+            }
+          : item,
+      ),
+    }))
   const toggle = (playlist: Playlist) =>
     run(async () => {
       await api(endpoints.playlistItem(playlist.id, chart.id), {
@@ -207,13 +209,10 @@ export function AddToPlaylistDialog({
         endpoints.playlists,
         jsonRequest('POST', { name }, csrfToken),
       )
-      setData(
-        (current) =>
-          current && {
-            ...current,
-            owned: [{ ...created, containsChart: false }, ...current.owned],
-          },
-      )
+      setData((current) => ({
+        ...current,
+        owned: [{ ...created, containsChart: false }, ...current.owned],
+      }))
       setName('')
       await api(endpoints.playlistItem(created.id, chart.id), {
         method: 'PUT',

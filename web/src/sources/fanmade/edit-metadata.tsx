@@ -15,6 +15,7 @@ import type { FormEvent } from 'react'
 import { ArrowCounterClockwiseIcon as RotateCcw } from '@phosphor-icons/react'
 import { CategoryPicker } from '@sitekit/categories'
 import { api, jsonRequest, replaceMovie } from '@sitekit/api/client'
+import { chartWritten } from '@sitekit/queries/chart-writes'
 import type { Chart, Locale } from './api/types'
 import { useNotification } from '@sitekit/notification-context'
 import { Modal } from '@sitekit/notifications'
@@ -42,7 +43,7 @@ type Patch = {
 }
 
 export function EditMetadata({
-  chart,
+  chart: given,
   csrf,
   onSaved,
   onDismiss,
@@ -53,6 +54,9 @@ export function EditMetadata({
   onDismiss: () => void
 }) {
   const { t } = useTranslation()
+  // The form compares what is typed with the chart it started from, so that chart stays as it was
+  // while the page behind reads it again.
+  const [chart] = useState(given)
 
   const languages = getLanguages()
   const initial = (code: Language) => ({
@@ -211,13 +215,16 @@ export function EditMetadata({
     setBusy(true)
     try {
       // The movie first: a rejected file leaves the other edits unsaved.
-      if (movieEdit.file)
+      if (movieEdit.file) {
         await replaceMovie(chart.id, movieEdit.file, movieEdit.offset, csrf, controller.signal)
+        void chartWritten(chart.id)
+      }
       if (Object.keys(patch).length) {
         const updated = await api<Chart>(endpoints.chart(chart.id), {
           ...jsonRequest('PATCH', patch, csrf),
           signal: controller.signal,
         })
+        void chartWritten(updated.id, updated)
         onSaved(updated)
       } else onDismiss()
       if (movieEdit.file) notify(t('messages.movieSubmitted'), 'info')

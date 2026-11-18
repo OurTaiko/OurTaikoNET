@@ -11,6 +11,7 @@ import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { api, jsonRequest, replaceMovie } from '@sitekit/api/client'
 import { MovieSettings, movieChanges, movieDraft } from '@sitekit/components/movie-settings'
 import { useNotification } from '@sitekit/notification-context'
+import { chartWritten } from '@sitekit/queries/chart-writes'
 import type { Chart, Locale } from './api/types'
 import { CategoryPicker } from '@sitekit/categories'
 import { cn } from '@sitekit/lib/utils'
@@ -45,7 +46,7 @@ export function parseBpm(value: string): number | null | undefined {
 // any time (R042, R045); the BPM and difficulties are the TJA's, so the BPM is
 // editable only on a song registered without files.
 export function EditMetadata({
-  chart,
+  chart: given,
   csrf,
   onSaved,
   onDismiss,
@@ -56,6 +57,9 @@ export function EditMetadata({
   onDismiss: () => void
 }) {
   const { t } = useTranslation()
+  // The form compares what is typed with the chart it started from, so that chart stays as it was
+  // while the page behind reads it again.
+  const [chart] = useState(given)
   const [title, setTitle] = useState(chart.title)
   const [subtitle, setSubtitle] = useState(chart.subtitle)
   const [bpm, setBpm] = useState(chart.bpm > 0 ? String(chart.bpm) : '')
@@ -116,36 +120,38 @@ export function EditMetadata({
     setError('')
     try {
       // The movie first: a rejected file leaves the other edits unsaved.
-      if (chart.hasFiles && movieEdit.file)
+      if (chart.hasFiles && movieEdit.file) {
         await replaceMovie(chart.id, movieEdit.file, movieEdit.offset, csrf)
+        void chartWritten(chart.id)
+      }
       const translations = (values: Partial<Record<Locale, string>>) =>
         Object.fromEntries(locales.map((locale) => [locale, values[locale]?.trim() || null]))
-      onSaved(
-        await api<Chart>(
-          endpoints.chart(chart.id),
-          jsonRequest(
-            'PATCH',
-            {
-              title: title.trim(),
-              subtitle: subtitle.trim(),
-              // The BPM is the TJA's once a chart has files.
-              ...(chart.hasFiles ? {} : { bpm: parsedBpm }),
-              // The preview range needs the audio; it is sent only when changed.
-              ...(chart.hasFiles && demoChanged ? { demoStart: start, demoEnd: end } : {}),
-              ...(chart.hasFiles && !movieEdit.file && movieEdit.offset !== undefined
-                ? { movieOffset: movieEdit.offset }
-                : {}),
-              nijiiroId: nijiiro,
-              officialId: official || null,
-              categoryIds,
-              description,
-              titleTranslations: translations(titles),
-              subtitleTranslations: translations(subtitles),
-            },
-            csrf,
-          ),
+      const updated = await api<Chart>(
+        endpoints.chart(chart.id),
+        jsonRequest(
+          'PATCH',
+          {
+            title: title.trim(),
+            subtitle: subtitle.trim(),
+            // The BPM is the TJA's once a chart has files.
+            ...(chart.hasFiles ? {} : { bpm: parsedBpm }),
+            // The preview range needs the audio; it is sent only when changed.
+            ...(chart.hasFiles && demoChanged ? { demoStart: start, demoEnd: end } : {}),
+            ...(chart.hasFiles && !movieEdit.file && movieEdit.offset !== undefined
+              ? { movieOffset: movieEdit.offset }
+              : {}),
+            nijiiroId: nijiiro,
+            officialId: official || null,
+            categoryIds,
+            description,
+            titleTranslations: translations(titles),
+            subtitleTranslations: translations(subtitles),
+          },
+          csrf,
         ),
       )
+      void chartWritten(updated.id, updated)
+      onSaved(updated)
       if (chart.hasFiles && movieEdit.file) notify(t('messages.movieSubmitted'), 'info')
     } catch (e) {
       setError((e as Error).message)

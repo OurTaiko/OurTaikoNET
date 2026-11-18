@@ -10,9 +10,11 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { I18nextProvider } from 'react-i18next'
 import { IconContext } from '@phosphor-icons/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { applyTone } from '@sitekit/accent'
 import { i18n, setAreaCatalogues, type Language } from '@sitekit/i18n'
 import { moveInArea, setVisitor } from '@sitekit/navigation'
+import { queryClient } from '@sitekit/query/client'
 import { FrameBuddy } from '@sitekit/shell/buddy'
 import { Frame } from '@sitekit/shell/shell'
 import { rememberSource, rememberedSource } from '@sitekit/shell/site'
@@ -121,19 +123,21 @@ function Root() {
   const current = useSyncExternalStore(watch, () => shown)
   return (
     <StrictMode>
-      <I18nextProvider i18n={i18n}>
-        <IconContext.Provider value={{ weight: 'bold' }}>
-          <ThemeProvider storageKey="ourtaiko-net-theme">
-            {/* The frame: one for the whole site, so it stays put when the area changes. */}
-            <Frame>
-              {/* A new key for each area: its router and every page under it start afresh. */}
-              {current && <current.part.App key={current.area} />}
-            </Frame>
-            {/* The player's Don: one for the whole site, so it is not drawn anew with an area. */}
-            <FrameBuddy />
-          </ThemeProvider>
-        </IconContext.Provider>
-      </I18nextProvider>
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <IconContext.Provider value={{ weight: 'bold' }}>
+            <ThemeProvider storageKey="ourtaiko-net-theme">
+              {/* The frame: one for the whole site, so it stays put when the area changes. */}
+              <Frame>
+                {/* A new key for each area: its router and every page under it start afresh. */}
+                {current && <current.part.App key={current.area} />}
+              </Frame>
+              {/* The player's Don: one for the whole site, so it is not drawn anew with an area. */}
+              <FrameBuddy />
+            </ThemeProvider>
+          </IconContext.Provider>
+        </I18nextProvider>
+      </QueryClientProvider>
     </StrictMode>
   )
 }

@@ -19,6 +19,10 @@ import { Card } from './components/ui/card'
 import { UserAvatar } from './components/user-avatar'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQuery, type Updater } from '@tanstack/react-query'
+import { queryClient } from './query/client'
+import { chartDeleted } from './queries/chart-writes'
+import { chartQueries, invalidateChartLists } from './queries/charts'
 import {
   DownloadSimpleIcon as Download,
   UploadSimpleIcon as Upload,
@@ -30,7 +34,7 @@ import {
   PencilSimpleLineIcon,
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
-import type { ChartBase, ChartList, ScoreReplay, Vote, VoteResult } from './api/types'
+import type { ChartBase, ScoreReplay, Vote, VoteResult } from './api/types'
 import { SiteChartCard, formatDuration } from './components/chart-card'
 import { blockName, isSupportedCourse, slotKey, supportsChart } from './courses'
 import { defaultDifficulty, hasConstants } from './chart-difficulty'
@@ -78,9 +82,6 @@ export function Library({
   const orderLabels = site.useChartOrderLabels()
   const [params, setParams] = useSearchParams(),
     { user, loading: authLoading } = useSession()
-  const [data, setData] = useState<ChartList | null>(null),
-    [error, setError] = useState(''),
-    [loading, setLoading] = useState(true)
   const [searchPending, setSearchPending] = useState(false)
   const search = useCallback(
     (query: string) => {
@@ -104,25 +105,15 @@ export function Library({
     ...readChartFilters(params, site.chartOrders),
     ...site.readExtraFilters?.(params),
   }
-  // The address of the list, filters and all: the request follows it.
-  const query = JSON.stringify({ q, page, pageSize: libraryPageSize, owner, ...filters })
-  useEffect(() => {
-    if (mine && !user) return
-    const controller = new AbortController()
-    setLoading(true)
-    setError('')
-    api<ChartList>(endpoints.chartList(JSON.parse(query), mine), { signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) setData(result)
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
-      })
-    return () => controller.abort()
-  }, [mine, user, query])
+  const list = useQuery({
+    ...chartQueries.list({ q, page, pageSize: libraryPageSize, owner, ...filters }, mine),
+    enabled: !mine || !!user,
+  })
+  const data = list.data
+  // What was read before stays on show when reading it again fails.
+  const error = data ? '' : (list.error?.message ?? '')
+  // Another page or search is on its way: what is shown is the one before.
+  const loading = list.isPlaceholderData
   if (mine && !user)
     return (
       <EmptyState title={t('messages.myCharts')}>
@@ -181,7 +172,7 @@ export function Library({
       </div>
       {error ? (
         <Notice>{error}</Notice>
-      ) : loading && !data ? (
+      ) : !data ? (
         <div className="song-grid" aria-label={t('messages.loadingCharts')}>
           {[0, 1, 2, 3, 4, 5].map((n) => (
             <Skeleton className="aspect-[3/4] rounded-[20px]" key={n} />
@@ -339,8 +330,7 @@ export function Detail() {
     session = useSession(),
     navigate = useNavigate(),
     location = useLocation()
-  const [chart, setChart] = useState<Chart | null>(null),
-    [error, setError] = useState(''),
+  const [actionError, setError] = useState(''),
     [confirm, setConfirm] = useState(false),
     [leaving, setLeaving] = useState(false),
     [busy, setBusy] = useState(false),
@@ -364,6 +354,13 @@ export function Detail() {
   // /charts/{id}?by=number|nijiiro|id: links from other sites name a chart by what they know of
   // it. Everything after the read goes by chart.id.
   const by = query.get('by') ?? ''
+  const read = chartQueries.detail<Chart>(id ?? '', by)
+  const { data: chart = null, error: readError } = useQuery({ ...read, enabled: !!id })
+  const error = actionError || (chart ? '' : (readError?.message ?? ''))
+  const setChart = (change: Updater<Chart | undefined, Chart | undefined>) => {
+    queryClient.setQueryData(read.queryKey, change)
+    void invalidateChartLists()
+  }
   const loadedId = chart?.id ?? ''
   const showReplay = useCallback(
     (scoreId: string | null) => {
@@ -396,8 +393,6 @@ export function Detail() {
     if (loadedId && replayParam) showReplay(replayParam)
   }, [loadedId, replayParam, showReplay])
   useEffect(() => {
-    const controller = new AbortController()
-    setChart(null)
     setError('')
     setEditing(false)
     setCoverEditing(false)
@@ -408,13 +403,6 @@ export function Detail() {
     setActivityTab('image')
     setChosenCourse('')
     setReplay(null)
-    if (!id) return
-    api<Chart>(endpoints.chartDetail(id, by), { signal: controller.signal })
-      .then(setChart)
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
   }, [id, by])
   useEffect(() => {
     setSection(commentId || location.hash === '#comments' ? 'comments' : 'info')
@@ -460,6 +448,7 @@ export function Detail() {
       await api(endpoints.chart(chart.id), jsonRequest('DELETE', {}, session.csrfToken))
       setConfirm(false)
       navigate('/me/charts')
+      void chartDeleted(chart.id)
       notify(t('messages.chartDeleted'), 'success')
     } catch (e) {
       setConfirm(false)

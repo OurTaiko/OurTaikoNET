@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { CrownSimpleIcon, PauseIcon, PlayIcon, UploadSimpleIcon } from '@phosphor-icons/react'
-import { api } from '@sitekit/api/client'
 import { chartText } from '@sitekit/chart-language'
 import { SYSTEM_OWNER_ID } from '@sitekit/chart-owners'
 import { RelativeTime } from '@sitekit/comments'
@@ -11,9 +11,9 @@ import { Button } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { cn } from '@sitekit/lib/utils'
-import { endpoints } from '@players/api/endpoints'
 import type { Activity } from '@players/api/types'
 import { Notice } from '@players/notice'
+import { playerQueries } from '@players/queries'
 import { prefersStill } from './recent-works'
 import { SourceTag, songPage } from './song-tile'
 
@@ -155,19 +155,13 @@ function Row({ item, copy = false }: { item: Activity; copy?: boolean }) {
 /** What players have just done on either source: plays they cleared and charts they uploaded. */
 export function CommunityActivity() {
   const { t } = useTranslation()
-  const [items, setItems] = useState<Activity[] | 'failed' | null>(null)
+  const activity = useQuery(playerQueries.activity())
+  const items = activity.data?.items ?? (activity.isError ? 'failed' : null)
   const [paused, setPaused] = useState(prefersStill)
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const copy = useRef<HTMLUListElement>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    api<{ items: Activity[] }>(endpoints.activity, { signal: controller.signal })
-      .then((answer) => setItems(answer.items))
-      .catch(() => !controller.signal.aborted && setItems('failed'))
-    return () => controller.abort()
-  }, [])
   const rows = Array.isArray(items) ? items : []
   // A handful fits without moving.
   const loops = rows.length > 6

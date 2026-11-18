@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PlusIcon } from '@phosphor-icons/react'
-import { api } from './api/client'
-import { endpoints } from './api/endpoints'
+import { useQuery } from '@tanstack/react-query'
 import type { ChartBase, ChartList } from './api/types'
 import { chartText } from './chart-language'
 import { SearchInput } from './components/search-input'
 import { ToggleRow } from './components/toggle-row'
 import { Button } from './components/ui/button'
+import { cn } from './lib/utils'
 import { Modal } from './notifications'
+import { chartQueries } from './queries/charts'
 
 // Searches every public song for the owner of a playlist. Each result shows
 // whether the playlist holds it; selecting one adds it or takes it out.
@@ -30,23 +31,13 @@ export function PlaylistSongSearchDialog<C extends ChartBase>({
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pending, setPending] = useState(false)
-  const [result, setResult] = useState<ChartList<C> | null>(null)
-  const [error, setError] = useState('')
   const search = useCallback((value: string) => {
     setQuery(value)
     setPage(1)
   }, [])
-  useEffect(() => {
-    const controller = new AbortController()
-    setResult(null)
-    setError('')
-    api<ChartList<C>>(endpoints.chartList({ q: query, page }), { signal: controller.signal })
-      .then(setResult)
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [query, page])
+  const list = useQuery(chartQueries.list({ q: query, page }))
+  const result = list.data as ChartList<C> | undefined
+  const error = result ? '' : (list.error?.message ?? '')
   const listed = new Set(charts.map((chart) => chart.id))
   return (
     <Modal title={t('playlists.addSongs')} onDismiss={onDismiss}>
@@ -62,7 +53,10 @@ export function PlaylistSongSearchDialog<C extends ChartBase>({
       {!result && !error && <p role="status">{t('messages.loadingCharts')}</p>}
       {result && (
         <div
-          className="max-h-80 space-y-2 overflow-y-auto"
+          className={cn(
+            'max-h-80 space-y-2 overflow-y-auto transition-opacity',
+            list.isPlaceholderData && 'opacity-60',
+          )}
           role="group"
           aria-label={t('messages.searchCharts')}
         >

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { Title, TitleRule, TitleStyle } from '@players/api/types'
@@ -13,6 +14,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { Notice } from '@players/notice'
+import { invalidatePlayers, playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
 import { titleName } from '@players/dan'
 import { ruleText } from '@players/title-rules'
@@ -23,23 +25,16 @@ const communityStyles: TitleStyle[] = ['wood', 'teal', 'wood2', 'gold']
 // A player keeps at most this many community titles (official ones do not count).
 const titleLimit = 5
 const languages = ['en', 'ja', 'ko'] as const
+const noRules: TitleRule[] = []
 
 export function useTitles() {
-  const [titles, setTitles] = useState<Title[] | null>(null)
-  const [rules, setRules] = useState<TitleRule[]>([])
-  const [error, setError] = useState('')
-  const [revision, setRevision] = useState(0)
-  useEffect(() => {
-    const controller = new AbortController()
-    api<{ titles: Title[]; rules?: TitleRule[] }>(endpoints.titles, { signal: controller.signal })
-      .then((r) => {
-        setTitles(r.titles)
-        setRules(r.rules ?? [])
-      })
-      .catch((e) => !controller.signal.aborted && setError(e.message))
-    return () => controller.abort()
-  }, [revision])
-  return { titles, rules, error, reload: () => setRevision((r) => r + 1) }
+  const { data, error } = useQuery(playerQueries.titles())
+  return {
+    titles: data?.titles ?? null,
+    rules: data?.rules ?? noRules,
+    // What was read before stays on show when reading it again fails.
+    error: data ? '' : (error?.message ?? ''),
+  }
 }
 
 type Draft = {
@@ -65,7 +60,7 @@ const emptyDraft: Draft = {
 
 // The titles the player made for their own 段位 courses: up to five community ones, which they
 // change or delete; of the ones an administrator made official they change the band only.
-function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
+function MyTitles({ titles }: { titles: Title[] }) {
   const { t } = useTranslation()
   const session = useSession()
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -82,7 +77,7 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
       await work()
       setMessage({ kind: 'info', text: done })
       setDraft(emptyDraft)
-      reload()
+      void invalidatePlayers()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -286,11 +281,11 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
 // titles come first.
 export function TitlesPage() {
   const { t, i18n } = useTranslation()
-  const { titles, rules, error, reload } = useTitles()
+  const { titles, rules, error } = useTitles()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   return (
     <div className="space-y-6">
-      {titles && <MyTitles titles={titles} reload={reload} />}
+      {titles && <MyTitles titles={titles} />}
       <Card className="rounded-3xl">
         <CardHeader>
           <CardTitle>{t('titles.catalog')}</CardTitle>

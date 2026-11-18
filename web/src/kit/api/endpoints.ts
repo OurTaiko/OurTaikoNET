@@ -31,8 +31,6 @@ const build = () =>
     dan: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}`,
     danOfficial: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/official`,
     danVote: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/vote`,
-    danComments: (id: string, query: { sort: string; page: number }) =>
-      withQuery(`${API_ROOT}/dans/${encodeURIComponent(id)}/comments`, query),
     users: (query: { q: string; sort: string; page: number }) =>
       withQuery(`${API_ROOT}/users`, query),
     user: (id: string) => `${API_ROOT}/users/${encodeURIComponent(id)}`,
@@ -77,8 +75,6 @@ const build = () =>
       withQuery(`${chartPath(id)}/leaderboard`, query),
     scoreReplay: (id: string) => `${API_ROOT}/scores/${encodeURIComponent(id)}/replay`,
     chartVote: (id: string) => `${chartPath(id)}/vote`,
-    chartComments: (id: string, query: { sort: string; page: number }) =>
-      withQuery(`${chartPath(id)}/comments`, query),
     newComment: (chartId: string) => `${chartPath(chartId)}/comments`,
     comment: (id: string) => `${API_ROOT}/comments/${encodeURIComponent(id)}`,
     commentThread: (id: string, sort: string) =>

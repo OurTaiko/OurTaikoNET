@@ -1,24 +1,42 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { XIcon } from '@phosphor-icons/react'
+import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
-import type {
-  ChartBase,
-  Collaboration,
-  CollaborationHistory,
-  PublicUser,
-  UserDirectory,
-} from './api/types'
+import type { ChartBase, CollaborationHistory, PublicUser, UserDirectory } from './api/types'
 import { isChartOwner } from './chart-owners'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { SearchInput } from './components/search-input'
 import { UserAvatar } from './components/user-avatar'
 import { formatLocale } from './i18n'
+import { cn } from './lib/utils'
 import { Modal, Notice } from './notifications'
 import { useSession } from './session'
 import { useNotification } from './notification-context'
+import { queryClient } from './query/client'
+import { SOURCE } from './source'
+
+// The server keeps every invitation, so owners can see whom they invited
+// after the dialog that sent it closes, and other owners' invitations too.
+function historyQuery(chartId: string) {
+  const address = endpoints.collaborations(chartId)
+  return queryOptions({
+    queryKey: [SOURCE, 'collaborations', chartId] as const,
+    queryFn: ({ signal }) =>
+      api<CollaborationHistory>(address, { signal }).then((page) => page.items),
+  })
+}
+
+function directoryQuery(q: string, page: number) {
+  const address = endpoints.users({ q, sort: 'active', page })
+  return queryOptions({
+    queryKey: [SOURCE, 'users', 'directory', { q, page }] as const,
+    queryFn: ({ signal }) => api<UserDirectory>(address, { signal }),
+    placeholderData: keepPreviousData,
+  })
+}
 
 export function CollaborationDialog({
   chart,
@@ -33,8 +51,6 @@ export function CollaborationDialog({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [history, setHistory] = useState<Collaboration[] | null>(null)
-  const [historyError, setHistoryError] = useState('')
   const [revoking, setRevoking] = useState<string | null>(null)
   const [revokeError, setRevokeError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -43,24 +59,10 @@ export function CollaborationDialog({
     setSelected(null)
     setError('')
   }, [])
-  // The server keeps every invitation, so owners can see whom they invited
-  // after the dialog that sent it closes, and other owners' invitations too.
-  const loadHistory = useCallback(
-    (signal?: AbortSignal) => {
-      setHistoryError('')
-      return api<CollaborationHistory>(endpoints.collaborations(chart.id), { signal })
-        .then((page) => setHistory(page.items))
-        .catch((e: Error) => {
-          if (!signal?.aborted) setHistoryError(e.message)
-        })
-    },
-    [chart.id],
-  )
-  useEffect(() => {
-    const controller = new AbortController()
-    void loadHistory(controller.signal)
-    return () => controller.abort()
-  }, [loadHistory])
+  const read = historyQuery(chart.id)
+  const { data: history, error: historyFailure } = useQuery(read)
+  const historyError = history ? '' : (historyFailure?.message ?? '')
+  const loadHistory = () => queryClient.invalidateQueries({ queryKey: read.queryKey })
   const pendingIds = new Set(
     history?.filter((item) => item.status === 'pending').map((item) => item.recipient.id),
   )
@@ -320,22 +322,9 @@ export function UserSearch({
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pending, setPending] = useState(false)
-  const [result, setResult] = useState<UserDirectory | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    const controller = new AbortController()
-    setResult(null)
-    setError('')
-    onSearch?.()
-    api<UserDirectory>(endpoints.users({ q: query, sort: 'active', page }), {
-      signal: controller.signal,
-    })
-      .then(setResult)
-      .catch((e: Error) => {
-        if (!controller.signal.aborted) setError(e.message)
-      })
-    return () => controller.abort()
-  }, [query, page, onSearch])
+  const directory = useQuery(directoryQuery(query, page))
+  const result = directory.data
+  const error = result ? '' : (directory.error?.message ?? '')
   const changePending = useCallback(
     (value: boolean) => {
       setPending(value)
@@ -343,10 +332,18 @@ export function UserSearch({
     },
     [onPendingChange],
   )
-  const search = useCallback((value: string) => {
-    setQuery(value)
-    setPage(1)
-  }, [])
+  const search = useCallback(
+    (value: string) => {
+      setQuery(value)
+      setPage(1)
+      onSearch?.()
+    },
+    [onSearch],
+  )
+  const turnTo = (next: number) => {
+    setPage(next)
+    onSearch?.()
+  }
   return (
     <>
       <SearchInput
@@ -360,7 +357,10 @@ export function UserSearch({
       {!result && !error && <p role="status">{t('messages.connecting')}</p>}
       {result && (
         <div
-          className="max-h-72 space-y-2 overflow-y-auto"
+          className={cn(
+            'max-h-72 space-y-2 overflow-y-auto transition-opacity',
+            directory.isPlaceholderData && 'opacity-60',
+          )}
           role="group"
           aria-label={t('collaboration.search')}
         >
@@ -402,7 +402,7 @@ export function UserSearch({
             type="button"
             variant="outline"
             disabled={page <= 1 || disabled || pending}
-            onClick={() => setPage(page - 1)}
+            onClick={() => turnTo(page - 1)}
           >
             {t('messages.previous')}
           </Button>
@@ -410,7 +410,7 @@ export function UserSearch({
             type="button"
             variant="outline"
             disabled={page * result.pageSize >= result.total || disabled || pending}
-            onClick={() => setPage(page + 1)}
+            onClick={() => turnTo(page + 1)}
           >
             {t('messages.next')}
           </Button>
