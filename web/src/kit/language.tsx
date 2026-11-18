@@ -1,14 +1,22 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { i18n, normalizeLanguage, formatLocale, browserLanguage } from './i18n'
-import { useSession } from './session-context'
+import { i18n, normalizeLanguage, formatLocale, browserLanguage, rememberLanguage } from './i18n'
+import { useSession } from './session'
 import { SiteHead } from './head'
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const { user } = useSession()
-  const language = user ? normalizeLanguage(user.preferredLanguage) : null
+  const { user, loading, error } = useSession()
+  // The account's language; null when nobody is signed in; undefined while that is not known,
+  // when the language on screen stays.
+  const language = user
+    ? normalizeLanguage(user.preferredLanguage)
+    : loading || error
+      ? undefined
+      : null
   useEffect(() => {
+    if (language === undefined) return
+    rememberLanguage(language)
     const updateLanguage = () => {
       void i18n.changeLanguage(language ?? browserLanguage())
     }

@@ -54,7 +54,7 @@ import {
   useNoticeCount,
 } from './notification-center'
 import type { Sourced } from './notification-center'
-import { useSession } from './session-context'
+import { useSession } from './session'
 import { useHideBuddy } from './shell/buddy'
 
 const count99 = (n: number) => (n > 99 ? '99+' : String(n))

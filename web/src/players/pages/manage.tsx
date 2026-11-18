@@ -11,7 +11,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Notice } from '@players/notice'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 
 // A player by the name people know them by: avatar, nickname, and the login name when that
 // is how they were found. The id is in the link and nowhere on the page.

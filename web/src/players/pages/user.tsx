@@ -41,7 +41,7 @@ import {
   TableRow,
 } from '@sitekit/components/ui/table'
 import { Notice } from '@players/notice'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 import { danName, offeredDans, titleName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'

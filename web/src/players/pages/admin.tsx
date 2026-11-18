@@ -18,7 +18,7 @@ import { readDonCatalog, type Catalog } from '@players/don-catalog'
 import { useDonItems } from '@players/don-items'
 import { catalogItem, donItemName } from '@sitekit/don3d'
 import { Notice } from '@players/notice'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 import { useTitles } from './titles'
 
 const styles: TitleStyle[] = ['wood', 'teal', 'wood2', 'purple', 'gold', 'rainbow']

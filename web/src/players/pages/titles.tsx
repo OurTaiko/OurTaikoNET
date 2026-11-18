@@ -13,7 +13,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { Notice } from '@players/notice'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 import { titleName } from '@players/dan'
 import { ruleText } from '@players/title-rules'
 

@@ -8,10 +8,8 @@ import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
 import { PageMeta } from '@sitekit/head'
 import { ChatsPage } from '@sitekit/chat-center'
 import { NotificationProvider } from '@sitekit/notifications'
-import { SessionProvider } from '@sitekit/session'
 import { RouterBridge } from '@sitekit/navigation'
 import { catalogues } from './i18n'
-import { endpoints } from './api/endpoints'
 import { Layout } from '@players/components/layout'
 import { HomePage } from './pages/home'
 import { DirectoryPage } from './pages/directory'
@@ -55,83 +53,81 @@ function App() {
     <BrowserRouter>
       <RouterBridge />
       <NotificationProvider>
-        <SessionProvider me={endpoints.me}>
-          <LanguageProvider>
-            <DocumentLanguage />
-            <Routes>
-              <Route element={<Layout />}>
-                <Route index element={<HomePage />} />
-                <Route
-                  path="players"
-                  element={
-                    <>
-                      <PageMeta title={t('shell.directory')} description={t('meta.players')} />
-                      <DirectoryPage />
-                    </>
-                  }
-                />
-                <Route path="players/users/:id" element={<OldUserAddress />} />
-                <Route path="players/:id" element={<UserPage />} />
+        <LanguageProvider>
+          <DocumentLanguage />
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route
+                path="players"
+                element={
+                  <>
+                    <PageMeta title={t('shell.directory')} description={t('meta.players')} />
+                    <DirectoryPage />
+                  </>
+                }
+              />
+              <Route path="players/users/:id" element={<OldUserAddress />} />
+              <Route path="players/:id" element={<UserPage />} />
+              <Route
+                path="titles"
+                element={
+                  <>
+                    <PageMeta title={t('shell.titles')} description={t('meta.titles')} />
+                    <TitlesPage />
+                  </>
+                }
+              />
+              <Route
+                path="chats"
+                element={
+                  <Private title={t('chat.title')}>
+                    <ChatsPage />
+                  </Private>
+                }
+              />
+              <Route
+                path="chats/:id"
+                element={
+                  <Private title={t('chat.title')}>
+                    <ChatsPage />
+                  </Private>
+                }
+              />
+              {/* The notices were a page of their own; they are a chat now. */}
+              <Route path="notifications" element={<Navigate to="/chats/system" replace />} />
+              <Route path="manage">
+                <Route index element={<NotFound />} />
                 <Route
                   path="titles"
                   element={
-                    <>
-                      <PageMeta title={t('shell.titles')} description={t('meta.titles')} />
-                      <TitlesPage />
-                    </>
-                  }
-                />
-                <Route
-                  path="chats"
-                  element={
-                    <Private title={t('chat.title')}>
-                      <ChatsPage />
+                    <Private title={t('shell.titleAdmin')}>
+                      <AdminPage />
                     </Private>
                   }
                 />
                 <Route
-                  path="chats/:id"
+                  path="groups"
                   element={
-                    <Private title={t('chat.title')}>
-                      <ChatsPage />
+                    <Private title={t('manage.heading')}>
+                      <ManagePage />
                     </Private>
                   }
                 />
-                {/* The notices were a page of their own; they are a chat now. */}
-                <Route path="notifications" element={<Navigate to="/chats/system" replace />} />
-                <Route path="manage">
-                  <Route index element={<NotFound />} />
-                  <Route
-                    path="titles"
-                    element={
-                      <Private title={t('shell.titleAdmin')}>
-                        <AdminPage />
-                      </Private>
-                    }
-                  />
-                  <Route
-                    path="groups"
-                    element={
-                      <Private title={t('manage.heading')}>
-                        <ManagePage />
-                      </Private>
-                    }
-                  />
-                  <Route
-                    path="visits"
-                    element={
-                      <Private title={t('visits.heading')}>
-                        <VisitsPage />
-                      </Private>
-                    }
-                  />
-                  <Route path="*" element={<NotFound />} />
-                </Route>
+                <Route
+                  path="visits"
+                  element={
+                    <Private title={t('visits.heading')}>
+                      <VisitsPage />
+                    </Private>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Route>
-            </Routes>
-          </LanguageProvider>
-        </SessionProvider>
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </LanguageProvider>
       </NotificationProvider>
     </BrowserRouter>
   )

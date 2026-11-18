@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowFatDownIcon, ArrowFatUpIcon } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { formatLocale } from '../i18n'
-import { useSession } from '../session-context'
+import { useSession } from '../session'
 import { useNotification } from '../notification-context'
 import type { Vote, VoteResult } from '../api/types'
 

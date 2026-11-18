@@ -40,7 +40,7 @@ import { ProfilePlate } from './components/profile-plate'
 import { VoteControl, loginPath } from './components/vote-control'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
-import { useSession } from './session-context'
+import { useSession } from './session'
 
 const maxCommentLength = 10000
 // Deeper replies continue on the comment's own page, as on Reddit; a phone has

@@ -20,7 +20,7 @@ import {
 } from './components/ui/table'
 import { blockName, slotKey } from './courses'
 import { Notice } from './notifications'
-import { useSession } from './session-context'
+import { useSession } from './session'
 
 // One block's leaderboard: every player once, with their
 // best play on the chart's current files.

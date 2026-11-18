@@ -16,7 +16,7 @@ import {
 } from '@sitekit/components/ui/table'
 import { cn } from '@sitekit/lib/utils'
 import { Notice } from '@players/notice'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 import { browserZone } from '@sitekit/shell/visits'
 
 // The periods offered, in days; today is the last day of each.

@@ -17,7 +17,7 @@ import { SearchInput } from './components/search-input'
 import { UserAvatar } from './components/user-avatar'
 import { formatLocale } from './i18n'
 import { Modal, Notice } from './notifications'
-import { useSession } from './session-context'
+import { useSession } from './session'
 import { useNotification } from './notification-context'
 
 export function CollaborationDialog({

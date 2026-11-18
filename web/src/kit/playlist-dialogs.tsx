@@ -15,7 +15,7 @@ import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Textarea } from './components/ui/textarea'
 import { Modal } from './notifications'
-import { useSession } from './session-context'
+import { useSession } from './session'
 
 // Creates a playlist, or edits the one given. C is the site's Chart, so onSaved hands back its Playlist.
 export function PlaylistDialog<C extends ChartBase = ChartBase>({

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { FrameBell, useTellFrame } from '@sitekit/shell/frame'
 import { ChatBell } from '@sitekit/chat-center'
-import { useSession } from '@players/session-context'
+import { useSession } from '@players/session'
 import { Notice } from '@players/notice'
 
 /** A page that belongs to no song source, inside the site's frame (drawn by src/root.tsx). */

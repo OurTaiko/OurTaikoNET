@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { Button } from './ui/button'
 import { CoverPicker } from './cover-picker'
 import { Modal } from '../notifications'
-import { useSession } from '../session-context'
+import { useSession } from '../session'
 import type { SavedCover } from '../cover'
 
 // Uploads a cover to `endpoint` (PUT, multipart field "cover"). With

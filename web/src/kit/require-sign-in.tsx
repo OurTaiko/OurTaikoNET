@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { buttonVariants } from './components/ui/button'
 import { EmptyState } from './components/empty-state'
 import { loginPath } from './components/vote-control'
-import { useSession } from './session-context'
+import { useSession } from './session'
 
 // A layout route for pages that need a signed-in user: in their place it asks the visitor to
 // sign in, and signing in comes back to the page.

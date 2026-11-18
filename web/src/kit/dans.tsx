@@ -47,7 +47,7 @@ import {
   titleUsableBy,
   useProfileTitles,
 } from './profile-titles'
-import { useSession } from './session-context'
+import { useSession } from './session'
 import { cn } from './lib/utils'
 import { SourceTag } from './components/source-tag'
 import { difficultyColors } from './components/difficulty-badges'

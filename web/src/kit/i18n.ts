@@ -37,8 +37,28 @@ export function browserLanguage(): Language {
   return 'en'
 }
 
-// Start with the browser language; LanguageProvider applies the SSO preference
-// once the session is available. No separate preference is stored locally.
+const languageKey = 'ourtaiko-net-language'
+/** The language of the player signed in on this browser when the site was last open. */
+export function rememberedLanguage(): Language | null {
+  try {
+    const kept = localStorage.getItem(languageKey)
+    return kept && kept in languageNames ? (kept as Language) : null
+  } catch {
+    return null
+  }
+}
+/** Keeps the signed-in player's language for the next visit; null when nobody is signed in. */
+export function rememberLanguage(language: Language | null) {
+  try {
+    if (language) localStorage.setItem(languageKey, language)
+    else localStorage.removeItem(languageKey)
+  } catch {
+    // The next visit simply starts from the browser's language.
+  }
+}
+
+// Start with the language the player had last time, else the browser's; LanguageProvider applies
+// the account's preference once the session is known.
 // The words every area shares, kept apart from the store: an area's own are merged into the
 // store, and the next area starts from these again.
 const shared: Record<Language, object> = { 'zh-Hans': zh, en, ja, ko }
@@ -50,7 +70,7 @@ void i18n.use(initReactI18next).init({
     ja: { translation: structuredClone(ja) },
     ko: { translation: structuredClone(ko) },
   },
-  lng: browserLanguage(),
+  lng: rememberedLanguage() ?? browserLanguage(),
   fallbackLng: 'zh-Hans',
   supportedLngs: Object.keys(languageNames),
   load: 'currentOnly',

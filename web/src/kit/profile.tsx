@@ -10,7 +10,7 @@ import { Input } from './components/ui/input'
 import { Link } from 'react-router-dom'
 import { ArrowUpRightIcon as ArrowUpRight } from '@phosphor-icons/react'
 import { profilePage } from './components/profile-plate'
-import { useSession } from './session-context'
+import { useSession } from './session'
 import { Notice } from './notifications'
 
 export function ProfilePage() {

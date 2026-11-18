@@ -51,6 +51,7 @@ import { useTellBuddy } from './buddy'
 import { FrameFooter } from './footer'
 import { setBellSlot, signOut, useTold } from './frame'
 import { SettingsSheet } from './settings'
+import { useSessionRefresh } from '../session'
 import { rememberSource, useRememberedSource, useSiteRoles } from './site'
 import { twinPath } from './twin'
 import { useCountVisit } from './visits'
@@ -96,6 +97,7 @@ export function Frame({ children }: { children: ReactNode }) {
   const base = area ? `/${area}` : ''
   const here = base + (path === '/' ? '/' : path)
   const roles = useSiteRoles(user?.id)
+  useSessionRefresh(here)
   // Each page shown is counted (./visits).
   useCountVisit(here)
   // The source the Songs group points at: this page's, or the one used last.

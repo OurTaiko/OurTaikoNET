@@ -15,7 +15,6 @@ import { Auth, ChartManagerPage, Detail, Library } from '@sitekit/pages'
 import { MyPlaylistsPage, PlaylistPage, PlaylistsPage } from '@sitekit/playlists'
 import { ProfilePage } from '@sitekit/profile'
 import { RequireSignIn } from '@sitekit/require-sign-in'
-import { SessionProvider } from '@sitekit/session'
 import { SiteProvider, type Site } from '@sitekit/site'
 import type { SourceId } from '@sitekit/source'
 import { RouterBridge, visit } from '@sitekit/navigation'
@@ -61,80 +60,78 @@ function App({
     <BrowserRouter basename={`/${source}`}>
       <RouterBridge />
       <NotificationProvider>
-        <SessionProvider>
-          <LanguageProvider>
-            <DocumentLanguage />
-            <CategoryProvider>
-              <SiteProvider value={site}>
-                <Routes>
-                  <Route element={<Layout />}>
-                    <Route index element={<Library />} />
-                    <Route path="users" element={<LeaveTo address="/players" />} />
-                    <Route path="users/:id" element={<LeaveToPlayer />} />
+        <LanguageProvider>
+          <DocumentLanguage />
+          <CategoryProvider>
+            <SiteProvider value={site}>
+              <Routes>
+                <Route element={<Layout />}>
+                  <Route index element={<Library />} />
+                  <Route path="users" element={<LeaveTo address="/players" />} />
+                  <Route path="users/:id" element={<LeaveToPlayer />} />
+                  <Route
+                    path="me/profile"
+                    element={
+                      <>
+                        <PageMeta title={t('messages.profile')} noindex />
+                        <ProfilePage />
+                      </>
+                    }
+                  />
+                  <Route path="me/charts" element={<ChartManagerPage />} />
+                  {/* Publishing and replacing files need a signed-in user. */}
+                  <Route element={<RequireSignIn />}>
+                    <Route path="me/charts/publish" element={<ChartManagerPage />} />
                     <Route
-                      path="me/profile"
+                      path="charts/:id/update"
                       element={
                         <>
-                          <PageMeta title={t('messages.profile')} noindex />
-                          <ProfilePage />
+                          <PageMeta title={t('messages.updateSongAndCharts')} noindex />
+                          <UpdatePage />
                         </>
-                      }
-                    />
-                    <Route path="me/charts" element={<ChartManagerPage />} />
-                    {/* Publishing and replacing files need a signed-in user. */}
-                    <Route element={<RequireSignIn />}>
-                      <Route path="me/charts/publish" element={<ChartManagerPage />} />
-                      <Route
-                        path="charts/:id/update"
-                        element={
-                          <>
-                            <PageMeta title={t('messages.updateSongAndCharts')} noindex />
-                            <UpdatePage />
-                          </>
-                        }
-                      />
-                    </Route>
-                    <Route path="playlists" element={<PlaylistsPage />} />
-                    <Route path="dans" element={<DansPage />} />
-                    <Route path="dans/new" element={<DanEditorPage />} />
-                    <Route path="dans/:id" element={<DanPage />} />
-                    <Route path="dans/:id/comments/:commentId" element={<DanPage />} />
-                    <Route path="dans/:id/edit" element={<DanEditorPage />} />
-                    <Route path="playlists/:id" element={<PlaylistPage />} />
-                    <Route path="me/playlists" element={<MyPlaylistsPage />} />
-                    <Route path="upload" element={<Navigate to="/me/charts/publish" replace />} />
-                    <Route
-                      path="charts/:id/edit"
-                      element={
-                        <>
-                          <PageMeta title={t('editor.title')} noindex />
-                          <ChartEditorPage />
-                        </>
-                      }
-                    />
-                    <Route path="charts/:id" element={<Detail />} />
-                    <Route path="charts/:id/comments/:commentId" element={<Detail />} />
-                    <Route path="notifications" element={<LeaveTo address="/chats/system" />} />
-                    <Route path="login" element={<Auth key="login" />} />
-                    <Route path="register" element={<Auth key="register" register />} />
-                    <Route
-                      path="*"
-                      element={
-                        <div className="flex flex-col items-center justify-center gap-4 rounded-[20px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground">
-                          <PageMeta title={t('messages.pageNotFound')} noindex />
-                          <h1 className="text-2xl font-extrabold sm:text-3xl">
-                            {t('messages.pageNotFound')}
-                          </h1>
-                          <Link to="/">{t('messages.backToExplore')}</Link>
-                        </div>
                       }
                     />
                   </Route>
-                </Routes>
-              </SiteProvider>
-            </CategoryProvider>
-          </LanguageProvider>
-        </SessionProvider>
+                  <Route path="playlists" element={<PlaylistsPage />} />
+                  <Route path="dans" element={<DansPage />} />
+                  <Route path="dans/new" element={<DanEditorPage />} />
+                  <Route path="dans/:id" element={<DanPage />} />
+                  <Route path="dans/:id/comments/:commentId" element={<DanPage />} />
+                  <Route path="dans/:id/edit" element={<DanEditorPage />} />
+                  <Route path="playlists/:id" element={<PlaylistPage />} />
+                  <Route path="me/playlists" element={<MyPlaylistsPage />} />
+                  <Route path="upload" element={<Navigate to="/me/charts/publish" replace />} />
+                  <Route
+                    path="charts/:id/edit"
+                    element={
+                      <>
+                        <PageMeta title={t('editor.title')} noindex />
+                        <ChartEditorPage />
+                      </>
+                    }
+                  />
+                  <Route path="charts/:id" element={<Detail />} />
+                  <Route path="charts/:id/comments/:commentId" element={<Detail />} />
+                  <Route path="notifications" element={<LeaveTo address="/chats/system" />} />
+                  <Route path="login" element={<Auth key="login" />} />
+                  <Route path="register" element={<Auth key="register" register />} />
+                  <Route
+                    path="*"
+                    element={
+                      <div className="flex flex-col items-center justify-center gap-4 rounded-[20px] border border-dashed bg-card/60 px-6 py-16 text-center [&>p]:max-w-lg [&>p]:text-muted-foreground">
+                        <PageMeta title={t('messages.pageNotFound')} noindex />
+                        <h1 className="text-2xl font-extrabold sm:text-3xl">
+                          {t('messages.pageNotFound')}
+                        </h1>
+                        <Link to="/">{t('messages.backToExplore')}</Link>
+                      </div>
+                    }
+                  />
+                </Route>
+              </Routes>
+            </SiteProvider>
+          </CategoryProvider>
+        </LanguageProvider>
       </NotificationProvider>
     </BrowserRouter>
   )
