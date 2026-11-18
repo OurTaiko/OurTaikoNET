@@ -232,11 +232,6 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	if history.Total != 1 || history.Items[0].ID != top.ID || history.Items[0].ChartTitle != "Song" {
 		t.Fatalf("history: %+v", history)
 	}
-	var space UserSpace
-	c.do("", "GET", "/api/users/"+alice, "", &space)
-	if space.User.CommentCount != 1 || space.User.Karma != 0 || space.User.Nickname == nil || *space.User.Nickname != "alice" {
-		t.Fatalf("profile: %+v", space.User)
-	}
 
 	// Deleting the chart cascades through comments and votes.
 	if code := c.do("owner", "DELETE", song, "", nil); code != 200 {
@@ -525,31 +520,6 @@ func testChartDetailBy(t *testing.T, w interactionWorld) {
 	}
 	if code := c.do("owner", "PATCH", w.chart(w.song), taken, &mapped); code != 200 || mapped.NijiiroID == nil || int64(*mapped.NijiiroID) != song.NumberID {
 		t.Fatal("freed Nijiiro ID", code)
-	}
-}
-
-func TestUserDirectory(t *testing.T) {
-	w := interactionWorldOf(t, Official)
-	c := w.c
-	var dir UserDirectory
-	if code := c.do("", "GET", "/api/users", "", &dir); code != 200 || dir.Total != 4 || !dir.ProfilesAvailable {
-		t.Fatalf("directory %d %+v", code, dir)
-	}
-	for _, u := range dir.Items {
-		if u.Nickname == nil {
-			t.Fatal("nickname missing", u.ID)
-		}
-		if u.ID == testUsers["owner"].ID && u.ChartCount != 2 {
-			t.Fatal("chart count", u.ChartCount)
-		}
-	}
-	if c.do("", "GET", "/api/users?q=ali", "", &dir); dir.Total != 1 || *dir.Items[0].Nickname != "alice" {
-		t.Fatalf("search %+v", dir)
-	}
-	for path, want := range map[string]int{"/api/users/ffffffffffffffffffffffffffffffff": 404, "/api/users/nope": 404, "/api/users?sort=karma": 400} {
-		if code := c.do("", "GET", path, "", nil); code != want {
-			t.Fatal(path, code)
-		}
 	}
 }
 

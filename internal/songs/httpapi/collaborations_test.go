@@ -114,10 +114,6 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	if code := c.do("", "GET", "/api/charts?owner="+alice, "", &mine); code != 200 || mine.Total != 1 {
 		t.Fatal("owner filter", code, mine.Total)
 	}
-	var space UserSpace
-	if code := c.do("", "GET", "/api/users/"+alice, "", &space); code != 200 || space.User.ChartCount != 1 {
-		t.Fatal("co-owner chart count", code, space)
-	}
 	if code := c.do("alice", "PATCH", "/api/charts/"+song+"", `{"description":"co-created"}`, nil); code != 200 {
 		t.Fatal("co-owner metadata", code)
 	}

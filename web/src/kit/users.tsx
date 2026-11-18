@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
 import { ArrowClockwiseIcon, UsersIcon } from '@phosphor-icons/react'
 import { api } from './api/client'
-import { endpoints, withQuery } from './api/endpoints'
-import { SITE_API_ROOT } from './api/config'
+import { endpoints } from './api/endpoints'
 import type { UserDirectory } from './api/types'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
@@ -13,25 +12,17 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-import { SOURCE, type SourceId } from './source'
-
 type DirectoryQuery = { q: string; sort: string; page: number }
 
-// The address is taken when the query is made: by the time the answer comes the visitor may be in
-// another area.
-function directoryQuery(source: SourceId | undefined, query: DirectoryQuery) {
-  const address = source
-    ? withQuery(`${SITE_API_ROOT}/sources/${source}/users`, query)
-    : endpoints.users(query)
-  return queryOptions({
-    queryKey: [source ?? SOURCE, 'users', query] as const,
-    queryFn: ({ signal }) => api<UserDirectory>(address, { signal }),
+const directoryQuery = (query: DirectoryQuery) =>
+  queryOptions({
+    queryKey: ['users', query] as const,
+    queryFn: ({ signal }) => api<UserDirectory>(endpoints.users(query), { signal }),
     placeholderData: keepPreviousData,
   })
-}
 
-/** source: whose players to list; the page's own source when left out. */
-export function UsersPage({ source }: { source?: SourceId }) {
+/** The site's players, whichever source they play. */
+export function UsersPage() {
   const { t } = useTranslation()
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -41,7 +32,7 @@ export function UsersPage({ source }: { source?: SourceId }) {
   const sort = params.get('sort') === 'newest' ? 'newest' : 'active'
   const rawPage = Number(params.get('page'))
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 10000 ? rawPage : 1
-  const directory = useQuery(directoryQuery(source, { q, sort, page }))
+  const directory = useQuery(directoryQuery({ q, sort, page }))
   const result = directory.data
   // What was read before stays on show when reading it again fails.
   const error = result ? '' : (directory.error?.message ?? '')

@@ -31,9 +31,9 @@ const build = () =>
     dan: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}`,
     danOfficial: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/official`,
     danVote: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/vote`,
+    /** The site's players, with what they did on all sources together. */
     users: (query: { q: string; sort: string; page: number }) =>
-      withQuery(`${API_ROOT}/users`, query),
-    user: (id: string) => `${API_ROOT}/users/${encodeURIComponent(id)}`,
+      withQuery(`${SITE_API_ROOT}/users`, query),
     categories: `${API_ROOT}/categories`,
     uploadRules: `${API_ROOT}/upload-rules`,
     // The site has one sign-in, outside any source. It returns to a page of this source.

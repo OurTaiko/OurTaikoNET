@@ -72,16 +72,6 @@ func TestOfficialChartsBelongToTheBuiltInAccount(t *testing.T) {
 		t.Fatal(notices, err)
 	}
 
-	if code := world.c.do("alice", "GET", "/api/users/"+account.SystemUserID, "", nil); code != 404 {
-		t.Fatal(code)
-	}
-	var users UserDirectory
-	if code := world.c.do("alice", "GET", "/api/users", "", &users); code != 200 {
-		t.Fatal(code)
-	}
-	if slices.ContainsFunc(users.Items, func(u PublicUser) bool { return u.ID == account.SystemUserID }) {
-		t.Fatal("the built-in account is listed as a player")
-	}
 }
 
 // Nobody can be asked to co-create a chart with the built-in account.

@@ -19,7 +19,6 @@ import type {
   ScoreView,
 } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
-import { sources } from '@players/components/song-tile'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { UserAvatar } from '@sitekit/components/user-avatar'
@@ -44,15 +43,7 @@ import { useSession } from '@players/session'
 import { danName, offeredDans, titleName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
-import {
-  ChartsTab,
-  CommentsTab,
-  PlaylistsTab,
-  Seen,
-  SourceStats,
-  chartSources,
-  useSourceProfiles,
-} from '@players/pages/user-works'
+import { ChartsTab, CommentsTab, PlaylistsTab, PlayerStats, Seen } from '@players/pages/user-works'
 import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
 import { usePageMeta } from '@sitekit/head'
@@ -81,9 +72,6 @@ export function UserPage() {
   const tab = tabs.find((name) => name === params.get('tab')) ?? 'overview'
   const open = (name: string) =>
     setParams(name === 'overview' ? {} : { tab: name }, { replace: true })
-  const works = useSourceProfiles(id)
-  const count = (field: 'chartCount' | 'playlistCount' | 'commentCount', of = sources) =>
-    of.reduce((total, source) => total + (works[source]?.[field] ?? 0), 0)
   const read = useQuery(playerQueries.profile(id))
   const profile = read.data
   // What was read before stays on show when reading it again fails.
@@ -116,7 +104,7 @@ export function UserPage() {
           />
           <div className="min-w-0 flex-1 space-y-3">
             <Nameplate plate={plate} />
-            <Seen profiles={works} />
+            <Seen totals={profile.user} />
             {!profile.profilesAvailable && (
               <Notice kind="info">{t('profile.accountCenterDown')}</Notice>
             )}
@@ -124,7 +112,7 @@ export function UserPage() {
           <MessageButton userId={id} />
         </CardContent>
       </Card>
-      <SourceStats profiles={works} />
+      <PlayerStats totals={profile.user} />
       {/* Another player starts afresh: their tabs show nothing of the one before. */}
       <Tabs key={id} value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
         {/* Eight tabs are wider than a phone: the row scrolls sideways there. */}
@@ -135,17 +123,17 @@ export function UserPage() {
             <TabsTrigger value="scores">{t('profile.tabs.scores')}</TabsTrigger>
             <TabsTrigger value="charts">
               {t('profile.tabs.charts')}
-              <TabCount value={count('chartCount', chartSources)} />
+              <TabCount value={profile.user.chartCount} />
             </TabsTrigger>
             <TabsTrigger value="playlists">
               {t('profile.tabs.playlists')}
-              <TabCount value={count('playlistCount')} />
+              <TabCount value={profile.user.playlistCount} />
             </TabsTrigger>
             <TabsTrigger value="dans">{t('profile.tabs.dans')}</TabsTrigger>
             <TabsTrigger value="titles">{t('profile.tabs.titles')}</TabsTrigger>
             <TabsTrigger value="comments">
               {t('profile.tabs.comments')}
-              <TabCount value={count('commentCount')} />
+              <TabCount value={profile.user.commentCount} />
             </TabsTrigger>
           </TabsList>
         </div>
