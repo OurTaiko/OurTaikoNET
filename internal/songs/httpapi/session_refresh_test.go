@@ -100,7 +100,7 @@ func TestWebSessionRenewal(t *testing.T) {
 		var wg sync.WaitGroup
 		for range 12 {
 			wg.Go(func() {
-				w := call(cookie, "GET", "/api/v1/me")
+				w := call(cookie, "GET", "/api/me")
 				if w.Code != 200 || !strings.Contains(w.Body.String(), id) {
 					t.Errorf("renew failed: %d %s", w.Code, w.Body.String())
 				}
@@ -118,21 +118,21 @@ func TestWebSessionRenewal(t *testing.T) {
 		if err != nil || plain != "refresh-new" || !before.Equal(after) {
 			t.Fatal("lost rotation or extended absolute deadline")
 		}
-		if w := call(cookie, "POST", "/api/v1/auth/logout"); w.Code != 200 {
+		if w := call(cookie, "POST", "/api/auth/logout"); w.Code != 200 {
 			t.Fatal(w.Code, w.Body.String())
 		}
-		if w := call(cookie, "GET", "/api/v1/me"); !strings.Contains(w.Body.String(), `"user":null`) {
+		if w := call(cookie, "GET", "/api/me"); !strings.Contains(w.Body.String(), `"user":null`) {
 			t.Fatal("logout did not invalidate local session")
 		}
 	})
 	t.Run("temporary outage is retryable", func(t *testing.T) {
 		cookie := seed()
 		mode.Store(1)
-		if w := call(cookie, "GET", "/api/v1/me"); w.Code != 503 {
+		if w := call(cookie, "GET", "/api/me"); w.Code != 503 {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		mode.Store(0)
-		if w := call(cookie, "GET", "/api/v1/me"); w.Code != 200 || !strings.Contains(w.Body.String(), id) {
+		if w := call(cookie, "GET", "/api/me"); w.Code != 200 || !strings.Contains(w.Body.String(), id) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 	})
@@ -140,7 +140,7 @@ func TestWebSessionRenewal(t *testing.T) {
 		cookie := seed()
 		mode.Store(2)
 		defer mode.Store(0)
-		if w := call(cookie, "GET", "/api/v1/me"); w.Code != 200 || !strings.Contains(w.Body.String(), `"user":null`) {
+		if w := call(cookie, "GET", "/api/me"); w.Code != 200 || !strings.Contains(w.Body.String(), `"user":null`) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		var n int
@@ -156,7 +156,7 @@ func TestWebSessionRenewal(t *testing.T) {
 			t.Fatal(err)
 		}
 		before := rotations.Load()
-		if w := call(cookie, "GET", "/api/v1/me"); !strings.Contains(w.Body.String(), `"user":null`) {
+		if w := call(cookie, "GET", "/api/me"); !strings.Contains(w.Body.String(), `"user":null`) {
 			t.Fatal(w.Body.String())
 		}
 		if rotations.Load() != before {
@@ -172,7 +172,7 @@ func TestWebSessionRenewal(t *testing.T) {
 		mode.Store(3)
 		defer mode.Store(0)
 		before := rotations.Load()
-		if w := call(cookie, "GET", "/api/v1/me"); !strings.Contains(w.Body.String(), `"user":null`) {
+		if w := call(cookie, "GET", "/api/me"); !strings.Contains(w.Body.String(), `"user":null`) {
 			t.Fatal(w.Body.String())
 		}
 		if rotations.Load() != before {

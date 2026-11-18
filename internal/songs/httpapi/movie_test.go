@@ -124,9 +124,9 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	sound, movie := part{"audio", "vorbis.ogg", audio}, part{"movie", "clip.mp4", clip}
 	withMovie := "BGMOVIE:clip.mp4\nMOVIEOFFSET:-0.5\n"
 
-	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", withMovie), sound, part{"movie", "other.mp4", clip}), 422, "TJA_MOVIE_MISMATCH")
-	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", ""), sound, movie), 400, "UPLOAD_FILES_INVALID")
-	rejected(send("POST", "/api/v1/charts", web.NewID(), tja("A", "BGMOVIE:clip.avi\n"), sound, part{"movie", "clip.avi", clip}), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("POST", "/api/charts", web.NewID(), tja("A", withMovie), sound, part{"movie", "other.mp4", clip}), 422, "TJA_MOVIE_MISMATCH")
+	rejected(send("POST", "/api/charts", web.NewID(), tja("A", ""), sound, movie), 400, "UPLOAD_FILES_INVALID")
+	rejected(send("POST", "/api/charts", web.NewID(), tja("A", "BGMOVIE:clip.avi\n"), sound, part{"movie", "clip.avi", clip}), 400, "UPLOAD_FILES_INVALID")
 	app.cleanupReplacedFiles()
 	var n int
 	if err = pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM charts)+(SELECT count(*) FROM chart_resources)+(SELECT count(*) FROM retired_files)`).Scan(&n); err != nil || n != 0 {
@@ -135,7 +135,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 
 	// A movie that cannot be decoded is left out; the chart is still published
 	// and its stored TJA no longer declares the movie.
-	partial := decode(send("POST", "/api/v1/charts", web.NewID(), tja("Partial", withMovie), sound, part{"movie", "clip.mp4", []byte("not a video")}), 201)
+	partial := decode(send("POST", "/api/charts", web.NewID(), tja("Partial", withMovie), sound, part{"movie", "clip.mp4", []byte("not a video")}), 201)
 	if partial.MovieHash != "" || len(partial.FailedFiles) != 1 || partial.FailedFiles[0] != (fileFailure{"movie", "MOVIE_INVALID"}) {
 		t.Fatalf("undecodable movie: %+v", partial)
 	}
@@ -147,7 +147,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		t.Fatal("stored TJA still declares the rejected movie", err)
 	}
 	remove := func(id string) int {
-		r := httptest.NewRequest("DELETE", "/api/v1/charts/"+id, strings.NewReader("{}"))
+		r := httptest.NewRequest("DELETE", "/api/charts/"+id, strings.NewReader("{}"))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -162,11 +162,11 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	app.cleanupReplacedFiles()
 
 	key := web.NewID()
-	chart := decode(send("POST", "/api/v1/charts", key, tja("A", withMovie), sound, movie), 201)
+	chart := decode(send("POST", "/api/charts", key, tja("A", withMovie), sound, movie), 201)
 	if len(chart.MovieHash) != 64 || chart.MovieSize <= 0 || chart.MovieOffset != -0.5 || chart.MovieHash == web.Hash(string(clip)) {
 		t.Fatalf("movie not recorded: %+v", chart)
 	}
-	if retry := decode(send("POST", "/api/v1/charts", key, tja("A", withMovie), sound, movie), 200); retry.ID != chart.ID || retry.MovieHash != chart.MovieHash {
+	if retry := decode(send("POST", "/api/charts", key, tja("A", withMovie), sound, movie), 200); retry.ID != chart.ID || retry.MovieHash != chart.MovieHash {
 		t.Fatal("retry did not return the stored chart")
 	}
 	stored, err := read(chart.MovieHash + ".mp4")
@@ -190,7 +190,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		}
 		return key
 	}
-	text := get("/api/v1/charts/" + chart.ID + "/tja")
+	text := get("/api/charts/" + chart.ID + "/tja")
 	if remote {
 		data, err := read(tjaKey(chart.ID))
 		if err != nil {
@@ -202,10 +202,10 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 		t.Fatal("stored TJA does not name the stored movie", text.Body.String())
 	}
 	// The movie alone: redirected to the object host, or served from local storage.
-	if w := get("/api/v1/charts/" + chart.ID + "/movie"); !remote && (w.Code != 200 || w.Header().Get("Content-Type") != "video/mp4" || !bytes.Equal(w.Body.Bytes(), stored)) {
+	if w := get("/api/charts/" + chart.ID + "/movie"); !remote && (w.Code != 200 || w.Header().Get("Content-Type") != "video/mp4" || !bytes.Equal(w.Body.Bytes(), stored)) {
 		t.Fatal("movie route", w.Code)
 	}
-	archive := get("/api/v1/charts/" + chart.ID + "/download")
+	archive := get("/api/charts/" + chart.ID + "/download")
 	z, err := zip.NewReader(bytes.NewReader(archive.Body.Bytes()), int64(archive.Body.Len()))
 	if err != nil || len(z.File) != 3 || z.File[2].Name != chart.MovieHash+".mp4" || z.File[2].UncompressedSize64 != uint64(chart.MovieSize) {
 		t.Fatal("ZIP lacks the movie", err)
@@ -218,7 +218,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 				ContentType string `json:"contentType"`
 			}
 		}
-		w := get("/api/v1/charts/" + chart.ID + "/resources")
+		w := get("/api/charts/" + chart.ID + "/resources")
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &manifest) != nil {
 			t.Fatal(w.Code, w.Body.String())
 		}
@@ -229,7 +229,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 
 	// The offset alone: the stored TJA is rewritten, its chart and scores kept.
 	patch := func(body string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("PATCH", "/api/v1/charts/"+chart.ID, strings.NewReader(body))
+		r := httptest.NewRequest("PATCH", "/api/charts/"+chart.ID, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -261,7 +261,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	moviePath := "/api/v1/charts/" + chart.ID + "/movie"
+	moviePath := "/api/charts/" + chart.ID + "/movie"
 	rejected(send("PUT", moviePath, web.NewID()), 400, "UPLOAD_FILES_INVALID")
 	rejected(send("PUT", moviePath, web.NewID(), part{"movie", "clip.avi", otherClip}), 400, "UPLOAD_FILES_INVALID")
 	rejected(send("PUT", moviePath, web.NewID(), part{"movieOffset", "", []byte("x")}, part{"movie", "o.mp4", otherClip}), 422, "TJA_MOVIE_OFFSET_INVALID")
@@ -286,7 +286,7 @@ func testBackgroundMovie(t *testing.T, remote bool) {
 	declares(chart.ID, "\nBGMOVIE:"+chart.MovieHash+".mp4\nMOVIEOFFSET:-0.5\n")
 
 	// A replacement that still declares BGMOVIE keeps the stored movie without a new upload.
-	files := "/api/v1/charts/" + chart.ID + "/files"
+	files := "/api/charts/" + chart.ID + "/files"
 	confirm := part{"confirmReset", "", []byte("true")}
 	originalKey := tjaKey(chart.ID)
 	kept := decode(send("PUT", files, web.NewID(), tja("B", "BGMOVIE:renamed.webm\nMOVIEOFFSET:1.25\n"), confirm), 200)
@@ -574,7 +574,7 @@ func TestBackgroundMovies(t *testing.T) {
 		part.Write(f.data)
 	}
 	form.Close()
-	r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+	r := httptest.NewRequest("POST", "/api/charts", &body)
 	r.Header.Set("Content-Type", form.FormDataContentType())
 	r.Header.Set("Origin", "http://localhost")
 	r.Header.Set("X-CSRF-Token", "csrf")

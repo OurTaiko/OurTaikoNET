@@ -54,7 +54,7 @@ func TestDanAttemptNamesItsScores(t *testing.T) {
 	play := func(key string, points int) string {
 		t.Helper()
 		var score Score
-		send("/api/v1/game/scores", key, fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":0,"bad":0,"score":%d,"drumroll":0,"max_combo":5}`, oni, points), 201, &score)
+		send("/api/game/scores", key, fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":0,"bad":0,"score":%d,"drumroll":0,"max_combo":5}`, oni, points), 201, &score)
 		return score.ID
 	}
 	type reply struct {
@@ -64,13 +64,13 @@ func TestDanAttemptNamesItsScores(t *testing.T) {
 	post := func(key, body string, status int) reply {
 		t.Helper()
 		var out reply
-		send("/api/v1/game/dan-results", key, body, status, &out)
+		send("/api/game/dan-results", key, body, status, &out)
 		return out
 	}
 	old := func(key, body string, status int) reply {
 		t.Helper()
 		var out reply
-		send("/api/v1/game/dan-attempts", key, body, status, &out)
+		send("/api/game/dan-attempts", key, body, status, &out)
 		return out
 	}
 	attempt := func(key, extra string, status int) string {
@@ -117,14 +117,14 @@ func TestDanAttemptNamesItsScores(t *testing.T) {
 	// Each address takes its own form; dan-attempts, what older games send, says it is deprecated.
 	old("dan-attempt-key-0009", together, 422)
 	post("dan-attempt-key-0009", `{"courseId":"`+course+`","verdict":1,"songsPlayed":1}`, 422)
-	deprecated := httptest.NewRequest("POST", "/api/v1/game/dan-attempts", strings.NewReader(`{"courseId":"`+course+`","verdict":0,"songsPlayed":0}`))
+	deprecated := httptest.NewRequest("POST", "/api/game/dan-attempts", strings.NewReader(`{"courseId":"`+course+`","verdict":0,"songsPlayed":0}`))
 	deprecated.Header.Set("Content-Type", "application/json")
 	deprecated.Header.Set("Authorization", "Bearer "+token)
 	deprecated.Header.Set("Idempotency-Key", "dan-attempt-key-0009")
 	deprecated.RemoteAddr = "10.8.1.1:1234"
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, deprecated)
-	if rec.Code != 200 || rec.Header().Get("Deprecation") != "@1794268800" || !strings.Contains(rec.Header().Get("Link"), "/api/v1/game/dan-results") {
+	if rec.Code != 200 || rec.Header().Get("Deprecation") != "@1794268800" || !strings.Contains(rec.Header().Get("Link"), "/api/game/dan-results") {
 		t.Fatal("deprecated", rec.Code, rec.Header())
 	}
 	// An older game uploads the scores on their own, the attempt between them: they are looked for

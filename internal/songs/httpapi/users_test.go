@@ -53,7 +53,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 		app.Handler().ServeHTTP(w, r)
 		return w
 	}
-	w := call("POST", "/api/v1/game/login", `{"username":"ActivityUser","password":"wrong"}`, "", "")
+	w := call("POST", "/api/game/login", `{"username":"ActivityUser","password":"wrong"}`, "", "")
 	if w.Code != 401 {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -61,14 +61,14 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 		t.Fatal("failed login marked active")
 	}
 	cookie := seedWebSession(t, app, id)
-	if w = call("GET", "/api/v1/me", "", cookie, ""); w.Code != 200 {
+	if w = call("GET", "/api/me", "", cookie, ""); w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
 	first, last := read()
 	if first != nil || last == nil {
 		t.Fatal("authenticated legacy session invented login or missed activity")
 	}
-	w = call("POST", "/api/v1/game/login", `{"username":"ActivityUser","password":"test-password"}`, "", "")
+	w = call("POST", "/api/game/login", `{"username":"ActivityUser","password":"test-password"}`, "", "")
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -85,7 +85,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	initial := *first
 	recent := *last
 	for i := 0; i < 3; i++ {
-		if w = call("GET", "/api/v1/game/scores", "", "", login.Token); w.Code != 200 {
+		if w = call("GET", "/api/game/scores", "", "", login.Token); w.Code != 200 {
 			t.Fatal(w.Body.String())
 		}
 	}
@@ -100,7 +100,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	first, last = read()
 	initial = *first
 	old := *last
-	if w = call("GET", "/api/v1/me", "", cookie, ""); w.Code != 200 {
+	if w = call("GET", "/api/me", "", cookie, ""); w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
 	first, last = read()
@@ -114,7 +114,7 @@ func TestUserActivityMigrationAndAuthentication(t *testing.T) {
 	_, last = read()
 	old = *last
 	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
-	if w = call("GET", "/api/v1/me", "", cookie, ""); w.Code != 503 {
+	if w = call("GET", "/api/me", "", cookie, ""); w.Code != 503 {
 		t.Fatal(w.Code)
 	}
 	if _, last = read(); !last.Equal(old) {
@@ -191,7 +191,7 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 	get := func(query string) (*httptest.ResponseRecorder, UserDirectory) {
 		t.Helper()
 		w := httptest.NewRecorder()
-		app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/users"+query, nil))
+		app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/users"+query, nil))
 		var result UserDirectory
 		if w.Code == 200 {
 			if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
@@ -252,12 +252,12 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 	}
 	// Exact owner filtering for the public chart link.
 	w = httptest.NewRecorder()
-	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts?owner="+ids[1], nil))
+	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/charts?owner="+ids[1], nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"total":0`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()
-	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts?owner="+ids[0], nil))
+	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/charts?owner="+ids[0], nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"total":2`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -265,7 +265,7 @@ func TestUserDirectoryPublicScopeAndStatistics(t *testing.T) {
 	spaceRequest := func(id string) *httptest.ResponseRecorder {
 		t.Helper()
 		response := httptest.NewRecorder()
-		app.Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/users/"+id, nil))
+		app.Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/users/"+id, nil))
 		return response
 	}
 	w = spaceRequest(ids[0])

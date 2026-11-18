@@ -179,7 +179,7 @@ func (s *Server) profiles(ctx context.Context, ids []string) map[string]account.
 	return names
 }
 
-// activity is GET /api/v1/activity, public: what the home page's community list shows. The
+// activity is GET /api/activity, public: what the home page's community list shows. The
 // answer is kept for a few seconds and given to everyone who asks meanwhile.
 func (s *Server) activity(w http.ResponseWriter, r *http.Request) {
 	s.feedMu.Lock()

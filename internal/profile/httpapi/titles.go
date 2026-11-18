@@ -133,7 +133,7 @@ func (s *Server) nameplate(ctx context.Context, db queryer, id string) (Nameplat
 	return plate, nil
 }
 
-// userNameplate is GET /api/v1/users/{id}/nameplate, public: the game reads it for each
+// userNameplate is GET /api/users/{id}/nameplate, public: the game reads it for each
 // signed-in seat. Nickname and avatar are empty while the account center does not answer.
 func (s *Server) userNameplate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -152,7 +152,7 @@ func (s *Server) userNameplate(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, plate)
 }
 
-// nameplates is GET /api/v1/nameplates?ids=a,b,…: up to 100 players' titles and 段位 at once,
+// nameplates is GET /api/nameplates?ids=a,b,…: up to 100 players' titles and 段位 at once,
 // for the other OurTaiko websites to draw next to the names they show (their own nicknames; this
 // asks the account center nothing). Readable from any website.
 func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +179,7 @@ func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"nameplates": plates})
 }
 
-// userProfile is GET /api/v1/users/{id}: who the player is, their nameplate and the services
+// userProfile is GET /api/users/{id}: who the player is, their nameplate and the services
 // shown. 404 when the account center knows no such active user.
 func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -206,7 +206,7 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// titleCatalog is GET /api/v1/titles: every title, readable from any website (the 段位 editors of
+// titleCatalog is GET /api/titles: every title, readable from any website (the 段位 editors of
 // the other OurTaiko websites pick reward titles from it), and the rules that give titles by
 // themselves (title_rules.go).
 func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
@@ -338,7 +338,7 @@ func (s *Server) userDans(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"badges": badges, "history": history})
 }
 
-// wearNameplate is PUT /api/v1/me/nameplate {titleId: string|null, showDan}: one of the
+// wearNameplate is PUT /api/me/nameplate {titleId: string|null, showDan}: one of the
 // player's own titles, or none.
 func (s *Server) wearNameplate(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
@@ -408,7 +408,7 @@ func (b *titleBody) text() ([]byte, bool) {
 	return translations, valid
 }
 
-// saveTitle is PUT /api/v1/admin/titles/{id}: create or change a title of the catalog. A
+// saveTitle is PUT /api/admin/titles/{id}: create or change a title of the catalog. A
 // player's title keeps its maker; making it official frees their place for another.
 func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.admin(w, r); !ok {
@@ -450,7 +450,7 @@ func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
-// createOwnTitle is POST /api/v1/me/titles {name, nameTranslations, description, style}: a
+// createOwnTitle is POST /api/me/titles {name, nameTranslations, description, style}: a
 // community title the player can give in their own 段位 courses. Its id is made here.
 func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
@@ -500,7 +500,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 201, t)
 }
 
-// saveOwnTitle is PUT /api/v1/me/titles/{id}, the same body: the maker changes a community
+// saveOwnTitle is PUT /api/me/titles/{id}, the same body: the maker changes a community
 // title. Of an official one they change the band only (any band); the rest is ignored.
 func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
@@ -550,7 +550,7 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, t)
 }
 
-// deleteOwnTitle is DELETE /api/v1/me/titles/{id}: the maker removes a community title. The
+// deleteOwnTitle is DELETE /api/me/titles/{id}: the maker removes a community title. The
 // players who earned it lose it, and a nameplate wearing it wears none.
 func (s *Server) deleteOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
@@ -584,7 +584,7 @@ type grantBody struct {
 	TitleID string `json:"titleId"`
 }
 
-// grantTitle is POST /api/v1/admin/grants {userId, titleId}: an administrator gives a title
+// grantTitle is POST /api/admin/grants {userId, titleId}: an administrator gives a title
 // (events, tests). It is recorded as an award of the service "admin".
 func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.admin(w, r)

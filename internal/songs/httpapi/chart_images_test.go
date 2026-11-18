@@ -87,7 +87,7 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 	}
 	upload := func(want int, parts ...part) Chart {
 		t.Helper()
-		rec := send("POST", "/api/v1/charts", parts...)
+		rec := send("POST", "/api/charts", parts...)
 		if rec.Code != want {
 			t.Fatalf("status %d want %d: %s", rec.Code, want, rec.Body.String())
 		}
@@ -127,7 +127,7 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 	}
 	declares(named.ID, "\nPREIMAGE:"+named.CoverHash+".webp\n")
 
-	rec := send("POST", "/api/v1/charts", chart("B", "PREIMAGE:jacket.png\n"), sound, part{"cover", "other.png", red})
+	rec := send("POST", "/api/charts", chart("B", "PREIMAGE:jacket.png\n"), sound, part{"cover", "other.png", red})
 	if rec.Code != 422 || !strings.Contains(rec.Body.String(), `"TJA_PREIMAGE_MISMATCH"`) {
 		t.Fatalf("mismatched cover: %d %s", rec.Code, rec.Body.String())
 	}
@@ -149,7 +149,7 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 
 	// Changing the cover alone rewrites PREIMAGE, adding it when missing.
 	for _, id := range []string{bare.ID, plain.ID} {
-		rec = send("PUT", "/api/v1/charts/"+id+"/cover", part{"cover", "new.png", blue})
+		rec = send("PUT", "/api/charts/"+id+"/cover", part{"cover", "new.png", blue})
 		if rec.Code != 200 {
 			t.Fatalf("cover change: %d %s", rec.Code, rec.Body.String())
 		}
@@ -159,23 +159,23 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 	}
 
 	// A file replacement without a cover keeps the chart's cover, which PREIMAGE then names.
-	rec = send("PUT", "/api/v1/charts/"+named.ID+"/files", chart("A2", "PREIMAGE:renamed.jpg\n"), part{"confirmReset", "", []byte("true")})
+	rec = send("PUT", "/api/charts/"+named.ID+"/files", chart("A2", "PREIMAGE:renamed.jpg\n"), part{"confirmReset", "", []byte("true")})
 	if rec.Code != 200 {
 		t.Fatalf("replacement: %d %s", rec.Code, rec.Body.String())
 	}
 	declares(named.ID, "\nPREIMAGE:"+named.CoverHash+".webp\n")
 	// ... and one with a cover must name it as PREIMAGE does.
-	rec = send("PUT", "/api/v1/charts/"+named.ID+"/files", chart("A3", "PREIMAGE:renamed.jpg\n"), part{"confirmReset", "", []byte("true")}, part{"cover", "jacket.png", blue})
+	rec = send("PUT", "/api/charts/"+named.ID+"/files", chart("A3", "PREIMAGE:renamed.jpg\n"), part{"confirmReset", "", []byte("true")}, part{"cover", "jacket.png", blue})
 	if rec.Code != 422 || !strings.Contains(rec.Body.String(), `"TJA_PREIMAGE_MISMATCH"`) {
 		t.Fatalf("mismatched replacement cover: %d %s", rec.Code, rec.Body.String())
 	}
 
 	// BGIMAGE works as BGMOVIE: its file must be the declared one, stored as WebP.
-	rec = send("POST", "/api/v1/charts", chart("F", ""), sound, part{"bgimage", "bg.png", red})
+	rec = send("POST", "/api/charts", chart("F", ""), sound, part{"bgimage", "bg.png", red})
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), `"UPLOAD_FILES_INVALID"`) {
 		t.Fatalf("undeclared background: %d %s", rec.Code, rec.Body.String())
 	}
-	rec = send("POST", "/api/v1/charts", chart("F", "BGIMAGE:bg.png\n"), sound, part{"bgimage", "other.png", red})
+	rec = send("POST", "/api/charts", chart("F", "BGIMAGE:bg.png\n"), sound, part{"bgimage", "other.png", red})
 	if rec.Code != 422 || !strings.Contains(rec.Body.String(), `"TJA_BGIMAGE_MISMATCH"`) {
 		t.Fatalf("mismatched background: %d %s", rec.Code, rec.Body.String())
 	}
@@ -190,10 +190,10 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 		return rec
 	}
 	// With public links the route redirects to the stored object.
-	if rec = get("/api/v1/charts/" + backdrop.ID + "/bgimage"); (rec.Code != 200 && rec.Code != 302) || (rec.Code == 302 && !strings.Contains(rec.Header().Get("Location"), backdrop.BackgroundHash+".webp")) {
+	if rec = get("/api/charts/" + backdrop.ID + "/bgimage"); (rec.Code != 200 && rec.Code != 302) || (rec.Code == 302 && !strings.Contains(rec.Header().Get("Location"), backdrop.BackgroundHash+".webp")) {
 		t.Fatalf("background route: %d %s", rec.Code, rec.Header().Get("Location"))
 	}
-	if rec = get("/api/v1/charts/" + backdrop.ID + "/resources"); !strings.Contains(rec.Body.String(), `"bgimage"`) {
+	if rec = get("/api/charts/" + backdrop.ID + "/resources"); !strings.Contains(rec.Body.String(), `"bgimage"`) {
 		t.Fatalf("resources lack the background: %s", rec.Body.String())
 	}
 	// Declared without a file: published without one.
@@ -209,18 +209,18 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 	}
 	declares(unfilmed.ID, "\nBGMOVIE:\n")
 	// A replacement still declaring BGIMAGE keeps the stored image; one without drops it.
-	rec = send("PUT", "/api/v1/charts/"+backdrop.ID+"/files", chart("F2", "BGIMAGE:elsewhere.jpg\n"), part{"confirmReset", "", []byte("true")})
+	rec = send("PUT", "/api/charts/"+backdrop.ID+"/files", chart("F2", "BGIMAGE:elsewhere.jpg\n"), part{"confirmReset", "", []byte("true")})
 	if rec.Code != 200 {
 		t.Fatalf("replacement keeping the background: %d %s", rec.Code, rec.Body.String())
 	}
 	declares(backdrop.ID, "\nBGIMAGE:"+backdrop.BackgroundHash+".webp\n")
-	rec = send("PUT", "/api/v1/charts/"+backdrop.ID+"/files", chart("F3", ""), part{"confirmReset", "", []byte("true")})
+	rec = send("PUT", "/api/charts/"+backdrop.ID+"/files", chart("F3", ""), part{"confirmReset", "", []byte("true")})
 	var dropped Chart
 	_ = json.Unmarshal(rec.Body.Bytes(), &dropped)
 	if rec.Code != 200 || dropped.BackgroundHash != "" || strings.Contains(stored(backdrop.ID), "BGIMAGE") {
 		t.Fatalf("replacement dropping the background: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec = get("/api/v1/charts/" + backdrop.ID + "/bgimage"); rec.Code != 404 {
+	if rec = get("/api/charts/" + backdrop.ID + "/bgimage"); rec.Code != 404 {
 		t.Fatalf("dropped background still served: %d", rec.Code)
 	}
 

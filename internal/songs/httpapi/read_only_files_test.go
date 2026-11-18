@@ -22,7 +22,7 @@ func TestAReadOnlyStoreTurnsUploadsAway(t *testing.T) {
 	s := &Server{}
 	s.Config.Objects = public
 	w := httptest.NewRecorder()
-	s.storing(next)(w, httptest.NewRequest("POST", "/api/v1/charts", nil))
+	s.storing(next)(w, httptest.NewRequest("POST", "/api/charts", nil))
 	if reached || w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "FILES_READ_ONLY") {
 		t.Fatal(reached, w.Code, w.Body.String())
 	}
@@ -31,7 +31,7 @@ func TestAReadOnlyStoreTurnsUploadsAway(t *testing.T) {
 	}
 
 	s.Config.Objects = objectstore.Local{Root: t.TempDir()}
-	s.storing(next)(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/v1/charts", nil))
+	s.storing(next)(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/charts", nil))
 	if !reached || s.ReadOnlyFiles() {
 		t.Fatal(reached, s.ReadOnlyFiles())
 	}

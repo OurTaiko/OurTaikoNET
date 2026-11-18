@@ -54,7 +54,7 @@ func TestUserScores(t *testing.T) {
 	get := func(query string, status int) page {
 		t.Helper()
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/users/"+player+"/scores"+query, nil))
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/users/"+player+"/scores"+query, nil))
 		if w.Code != status {
 			t.Fatalf("%s: %d %s", query, w.Code, w.Body.String())
 		}
@@ -117,12 +117,12 @@ func TestUserScores(t *testing.T) {
 		get(query, 400)
 	}
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/users/NOT-AN-ID/scores", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/users/NOT-AN-ID/scores", nil))
 	if w.Code != 404 {
 		t.Fatal("invalid id", w.Code)
 	}
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/users/0000000000000000000000000000ffff/scores", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/users/0000000000000000000000000000ffff/scores", nil))
 	if w.Code != 200 || w.Body.String() == "" {
 		t.Fatal("a player without scores has an empty list", w.Code)
 	}

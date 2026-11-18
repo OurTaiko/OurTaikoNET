@@ -111,7 +111,7 @@ type ruleBody struct {
 // a status and a problem to answer when not, or an error.
 type itemCheck func(ctx context.Context, tx pgx.Tx) (status int, code, message string, err error)
 
-// createTitleRule is POST /api/v1/admin/titles/{id}/rules {kind, source, chartId, category,
+// createTitleRule is POST /api/admin/titles/{id}/rules {kind, source, chartId, category,
 // course, clear, count}: from now on the title is given to whoever meets the rule, and at once
 // to everyone who meets it already. Only a title of the catalog's own takes rules, not one a
 // player made. It answers {rule, granted}: the rule and how many players got the title now.
@@ -132,7 +132,7 @@ func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// createDonItemRule is POST /api/v1/admin/don/items/{part}/{id}/rules, with the body of
+// createDonItemRule is POST /api/admin/don/items/{part}/{id}/rules, with the body of
 // createTitleRule: the same for a part of the 3D Don of the catalog (not 0, none).
 func (s *Server) createDonItemRule(w http.ResponseWriter, r *http.Request) {
 	part := r.PathValue("part")
@@ -231,7 +231,7 @@ func (s *Server) createRule(w http.ResponseWriter, r *http.Request, item titleru
 	web.Respond(w, 201, map[string]any{"rule": saved, "granted": granted})
 }
 
-// deleteTitleRule is DELETE /api/v1/admin/rules/{id}: the rule gives nothing from now on.
+// deleteTitleRule is DELETE /api/admin/rules/{id}: the rule gives nothing from now on.
 // Players keep what it gave.
 func (s *Server) deleteTitleRule(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.admin(w, r); !ok {

@@ -32,7 +32,7 @@ func TestEmbeddedSite(t *testing.T) {
 		{"GET", "/icons/icon-192.png", "public, max-age=3600", 200, false},
 		{"GET", "/assets/missing.js", "no-store", 404, false},
 		{"GET", "/edit/missing", "no-store", 404, false},
-		{"GET", "/api/v1/missing", "no-store", 404, false},
+		{"GET", "/api/missing", "no-store", 404, false},
 		{"GET", "/.gitkeep", "no-store", 404, false},
 	} {
 		t.Run(tc.method+tc.path, func(t *testing.T) {

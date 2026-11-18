@@ -25,7 +25,7 @@ func (s *source) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.asked = append(s.asked, r.Method+" "+r.URL.RequestURI()+" "+r.Header.Get("Accept-Encoding"))
 	fail := s.fail
 	s.mu.Unlock()
-	personal := r.URL.Path == "/api/v1/game/scores" || r.URL.Path == "/api/v1/game/playlists"
+	personal := r.URL.Path == "/api/game/scores" || r.URL.Path == "/api/game/playlists"
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	switch {
 	case r.URL.Path == fail:
@@ -35,7 +35,7 @@ func (s *source) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		io.WriteString(w, `{"code":"UNAUTHORIZED"}`)
 	default:
-		io.WriteString(w, `{"from":"`+s.name+`","route":"`+strings.TrimPrefix(r.URL.Path, "/api/v1/game/")+`"}`)
+		io.WriteString(w, `{"from":"`+s.name+`","route":"`+strings.TrimPrefix(r.URL.Path, "/api/game/")+`"}`)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestTheGameLoadsEverySourceInOneAnswer(t *testing.T) {
 	}
 
 	// Nobody signed in: the catalogue and the dan courses of both, in the sources' order.
-	code, sources, raw := ask("/api/v1/game/sources", "")
+	code, sources, raw := ask("/api/game/sources", "")
 	if code != 200 || len(sources) != 2 || sources[0].ID != "fanmade" || sources[1].Name != "OurTaiko Database" {
 		t.Fatal(code, raw)
 	}
@@ -77,41 +77,41 @@ func TestTheGameLoadsEverySourceInOneAnswer(t *testing.T) {
 	}
 
 	// Signed in: the player's scores and playlists too.
-	code, sources, raw = ask("/api/v1/game/sources", "good")
+	code, sources, raw = ask("/api/game/sources", "good")
 	if code != 200 || sources[1].Scores == nil || *sources[1].Scores != (part{"official", "scores"}) || sources[0].Playlists == nil || sources[0].Catalog == nil {
 		t.Fatal(code, raw)
 	}
 	// Only what is named.
-	code, sources, raw = ask("/api/v1/game/sources?parts=scores,playlists", "good")
+	code, sources, raw = ask("/api/game/sources?parts=scores,playlists", "good")
 	if code != 200 || sources[0].Catalog != nil || sources[0].Dans != nil || sources[0].Scores == nil || sources[1].Playlists == nil {
 		t.Fatal(code, raw)
 	}
-	if code, sources, raw = ask("/api/v1/game/sources?parts=scores", "good"); code != 200 || sources[0].Playlists != nil || sources[0].Scores == nil {
+	if code, sources, raw = ask("/api/game/sources?parts=scores", "good"); code != 200 || sources[0].Playlists != nil || sources[0].Scores == nil {
 		t.Fatal(code, raw)
 	}
 	// A session the sources refuse is refused here, as they refuse it.
-	if code, _, raw = ask("/api/v1/game/sources", "expired"); code != 401 || !strings.Contains(raw, "UNAUTHORIZED") {
+	if code, _, raw = ask("/api/game/sources", "expired"); code != 401 || !strings.Contains(raw, "UNAUTHORIZED") {
 		t.Fatal(code, raw)
 	}
-	if code, _, raw = ask("/api/v1/game/sources?parts=scores", ""); code != 401 {
+	if code, _, raw = ask("/api/game/sources?parts=scores", ""); code != 401 {
 		t.Fatal(code, raw)
 	}
 	// A part that is none.
-	for _, path := range []string{"/api/v1/game/sources?parts=everything", "/api/v1/game/sources?parts=catalog,charts"} {
+	for _, path := range []string{"/api/game/sources?parts=everything", "/api/game/sources?parts=catalog,charts"} {
 		if code, _, raw = ask(path, ""); code != 400 || !strings.Contains(raw, "PARTS_INVALID") {
 			t.Fatal(path, code, raw)
 		}
 	}
 	// One part failing in one source: no half answer.
-	official.fail = "/api/v1/game/dans"
-	if code, _, raw = ask("/api/v1/game/sources", ""); code != 503 || strings.Contains(raw, "fanmade") {
+	official.fail = "/api/game/dans"
+	if code, _, raw = ask("/api/game/sources", ""); code != 503 || strings.Contains(raw, "fanmade") {
 		t.Fatal(code, raw)
 	}
 	official.fail = ""
 
 	// The answer is compressed once, for a client that takes it so; the sources are not asked to.
 	fanmade.asked = nil
-	r := httptest.NewRequest("GET", "/api/v1/game/sources", nil)
+	r := httptest.NewRequest("GET", "/api/game/sources", nil)
 	r.Header.Set("Accept-Encoding", "gzip")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)

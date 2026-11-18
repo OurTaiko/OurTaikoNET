@@ -49,7 +49,7 @@ func TestDanCourses(t *testing.T) {
 			w.WriteHeader(503)
 			return
 		}
-		if r.Method == "GET" && r.URL.Path == "/api/v1/titles" {
+		if r.Method == "GET" && r.URL.Path == "/api/titles" {
 			catalogReads.Add(1)
 			mu.Lock()
 			defer mu.Unlock()
@@ -95,7 +95,7 @@ func TestDanCourses(t *testing.T) {
 		requests++
 		r.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", requests%250+1)
 		r.Header.Set("Content-Type", "application/json")
-		if strings.HasPrefix(path, "/api/v1/game/") {
+		if strings.HasPrefix(path, "/api/game/") {
 			if user != "" {
 				r.Header.Set("Authorization", "Bearer "+game[user])
 			}
@@ -129,7 +129,7 @@ func TestDanCourses(t *testing.T) {
  "rewards":{"dan":20,"titles":[{"id":"ten-dan","on":"red"},{"id":"ten-dan-gold","on":"gold"}]}}`
 
 	// Anyone signed in publishes; what the game needs is checked.
-	expect(call("POST", "/api/v1/dans", course, ""), 401, nil)
+	expect(call("POST", "/api/dans", course, ""), 401, nil)
 	for _, bad := range []string{
 		strings.Replace(course, `"type":"gauge","range":"more","value":[100]`, `"type":"gauge","range":"more","value":[[100],null]`, 1),
 		strings.Replace(course, `"value":[[10,5],null]`, `"value":[[0],null]`, 1),
@@ -143,23 +143,23 @@ func TestDanCourses(t *testing.T) {
 		strings.Replace(course, `"course":"Oni","side":"single"}`, `"course":"Oni"}`, 1),
 		strings.Replace(course, `"course":"Oni","side":"single"}`, `"course":"Oni","side":"p2"}`, 1),
 	} {
-		expect(call("POST", "/api/v1/dans", bad, alice), 422, nil)
+		expect(call("POST", "/api/dans", bad, alice), 422, nil)
 	}
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"course":"Oni","side":"single","hidden"`, `"course":"Edit","side":"single","hidden"`, 1), alice), 422, nil)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"course":"Oni","side":"single","hidden"`, `"course":"Edit","side":"single","hidden"`, 1), alice), 422, nil)
 
 	// Reward titles are on Profile, and official or the maker's own community titles.
 	var problemBody struct{ Code string }
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 422, &problemBody)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 422, &problemBody)
 	if problemBody.Code != "DAN_TITLE_NOT_FOUND" {
 		t.Fatal(problemBody)
 	}
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"ten-dan-gold"`, `"carols"`, 1), alice), 422, &problemBody)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"carols"`, 1), alice), 422, &problemBody)
 	if problemBody.Code != "DAN_TITLE_NOT_OWNED" {
 		t.Fatal(problemBody)
 	}
 	reads := catalogReads.Load()
 	var withShared DanCourse
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"ten-dan-gold"`, `"shared"`, 1), alice), 201, &withShared)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"shared"`, 1), alice), 201, &withShared)
 	if catalogReads.Load() != reads {
 		t.Fatal("the catalog is kept for a minute")
 	}
@@ -167,10 +167,10 @@ func TestDanCourses(t *testing.T) {
 	mu.Lock()
 	titles = append(titles, map[string]any{"id": "brand-new", "official": false, "ownerId": alice})
 	mu.Unlock()
-	expect(call("PUT", "/api/v1/dans/"+withShared.ID, strings.Replace(course, `"ten-dan-gold"`, `"brand-new"`, 1), alice), 200, nil)
-	expect(call("DELETE", "/api/v1/dans/"+withShared.ID, "", alice), 200, nil)
+	expect(call("PUT", "/api/dans/"+withShared.ID, strings.Replace(course, `"ten-dan-gold"`, `"brand-new"`, 1), alice), 200, nil)
+	expect(call("DELETE", "/api/dans/"+withShared.ID, "", alice), 200, nil)
 	var created DanCourse
-	expect(call("POST", "/api/v1/dans", course, alice), 201, &created)
+	expect(call("POST", "/api/dans", course, alice), 201, &created)
 	if created.Official || created.Owner != "Alice" || created.Title["en"] != "10th Dan" || len(created.Songs) != 2 || !created.Songs[1].Hidden ||
 		created.Songs[0].Chart.Side != "single" || created.Songs[0].Level != 9 || !created.Songs[0].Valid || !created.Songs[0].Available || created.Songs[1].Title != "Beta" {
 		t.Fatalf("created %+v", created)
@@ -181,41 +181,41 @@ func TestDanCourses(t *testing.T) {
 		t.Fatal("code", created.Code)
 	}
 	var coded DanCourse
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"color":3`, `"color":3,"code":" ab12cd "`, 1), alice), 201, &coded)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"color":3`, `"color":3,"code":" ab12cd "`, 1), alice), 201, &coded)
 	if coded.Code != "AB12CD" {
 		t.Fatal("chosen code", coded.Code)
 	}
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"ab12cd"`, 1), alice), 409, &problemBody)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"ab12cd"`, 1), alice), 409, &problemBody)
 	if problemBody.Code != "DAN_CODE_TAKEN" {
 		t.Fatal(problemBody)
 	}
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"ab-12"`, 1), alice), 422, &problemBody)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"ab-12"`, 1), alice), 422, &problemBody)
 	if problemBody.Code != "DAN_CODE_INVALID" {
 		t.Fatal(problemBody)
 	}
-	expect(call("DELETE", "/api/v1/dans/"+coded.ID, "", alice), 200, nil)
+	expect(call("DELETE", "/api/dans/"+coded.ID, "", alice), 200, nil)
 	// A deleted course keeps its code.
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"AB12CD"`, 1), alice), 409, nil)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"color":3`, `"color":3,"code":"AB12CD"`, 1), alice), 409, nil)
 
 	// The game's list carries official courses only; any course answers to its code.
 	var list struct {
 		Dans       []DanCourse
 		DanVersion int
 	}
-	expect(call("GET", "/api/v1/game/dans", "", ""), 200, &list)
+	expect(call("GET", "/api/game/dans", "", ""), 200, &list)
 	if list.DanVersion != 1 || len(list.Dans) != 0 {
 		t.Fatalf("game list before official %+v", list)
 	}
 	var byCode DanCourse
-	expect(call("GET", "/api/v1/game/dans/"+strings.ToLower(created.Code), "", ""), 200, &byCode)
+	expect(call("GET", "/api/game/dans/"+strings.ToLower(created.Code), "", ""), 200, &byCode)
 	if byCode.ID != created.ID || byCode.Format != 1 || byCode.Songs[1].Chart.ID != songB {
 		t.Fatalf("by code %+v", byCode)
 	}
-	expect(call("GET", "/api/v1/game/dans/AB12CD", "", ""), 404, nil)
-	expect(call("GET", "/api/v1/game/dans/ZZZZZZ", "", ""), 404, nil)
-	expect(call("GET", "/api/v1/game/dans/zz", "", ""), 404, nil)
+	expect(call("GET", "/api/game/dans/AB12CD", "", ""), 404, nil)
+	expect(call("GET", "/api/game/dans/ZZZZZZ", "", ""), 404, nil)
+	expect(call("GET", "/api/game/dans/zz", "", ""), 404, nil)
 	var catalog map[string]any
-	expect(call("GET", "/api/v1/game/catalog", "", ""), 200, &catalog)
+	expect(call("GET", "/api/game/catalog", "", ""), 200, &catalog)
 	if catalog["danVersion"] != float64(1) {
 		t.Fatal("the catalog says the server hands out courses")
 	}
@@ -223,18 +223,18 @@ func TestDanCourses(t *testing.T) {
 	attempt := func(key, body string, status int) map[string]json.RawMessage {
 		t.Helper()
 		var reply map[string]json.RawMessage
-		expect(call("POST", "/api/v1/game/dan-attempts", body, carol, key), status, &reply)
+		expect(call("POST", "/api/game/dan-attempts", body, carol, key), status, &reply)
 		return reply
 	}
-	expect(call("POST", "/api/v1/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, carol), 400, nil)
-	expect(call("POST", "/api/v1/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, "", "attempt-key-0001"), 401, nil)
+	expect(call("POST", "/api/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, carol), 400, nil)
+	expect(call("POST", "/api/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, "", "attempt-key-0001"), 401, nil)
 	attempt("attempt-key-0001", `{"courseId":"`+created.ID+`","verdict":7,"songsPlayed":2}`, 422)
 	attempt("attempt-key-0001", `{"courseId":"999","verdict":1,"songsPlayed":2}`, 422) // course IDs are 32 hex digits
 	attempt("attempt-key-0001", `{"courseId":"`+web.NewID()+`","verdict":1,"songsPlayed":2}`, 404)
 	if !validID(created.ID) {
 		t.Fatal("course ID", created.ID)
 	}
-	expect(call("GET", "/api/v1/dans/999", "", ""), 404, nil)
+	expect(call("GET", "/api/dans/999", "", ""), 404, nil)
 
 	// Not official yet: the titles come, no 段位.
 	reply := attempt("attempt-key-0001", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, 200)
@@ -246,9 +246,9 @@ func TestDanCourses(t *testing.T) {
 	}
 
 	// Administrators mark official courses.
-	expect(call("PUT", "/api/v1/dans/"+created.ID+"/official", `{"official":true}`, alice), 403, nil)
-	expect(call("PUT", "/api/v1/dans/"+created.ID+"/official", `{"official":true}`, boss), 200, nil)
-	expect(call("GET", "/api/v1/game/dans", "", ""), 200, &list)
+	expect(call("PUT", "/api/dans/"+created.ID+"/official", `{"official":true}`, alice), 403, nil)
+	expect(call("PUT", "/api/dans/"+created.ID+"/official", `{"official":true}`, boss), 200, nil)
+	expect(call("GET", "/api/game/dans", "", ""), 200, &list)
 	if len(list.Dans) != 1 || list.Dans[0].ID != created.ID || list.Dans[0].Code != created.Code {
 		t.Fatalf("game list once official %+v", list)
 	}
@@ -287,7 +287,7 @@ func TestDanCourses(t *testing.T) {
 	result := func(key, body string, status int) map[string]json.RawMessage {
 		t.Helper()
 		var reply map[string]json.RawMessage
-		expect(call("POST", "/api/v1/game/dan-results", body, carol, key), status, &reply)
+		expect(call("POST", "/api/game/dan-results", body, carol, key), status, &reply)
 		return reply
 	}
 	slot := func(song string) int64 {
@@ -301,7 +301,7 @@ func TestDanCourses(t *testing.T) {
 	play := func(song, key string, points int) string {
 		t.Helper()
 		var score Score
-		expect(call("POST", "/api/v1/game/scores", fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":0,"bad":0,"score":%d,"drumroll":0,"max_combo":5}`, slot(song), points), carol, key), 201, &score)
+		expect(call("POST", "/api/game/scores", fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":0,"bad":0,"score":%d,"drumroll":0,"max_combo":5}`, slot(song), points), carol, key), 201, &score)
 		return score.ID
 	}
 	scores := func(reply map[string]json.RawMessage) string {
@@ -387,14 +387,14 @@ func TestDanCourses(t *testing.T) {
 	// deprecated; the catalog tells a game that dan-results is there.
 	attempt("attempt-key-0010", together, 422)
 	result("attempt-key-0010", `{"courseId":"`+created.ID+`","verdict":0,"songsPlayed":0}`, 422)
-	old := call("POST", "/api/v1/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":0,"songsPlayed":0}`, carol, "attempt-key-0010")
-	if old.Code != 200 || old.Header().Get("Deprecation") != "@1794268800" || !strings.Contains(old.Header().Get("Link"), "/api/v1/game/dan-results") {
+	old := call("POST", "/api/game/dan-attempts", `{"courseId":"`+created.ID+`","verdict":0,"songsPlayed":0}`, carol, "attempt-key-0010")
+	if old.Code != 200 || old.Header().Get("Deprecation") != "@1794268800" || !strings.Contains(old.Header().Get("Link"), "/api/game/dan-results") {
 		t.Fatal("deprecated", old.Code, old.Header())
 	}
-	if made := call("POST", "/api/v1/game/dan-results", `{"courseId":"`+created.ID+`","verdict":0,"scores":[]}`, carol, "attempt-key-0011"); made.Code != 200 || made.Header().Get("Deprecation") != "" {
+	if made := call("POST", "/api/game/dan-results", `{"courseId":"`+created.ID+`","verdict":0,"scores":[]}`, carol, "attempt-key-0011"); made.Code != 200 || made.Header().Get("Deprecation") != "" {
 		t.Fatal("dan-results is not deprecated", made.Code, made.Header())
 	}
-	expect(call("GET", "/api/v1/game/catalog", "", ""), 200, &catalog)
+	expect(call("GET", "/api/game/catalog", "", ""), 200, &catalog)
 	if catalog["danResultsVersion"] != float64(1) || catalog["danAttemptScores"] != nil {
 		t.Fatal("the catalog names dan-results", catalog["danResultsVersion"])
 	}
@@ -441,23 +441,23 @@ func TestDanCourses(t *testing.T) {
 		t.Fatal(err)
 	}
 	var detail DanCourse
-	expect(call("GET", "/api/v1/dans/"+created.ID, "", ""), 200, &detail)
+	expect(call("GET", "/api/dans/"+created.ID, "", ""), 200, &detail)
 	if !detail.Songs[0].Available || !detail.Songs[0].Valid {
 		t.Fatalf("same blocks in a new file %+v", detail.Songs[0])
 	}
 	if _, err = pool.Exec(ctx, `UPDATE chart_difficulties SET content_hash='v1:'||repeat('e',64) WHERE chart_id=$1 AND course='Oni' AND side='single'`, songA); err != nil {
 		t.Fatal(err)
 	}
-	expect(call("GET", "/api/v1/dans/"+created.ID, "", ""), 200, &detail)
+	expect(call("GET", "/api/dans/"+created.ID, "", ""), 200, &detail)
 	if detail.Songs[0].Available || detail.Songs[0].Valid || detail.Songs[0].Chart.Side != "single" || !detail.Official {
 		t.Fatalf("replaced chart %+v", detail.Songs[0])
 	}
-	expect(call("GET", "/api/v1/game/dans/"+created.Code, "", ""), 404, nil)
+	expect(call("GET", "/api/game/dans/"+created.Code, "", ""), 404, nil)
 
 	// The owner (or an administrator) changes and removes it; others cannot.
 	changed := strings.Replace(course, `"十段"`, `"十段・改"`, 1)
-	expect(call("PUT", "/api/v1/dans/"+created.ID, changed, carol), 403, nil)
-	expect(call("PUT", "/api/v1/dans/"+created.ID, changed, alice), 200, &detail)
+	expect(call("PUT", "/api/dans/"+created.ID, changed, carol), 403, nil)
+	expect(call("PUT", "/api/dans/"+created.ID, changed, alice), 200, &detail)
 	if detail.Title["ja"] != "十段・改" || !detail.Songs[0].Available {
 		t.Fatalf("saving again pins the current chart %+v", detail)
 	}
@@ -465,37 +465,37 @@ func TestDanCourses(t *testing.T) {
 	s.mu.Lock()
 	s.limits = map[string]window{}
 	s.mu.Unlock()
-	expect(call("DELETE", "/api/v1/dans/"+created.ID, "", carol), 403, nil)
-	expect(call("DELETE", "/api/v1/dans/"+created.ID, "", alice), 200, nil)
-	expect(call("GET", "/api/v1/dans/"+created.ID, "", ""), 404, nil)
+	expect(call("DELETE", "/api/dans/"+created.ID, "", carol), 403, nil)
+	expect(call("DELETE", "/api/dans/"+created.ID, "", alice), 200, nil)
+	expect(call("GET", "/api/dans/"+created.ID, "", ""), 404, nil)
 	var empty struct{ Dans []DanCourse }
-	expect(call("GET", "/api/v1/dans", "", ""), 200, &empty)
+	expect(call("GET", "/api/dans", "", ""), 200, &empty)
 	if len(empty.Dans) != 0 {
 		t.Fatal("deleted course listed")
 	}
-	if w := call("POST", "/api/v1/dans", course, alice); w.Code != 201 {
+	if w := call("POST", "/api/dans", course, alice); w.Code != 201 {
 		io.WriteString(io.Discard, w.Body.String())
 		t.Fatal(w.Code)
 	}
 
 	// While Profile does not answer, titles are not checked (Profile skips what it cannot give).
 	down.Store(true)
-	expect(call("POST", "/api/v1/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 201, nil)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 201, nil)
 	down.Store(false)
 
 	// At most ten courses that are not official each; an official one frees its place.
 	resetRateLimit(s)
 	plain := strings.Replace(course, `,"titles":[{"id":"ten-dan","on":"red"},{"id":"ten-dan-gold","on":"gold"}]`, ``, 1)
 	var first DanCourse
-	expect(call("POST", "/api/v1/dans", plain, carol), 201, &first)
+	expect(call("POST", "/api/dans", plain, carol), 201, &first)
 	for i := 1; i < danCommunityLimit; i++ {
-		expect(call("POST", "/api/v1/dans", plain, carol), 201, nil)
+		expect(call("POST", "/api/dans", plain, carol), 201, nil)
 	}
-	expect(call("POST", "/api/v1/dans", plain, carol), 409, &problemBody)
+	expect(call("POST", "/api/dans", plain, carol), 409, &problemBody)
 	if problemBody.Code != "DAN_LIMIT_REACHED" {
 		t.Fatal(problemBody)
 	}
-	expect(call("PUT", "/api/v1/dans/"+first.ID+"/official", `{"official":true}`, boss), 200, nil)
-	expect(call("POST", "/api/v1/dans", plain, carol), 201, nil)
-	expect(call("POST", "/api/v1/dans", plain, carol), 409, nil)
+	expect(call("PUT", "/api/dans/"+first.ID+"/official", `{"official":true}`, boss), 200, nil)
+	expect(call("POST", "/api/dans", plain, carol), 201, nil)
+	expect(call("POST", "/api/dans", plain, carol), 409, nil)
 }

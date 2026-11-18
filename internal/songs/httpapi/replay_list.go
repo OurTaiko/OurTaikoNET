@@ -10,7 +10,7 @@ import (
 )
 
 // ReplayListing is one recorded play on the public replay list: the score, the song's title and
-// the block's level, and who played it. GET /api/v1/scores/{id}/replay gives its recording.
+// the block's level, and who played it. GET /api/scores/{id}/replay gives its recording.
 type ReplayListing struct {
 	Score
 	Title             string          `json:"title"`
@@ -28,7 +28,7 @@ var replayListOrders = map[string]string{
 	"score":  "sc.score DESC,sc.submitted_at DESC,sc.id",
 }
 
-// replayList is GET /api/v1/replays, public like the leaderboards: the plays whose recording is
+// replayList is GET /api/replays, public like the leaderboards: the plays whose recording is
 // kept, on the current files of published charts, so each can be played back over the chart as
 // it is now (the game's ghost battle). sort is recent (default) or score; course narrows to one
 // course and categoryId to the songs of one category (as the game catalog lists them); 20 a page.

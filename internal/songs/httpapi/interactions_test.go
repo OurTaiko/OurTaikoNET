@@ -26,7 +26,7 @@ func testChartVotes(t *testing.T, w interactionWorld) {
 			t.Fatal("invalid vote accepted", body, code)
 		}
 	}
-	for _, path := range []string{"/api/v1/charts/999999/vote", "/api/v1/charts/song/vote"} {
+	for _, path := range []string{"/api/charts/999999/vote", "/api/charts/song/vote"} {
 		if code := c.do("alice", "PUT", path, `{"value":1}`, nil); code != 404 {
 			t.Fatal("missing chart", path, code)
 		}
@@ -57,7 +57,7 @@ func testChartVotes(t *testing.T, w interactionWorld) {
 	// "top" puts the voted older chart first; the default order is newest first.
 	for order, first := range map[string]string{"": w.other, "top": w.song, "hot": w.other, "comments": w.other} {
 		var list struct{ Items []Chart }
-		if code := c.do("", "GET", "/api/v1/charts?order="+order, "", &list); code != 200 || len(list.Items) != 2 || list.Items[0].ID != first {
+		if code := c.do("", "GET", "/api/charts?order="+order, "", &list); code != 200 || len(list.Items) != 2 || list.Items[0].ID != first {
 			t.Fatal("order", order, code, list.Items)
 		}
 	}
@@ -107,11 +107,11 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	}
 	// Bob downvotes the long comment so "best" ranks the first comment ahead.
 	var v VoteResult
-	c.do("bob", "PUT", "/api/v1/comments/"+long.ID+"/vote", `{"value":-1}`, &v)
+	c.do("bob", "PUT", "/api/comments/"+long.ID+"/vote", `{"value":-1}`, &v)
 	if v.Upvotes != nil {
 		t.Fatal("comment vote published separate counts")
 	}
-	c.do("owner", "PUT", "/api/v1/comments/"+top.ID+"/vote", `{"value":1}`, &v)
+	c.do("owner", "PUT", "/api/comments/"+top.ID+"/vote", `{"value":1}`, &v)
 	if v.Score != 2 || v.MyVote != 1 {
 		t.Fatalf("comment vote: %+v", v)
 	}
@@ -143,46 +143,46 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 
 	// Permalink of the middle reply contains its subtree only.
 	var thread struct{ Item Comment }
-	c.do("", "GET", "/api/v1/comments/"+reply.ID, "", &thread)
+	c.do("", "GET", "/api/comments/"+reply.ID, "", &thread)
 	if thread.Item.ID != reply.ID || thread.Item.ChartTitle != "Song" || len(thread.Item.Replies) != 1 || thread.Item.Replies[0].ID != deep.ID {
 		t.Fatalf("permalink: %+v", thread.Item)
 	}
 
 	// Editing: only the author, and the edit is marked.
-	if code := c.do("alice", "PATCH", "/api/v1/comments/"+reply.ID, `{"body":"hijack"}`, nil); code != 403 {
+	if code := c.do("alice", "PATCH", "/api/comments/"+reply.ID, `{"body":"hijack"}`, nil); code != 403 {
 		t.Fatal("edit by another user", code)
 	}
 	var edited Comment
-	c.do("bob", "PATCH", "/api/v1/comments/"+reply.ID, `{"body":"reply, edited"}`, &edited)
+	c.do("bob", "PATCH", "/api/comments/"+reply.ID, `{"body":"reply, edited"}`, &edited)
 	if edited.Body != "reply, edited" || edited.EditedAt == nil {
 		t.Fatalf("edit: %+v", edited)
 	}
 
 	// Notifications: alice got bob's reply; owner got alice's top-level comments.
 	var unread map[string]int
-	c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread)
+	c.do("alice", "GET", "/api/me/notifications/unread", "", &unread)
 	if unread["count"] != 1 {
 		t.Fatal("alice unread", unread)
 	}
 	var notes NotificationPage
-	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 2 || notes.Unread != 2 || notes.Items[0].Kind != "chart_comment" || notes.Items[0].Read ||
 		notes.Items[0].Actor == nil || notes.Items[0].Actor.Nickname != "alice" || notes.Items[0].Chart.Title != "Song" || notes.Items[0].Comment.ID != top.ID {
 		t.Fatalf("owner notifications: %+v", notes)
 	}
-	if code := c.do("owner", "POST", "/api/v1/me/notifications/read", `{}`, nil); code != 200 {
+	if code := c.do("owner", "POST", "/api/me/notifications/read", `{}`, nil); code != 200 {
 		t.Fatal("mark all read", code)
 	}
-	c.do("owner", "GET", "/api/v1/me/notifications/unread", "", &unread)
+	c.do("owner", "GET", "/api/me/notifications/unread", "", &unread)
 	if unread["count"] != 0 {
 		t.Fatal("still unread", unread)
 	}
 
 	// Deleting a comment with replies keeps an anonymous placeholder.
-	if code := c.do("alice", "DELETE", "/api/v1/comments/"+reply.ID, "", nil); code != 403 {
+	if code := c.do("alice", "DELETE", "/api/comments/"+reply.ID, "", nil); code != 403 {
 		t.Fatal("delete by another user", code)
 	}
-	c.do("bob", "DELETE", "/api/v1/comments/"+reply.ID, "", nil)
+	c.do("bob", "DELETE", "/api/comments/"+reply.ID, "", nil)
 	c.do("", "GET", song+"/comments?sort=new", "", &page)
 	placeholder := page.Items[0].Replies[0]
 	if !placeholder.Deleted || placeholder.Body != "" || placeholder.AuthorID != "" || placeholder.Author != "" || len(placeholder.Replies) != 1 {
@@ -191,16 +191,16 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	if code := c.do("alice", "POST", song+"/comments", `{"body":"x","parentId":"`+reply.ID+`"}`, nil); code != 409 {
 		t.Fatal("reply to deleted comment", code)
 	}
-	if code := c.do("alice", "PUT", "/api/v1/comments/"+reply.ID+"/vote", `{"value":1}`, nil); code != 409 {
+	if code := c.do("alice", "PUT", "/api/comments/"+reply.ID+"/vote", `{"value":1}`, nil); code != 409 {
 		t.Fatal("vote on deleted comment", code)
 	}
-	c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread)
+	c.do("alice", "GET", "/api/me/notifications/unread", "", &unread)
 	if unread["count"] != 0 {
 		t.Fatal("notice of a deleted reply", unread)
 	}
 	// An administrator removes the last reply; the empty placeholder above goes too.
 	var removed map[string]bool
-	c.do("admin", "DELETE", "/api/v1/comments/"+deep.ID, "", &removed)
+	c.do("admin", "DELETE", "/api/comments/"+deep.ID, "", &removed)
 	if !removed["purged"] {
 		t.Fatal("leaf not purged")
 	}
@@ -214,8 +214,8 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	}
 	// Removal by an administrator keeps replies under a "removed" placeholder.
 	post("bob", song, "under", long.ID)
-	c.do("admin", "DELETE", "/api/v1/comments/"+long.ID, "", nil)
-	c.do("alice", "GET", "/api/v1/me/notifications?filter=unread", "", &notes)
+	c.do("admin", "DELETE", "/api/comments/"+long.ID, "", nil)
+	c.do("alice", "GET", "/api/me/notifications?filter=unread", "", &notes)
 	if notes.Total != 2 || notes.Items[0].Kind != "comment_removed" || notes.Items[0].Actor != nil || notes.Items[0].Chart.ID != w.song || notes.Items[1].Kind != "comment_reply" {
 		t.Fatalf("removal notice: %+v", notes)
 	}
@@ -228,12 +228,12 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	// owner's upvote on the live comment and bob's downvote on the removed one.
 	alice := testUsers["alice"].ID
 	var history CommentList
-	c.do("", "GET", "/api/v1/users/"+alice+"/comments", "", &history)
+	c.do("", "GET", "/api/users/"+alice+"/comments", "", &history)
 	if history.Total != 1 || history.Items[0].ID != top.ID || history.Items[0].ChartTitle != "Song" {
 		t.Fatalf("history: %+v", history)
 	}
 	var space UserSpace
-	c.do("", "GET", "/api/v1/users/"+alice, "", &space)
+	c.do("", "GET", "/api/users/"+alice, "", &space)
 	if space.User.CommentCount != 1 || space.User.Karma != 0 || space.User.Nickname == nil || *space.User.Nickname != "alice" {
 		t.Fatalf("profile: %+v", space.User)
 	}
@@ -274,7 +274,7 @@ func testConcurrentVotes(t *testing.T, w interactionWorld) {
 	var wg sync.WaitGroup
 	codes := make(chan int, 64)
 	for _, user := range []string{"owner", "alice", "bob", "admin"} {
-		for _, path := range []string{w.chart(w.song) + "/vote", "/api/v1/comments/" + comment.ID + "/vote"} {
+		for _, path := range []string{w.chart(w.song) + "/vote", "/api/comments/" + comment.ID + "/vote"} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -309,11 +309,11 @@ func testNotificationCenter(t *testing.T, w interactionWorld) {
 	var comment Comment
 	c.do("alice", "POST", song+"/comments", `{"body":"hello"}`, &comment)
 	var notes NotificationPage
-	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications", "", &notes)
 	if len(notes.Items) != 1 {
 		t.Fatal("no notice", notes)
 	}
-	path := "/api/v1/me/notifications/" + notes.Items[0].ID
+	path := "/api/me/notifications/" + notes.Items[0].ID
 	// Only the recipient can see or change a notice.
 	if code := c.do("bob", "PATCH", path, `{"read":true}`, nil); code != 404 {
 		t.Fatal("foreign mark", code)
@@ -322,38 +322,38 @@ func testNotificationCenter(t *testing.T, w interactionWorld) {
 		t.Fatal("foreign dismiss", code)
 	}
 	c.do("owner", "PATCH", path, `{"read":true}`, nil)
-	c.do("owner", "GET", "/api/v1/me/notifications?filter=unread", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications?filter=unread", "", &notes)
 	if notes.Total != 0 || notes.Unread != 0 {
 		t.Fatal("read notice listed as unread", notes)
 	}
 	c.do("owner", "PATCH", path, `{"read":false}`, nil)
-	c.do("owner", "GET", "/api/v1/me/notifications?filter=unread", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications?filter=unread", "", &notes)
 	if notes.Total != 1 {
 		t.Fatal("marked unread again", notes)
 	}
 	if code := c.do("owner", "DELETE", path, "", nil); code != 200 {
 		t.Fatal("dismiss", code)
 	}
-	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 0 {
 		t.Fatal("dismissed notice listed", notes)
 	}
 
 	// Muting a kind stops new notices of that kind only.
-	if code := c.do("owner", "PUT", "/api/v1/me/notification-settings", `{"nope":false}`, nil); code != 400 {
+	if code := c.do("owner", "PUT", "/api/me/notification-settings", `{"nope":false}`, nil); code != 400 {
 		t.Fatal("unknown kind accepted", code)
 	}
 	var settings struct{ Items []notificationSetting }
-	c.do("owner", "PUT", "/api/v1/me/notification-settings", `{"chart_comment":false}`, &settings)
+	c.do("owner", "PUT", "/api/me/notification-settings", `{"chart_comment":false}`, &settings)
 	if len(settings.Items) != len(notificationKinds) || settings.Items[1].Kind != "chart_comment" || settings.Items[1].Enabled || !settings.Items[0].Enabled {
 		t.Fatalf("settings: %+v", settings)
 	}
 	c.do("bob", "POST", song+"/comments", `{"body":"muted"}`, nil)
-	c.do("owner", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("owner", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 0 {
 		t.Fatal("muted kind delivered", notes)
 	}
-	c.do("owner", "PUT", "/api/v1/me/notification-settings", `{"chart_comment":true}`, &settings)
+	c.do("owner", "PUT", "/api/me/notification-settings", `{"chart_comment":true}`, &settings)
 	if !settings.Items[1].Enabled {
 		t.Fatal("not re-enabled")
 	}
@@ -367,11 +367,11 @@ func testNotificationCenter(t *testing.T, w interactionWorld) {
 		t.Fatal(err)
 	}
 	for _, vote := range []struct{ user, value string }{{"owner", "1"}, {"bob", "1"}, {"admin", "1"}, {"bob", "0"}, {"bob", "1"}} {
-		if code := c.do(vote.user, "PUT", "/api/v1/comments/"+comment.ID+"/vote", `{"value":`+vote.value+`}`, nil); code != 200 {
+		if code := c.do(vote.user, "PUT", "/api/comments/"+comment.ID+"/vote", `{"value":`+vote.value+`}`, nil); code != 200 {
 			t.Fatal("vote", code)
 		}
 	}
-	c.do("alice", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("alice", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 1 || notes.Items[0].Kind != "comment_upvotes" || notes.Items[0].Data["upvotes"] != float64(5) || notes.Items[0].Comment.Excerpt != "hello" || notes.Items[0].Actor != nil {
 		t.Fatalf("milestone: %+v", notes)
 	}
@@ -381,7 +381,7 @@ func testNotificationCenter(t *testing.T, w interactionWorld) {
 		t.Fatal(err)
 	}
 	var unread map[string]int
-	c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread)
+	c.do("alice", "GET", "/api/me/notifications/unread", "", &unread)
 	if unread["count"] != 0 {
 		t.Fatal("notice of a hidden chart", unread)
 	}
@@ -532,7 +532,7 @@ func TestUserDirectory(t *testing.T) {
 	w := interactionWorldOf(t, Official)
 	c := w.c
 	var dir UserDirectory
-	if code := c.do("", "GET", "/api/v1/users", "", &dir); code != 200 || dir.Total != 4 || !dir.ProfilesAvailable {
+	if code := c.do("", "GET", "/api/users", "", &dir); code != 200 || dir.Total != 4 || !dir.ProfilesAvailable {
 		t.Fatalf("directory %d %+v", code, dir)
 	}
 	for _, u := range dir.Items {
@@ -543,10 +543,10 @@ func TestUserDirectory(t *testing.T) {
 			t.Fatal("chart count", u.ChartCount)
 		}
 	}
-	if c.do("", "GET", "/api/v1/users?q=ali", "", &dir); dir.Total != 1 || *dir.Items[0].Nickname != "alice" {
+	if c.do("", "GET", "/api/users?q=ali", "", &dir); dir.Total != 1 || *dir.Items[0].Nickname != "alice" {
 		t.Fatalf("search %+v", dir)
 	}
-	for path, want := range map[string]int{"/api/v1/users/ffffffffffffffffffffffffffffffff": 404, "/api/v1/users/nope": 404, "/api/v1/users?sort=karma": 400} {
+	for path, want := range map[string]int{"/api/users/ffffffffffffffffffffffffffffffff": 404, "/api/users/nope": 404, "/api/users?sort=karma": 400} {
 		if code := c.do("", "GET", path, "", nil); code != want {
 			t.Fatal(path, code)
 		}
@@ -558,14 +558,14 @@ func TestPlaylistRemovedNotice(t *testing.T) {
 	w := interactionWorldOf(t, Official)
 	c := w.c
 	var p struct{ ID string }
-	if code := c.do("alice", "POST", "/api/v1/playlists", `{"name":"Mix","public":true}`, &p); code != 201 {
+	if code := c.do("alice", "POST", "/api/playlists", `{"name":"Mix","public":true}`, &p); code != 201 {
 		t.Fatal("create playlist", code)
 	}
-	if code := c.do("admin", "DELETE", "/api/v1/playlists/"+p.ID, "", nil); code != 200 {
+	if code := c.do("admin", "DELETE", "/api/playlists/"+p.ID, "", nil); code != 200 {
 		t.Fatal("admin delete", code)
 	}
 	var notes NotificationPage
-	c.do("alice", "GET", "/api/v1/me/notifications", "", &notes)
+	c.do("alice", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 1 || notes.Items[0].Kind != "playlist_removed" || notes.Items[0].Data["name"] != "Mix" || notes.Items[0].Actor != nil {
 		t.Fatalf("notice %+v", notes)
 	}
@@ -575,7 +575,7 @@ func TestPlaylistRemovedNotice(t *testing.T) {
 func TestUploadPermission(t *testing.T) {
 	w := interactionWorldOf(t, Official)
 	for name, want := range map[string]bool{"owner": false, "admin": true, "alice": false} {
-		if code := w.c.do(name, "POST", "/api/v1/charts", "", nil); (code == 403) == want {
+		if code := w.c.do(name, "POST", "/api/charts", "", nil); (code == 403) == want {
 			t.Fatalf("%s upload status %d", name, code)
 		}
 	}
@@ -586,10 +586,10 @@ func TestPlaylistIDs(t *testing.T) {
 	w := interactionWorldOf(t, Official)
 	c := w.c
 	var p Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"P","public":true}`, &p); code != 201 || !validID(p.ID) {
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"P","public":true}`, &p); code != 201 || !validID(p.ID) {
 		t.Fatal("create", code, p.ID)
 	}
-	path := "/api/v1/playlists/" + p.ID
+	path := "/api/playlists/" + p.ID
 	for _, chart := range []string{w.song, w.other} {
 		if code := c.do("owner", "PUT", path+"/items/"+chart, "", nil); code != 201 {
 			t.Fatal("add", chart, code)
@@ -606,14 +606,14 @@ func TestPlaylistIDs(t *testing.T) {
 		t.Fatal("favorite", code)
 	}
 	var mine MyPlaylists
-	if code := c.do("alice", "GET", "/api/v1/me/playlists", "", &mine); code != 200 || len(mine.Favorites) != 1 || mine.Favorites[0].ID != p.ID {
+	if code := c.do("alice", "GET", "/api/me/playlists", "", &mine); code != 200 || len(mine.Favorites) != 1 || mine.Favorites[0].ID != p.ID {
 		t.Fatal("favorites", code, mine.Favorites)
 	}
 	if code := c.do("owner", "PATCH", path, `{"name":"Q"}`, &detail); code != 200 || detail.ID != p.ID || detail.Name != "Q" {
 		t.Fatal("edit", code, detail.ID)
 	}
 	for _, other := range []string{"1", "0123456789ABCDEF0123456789ABCDEF", web.NewID()} {
-		if code := c.do("", "GET", "/api/v1/playlists/"+other, "", nil); code != 404 {
+		if code := c.do("", "GET", "/api/playlists/"+other, "", nil); code != 404 {
 			t.Fatal("missing playlist", other, code)
 		}
 	}
@@ -651,7 +651,7 @@ func testGameChartVote(t *testing.T, w interactionWorld) {
 		}
 		return rec.Code
 	}
-	path := "/api/v1/game/charts/" + w.song + "/vote"
+	path := "/api/game/charts/" + w.song + "/vote"
 	var mine struct{ MyVote *int }
 	if code := call("", "GET", path, "", nil); code != 401 {
 		t.Fatal("guest read", code)
@@ -659,7 +659,7 @@ func testGameChartVote(t *testing.T, w interactionWorld) {
 	if code := call("", "PUT", path, `{"value":1}`, nil); code != 401 {
 		t.Fatal("guest vote", code)
 	}
-	if code := call(token, "GET", "/api/v1/game/charts/999999/vote", "", nil); code != 404 {
+	if code := call(token, "GET", "/api/game/charts/999999/vote", "", nil); code != 404 {
 		t.Fatal("missing chart", code)
 	}
 	if code := call(token, "GET", path, "", &mine); code != 200 || mine.MyVote == nil || *mine.MyVote != 0 {

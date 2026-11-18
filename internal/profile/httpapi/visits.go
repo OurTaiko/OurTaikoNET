@@ -62,7 +62,7 @@ func (s *Server) visitAllowed(host string) bool {
 	return limit.count <= visitsAMinute
 }
 
-// countVisit is POST /api/v1/visits with {"path": "/fanmade/charts/…"}: the website shows that
+// countVisit is POST /api/visits with {"path": "/fanmade/charts/…"}: the website shows that
 // page. No session is needed and nothing is answered (204), also when the view is not counted:
 // a program's, one too many, or an address that is none of the site's.
 func (s *Server) countVisit(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +102,7 @@ func unknownZone(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "22023"
 }
 
-// visitSummary is GET /api/v1/visits?tz=Asia/Shanghai, public: {"total": {"views",
+// visitSummary is GET /api/visits?tz=Asia/Shanghai, public: {"total": {"views",
 // "visitors"}, "today": {…}, "since": "2026-11-16"}, today and since being of that time zone.
 // Kept for visitSummaryKept and given to everyone who asks for that zone meanwhile.
 func (s *Server) visitSummary(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +134,7 @@ func (s *Server) visitSummary(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, kept.summary)
 }
 
-// visitReport is GET /api/v1/admin/visits?days=30&tz=Asia/Shanghai (days 1 to visits.MaxDays),
+// visitReport is GET /api/admin/visits?days=30&tz=Asia/Shanghai (days 1 to visits.MaxDays),
 // for the site's administrator: the summary, each of the last days of that time zone (oldest
 // first, today last), the views in each of its hours over them, and the pages seen most.
 func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {

@@ -263,7 +263,7 @@ func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 	web.Respond(w, 200, answer)
 }
 
-// donCatalogAnswer is GET /api/v1/don/catalog: the bucket's catalog as it is, with baseUrl, the
+// donCatalogAnswer is GET /api/don/catalog: the bucket's catalog as it is, with baseUrl, the
 // address its paths are relative to. Readable from any website.
 func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -301,7 +301,7 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, all)
 }
 
-// userDon is GET /api/v1/users/{id}/don: a player's Don and its files, for the game. Readable
+// userDon is GET /api/users/{id}/don: a player's Don and its files, for the game. Readable
 // from any website, like the nameplate.
 func (s *Server) userDon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -318,7 +318,7 @@ func (s *Server) userDon(w http.ResponseWriter, r *http.Request) {
 	s.answerDon(w, r, l)
 }
 
-// myDon is GET /api/v1/me/don.
+// myDon is GET /api/me/don.
 func (s *Server) myDon(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, false)
 	if !ok {
@@ -332,7 +332,7 @@ func (s *Server) myDon(w http.ResponseWriter, r *http.Request) {
 	s.answerDon(w, r, l)
 }
 
-// wearDon is PUT /api/v1/me/don: {costume, cos, head, body, puchi, paint, colors} (paint left out
+// wearDon is PUT /api/me/don: {costume, cos, head, body, puchi, paint, colors} (paint left out
 // is 0, no makeup). Every number must be
 // in the catalog (the costume's even when wearing a head and body, and the other way round, so a
 // switch back keeps what was chosen); colors null is the seat's defaults.

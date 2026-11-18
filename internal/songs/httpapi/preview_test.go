@@ -86,7 +86,7 @@ func TestPreviewLifecycle(t *testing.T) {
 				t.Fatal("backfill replaced an existing preview")
 			}
 			call := func(body, token, csrf string) *httptest.ResponseRecorder {
-				r := httptest.NewRequest("PATCH", "/api/v1/charts/song", strings.NewReader(body))
+				r := httptest.NewRequest("PATCH", "/api/charts/song", strings.NewReader(body))
 				r.Header.Set("Content-Type", "application/json")
 				r.Header.Set("Origin", "http://localhost")
 				r.Header.Set("X-CSRF-Token", csrf)
@@ -122,7 +122,7 @@ func TestPreviewLifecycle(t *testing.T) {
 			}
 			// Lists expose the current preview location; the full audio endpoint stays separate.
 			w = httptest.NewRecorder()
-			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts", nil))
+			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/charts", nil))
 			if w.Code != 200 || !strings.Contains(w.Body.String(), `"previewPath"`) {
 				t.Fatal(w.Code, w.Body.String())
 			}

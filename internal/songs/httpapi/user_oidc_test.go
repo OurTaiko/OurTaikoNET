@@ -85,7 +85,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 		if _, err := pool.Exec(ctx, `INSERT INTO oidc_flows VALUES($1,$2,'test-nonce','test-verifier','/users',now()+interval '5 minutes')`, web.Hash(state), web.Hash(binding)); err != nil {
 			t.Fatal(err)
 		}
-		req := httptest.NewRequest("GET", "/api/v1/auth/sso/callback?state="+state+"&code="+id, nil)
+		req := httptest.NewRequest("GET", "/api/auth/sso/callback?state="+state+"&code="+id, nil)
 		req.AddCookie(&http.Cookie{Name: "ourtaiko_oidc", Value: binding})
 		response := httptest.NewRecorder()
 		app.Handler().ServeHTTP(response, req)

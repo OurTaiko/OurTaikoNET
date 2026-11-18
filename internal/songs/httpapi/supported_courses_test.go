@@ -55,7 +55,7 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 		r := httptest.NewRequest(method, path, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("X-CSRF-Token", "csrf")
-		if strings.HasPrefix(path, "/api/v1/game/") {
+		if strings.HasPrefix(path, "/api/game/") {
 			r.Header.Set("Authorization", "Bearer "+token)
 		} else {
 			r.Header.Set("Origin", origin)
@@ -68,7 +68,7 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 		}
 		return w
 	}
-	for _, path := range []string{"/api/v1/charts", "/api/v1/me/charts", "/api/v1/game/search?course=Oni"} {
+	for _, path := range []string{"/api/charts", "/api/me/charts", "/api/game/search?course=Oni"} {
 		var list struct {
 			Items []Chart
 			Total int
@@ -79,17 +79,17 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 		}
 	}
 	for _, course := range []string{"Tower", "Dan", "5", "6"} {
-		call("GET", "/api/v1/game/search?course="+course, "", 400)
+		call("GET", "/api/game/search?course="+course, "", 400)
 	}
 	var withdrawn int64
 	if err = pool.QueryRow(ctx, `SELECT test_slot($1,'Oni')`, ids[1]).Scan(&withdrawn); err != nil {
 		t.Fatal(err)
 	}
 	body := fmt.Sprintf(`{"difficultyId":%d,"good":10,"ok":0,"bad":0,"score":10000,"drumroll":0,"max_combo":10}`, withdrawn)
-	call("POST", "/api/v1/scores", body, 404)
-	call("POST", "/api/v1/game/scores", body, 404)
+	call("POST", "/api/scores", body, 404)
+	call("POST", "/api/game/scores", body, 404)
 	for i := 1; i < len(ids); i++ {
-		path := "/api/v1/charts/" + ids[i]
+		path := "/api/charts/" + ids[i]
 		call("GET", path, "", 404)
 		call("GET", path+"/leaderboard", "", 404)
 		for _, kind := range []string{"tja", "audio", "download"} {
@@ -101,11 +101,11 @@ func TestWithdrawnChartsAPI(t *testing.T) {
 		Charts []Chart
 		Scores []Score
 	}
-	w := call("GET", "/api/v1/game/catalog", "", 200)
+	w := call("GET", "/api/game/catalog", "", 200)
 	if err = json.Unmarshal(w.Body.Bytes(), &snapshot); err != nil || len(snapshot.Charts) != 1 || snapshot.Charts[0].ID != ids[0] {
 		t.Fatal("withdrawn game data leaked", w.Body.String(), err)
 	}
-	w = call("GET", "/api/v1/game/scores", "", 200)
+	w = call("GET", "/api/game/scores", "", 200)
 	if err = json.Unmarshal(w.Body.Bytes(), &snapshot); err != nil || len(snapshot.Scores) != 1 || snapshot.Scores[0].SongID != ids[0] {
 		t.Fatal("withdrawn game scores leaked", w.Body.String(), err)
 	}
@@ -132,7 +132,7 @@ func TestUploadRejectsUnsupportedCourses(t *testing.T) {
 			audio, _ := form.CreateFormFile("audio", "music.ogg")
 			audio.Write([]byte("OggS fixture"))
 			form.Close()
-			r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+			r := httptest.NewRequest("POST", "/api/charts", &body)
 			r.Header.Set("Origin", "http://127.0.0.1:5173")
 			r.Header.Set("Content-Type", form.FormDataContentType())
 			r.Header.Set("X-CSRF-Token", "csrf")

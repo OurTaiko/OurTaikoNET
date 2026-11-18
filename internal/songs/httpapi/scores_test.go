@@ -63,10 +63,10 @@ func TestSubmitScore(t *testing.T) {
 		return w
 	}
 	gameBody := `{` + slot + `,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6}`
-	if w := native("POST", "/api/v1/game/scores", gameBody); w.Code != 201 || !strings.Contains(w.Body.String(), `"max_combo":6`) {
+	if w := native("POST", "/api/game/scores", gameBody); w.Code != 201 || !strings.Contains(w.Body.String(), `"max_combo":6`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w := native("POST", "/api/v1/game/scores", gameBody); w.Code != 200 || !strings.Contains(w.Body.String(), `"max_combo":6`) {
+	if w := native("POST", "/api/game/scores", gameBody); w.Code != 200 || !strings.Contains(w.Body.String(), `"max_combo":6`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Receipts stored before a field was removed hashed it; retries compare the score itself.
@@ -74,23 +74,23 @@ func TestSubmitScore(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE scores SET payload_digest=$1 WHERE idempotency_key='game-integration-score-1'`, web.Hash(oldBody)); err != nil {
 		t.Fatal(err)
 	}
-	if w := native("POST", "/api/v1/game/scores", gameBody); w.Code != 200 || strings.Contains(w.Body.String(), "versionId") {
+	if w := native("POST", "/api/game/scores", gameBody); w.Code != 200 || strings.Contains(w.Body.String(), "versionId") {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w := native("POST", "/api/v1/game/scores", oldBody); w.Code != 400 {
+	if w := native("POST", "/api/game/scores", oldBody); w.Code != 400 {
 		t.Fatal("removed field accepted", w.Code, w.Body.String())
 	}
-	if w := native("GET", "/api/v1/game/catalog", ""); w.Code != 200 || strings.Contains(w.Body.String(), "songIdOnly") || strings.Contains(w.Body.String(), "versionId") {
+	if w := native("GET", "/api/game/catalog", ""); w.Code != 200 || strings.Contains(w.Body.String(), "songIdOnly") || strings.Contains(w.Body.String(), "versionId") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// The score list carries the account's scores without the catalog.
-	if w := native("GET", "/api/v1/game/scores", ""); w.Code != 200 || strings.Contains(w.Body.String(), "versionId") || strings.Contains(w.Body.String(), `"charts"`) || !strings.Contains(w.Body.String(), `"good":5`) || !strings.Contains(w.Body.String(), `"max_combo":6`) {
+	if w := native("GET", "/api/game/scores", ""); w.Code != 200 || strings.Contains(w.Body.String(), "versionId") || strings.Contains(w.Body.String(), `"charts"`) || !strings.Contains(w.Body.String(), `"good":5`) || !strings.Contains(w.Body.String(), `"max_combo":6`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Existing personal scores must never leak through the catalog,
 	// including when a browser session cookie accompanies the request.
 	for _, browserCookie := range []string{"", cookie, cookie2} {
-		r := httptest.NewRequest("GET", "/api/v1/game/catalog", nil)
+		r := httptest.NewRequest("GET", "/api/game/catalog", nil)
 		if browserCookie != "" {
 			r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: browserCookie})
 		}
@@ -100,7 +100,7 @@ func TestSubmitScore(t *testing.T) {
 			t.Fatal("guest received personal data", w.Code, w.Body.String())
 		}
 	}
-	if w := native("POST", "/api/v1/game/scores", strings.Replace(gameBody, `"max_combo":6`, `"max_combo":5`, 1)); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
+	if w := native("POST", "/api/game/scores", strings.Replace(gameBody, `"max_combo":6`, `"max_combo":5`, 1)); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Leave the existing count assertions isolated from this native submission.
@@ -120,7 +120,7 @@ func TestSubmitScore(t *testing.T) {
 			}
 		}
 		field := fmt.Sprintf(`"ClearStatus":%d`, status)
-		w := native("POST", "/api/v1/game/scores", body)
+		w := native("POST", "/api/game/scores", body)
 		if w.Code != 201 || !strings.Contains(w.Body.String(), field) {
 			t.Fatal("clear status receipt", w.Code, w.Body.String())
 		}
@@ -132,14 +132,14 @@ func TestSubmitScore(t *testing.T) {
 		if err := pool.QueryRow(ctx, `SELECT clear_status FROM scores WHERE id=$1`, first.ID).Scan(&stored); err != nil || stored != status {
 			t.Fatal("clear status not persisted", stored, err)
 		}
-		if retry := native("POST", "/api/v1/game/scores", body); retry.Code != 200 || !strings.Contains(retry.Body.String(), first.ID) || !strings.Contains(retry.Body.String(), field) {
+		if retry := native("POST", "/api/game/scores", body); retry.Code != 200 || !strings.Contains(retry.Body.String(), first.ID) || !strings.Contains(retry.Body.String(), field) {
 			t.Fatal("clear status retry failed", retry.Code, retry.Body.String())
 		}
 		changed := strings.TrimSuffix(gameBody, "}") + fmt.Sprintf(`,"ClearStatus":%d}`, (status+1)%4)
-		if conflict := native("POST", "/api/v1/game/scores", changed); conflict.Code != 409 {
+		if conflict := native("POST", "/api/game/scores", changed); conflict.Code != 409 {
 			t.Fatal("clear status must participate in idempotency", conflict.Code, conflict.Body.String())
 		}
-		for _, path := range []string{"/api/v1/game/scores", "/api/v1/charts/" + song + "/leaderboard"} {
+		for _, path := range []string{"/api/game/scores", "/api/charts/" + song + "/leaderboard"} {
 			if w := native("GET", path, ""); w.Code != 200 || !strings.Contains(w.Body.String(), first.ID) || !strings.Contains(w.Body.String(), field) {
 				t.Fatal("clear status missing from query", path, w.Code, w.Body.String())
 			}
@@ -152,7 +152,7 @@ func TestSubmitScore(t *testing.T) {
 	body := `{` + slot + `,"good":300,"ok":10,"bad":2,"score":900000,"drumroll":50,"max_combo":250,"ClearStatus":1}`
 	var requestCount atomic.Uint32
 	call := func(body, key, token string, headers map[string]string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("POST", "/api/v1/scores", strings.NewReader(body))
+		r := httptest.NewRequest("POST", "/api/scores", strings.NewReader(body))
 		// This validation suite exceeds the per-IP minute budget. Model separate
 		// clients while keeping the real limiter enabled in the handler.
 		r.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", requestCount.Add(1))
@@ -349,7 +349,7 @@ func testScorePlayCounts(t *testing.T, w interactionWorld) {
 	}
 	post := func(key, extra string) *httptest.ResponseRecorder {
 		t.Helper()
-		return send("POST", "/api/v1/game/scores", key, fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6%s}`, oni, extra))
+		return send("POST", "/api/game/scores", key, fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6%s}`, oni, extra))
 	}
 	read := func(rec *httptest.ResponseRecorder) Score {
 		t.Helper()
@@ -399,7 +399,7 @@ func testScorePlayCounts(t *testing.T, w interactionWorld) {
 	}
 	// The player's list and the leaderboard carry them too.
 	var list struct{ Scores []Score }
-	rec := send("GET", "/api/v1/game/scores", "", "")
+	rec := send("GET", "/api/game/scores", "", "")
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err, rec.Body.String())
 	}

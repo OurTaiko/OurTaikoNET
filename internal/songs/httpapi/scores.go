@@ -55,7 +55,7 @@ type Score struct {
 	// False once the song's TJA or audio was replaced after this play.
 	IsLatest    bool      `json:"isLatest"`
 	SubmittedAt time.Time `json:"submittedAt"`
-	// The play's recording is kept: GET /api/v1/scores/{id}/replay.
+	// The play's recording is kept: GET /api/scores/{id}/replay.
 	HasReplay bool `json:"hasReplay"`
 }
 

@@ -21,7 +21,7 @@ import (
 // route only the website's session counts, so a token kept in a game cannot do what the
 // website can.
 func isGameRequest(r *http.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/api/v1/game/")
+	return strings.HasPrefix(r.URL.Path, "/api/game/")
 }
 
 func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {

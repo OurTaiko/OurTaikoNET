@@ -98,7 +98,7 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 		{ids(alice, strings.Repeat("f", 32)), 404, "USER_NOT_FOUND"},
 	} {
 		for _, files := range kinds {
-			if w := send("POST", "/api/v1/charts", web.NewID(), "Rejected", tc.field, files, true); w.Code != tc.want || !strings.Contains(w.Body.String(), tc.code) {
+			if w := send("POST", "/api/charts", web.NewID(), "Rejected", tc.field, files, true); w.Code != tc.want || !strings.Contains(w.Body.String(), tc.code) {
 				t.Fatal(tc.field, files, w.Code, w.Body.String())
 			}
 		}
@@ -109,7 +109,7 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 
 	// The web uploader does not wait: both are invited once the chart is published.
 	key := web.NewID()
-	if w := send("POST", "/api/v1/charts", key, "Together", ids(alice, bob, alice), true, true); w.Code != 202 {
+	if w := send("POST", "/api/charts", key, "Together", ids(alice, bob, alice), true, true); w.Code != 202 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	var chartID string
@@ -129,10 +129,10 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	}
 	// Sending the finished request again returns the chart and invites nobody twice;
 	// another selection under the same key is a different request.
-	if w := send("POST", "/api/v1/charts", key, "Together", ids(bob, alice), true, true); w.Code != 200 || !strings.Contains(w.Body.String(), chartID) {
+	if w := send("POST", "/api/charts", key, "Together", ids(bob, alice), true, true); w.Code != 200 || !strings.Contains(w.Body.String(), chartID) {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w := send("POST", "/api/v1/charts", key, "Together", ids(alice), true, true); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
+	if w := send("POST", "/api/charts", key, "Together", ids(alice), true, true); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	if count(`SELECT count(*) FROM chart_collaborations`) != 2 || count(`SELECT count(*) FROM charts`) != charts+1 {
@@ -143,7 +143,7 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	if err = s.DB.QueryRow(ctx, `SELECT id FROM notifications WHERE recipient_id=$1 AND kind='chart_collaboration'`, alice).Scan(&notice); err != nil {
 		t.Fatal(err)
 	}
-	if code := c.do("alice", "POST", "/api/v1/me/notifications/"+notice+"/respond", `{"accept":true}`, nil); code != 200 {
+	if code := c.do("alice", "POST", "/api/me/notifications/"+notice+"/respond", `{"accept":true}`, nil); code != 200 {
 		t.Fatal(code)
 	}
 	if published, err := s.chart(ctx, chartID); err != nil || len(published.OwnerIDs) != 2 || !published.hasOwner(alice) {
@@ -151,7 +151,7 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	}
 
 	// A replacement invites nobody: its chart already has the co-creator dialog.
-	if w := send("PUT", "/api/v1/charts/"+chartID+"/files", web.NewID(), "Replaced", ids(bob), true, false, "confirmReset", "true"); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
+	if w := send("PUT", "/api/charts/"+chartID+"/files", web.NewID(), "Replaced", ids(bob), true, false, "confirmReset", "true"); w.Code != 400 || !strings.Contains(w.Body.String(), "UPLOAD_FILES_INVALID") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 
@@ -159,14 +159,14 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	if registers {
 		key = web.NewID()
 		var song Chart
-		w := send("POST", "/api/v1/charts", key, "Song only", ids(bob), false, false)
+		w := send("POST", "/api/charts", key, "Song only", ids(bob), false, false)
 		if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &song) != nil || song.ID == "" {
 			t.Fatal(w.Code, w.Body.String())
 		}
-		if w := send("POST", "/api/v1/charts", key, "Song only", ids(bob), false, false); w.Code != 200 || !strings.Contains(w.Body.String(), song.ID) {
+		if w := send("POST", "/api/charts", key, "Song only", ids(bob), false, false); w.Code != 200 || !strings.Contains(w.Body.String(), song.ID) {
 			t.Fatal(w.Code, w.Body.String())
 		}
-		if w := send("POST", "/api/v1/charts", key, "Song only", "", false, false); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
+		if w := send("POST", "/api/charts", key, "Song only", "", false, false); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		if n := count(`SELECT count(*) FROM chart_collaborations c JOIN notifications n ON n.collaboration_id=c.id WHERE c.chart_id=$1 AND c.recipient_id=$2 AND c.status='pending'`, song.ID, bob); n != 1 {
@@ -180,12 +180,12 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 		t.Fatal(err)
 	}
 	for _, files := range kinds {
-		if w := send("POST", "/api/v1/charts", web.NewID(), "Too many", ids(alice, bob), files, false); w.Code != 429 || !strings.Contains(w.Body.String(), "RATE_LIMITED") {
+		if w := send("POST", "/api/charts", web.NewID(), "Too many", ids(alice, bob), files, false); w.Code != 429 || !strings.Contains(w.Body.String(), "RATE_LIMITED") {
 			t.Fatal(files, w.Code, w.Body.String())
 		}
 	}
 	// An uploader who waits gets the chart; the last invitation of the day went out with it.
-	w := send("POST", "/api/v1/charts", web.NewID(), "Last one", ids(bob), true, false)
+	w := send("POST", "/api/charts", web.NewID(), "Last one", ids(bob), true, false)
 	var last Chart
 	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &last) != nil || last.ID == "" {
 		t.Fatal(w.Code, w.Body.String())
@@ -193,14 +193,14 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	if n := count(`SELECT count(*) FROM chart_collaborations WHERE chart_id=$1 AND recipient_id=$2 AND status='pending'`, last.ID, bob); n != 1 {
 		t.Fatal("invitation of a waited upload", n)
 	}
-	if code := c.do("admin", "POST", "/api/v1/charts/"+last.ID+"/collaborations", fmt.Sprintf(`{"userId":%q}`, alice), nil); code != 429 {
+	if code := c.do("admin", "POST", "/api/charts/"+last.ID+"/collaborations", fmt.Sprintf(`{"userId":%q}`, alice), nil); code != 429 {
 		t.Fatal(code)
 	}
 	// Uploads without the field publish as before.
-	if w = send("POST", "/api/v1/charts", web.NewID(), "Alone", "", true, false); w.Code != 201 {
+	if w = send("POST", "/api/charts", web.NewID(), "Alone", "", true, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w = send("POST", "/api/v1/charts", web.NewID(), "Nobody", "[]", !registers, false); w.Code != 201 {
+	if w = send("POST", "/api/charts", web.NewID(), "Nobody", "[]", !registers, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Together, Last one, Alone and Nobody; bob still asked about the first two. The official

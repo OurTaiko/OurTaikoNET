@@ -89,7 +89,7 @@ func testAudioStreamHTTP(t *testing.T, remote bool) {
 				t.Fatal(err)
 			}
 			mustExec(`INSERT INTO chart_difficulties(chart_id,course,side,level,maker) SELECT chart_id,course,'single',level,maker FROM (VALUES ($1,'Oni',5,'')) v(chart_id,course,level,maker)`, song)
-			path := "/api/v1/charts/" + song + "/audio"
+			path := "/api/charts/" + song + "/audio"
 			etag := `"` + digest + `"`
 			media := "audio/mpeg"
 			if filename == "vorbis.ogg" {
@@ -168,10 +168,10 @@ func testAudioStreamHTTP(t *testing.T, remote bool) {
 			}
 			// The advertised URL also works after loading a normal chart response.
 			chart, err := app.chart(ctx, song)
-			if err != nil || chart.AudioPreview == nil || chart.AudioPreview.URL != path || chart.AudioPreview.StartSeconds != 30 || chart.AudioPreview.DurationSeconds != 15 || chart.AudioHash != digest || chart.AudioSize != int64(len(data)) {
+			if err != nil || chart.AudioPreview == nil || chart.AudioPreview.URL != "/api/v1/charts/"+song+"/audio" || chart.AudioPreview.StartSeconds != 30 || chart.AudioPreview.DurationSeconds != 15 || chart.AudioHash != digest || chart.AudioSize != int64(len(data)) {
 				t.Fatalf("chart preview: %+v, %v", chart, err)
 			}
-			w = call("GET", "/api/v1/game/catalog", nil)
+			w = call("GET", "/api/game/catalog", nil)
 			var catalog struct {
 				AudioPreviewVersion int `json:"audioPreviewVersion"`
 			}

@@ -43,7 +43,7 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		af.Write(audio)
 		form.WriteField("difficultyMakers", `[{"course":"Oni","side":"single","maker":"S"},{"course":"Oni","side":"p1","maker":"A"},{"course":"Oni","side":"p2","maker":"B"}]`)
 		form.Close()
-		r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+		r := httptest.NewRequest("POST", "/api/charts", &body)
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -94,48 +94,48 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		key := web.NewID()
 		body := score(d.ID, 1000+i)
 		var v Score
-		if w := call("POST", "/api/v1/game/scores", body, key); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &v) != nil ||
+		if w := call("POST", "/api/game/scores", body, key); w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &v) != nil ||
 			v.SongID != c.ID || v.DifficultyID != d.ID || v.Course != "Oni" || v.Side != d.Side || !v.IsLatest {
 			t.Fatal(w.Code, w.Body.String())
 		}
-		if w := call("POST", "/api/v1/game/scores", body, key); w.Code != 200 {
+		if w := call("POST", "/api/game/scores", body, key); w.Code != 200 {
 			t.Fatal("retry", w.Code, w.Body.String())
 		}
 	}
-	if w := call("POST", "/api/v1/game/scores", score(c.Difficulties[2].ID+1000, 2000), web.NewID()); w.Code != 404 {
+	if w := call("POST", "/api/game/scores", score(c.Difficulties[2].ID+1000, 2000), web.NewID()); w.Code != 404 {
 		t.Fatal("nonexistent block accepted", w.Code, w.Body.String())
 	}
-	if w := call("POST", "/api/v1/game/scores", score(0, 2000), web.NewID()); w.Code != 422 {
+	if w := call("POST", "/api/game/scores", score(0, 2000), web.NewID()); w.Code != 422 {
 		t.Fatal("missing block accepted", w.Code, w.Body.String())
 	}
-	if w := call("POST", "/api/v1/game/scores", `{"songId":"`+c.ID+`","difficulty":"Oni","good":1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":1}`, web.NewID()); w.Code != 400 {
+	if w := call("POST", "/api/game/scores", `{"songId":"`+c.ID+`","difficulty":"Oni","good":1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":1}`, web.NewID()); w.Code != 400 {
 		t.Fatal("retired score form accepted", w.Code, w.Body.String())
 	}
 	// Every block has its own leaderboard; the default is the first of the hardest course.
 	for i, d := range c.Difficulties {
-		w := call("GET", fmt.Sprintf("/api/v1/charts/%s/leaderboard?difficultyId=%d", c.ID, d.ID), "", "")
+		w := call("GET", fmt.Sprintf("/api/charts/%s/leaderboard?difficultyId=%d", c.ID, d.ID), "", "")
 		var v leaderboardResponse
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || v.Total != 1 || len(v.Items) != 1 || v.DifficultyID != d.ID || v.Side != d.Side || v.Items[0].Side != d.Side || v.Items[0].Score.Score != int64(1000+i) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 	}
 	var v leaderboardResponse
-	if w := call("GET", "/api/v1/charts/"+c.ID+"/leaderboard", "", ""); w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || v.Course != "Oni" || v.Side != "single" {
+	if w := call("GET", "/api/charts/"+c.ID+"/leaderboard", "", ""); w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || v.Course != "Oni" || v.Side != "single" {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	w = call("GET", "/api/v1/game/catalog", "", "")
+	w = call("GET", "/api/game/catalog", "", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"chartSlotVersion":1`) || !strings.Contains(w.Body.String(), `"side":"p2"`) || strings.Contains(w.Body.String(), "isSingle") {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	w = call("GET", "/api/v1/game/scores", "", "")
+	w = call("GET", "/api/game/scores", "", "")
 	if w.Code != 200 || strings.Count(w.Body.String(), `"difficultyId"`) != 3 || !strings.Contains(w.Body.String(), `"side":"p2"`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	w = call("GET", "/api/v1/game/search?course=Oni", "", "")
+	w = call("GET", "/api/game/search?course=Oni", "", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), c.ID) {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w = call("GET", "/api/v1/game/search?course=Oni_1p", "", ""); w.Code != 400 {
+	if w = call("GET", "/api/game/search?course=Oni_1p", "", ""); w.Code != 400 {
 		t.Fatal("side-suffixed course accepted", w.Code, w.Body.String())
 	}
 }

@@ -13,16 +13,16 @@ import (
 
 // Players writing to each other (package chat), all of it for the signed-in player only:
 //
-//	GET    /api/v1/chats                      their chats, the latest written first, and a cursor
-//	POST   /api/v1/chats {"userId"}           the chat with a player, made if there is none
-//	GET    /api/v1/chats/unread               how many messages are unread, in how many chats,
+//	GET    /api/chats                      their chats, the latest written first, and a cursor
+//	POST   /api/chats {"userId"}           the chat with a player, made if there is none
+//	GET    /api/chats/unread               how many messages are unread, in how many chats,
 //	                                          and the cursor to wait for updates from
-//	GET    /api/v1/chats/updates?after=<seq>  messages after the cursor; waits for some (below)
-//	GET    /api/v1/chats/{id}                 one chat
-//	GET    /api/v1/chats/{id}/messages?before=<seq>&limit=<n>
-//	POST   /api/v1/chats/{id}/messages {"body"}
-//	POST   /api/v1/chats/{id}/read {"seq"}    read up to a message
-//	PUT    /api/v1/chats/{id}/block {"blocked"}
+//	GET    /api/chats/updates?after=<seq>  messages after the cursor; waits for some (below)
+//	GET    /api/chats/{id}                 one chat
+//	GET    /api/chats/{id}/messages?before=<seq>&limit=<n>
+//	POST   /api/chats/{id}/messages {"body"}
+//	POST   /api/chats/{id}/read {"seq"}    read up to a message
+//	PUT    /api/chats/{id}/block {"blocked"}
 //
 // updates is a long poll: when nothing is newer than after, it waits up to chatWait for a
 // message or for a peer to read, then answers {"messages": [...], "cursor": n, "changed": b}.

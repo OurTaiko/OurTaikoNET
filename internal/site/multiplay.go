@@ -8,7 +8,7 @@ import (
 
 // Multiplay is where the game finds Multi-Enso, the online rooms (internal/multiplay): a
 // gRPC service on a port of its own, not part of this API. The game asks
-// GET /api/v1/game/multiplay before it connects:
+// GET /api/game/multiplay before it connects:
 //
 //	{"url": "https://net.ourtaiko.org", "protocol": 1, "maxProtocol": 2, "maxMembers": 5}
 //

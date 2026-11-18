@@ -24,10 +24,10 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	c, s, ctx := w.c, w.s, context.Background()
 	owner := testUsers["owner"].ID
 	var p Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"Covered","public":true}`, &p); code != 201 {
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"Covered","public":true}`, &p); code != 201 {
 		t.Fatal(code)
 	}
-	path := "/api/v1/playlists/" + p.ID + "/cover"
+	path := "/api/playlists/" + p.ID + "/cover"
 	var picture bytes.Buffer
 	if e := png.Encode(&picture, image.NewNRGBA(image.Rect(0, 0, 40, 30))); e != nil {
 		t.Fatal(e)
@@ -58,7 +58,7 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if e := json.Unmarshal(rec.Body.Bytes(), &result); e != nil || rec.Code != 200 || len(result.CoverHash) != 64 {
 		t.Fatal("cover", rec.Code, rec.Body.String())
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
+	if code := c.do("", "GET", "/api/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
 		t.Fatal("cover hash", code, p.CoverHash)
 	}
 	// Covers are read from the bucket only: there is no API route to read one.
@@ -98,10 +98,10 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if e2 != nil {
 		t.Fatal(e2)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.song, `{}`, nil); code != 201 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+p.ID+"/items/"+w.song, `{}`, nil); code != 201 {
 		t.Fatal("add", code)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.other, `{}`, nil); code != 201 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+p.ID+"/items/"+w.other, `{}`, nil); code != 201 {
 		t.Fatal("add a song outside the catalog", code)
 	}
 	folders := func(app *Server) []GamePlaylist {
@@ -163,7 +163,7 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if covers() != 1 {
 		t.Fatal("playlist cover deleted while referenced", covers())
 	}
-	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
+	if code := c.do("owner", "DELETE", "/api/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
 		t.Fatal("cover kept after its playlist", code, covers())
 	}
 	if _, e := s.Config.Objects.Open(ctx, coverKey); e == nil {

@@ -15,7 +15,7 @@ import (
 // center's administrator of this site) may use it; being in a group does not let anyone give
 // groups.
 
-// groupCatalog is GET /api/v1/admin/groups: every group there is.
+// groupCatalog is GET /api/admin/groups: every group there is.
 func (s *Server) groupCatalog(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
 		return
@@ -29,7 +29,7 @@ var loginName = regexp.MustCompile(`^\S{1,24}$`)
 // How many players a search answers with.
 const foundPlayers = 20
 
-// groupMembers is GET /api/v1/admin/users: the players who are in any group; with
+// groupMembers is GET /api/admin/users: the players who are in any group; with
 // ?ids=a,b (at most 100) those players and their groups, whether they have any or not; with
 // ?q=text the players text finds, and their groups.
 func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +107,7 @@ func (s *Server) findPlayers(w http.ResponseWriter, r *http.Request, text string
 	web.Respond(w, 200, map[string]any{"users": users})
 }
 
-// giveGroups is PUT /api/v1/admin/users/{id}/groups with {"groups": ["OFFICIAL_MANAGER", …]}:
+// giveGroups is PUT /api/admin/users/{id}/groups with {"groups": ["OFFICIAL_MANAGER", …]}:
 // the player is from now on in exactly these groups. The change is recorded with who made it.
 func (s *Server) giveGroups(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.siteAdmin(w, r)

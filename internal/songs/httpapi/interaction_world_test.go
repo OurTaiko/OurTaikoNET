@@ -17,7 +17,7 @@ type interactionWorld struct {
 }
 
 func (w interactionWorld) chart(id string) string {
-	return "/api/v1/charts/" + id
+	return "/api/charts/" + id
 }
 
 // interactionWorldOf makes the world on a source. On the official source the two charts are

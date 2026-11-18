@@ -43,7 +43,7 @@ func TestNameplateArtRouting(t *testing.T) {
 		return "US"
 	}})
 	answer := func(ip, query string) map[string]any {
-		r := httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog"+query, nil)
+		r := httptest.NewRequest("GET", "/api/nameplate-art/catalog"+query, nil)
 		r.RemoteAddr = ip + ":123"
 		w := httptest.NewRecorder()
 		server.Handler().ServeHTTP(w, r)
@@ -98,7 +98,7 @@ func TestNameplateArtFailureThrottle(t *testing.T) {
 	server := New(nil, Config{NameplateCatalogURL: site.URL + "/catalog.json", DonClient: site.Client()})
 	for range 2 {
 		w := httptest.NewRecorder()
-		server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog", nil))
+		server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/nameplate-art/catalog", nil))
 		if w.Code != 503 {
 			t.Fatalf("status = %d", w.Code)
 		}
@@ -120,14 +120,14 @@ func TestNameplateArtRefreshOutlivesRequest(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	w := httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog", nil).WithContext(ctx))
+	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/nameplate-art/catalog", nil).WithContext(ctx))
 	if w.Code != 503 {
 		t.Fatalf("status = %d", w.Code)
 	}
 	close(release)
 	waitNameplateRefresh(t, server)
 	w = httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/nameplate-art/catalog", nil))
+	server.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/nameplate-art/catalog", nil))
 	if w.Code != 200 {
 		t.Fatalf("status after refresh = %d", w.Code)
 	}

@@ -132,7 +132,7 @@ type Title struct {
 	OwnerID  *string `json:"ownerId"`
 }
 
-// Titles is Profile's title catalog (GET /api/v1/titles) by id, kept for a minute; fresh reads
+// Titles is Profile's title catalog (GET /api/titles) by id, kept for a minute; fresh reads
 // it again.
 func (c *Client) Titles(ctx context.Context, fresh bool) (map[string]Title, error) {
 	c.mu.Lock()
@@ -140,7 +140,7 @@ func (c *Client) Titles(ctx context.Context, fresh bool) (map[string]Title, erro
 	if !fresh && c.titles != nil && time.Since(c.titlesAt) < time.Minute {
 		return c.titles, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", c.config.URL+"/api/v1/titles", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.config.URL+"/api/titles", nil)
 	if err != nil {
 		return nil, err
 	}

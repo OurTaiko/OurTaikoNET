@@ -39,20 +39,20 @@ func TestPlaylistLifecycle(t *testing.T) {
 	named := strings.NewReplacer(world.song, "song", world.other, "other").Replace
 	for _, body := range []string{`{}`, `{"name":"  "}`, `{"name":"` + strings.Repeat("歌", 51) + `"}`, `{"name":"a","categoryId":"none"}`,
 		`{"name":"a","description":"` + strings.Repeat("字", 501) + `"}`, `{"name":"a\u0007"}`} {
-		if code := c.do("owner", "POST", "/api/v1/playlists", body, nil); code != 400 {
+		if code := c.do("owner", "POST", "/api/playlists", body, nil); code != 400 {
 			t.Fatal("invalid playlist accepted", body, code)
 		}
 	}
-	if code := c.do("", "POST", "/api/v1/playlists", `{"name":"Mine"}`, nil); code != 401 {
+	if code := c.do("", "POST", "/api/playlists", `{"name":"Mine"}`, nil); code != 401 {
 		t.Fatal("guest created a playlist", code)
 	}
 	var p Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":" Mine ","description":"first\r\nline"}`, &p); code != 201 ||
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":" Mine ","description":"first\r\nline"}`, &p); code != 201 ||
 		p.Name != "Mine" || p.Description != "first\nline" || p.Public || p.System || p.CategoryID != "variety" || p.Genre != "VARIETY" ||
 		p.OwnerID != playlistOwner || p.Owner == nil || p.ChartCount != 0 || p.CreatedAt == nil {
 		t.Fatalf("created %d %+v", code, p)
 	}
-	path := "/api/v1/playlists/" + p.ID
+	path := "/api/playlists/" + p.ID
 	// A private playlist exists only for its owner.
 	for user, want := range map[string]int{"": 404, "alice": 404, "admin": 404, "owner": 200} {
 		if code := c.do(user, "GET", path, "", nil); code != want {
@@ -106,11 +106,11 @@ func TestPlaylistLifecycle(t *testing.T) {
 	}
 
 	var mine MyPlaylists
-	if code := c.do("owner", "GET", "/api/v1/me/playlists?chart="+world.other, "", &mine); code != 200 || len(mine.Owned) != 1 || len(mine.Favorites) != 0 ||
+	if code := c.do("owner", "GET", "/api/me/playlists?chart="+world.other, "", &mine); code != 200 || len(mine.Owned) != 1 || len(mine.Favorites) != 0 ||
 		mine.Owned[0].ContainsChart == nil || !*mine.Owned[0].ContainsChart || mine.MaxItems != maxPlaylistItems {
 		t.Fatalf("mine %d %+v", code, mine)
 	}
-	if code := c.do("", "GET", "/api/v1/me/playlists", "", nil); code != 401 {
+	if code := c.do("", "GET", "/api/me/playlists", "", nil); code != 401 {
 		t.Fatal("guest library", code)
 	}
 
@@ -147,20 +147,20 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if v := detail("alice"); !v.Favorited || v.FavoriteCount != 1 {
 		t.Fatalf("favorited detail %+v", v)
 	}
-	if code := c.do("alice", "GET", "/api/v1/me/playlists", "", &mine); code != 200 || len(mine.Owned) != 0 || len(mine.Favorites) != 1 || mine.Favorites[0].ID != p.ID {
+	if code := c.do("alice", "GET", "/api/me/playlists", "", &mine); code != 200 || len(mine.Owned) != 0 || len(mine.Favorites) != 1 || mine.Favorites[0].ID != p.ID {
 		t.Fatalf("alice library %d %+v", code, mine)
 	}
 
 	resetRateLimit(s)
 	// Plaza: public playlists with songs; a user's page also lists empty ones.
 	var empty Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"Empty","public":true}`, &empty); code != 201 {
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"Empty","public":true}`, &empty); code != 201 {
 		t.Fatal("empty playlist", code)
 	}
 	var page PlaylistPage
 	list := func(query string, want ...string) {
 		t.Helper()
-		if code := c.do("alice", "GET", "/api/v1/playlists"+query, "", &page); code != 200 || page.Total != len(want) || len(page.Items) != len(want) {
+		if code := c.do("alice", "GET", "/api/playlists"+query, "", &page); code != 200 || page.Total != len(want) || len(page.Items) != len(want) {
 			t.Fatalf("list %s: %d %+v", query, code, page)
 		}
 		for i, id := range want {
@@ -178,19 +178,19 @@ func TestPlaylistLifecycle(t *testing.T) {
 	list("?sort=favorites&owner="+playlistOwner, p.ID, empty.ID)
 	list("?owner=" + playlistAlice)
 	for _, query := range []string{"?sort=random", "?page=0", "?owner=x"} {
-		if code := c.do("", "GET", "/api/v1/playlists"+query, "", nil); code != 400 {
+		if code := c.do("", "GET", "/api/playlists"+query, "", nil); code != 400 {
 			t.Fatal("invalid query", query, code)
 		}
 	}
 	var space UserSpace
-	if code := c.do("", "GET", "/api/v1/users/"+playlistOwner, "", &space); code != 200 || space.User.PlaylistCount != 2 {
+	if code := c.do("", "GET", "/api/users/"+playlistOwner, "", &space); code != 200 || space.User.PlaylistCount != 2 {
 		t.Fatal("public playlist count", code, space.User.PlaylistCount)
 	}
 
 	resetRateLimit(s)
 	// A playlist that turns private hides from those who keep it, and returns with it.
 	c.do("owner", "PATCH", path, `{"public":false}`, nil)
-	if code := c.do("alice", "GET", "/api/v1/me/playlists", "", &mine); code != 200 || len(mine.Favorites) != 0 {
+	if code := c.do("alice", "GET", "/api/me/playlists", "", &mine); code != 200 || len(mine.Favorites) != 0 {
 		t.Fatal("private favorite shown", code)
 	}
 	if code := c.do("alice", "GET", path, "", nil); code != 404 {
@@ -228,9 +228,9 @@ func TestPlaylistLifecycle(t *testing.T) {
 		}
 		return strings.Join(out, " ")
 	}
-	c.do("owner", "PATCH", "/api/v1/playlists/"+empty.ID, `{"public":false}`, nil)
-	c.do("owner", "PUT", "/api/v1/playlists/"+empty.ID+"/items/"+world.other+"", `{}`, nil)
-	c.do("alice", "PUT", "/api/v1/charts/"+world.other+"/vote", `{"value":1}`, nil)
+	c.do("owner", "PATCH", "/api/playlists/"+empty.ID, `{"public":false}`, nil)
+	c.do("owner", "PUT", "/api/playlists/"+empty.ID+"/items/"+world.other+"", `{}`, nil)
+	c.do("alice", "PUT", "/api/charts/"+world.other+"/vote", `{"value":1}`, nil)
 	if got := kinds(game(playlistOwner)); !strings.HasPrefix(got, "owned:Empty:VARIETY:other owned:Mine:GAME:song+other system:") || strings.Contains(got, "Liked") {
 		t.Fatal("owner folders", got)
 	}
@@ -249,7 +249,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if own := personalGamePlaylists(game("")); len(own) != 0 {
 		t.Fatal("guest personal folders", kinds(own))
 	}
-	r := httptest.NewRequest("GET", "/api/v1/game/catalog", nil)
+	r := httptest.NewRequest("GET", "/api/game/catalog", nil)
 	w := httptest.NewRecorder()
 	c.handler.ServeHTTP(w, r)
 	var catalog struct {
@@ -263,31 +263,31 @@ func TestPlaylistLifecycle(t *testing.T) {
 	resetRateLimit(s)
 	// System playlists on the website.
 	var systems struct{ Items []Playlist }
-	if code := c.do("alice", "GET", "/api/v1/playlists/system", "", &systems); code != 200 || len(systems.Items) != 3 || systems.Items[0].ID != "liked" || !systems.Items[0].System || systems.Items[0].Owner != nil {
+	if code := c.do("alice", "GET", "/api/playlists/system", "", &systems); code != 200 || len(systems.Items) != 3 || systems.Items[0].ID != "liked" || !systems.Items[0].System || systems.Items[0].Owner != nil {
 		t.Fatalf("systems %d %+v", code, systems)
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/system", "", &systems); code != 200 || len(systems.Items) != 2 || systems.Items[0].ID != "acclaimed" {
+	if code := c.do("", "GET", "/api/playlists/system", "", &systems); code != 200 || len(systems.Items) != 2 || systems.Items[0].ID != "acclaimed" {
 		t.Fatalf("guest systems %d %+v", code, systems)
 	}
 	var liked Playlist
-	if code := c.do("alice", "GET", "/api/v1/playlists/liked", "", &liked); code != 200 || playlistIDs(liked.Charts) != world.other || !liked.System || liked.Public {
+	if code := c.do("alice", "GET", "/api/playlists/liked", "", &liked); code != 200 || playlistIDs(liked.Charts) != world.other || !liked.System || liked.Public {
 		t.Fatalf("liked %d %+v", code, liked)
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/liked", "", nil); code != 401 {
+	if code := c.do("", "GET", "/api/playlists/liked", "", nil); code != 401 {
 		t.Fatal("guest liked", code)
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/daily", "", &liked); code != 200 || len(liked.Charts) != 2 {
+	if code := c.do("", "GET", "/api/playlists/daily", "", &liked); code != 200 || len(liked.Charts) != 2 {
 		t.Fatal("daily", code, len(liked.Charts))
 	}
 	for _, write := range [][2]string{{"PATCH", ""}, {"DELETE", ""}, {"PUT", "/items/" + world.song + ""}, {"PUT", "/favorite"}} {
-		if code := c.do("alice", write[0], "/api/v1/playlists/liked"+write[1], `{}`, nil); code != 404 {
+		if code := c.do("alice", write[0], "/api/playlists/liked"+write[1], `{}`, nil); code != 404 {
 			t.Fatal("system playlist written", write, code)
 		}
 	}
 
 	resetRateLimit(s)
 	// A deleted song leaves the playlist.
-	if code := c.do("owner", "DELETE", "/api/v1/charts/"+world.song+"", `{}`, nil); code != 200 {
+	if code := c.do("owner", "DELETE", "/api/charts/"+world.song+"", `{}`, nil); code != 200 {
 		t.Fatal("delete song", code)
 	}
 	if v := detail("alice"); playlistIDs(v.Charts) != world.other || v.ChartCount != 1 {
@@ -304,18 +304,18 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if code := c.do("alice", "DELETE", path, `{}`, nil); code != 403 {
 		t.Fatal("foreign delete", code)
 	}
-	if code := c.do("admin", "DELETE", "/api/v1/playlists/"+empty.ID, `{}`, nil); code != 404 {
+	if code := c.do("admin", "DELETE", "/api/playlists/"+empty.ID, `{}`, nil); code != 404 {
 		t.Fatal("admin deleted a private playlist", code)
 	}
 	if code := c.do("admin", "DELETE", path, `{}`, nil); code != 200 {
 		t.Fatal("admin delete", code)
 	}
 	var notices NotificationPage
-	if code := c.do("owner", "GET", "/api/v1/me/notifications", "", &notices); code != 200 || len(notices.Items) == 0 ||
+	if code := c.do("owner", "GET", "/api/me/notifications", "", &notices); code != 200 || len(notices.Items) == 0 ||
 		notices.Items[0].Kind != "playlist_removed" || notices.Items[0].Data["name"] != "Mine" || notices.Items[0].Actor != nil {
 		t.Fatalf("removal notice %d %+v", code, notices)
 	}
-	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+empty.ID, `{}`, nil); code != 200 {
+	if code := c.do("owner", "DELETE", "/api/playlists/"+empty.ID, `{}`, nil); code != 200 {
 		t.Fatal("own delete", code)
 	}
 	var left int
@@ -338,7 +338,7 @@ func TestPlaylistLimits(t *testing.T) {
 	codes := make(chan int, 4)
 	for range 4 {
 		wg.Add(1)
-		go func() { defer wg.Done(); codes <- c.do("owner", "POST", "/api/v1/playlists", `{"name":"Last"}`, nil) }()
+		go func() { defer wg.Done(); codes <- c.do("owner", "POST", "/api/playlists", `{"name":"Last"}`, nil) }()
 	}
 	wg.Wait()
 	close(codes)
@@ -360,18 +360,18 @@ func TestPlaylistLimits(t *testing.T) {
 	if _, e := s.DB.Exec(ctx, `INSERT INTO playlist_items(playlist_id,chart_id,position) SELECT lpad('1',32,'0'),'c'||n,n FROM generate_series(1,$1) n`, maxPlaylistItems); e != nil {
 		t.Fatal(e)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/"+world.song+"", `{}`, nil); code != 409 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+firstListed+"/items/"+world.song+"", `{}`, nil); code != 409 {
 		t.Fatal("add to a full playlist", code)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+firstListed+"/items/c7", `{}`, nil); code != 200 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+firstListed+"/items/c7", `{}`, nil); code != 200 {
 		t.Fatal("existing song of a full playlist", code)
 	}
 	var p Playlist
-	if code := c.do("", "GET", "/api/v1/playlists/"+firstListed, "", &p); code != 200 || len(p.Charts) != maxPlaylistItems || p.Charts[0].ID != "c1" || p.Charts[maxPlaylistItems-1].ID != fmt.Sprint("c", maxPlaylistItems) {
+	if code := c.do("", "GET", "/api/playlists/"+firstListed, "", &p); code != 200 || len(p.Charts) != maxPlaylistItems || p.Charts[0].ID != "c1" || p.Charts[maxPlaylistItems-1].ID != fmt.Sprint("c", maxPlaylistItems) {
 		t.Fatal("full playlist", code, len(p.Charts))
 	}
 	var page PlaylistPage
-	if code := c.do("", "GET", "/api/v1/playlists?page=2&owner="+playlistOwner, "", &page); code != 200 || page.Total != maxPlaylists-1 || len(page.Items) != playlistPageSize {
+	if code := c.do("", "GET", "/api/playlists?page=2&owner="+playlistOwner, "", &page); code != 200 || page.Total != maxPlaylists-1 || len(page.Items) != playlistPageSize {
 		t.Fatal("second page", code, page.Total, len(page.Items))
 	}
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/db"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/api/mount"
+	apiv1 "ourtaiko.dev/net/internal/api/v1"
 	"ourtaiko.dev/net/internal/awards"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
@@ -231,13 +233,13 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	// Each old host still answers its API; its pages are those of the new site now.
 	if cfg.LegacyFanmadeHost != "" {
-		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.withRewards(a.Fanmade.Handler()), Page: legacy.Under(cfg.Origin, "/fanmade")}
+		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: versions(a.withRewards(a.Fanmade.Handler())), Page: legacy.Under(cfg.Origin, "/fanmade")}
 	}
 	if cfg.LegacyOfficialHost != "" {
-		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.withRewards(a.Official.Handler()), Page: legacy.Under(cfg.Origin, "/official")}
+		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: versions(a.withRewards(a.Official.Handler())), Page: legacy.Under(cfg.Origin, "/official")}
 	}
 	if cfg.LegacyProfileHost != "" {
-		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.Players.Handler()), Page: legacy.Players(cfg.Origin)}
+		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(versions(a.Players.Handler())), Page: legacy.Players(cfg.Origin)}
 	}
 	if cfg.Multiplay.ListenAddr != "" {
 		timings := multiplay.DefaultTimings
@@ -273,9 +275,15 @@ func (a *App) Handler() http.Handler {
 	ready := a.Fanmade.Handler()
 	routes := http.NewServeMux()
 	routes.Handle("/readyz", ready)
-	routes.Handle("/", a.withRewards(current))
+	routes.Handle("/", versions(a.withRewards(current)))
 	// Every answer, the old domains' too, says how many rewards its player has not seen.
 	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
+}
+
+// versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
+// (package apiv1). Health checks and /internal/ reach api as they are.
+func versions(api http.Handler) http.Handler {
+	return mount.Serve(map[string]http.Handler{apiv1.Version: apiv1.Handler(api)}, api)
 }
 
 // withRewards serves the rewards' routes (package rewards) in front of an API: the website asks
@@ -283,8 +291,8 @@ func (a *App) Handler() http.Handler {
 // part knows the website. The old domains have them too, for a game that still uses one.
 func (a *App) withRewards(next http.Handler) http.Handler {
 	mux := http.NewServeMux()
-	a.rewards.Routes(mux, "/api/v1/me/rewards", a.Players.Require)
-	a.rewards.Routes(mux, "/api/v1/game/rewards", a.Fanmade.Require)
+	a.rewards.Routes(mux, "/api/me/rewards", a.Players.Require)
+	a.rewards.Routes(mux, "/api/game/rewards", a.Fanmade.Require)
 	mux.Handle("/", next)
 	return mux
 }

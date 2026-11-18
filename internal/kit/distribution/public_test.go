@@ -14,7 +14,7 @@ func TestRegionalPublicAvatars(t *testing.T) {
 	for _, ip := range []string{"203.0.113.1", "203.0.113.2", "203.0.113.3", "203.0.113.4", "203.0.113.5"} {
 		request := mainland()
 		request.Header.Set("X-Real-IP", ip)
-		request.URL.Path = "/api/v1/distribution/avatar"
+		request.URL.Path = "/api/distribution/avatar"
 		request.URL.RawQuery = url.Values{"url": {original}, "redirect": {"1"}}.Encode()
 		response := httptest.NewRecorder()
 		router.Public(response, request)
@@ -28,7 +28,7 @@ func TestRegionalPublicAvatars(t *testing.T) {
 	}
 	for _, invalid := range []string{original + "?signature=x", original + "#x", strings.Replace(original, "distrib.ourtaiko.org", "private.example", 1), CanonicalBase + "sso/avatars/../secret.webp"} {
 		request := mainland()
-		request.URL.Path = "/api/v1/distribution/avatar"
+		request.URL.Path = "/api/distribution/avatar"
 		request.URL.RawQuery = url.Values{"url": {invalid}}.Encode()
 		response := httptest.NewRecorder()
 		router.Public(response, request)
@@ -37,7 +37,7 @@ func TestRegionalPublicAvatars(t *testing.T) {
 		}
 	}
 	request := mainland()
-	request.URL.Path = "/api/v1/distribution/player-build"
+	request.URL.Path = "/api/distribution/player-build"
 	response := httptest.NewRecorder()
 	router.Public(response, request)
 	if response.Code != 404 {
@@ -50,7 +50,7 @@ func TestRegionalSource(t *testing.T) {
 	for _, ip := range []string{"203.0.113.1", "203.0.113.2"} {
 		request := mainland()
 		request.Header.Set("X-Real-IP", ip)
-		request.URL.Path = "/api/v1/distribution/source"
+		request.URL.Path = "/api/distribution/source"
 		response := httptest.NewRecorder()
 		router.Public(response, request)
 		var answer SourceAnswer

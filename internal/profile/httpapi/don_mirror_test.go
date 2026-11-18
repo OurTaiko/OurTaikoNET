@@ -84,7 +84,7 @@ func TestDonMirrorRouting(t *testing.T) {
 		{"mainland", "172.20.0.1:1234", "203.0.113.1", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", "/api/v1/users/test/don", nil)
+			r := httptest.NewRequest("GET", "/api/users/test/don", nil)
 			r.RemoteAddr = tc.peer
 			r.Header.Set("X-Real-IP", tc.client)
 			w := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestDonMirrorRouting(t *testing.T) {
 	mirrorBase := origin.URL + "/staging/3dchara/"
 	catalogAnswer := func(t *testing.T, server *Server, ip string) ([]string, string, string) {
 		t.Helper()
-		r := httptest.NewRequest("GET", "/api/v1/don/catalog", nil)
+		r := httptest.NewRequest("GET", "/api/don/catalog", nil)
 		r.RemoteAddr = "172.20.0.1:1234"
 		r.Header.Set("X-Real-IP", ip)
 		w := httptest.NewRecorder()

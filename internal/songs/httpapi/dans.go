@@ -19,7 +19,7 @@ import (
 
 // 段位 courses in the format of OurTaikoPlay's .otdan.json (OurTaikoLogs DanDojo.md): one to
 // three chart blocks with conditions. The website keeps them, the game reads them from
-// GET /api/v1/game/dans and reports attempts to POST /api/v1/game/dan-attempts, which asks
+// GET /api/game/dans and reports attempts to POST /api/game/dan-attempts, which asks
 // OurTaikoProfile for the titles and 段位 badge they earn.
 
 const danMaxSongs = 3
@@ -432,7 +432,7 @@ func (s *Server) saveDanSongs(ctx context.Context, tx pgx.Tx, course string, son
 	return nil
 }
 
-// createDan is POST /api/v1/dans: any signed-in user publishes a course (not official).
+// createDan is POST /api/dans: any signed-in user publishes a course (not official).
 func (s *Server) createDan(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -594,7 +594,7 @@ func (s *Server) deleteDan(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
-// markDanOfficial is PUT /api/v1/dans/{id}/official {official}: administrators only.
+// markDanOfficial is PUT /api/dans/{id}/official {official}: administrators only.
 func (s *Server) markDanOfficial(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.required(w, r, true)
 	if !ok {
@@ -622,7 +622,7 @@ func (s *Server) markDanOfficial(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]bool{"official": body.Official})
 }
 
-// gameDans is GET /api/v1/game/dans: the official courses for the game's list, which finds
+// gameDans is GET /api/game/dans: the official courses for the game's list, which finds
 // the songs in this server's catalog and greys a course whose chart changed (tjaHash). The
 // other courses are reached by code (gameDanByCode).
 func (s *Server) gameDans(w http.ResponseWriter, r *http.Request) {
@@ -634,7 +634,7 @@ func (s *Server) gameDans(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"dans": courses, "danVersion": 1})
 }
 
-// gameDanByCode is GET /api/v1/game/dans/{code}: one published course, official or not, by
+// gameDanByCode is GET /api/game/dans/{code}: one published course, official or not, by
 // the code the game's 外伝 entry took. A course with a song that is no longer available is
 // not found: the game only challenges courses it can play whole.
 func (s *Server) gameDanByCode(w http.ResponseWriter, r *http.Request) {
@@ -704,7 +704,7 @@ type danAttemptScore struct {
 // The largest attempt: three scores, each with a recording.
 const maxDanAttemptBytes = 3*maxScoreRequestBytes + 8192
 
-// submitDanResult is POST /api/v1/game/dan-results with an Idempotency-Key, from a signed-in
+// submitDanResult is POST /api/game/dan-results with an Idempotency-Key, from a signed-in
 // game: {courseId, verdict 0–6, scores}, where scores are the played songs' scores in song
 // order (null for a song without one). The scores are saved first and the attempt with their
 // ids, in one transaction, so an attempt and its scores are there together or not at all. A
@@ -721,14 +721,14 @@ func (s *Server) submitDanResult(w http.ResponseWriter, r *http.Request) {
 // Deprecation header says.
 const danAttemptsDeprecated = "@1794268800"
 
-// Deprecated: submitDanAttempt is POST /api/v1/game/dan-attempts {courseId, verdict,
+// Deprecated: submitDanAttempt is POST /api/game/dan-attempts {courseId, verdict,
 // songsPlayed}, what games before dan-results send. They upload the songs' scores on their own
 // (POST /game/scores), around the attempt; the scores are looked for by time
 // (dan_attempt_scores), when the attempt comes and as each score follows it. Use
 // POST /game/dan-results.
 func (s *Server) submitDanAttempt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Deprecation", danAttemptsDeprecated)
-	w.Header().Set("Link", `</api/v1/game/dan-results>; rel="successor-version"`)
+	w.Header().Set("Link", `</api/game/dan-results>; rel="successor-version"`)
 	s.saveDanAttempt(w, r, false)
 }
 

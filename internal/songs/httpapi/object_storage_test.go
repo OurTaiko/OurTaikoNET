@@ -17,7 +17,7 @@ import (
 func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []byte) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+chartID+"/resources", nil))
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+chartID+"/resources", nil))
 	var payload struct {
 		ChartID string `json:"chartId"`
 
@@ -96,7 +96,7 @@ func TestS3PendingRecovery(t *testing.T) {
 		f.Close()
 	}
 	w := httptest.NewRecorder()
-	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/catalog", nil))
+	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/game/catalog", nil))
 	if w.Code != 200 {
 		t.Fatal("game inaccessible", w.Code)
 	}

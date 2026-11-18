@@ -43,7 +43,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	app := testServer(t, pool, Config{Storage: storage, Origin: "http://127.0.0.1:5173"})
 	handler := app.Handler()
 	call := func(actor, csrf, body string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("PATCH", "/api/v1/charts/chart", strings.NewReader(body))
+		r := httptest.NewRequest("PATCH", "/api/charts/chart", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Origin", "http://127.0.0.1:5173")
 		r.Header.Set("X-CSRF-Token", csrf)
@@ -114,7 +114,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		t.Fatalf("metadata response lost cover or changed resources: %+v", edited)
 	}
 	detailResponse := httptest.NewRecorder()
-	handler.ServeHTTP(detailResponse, httptest.NewRequest("GET", "/api/v1/charts/chart?by=id", nil))
+	handler.ServeHTTP(detailResponse, httptest.NewRequest("GET", "/api/charts/chart?by=id", nil))
 	var detail Chart
 	if detailResponse.Code != http.StatusOK || json.Unmarshal(detailResponse.Body.Bytes(), &detail) != nil || detail.CoverHash != edited.CoverHash || detail.TitleTranslations["zh"] != "新译名" {
 		t.Fatalf("GET/PATCH metadata mismatch: %s", detailResponse.Body.String())
@@ -130,7 +130,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		t.Fatalf("incomplete dictionary: %s", all.Body.String())
 	}
 	for _, lang := range []string{"en", "ja", "zh", "ko"} {
-		rr := httptest.NewRequest("GET", "/api/v1/charts/chart?by=id&lang="+lang, nil)
+		rr := httptest.NewRequest("GET", "/api/charts/chart?by=id&lang="+lang, nil)
 		rr.Header.Set("Accept-Language", lang)
 		ww := httptest.NewRecorder()
 		handler.ServeHTTP(ww, rr)
@@ -162,7 +162,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 	if same := call("d46774d30dd13b92d9e536808da468a4", "csrf", `{}`); same.Code != 200 || json.Unmarshal(same.Body.Bytes(), &clearedChart) != nil || clearedChart.Title != "Admin edit" || len(clearedChart.TitleTranslations) != 2 {
 		t.Fatalf("empty edit: %d %s", same.Code, same.Body.String())
 	}
-	r := httptest.NewRequest("GET", "/api/v1/me", nil)
+	r := httptest.NewRequest("GET", "/api/me", nil)
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: tokens["5f63f79d876d201a13f8710453636837"]})
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -182,7 +182,7 @@ func TestMetadataAuthorOrAdmin(t *testing.T) {
 		t.Fatalf("denied write changed title: %s %v", title, err)
 	}
 	// Registration does not accept an administrator flag.
-	r = httptest.NewRequest("POST", "/api/v1/auth/register", strings.NewReader(`{"username":"forgedadmin","password":"password123","isAdmin":true}`))
+	r = httptest.NewRequest("POST", "/api/auth/register", strings.NewReader(`{"username":"forgedadmin","password":"password123","isAdmin":true}`))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Origin", "http://127.0.0.1:5173")
 	w = httptest.NewRecorder()

@@ -107,7 +107,7 @@ func TestRoomsDrawFromTheGameCatalog(t *testing.T) {
 	}
 	listed := func() map[string]bool {
 		t.Helper()
-		if status := w.c.do("", "GET", "/api/v1/game/catalog", "", &catalog); status != 200 {
+		if status := w.c.do("", "GET", "/api/game/catalog", "", &catalog); status != 200 {
 			t.Fatal("catalog", status)
 		}
 		ids := map[string]bool{}
@@ -179,7 +179,7 @@ func TestGameIdentity(t *testing.T) {
 	// The game signs in without an Origin, as no browser does.
 	var login struct{ AccessToken string }
 	signIn := func(server *Server, credentials string) int {
-		r := httptest.NewRequest("POST", "/api/v1/game/login", strings.NewReader(credentials))
+		r := httptest.NewRequest("POST", "/api/game/login", strings.NewReader(credentials))
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		server.Handler().ServeHTTP(w, r)

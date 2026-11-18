@@ -67,7 +67,7 @@ func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
 	requests := 0
 	send := func(key string) (int, map[string]json.RawMessage) {
 		t.Helper()
-		r := httptest.NewRequest("POST", "/api/v1/game/dan-results", strings.NewReader(body))
+		r := httptest.NewRequest("POST", "/api/game/dan-results", strings.NewReader(body))
 		requests++
 		r.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", requests)
 		r.Header.Set("Content-Type", "application/json")

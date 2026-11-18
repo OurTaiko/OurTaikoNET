@@ -46,7 +46,7 @@ func (r *Router) Public(w http.ResponseWriter, request *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	switch request.URL.Path {
-	case "/api/v1/distribution/avatar":
+	case "/api/distribution/avatar":
 		original := request.URL.Query().Get("url")
 		u, err := url.Parse(original)
 		if err != nil || u.Scheme != "https" || u.Host != "distrib.ourtaiko.org" || u.User != nil ||
@@ -61,7 +61,7 @@ func (r *Router) Public(w http.ResponseWriter, request *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]string{"url": selected, "fallbackUrl": original})
-	case "/api/v1/distribution/source":
+	case "/api/distribution/source":
 		json.NewEncoder(w).Encode(r.Source(request))
 	default:
 		http.NotFound(w, request)

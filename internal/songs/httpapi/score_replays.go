@@ -104,7 +104,7 @@ func normalizeScoreReplay(raw json.RawMessage) json.RawMessage {
 	return canonical
 }
 
-// scoreReplay is GET /api/v1/scores/{id}/replay, public like the leaderboards: the play and its
+// scoreReplay is GET /api/scores/{id}/replay, public like the leaderboards: the play and its
 // recording. A score without a recording, or on a chart that is not published, has none. The
 // inputs were played on the files the score was made with, so the reader checks isLatest
 // before showing them over the current chart.

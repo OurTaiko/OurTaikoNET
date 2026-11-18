@@ -45,33 +45,33 @@ func TestPublicGameSearch(t *testing.T) {
 		endpoint, query      string
 		total, items, status int
 	}{
-		{"/api/v1/game/search", "?q=Search&course=Oni&level=8", 14, 14, 200},
-		{"/api/v1/game/search", "?q=Search&course=Easy&level=8", 0, 0, 200},
-		{"/api/v1/game/search", "?q=検索曲&level=3", 14, 14, 200},
-		{"/api/v1/game/search", "?q=Artist", 14, 14, 200},
-		{"/api/v1/game/search", "?q=公开昵称", 0, 0, 200},
-		{"/api/v1/game/search", "?course=Edit", 0, 0, 200},
-		{"/api/v1/game/search", "?course=Tower", 0, 0, 400},
-		{"/api/v1/game/search", "?level=nope", 0, 0, 400},
-		{"/api/v1/game/search", "?level=-1", 0, 0, 400},
-		{"/api/v1/game/search", "?level=100", 0, 0, 400},
-		{"/api/v1/game/search", "?order=hot", 0, 0, 400},
-		{"/api/v1/game/search", "?order=comments", 0, 0, 400},
-		{"/api/v1/charts", "?q=Search", 14, 12, 200},
-		{"/api/v1/charts", "?q=Search&page=2", 14, 2, 200},
-		{"/api/v1/charts", "?q=検索曲", 14, 12, 200},
-		{"/api/v1/charts", "?q=Artist&order=hot", 14, 12, 200},
-		{"/api/v1/charts", "?q=公开昵称", 0, 0, 200},
-		{"/api/v1/charts", "?q=searcher", 0, 0, 200},
+		{"/api/game/search", "?q=Search&course=Oni&level=8", 14, 14, 200},
+		{"/api/game/search", "?q=Search&course=Easy&level=8", 0, 0, 200},
+		{"/api/game/search", "?q=検索曲&level=3", 14, 14, 200},
+		{"/api/game/search", "?q=Artist", 14, 14, 200},
+		{"/api/game/search", "?q=公开昵称", 0, 0, 200},
+		{"/api/game/search", "?course=Edit", 0, 0, 200},
+		{"/api/game/search", "?course=Tower", 0, 0, 400},
+		{"/api/game/search", "?level=nope", 0, 0, 400},
+		{"/api/game/search", "?level=-1", 0, 0, 400},
+		{"/api/game/search", "?level=100", 0, 0, 400},
+		{"/api/game/search", "?order=hot", 0, 0, 400},
+		{"/api/game/search", "?order=comments", 0, 0, 400},
+		{"/api/charts", "?q=Search", 14, 12, 200},
+		{"/api/charts", "?q=Search&page=2", 14, 2, 200},
+		{"/api/charts", "?q=検索曲", 14, 12, 200},
+		{"/api/charts", "?q=Artist&order=hot", 14, 12, 200},
+		{"/api/charts", "?q=公开昵称", 0, 0, 200},
+		{"/api/charts", "?q=searcher", 0, 0, 200},
 		// The website's list filters by course and star level too, one block holding both.
-		{"/api/v1/charts", "?q=Search&course=Easy&level=8", 0, 0, 200},
-		{"/api/v1/charts", "?q=Search&course=Oni&level=8", 14, 12, 200},
-		{"/api/v1/charts", "?level=3", 14, 12, 200},
-		{"/api/v1/charts", "?course=Tower", 0, 0, 400},
-		{"/api/v1/charts", "?level=nope", 0, 0, 400},
-		{"/api/v1/charts", "?order=unfc", 0, 0, 400},
-		{"/api/v1/charts", "?order=unperfect", 0, 0, 400},
-		{"/api/v1/charts", "?page=10001", 0, 0, 400},
+		{"/api/charts", "?q=Search&course=Easy&level=8", 0, 0, 200},
+		{"/api/charts", "?q=Search&course=Oni&level=8", 14, 12, 200},
+		{"/api/charts", "?level=3", 14, 12, 200},
+		{"/api/charts", "?course=Tower", 0, 0, 400},
+		{"/api/charts", "?level=nope", 0, 0, 400},
+		{"/api/charts", "?order=unfc", 0, 0, 400},
+		{"/api/charts", "?order=unperfect", 0, 0, 400},
+		{"/api/charts", "?page=10001", 0, 0, 400},
 	} {
 		r := httptest.NewRequest("GET", tc.endpoint+tc.query, nil)
 		w := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestPublicGameSearch(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','',now()+interval '1 day')`, web.Hash("game:"+gameToken)); err != nil {
 		t.Fatal(err)
 	}
-	for _, endpoint := range []string{"/api/v1/game/search"} {
+	for _, endpoint := range []string{"/api/game/search"} {
 		for _, tc := range []struct {
 			order, course, auth string
 			first               int
@@ -125,13 +125,13 @@ func TestPublicGameSearch(t *testing.T) {
 			r := httptest.NewRequest("GET", endpoint+"?order="+tc.order+"&course="+tc.course, nil)
 			if tc.auth != "" {
 				token := webToken
-				if strings.HasPrefix(endpoint, "/api/v1/game/") {
+				if strings.HasPrefix(endpoint, "/api/game/") {
 					token = gameToken
 				}
 				if tc.auth == "invalid" {
 					token = strings.Repeat("d", 64)
 				}
-				if strings.HasPrefix(endpoint, "/api/v1/game/") {
+				if strings.HasPrefix(endpoint, "/api/game/") {
 					r.Header.Set("Authorization", "Bearer "+token)
 				} else {
 					r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: token})
@@ -151,7 +151,7 @@ func TestPublicGameSearch(t *testing.T) {
 	// A score of replaced files counts while the block has no current one.
 	first := func(want int) {
 		t.Helper()
-		r := httptest.NewRequest("GET", "/api/v1/game/search?order=unfc&course=Oni", nil)
+		r := httptest.NewRequest("GET", "/api/game/search?order=unfc&course=Oni", nil)
 		r.Header.Set("Authorization", "Bearer "+gameToken)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -177,9 +177,9 @@ func TestPublicGameSearch(t *testing.T) {
 	// list without web enrichment. Browser cookies cannot authorize game ordering.
 	{
 		var paged []string
-		for _, path := range []string{"/api/v1/charts?page=1", "/api/v1/charts?page=2", "/api/v1/game/search?"} {
+		for _, path := range []string{"/api/charts?page=1", "/api/charts?page=2", "/api/game/search?"} {
 			r := httptest.NewRequest("GET", path+"&order=default", nil)
-			if strings.HasPrefix(path, "/api/v1/game/") {
+			if strings.HasPrefix(path, "/api/game/") {
 				r.Header.Set("Authorization", "Bearer "+gameToken)
 			} else {
 				r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: webToken})
@@ -194,7 +194,7 @@ func TestPublicGameSearch(t *testing.T) {
 			if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil {
 				t.Fatal(w.Code, w.Body.String())
 			}
-			if strings.HasPrefix(path, "/api/v1/charts") {
+			if strings.HasPrefix(path, "/api/charts") {
 				for _, c := range result.Items {
 					paged = append(paged, c.ID)
 				}
@@ -210,7 +210,7 @@ func TestPublicGameSearch(t *testing.T) {
 			}
 		}
 	}
-	r := httptest.NewRequest("GET", "/api/v1/game/search?order=unfc&course=Oni", nil)
+	r := httptest.NewRequest("GET", "/api/game/search?order=unfc&course=Oni", nil)
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: webToken})
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -221,7 +221,7 @@ func TestPublicGameSearch(t *testing.T) {
 
 	// Metadata search must keep working without SSO nickname search.
 	s.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}}
-	for _, endpoint := range []string{"/api/v1/charts", "/api/v1/game/search"} {
+	for _, endpoint := range []string{"/api/charts", "/api/game/search"} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", endpoint+"?q=Artist", nil))
 		if w.Code != 200 {
@@ -234,7 +234,7 @@ func TestPublicGameSearch(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE charts SET category_flags=0 WHERE id=$1`, fmt.Sprintf("%032d", 13)); err != nil {
 		t.Fatal(err)
 	}
-	for endpoint, want := range map[string]int{"/api/v1/game/search": 13, "/api/v1/game/catalog": 13, "/api/v1/charts?page=2": 14} {
+	for endpoint, want := range map[string]int{"/api/game/search": 13, "/api/game/catalog": 13, "/api/charts?page=2": 14} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", endpoint, nil))
 		var found struct {

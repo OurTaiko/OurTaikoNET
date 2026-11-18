@@ -62,7 +62,7 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	app := New(pool, Config{Objects: remote})
 	handler := app.Handler()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/resources", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/cdn-song/resources", nil))
 	var payload struct {
 		URLsExpire bool    `json:"urlsExpire"`
 		ExpiresAt  *string `json:"expiresAt"`
@@ -85,7 +85,7 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	for _, method := range []string{"GET", "HEAD"} {
 		for _, path := range []string{"audio", "tja"} {
 			w = httptest.NewRecorder()
-			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/charts/cdn-song/"+path, nil))
+			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/charts/cdn-song/"+path, nil))
 			// A redirect by chart ID is never cached: a replaced or removed chart is asked about again.
 			if w.Code != 302 || !strings.HasPrefix(w.Header().Get("Location"), "https://cdn.example/fanmade/") || w.Header().Get("Cache-Control") != "no-store" {
 				t.Fatalf("%s %s: %d %s", method, path, w.Code, w.Body.String())
@@ -100,7 +100,7 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	}
 	for id, want := range map[string]string{"cdn-song": "https://cdn.example/fanmade/covers/song/cover.webp", "cdn-hashed": "https://cdn.example/fanmade/" + strings.Repeat("e", 64) + ".webp"} {
 		w = httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+id+"?by=id", nil))
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+id+"?by=id", nil))
 		var detail Chart
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &detail) != nil || detail.CoverURL != want {
 			t.Fatalf("%s: %d coverUrl %q", id, w.Code, detail.CoverURL)
@@ -111,7 +111,7 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	}
 	for _, path := range []string{"audio", "tja", "download", "resources"} {
 		w = httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/"+path, nil))
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/cdn-song/"+path, nil))
 		if w.Code != 404 {
 			t.Fatalf("removed %s: %d", path, w.Code)
 		}
