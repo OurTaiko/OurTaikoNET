@@ -15,8 +15,6 @@ type Source struct {
 	// DefaultReturn is where signing in returns to when it was asked for nowhere, or nowhere
 	// allowed.
 	DefaultReturn string
-	// PageSize is how many charts a page of the chart list has.
-	PageSize int
 	// Categories is the catalog, in the order and with the names clients have always been
 	// given. Genre is the game's box.def #GENRE.
 	Categories []categoryEntry

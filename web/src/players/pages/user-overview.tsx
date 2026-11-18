@@ -284,7 +284,7 @@ function Charts({ id, onMore }: { id: string; onMore: () => void }) {
     >
       <div className="song-grid" data-testid="overview-charts">
         {charts.map(({ source, chart }) => (
-          <SongTile key={`${source}/${chart.id}`} source={source} chart={chart} tag />
+          <SongTile key={`${source}/${chart.id}`} source={source} chart={chart} />
         ))}
       </div>
     </Panel>

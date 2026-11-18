@@ -59,6 +59,9 @@ import type { TFunction } from 'i18next'
 // A chart registered without its files yet (OurTaiko Database) has hasFiles false.
 type Chart = ChartBase & { hasFiles?: boolean }
 
+// The same in both sources. It divides evenly by the song grid's usual numbers of columns.
+const libraryPageSize = 24
+
 export function Library({
   mine = false,
   ownerId,
@@ -102,7 +105,7 @@ export function Library({
     ...site.readExtraFilters?.(params),
   }
   // The address of the list, filters and all: the request follows it.
-  const query = JSON.stringify({ q, page, owner, ...filters })
+  const query = JSON.stringify({ q, page, pageSize: libraryPageSize, owner, ...filters })
   useEffect(() => {
     if (mine && !user) return
     const controller = new AbortController()

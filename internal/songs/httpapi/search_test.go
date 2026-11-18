@@ -57,16 +57,17 @@ func TestPublicGameSearch(t *testing.T) {
 		{"/api/game/search", "?level=100", 0, 0, 400},
 		{"/api/game/search", "?order=hot", 0, 0, 400},
 		{"/api/game/search", "?order=comments", 0, 0, 400},
-		{"/api/charts", "?q=Search", 14, 12, 200},
-		{"/api/charts", "?q=Search&page=2", 14, 2, 200},
-		{"/api/charts", "?q=検索曲", 14, 12, 200},
-		{"/api/charts", "?q=Artist&order=hot", 14, 12, 200},
+		{"/api/charts", "?q=Search&pageSize=12", 14, 12, 200},
+		{"/api/charts", "?q=Search", 14, 14, 200},
+		{"/api/charts", "?q=Search&page=2&pageSize=12", 14, 2, 200},
+		{"/api/charts", "?q=検索曲&pageSize=12", 14, 12, 200},
+		{"/api/charts", "?q=Artist&order=hot&pageSize=12", 14, 12, 200},
 		{"/api/charts", "?q=公开昵称", 0, 0, 200},
 		{"/api/charts", "?q=searcher", 0, 0, 200},
 		// The website's list filters by course and star level too, one block holding both.
 		{"/api/charts", "?q=Search&course=Easy&level=8", 0, 0, 200},
-		{"/api/charts", "?q=Search&course=Oni&level=8", 14, 12, 200},
-		{"/api/charts", "?level=3", 14, 12, 200},
+		{"/api/charts", "?q=Search&course=Oni&level=8&pageSize=12", 14, 12, 200},
+		{"/api/charts", "?level=3&pageSize=12", 14, 12, 200},
 		{"/api/charts", "?course=Tower", 0, 0, 400},
 		{"/api/charts", "?level=nope", 0, 0, 400},
 		{"/api/charts", "?order=unfc", 0, 0, 400},
@@ -177,7 +178,7 @@ func TestPublicGameSearch(t *testing.T) {
 	// list without web enrichment. Browser cookies cannot authorize game ordering.
 	{
 		var paged []string
-		for _, path := range []string{"/api/charts?page=1", "/api/charts?page=2", "/api/game/search?"} {
+		for _, path := range []string{"/api/charts?page=1&pageSize=12", "/api/charts?page=2&pageSize=12", "/api/game/search?"} {
 			r := httptest.NewRequest("GET", path+"&order=default", nil)
 			if strings.HasPrefix(path, "/api/game/") {
 				r.Header.Set("Authorization", "Bearer "+gameToken)

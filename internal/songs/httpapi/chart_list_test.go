@@ -7,7 +7,7 @@ import (
 )
 
 // The chart list is the same code on both sources, so this one takes every filter and order
-// the official source's list does; a page here has this source's own number of charts.
+// the official source's list does.
 func TestChartListFiltersAndOrders(t *testing.T) {
 	world := interactionWorldOf(t, Fanmade)
 	c, s := world.c, world.s
@@ -42,7 +42,7 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 		}
 		return p.Items[0].ID
 	}
-	if p := list(""); p.PageSize != 12 || p.Total != 2 {
+	if p := list(""); p.PageSize != 24 || p.Total != 2 {
 		t.Fatalf("page %+v", p)
 	}
 	for query, want := range map[string]string{
@@ -66,7 +66,15 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 	if p := list("?q=" + strconv.FormatInt(song.NumberID, 10)); p.Total != 1 || p.Items[0].ID != world.song {
 		t.Fatal("keyword number", p.Total)
 	}
-	for _, query := range []string{"?order=newest", "?files=maybe", "?nijiiro=1", "?level=11", "?course=Ura", "?category=missing", "?page=10001"} {
+	// The client can say how many charts a page has; the pages then follow that number.
+	one, two := list("?pageSize=1"), list("?pageSize=1&page=2")
+	if one.PageSize != 1 || one.Total != 2 || len(one.Items) != 1 || len(two.Items) != 1 || one.Items[0].ID == two.Items[0].ID {
+		t.Fatalf("pages of one: %+v, %+v", one, two)
+	}
+	if p := list("?pageSize=100"); p.PageSize != 100 || len(p.Items) != 2 {
+		t.Fatalf("page of the most %+v", p)
+	}
+	for _, query := range []string{"?pageSize=0", "?pageSize=-1", "?pageSize=101", "?pageSize=many", "?order=newest", "?files=maybe", "?nijiiro=1", "?level=11", "?course=Ura", "?category=missing", "?page=10001"} {
 		if code := c.do("", "GET", "/api/charts"+query, "", nil); code != 400 {
 			t.Fatal(query, code)
 		}

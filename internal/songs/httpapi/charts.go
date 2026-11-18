@@ -272,10 +272,17 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) {
 	s.search(w, r, u.User.ID)
 }
 
-// search pages the chart list, Source.PageSize charts at a time. Filters: keyword, owner, category,
-// a course and star level that must hold for the same block (any side), whether the chart
-// has a Nijiiro ID, and whether it has files. Every filter and order is there on both
-// sources; which of them a source's website offers is the website's business.
+// How many charts a page of the chart list has when the client does not say, on both sources,
+// and the most a client can ask for.
+const (
+	defaultChartPageSize = 24
+	maxChartPageSize     = 100
+)
+
+// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category, a
+// course and star level that must hold for the same block (any side), whether the chart has a
+// Nijiiro ID, and whether it has files. Every filter and order is there on both sources; which
+// of them a source's website offers is the website's business.
 func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))
@@ -290,6 +297,14 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 	if page > 10000 {
 		problem(w, 400, "QUERY_INVALID", "页码超出范围")
 		return
+	}
+	pageSize := defaultChartPageSize
+	if raw := query.Get("pageSize"); raw != "" {
+		var e error
+		if pageSize, e = strconv.Atoi(raw); e != nil || pageSize < 1 || pageSize > maxChartPageSize {
+			problem(w, 400, "QUERY_INVALID", "每页数量必须在 1 到 100 之间")
+			return
+		}
 	}
 	var flag CategoryFlags
 	if id := query.Get("category"); id != "" {
@@ -365,7 +380,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		internal(w, e)
 		return
 	}
-	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, s.source().PageSize, (page-1)*s.source().PageSize)...)
+	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, pageSize, (page-1)*pageSize)...)
 	if e != nil {
 		internal(w, e)
 		return
@@ -376,7 +391,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		return
 	}
 	s.chartNames(r.Context(), items)
-	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": s.source().PageSize})
+	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
 }
 
 // nijiiroID reads a Nijiiro ID as text: a positive int4 without leading zeros.
