@@ -1,11 +1,6 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  fetchResource,
-  originResource,
-  retryResourceOrigin,
-  verifiedResource,
-} from './resource-download'
+import { verifiedResource } from './resource-download'
 
 const bytes = 'verified audio'
 const hash = createHash('sha256').update(bytes).digest('hex')
@@ -96,21 +91,35 @@ describe('regional resource downloads', () => {
     ).rejects.toThrow('aborted')
     expect(fetch).toHaveBeenCalledTimes(1)
   })
-  it('only retries local media API URLs and never changes signed/external URLs', async () => {
-    const path = '/api/v1/sources/official/charts/123/audio'
-    expect(originResource(path + '?v=abc')).toBe(path + '?v=abc&origin=1')
-    expect(originResource(path + '?origin=1')).toBeNull()
-    expect(originResource(canonical)).toBeNull()
-    expect(originResource('https://other.example' + path)).toBeNull()
-    const element = { src: path, getAttribute: () => null }
-    expect(retryResourceOrigin(element)).toBe(true)
-    expect(retryResourceOrigin(element)).toBe(false)
-    const fetch = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('', { status: 503 }))
-      .mockResolvedValueOnce(new Response(bytes))
-    vi.stubGlobal('fetch', fetch)
-    expect(await (await fetchResource(path)).text()).toBe(bytes)
-    expect(fetch.mock.calls.map(([url]) => url)).toEqual([path, path + '?origin=1'])
+  it('takes a path from the visitor root and falls back to the canonical one', async () => {
+    vi.resetModules()
+    const { pathResource } = await import('./resource-download')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          mirror: true,
+          baseUrl: 'https://mirror.example/ourtaiko/',
+          canonicalBaseUrl: 'https://distrib.ourtaiko.org/',
+        }),
+      ),
+    )
+    expect(await pathResource('database/song.ogg', { size: 3 })).toEqual({
+      url: 'https://mirror.example/ourtaiko/database/song.ogg',
+      fallbackUrl: 'https://distrib.ourtaiko.org/database/song.ogg',
+      size: 3,
+    })
+  })
+  it('has no fallback on the canonical root', async () => {
+    vi.resetModules()
+    const { pathResource } = await import('./resource-download')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 503 })),
+    )
+    expect(await pathResource('database/song.ogg')).toEqual({
+      url: 'https://distrib.ourtaiko.org/database/song.ogg',
+      fallbackUrl: undefined,
+    })
   })
 })

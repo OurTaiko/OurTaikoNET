@@ -10,9 +10,9 @@ export { SourceTag }
 
 // These pages belong to no source, so they say which source's API and pages they mean.
 export const sources: SourceId[] = ['fanmade', 'official']
-export const sourceApi = (source: SourceId) => `/api/v1/sources/${source}`
+export const sourceApi = (source: SourceId) => `/api/v2/sources/${source}`
 export const songPage = (source: SourceId, id: string) => `/${source}/charts/${id}`
-export const coverOf = (chart: ChartBase) => chart.coverUrl || undefined
+export const coverOf = (chart: ChartBase) => chart.songCoverPath || undefined
 
 /** A song of a named source: the tile of the song lists, linking to the song's page there. */
 export function SongTile({

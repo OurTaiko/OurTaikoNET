@@ -69,11 +69,11 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
         <div className="flex justify-between items-center gap-3 mt-auto">
           <span className="flex items-center gap-2 min-w-0">
             <UserAvatar
-              nickname={chart.uploader}
-              avatarUrl={chart.uploaderAvatarUrl}
+              nickname={chart.author}
+              avatarPath={chart.authorAvatarPath}
               className="size-7"
             />
-            <span className="font-semibold text-sm truncate">{chart.uploader}</span>
+            <span className="font-semibold text-sm truncate">{chart.author}</span>
           </span>
           <a className={cn(buttonVariants(), 'shrink-0')} href={page}>
             {t('home.openChart')}

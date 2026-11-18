@@ -68,7 +68,7 @@ const build = () =>
     /** PUT: the background movie on its own, with an optional movieOffset. */
     chartMovie: (id: string) => `${chartPath(id)}/movie`,
     chartFilesPreview: (id: string) => `${chartPath(id)}/files/preview`,
-    /** The stored files' manifest: direct links, sizes and SHA-256. */
+    /** The stored files' manifest: each file's path under the distribution root, size and SHA-256. */
     resources: (id: string) => `${chartPath(id)}/resources`,
     cover: (id: string) => `${chartPath(id)}/cover`,
     leaderboard: (id: string, query: { difficultyId?: number; page: number }) =>

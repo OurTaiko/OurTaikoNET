@@ -659,7 +659,7 @@ function SongPicker({
               >
                 <span className="block font-medium">{text.title}</span>
                 <span className="block text-xs text-muted-foreground">
-                  {[text.subtitle, chart.maker || chart.uploader].filter(Boolean).join(' · ')}
+                  {[text.subtitle, chart.maker || chart.author].filter(Boolean).join(' · ')}
                 </span>
               </button>
             </li>

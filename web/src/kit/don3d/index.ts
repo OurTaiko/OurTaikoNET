@@ -21,6 +21,7 @@ export {
   type DonCatalogItem,
   type DonLook,
   type DonPartKind,
+  type DonRoot,
   type DonSource,
 } from './catalog'
 export { donMotionNames, type DonMotionName } from './chara'

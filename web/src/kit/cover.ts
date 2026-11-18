@@ -7,11 +7,14 @@ export function coverFileError(file: File): string {
   if (!file.size || file.size > maxCoverBytes) return t('messages.coverMustNotBeEmptyOrExceed8Mib')
   return ''
 }
-// The cover's address in the public bucket; there is no API route to read a cover. Components
-// move it to the visitor's regional root (card-cover.tsx).
-export function coverSource(chart: Pick<ChartBase, 'coverUrl'>): string | undefined {
-  return chart.coverUrl || undefined
+// The cover's path under the distribution root; there is no API route to read a cover.
+// Components read it from the visitor's root (card-cover.tsx).
+export function coverSource(chart: Pick<ChartBase, 'songCoverPath'>): string | undefined {
+  return chart.songCoverPath || undefined
 }
 
-/** What a cover upload answers: the new cover's hash and own address, both empty once removed. */
-export type SavedCover = { coverHash: string; coverUrl?: string }
+/**
+ * What a cover upload answers: the new cover's hash and path, both empty once removed. A chart's
+ * cover answers songCoverPath, a playlist's songListCoverPath.
+ */
+export type SavedCover = { coverHash: string; songCoverPath?: string; songListCoverPath?: string }

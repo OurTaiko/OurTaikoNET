@@ -53,6 +53,7 @@ import { difficultyColors } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { EmptyState } from './components/empty-state'
 import { PageMeta, usePageMeta, type PageMetaProps } from './head'
+import { canonicalFileUrl } from './distribution'
 import type { TFunction } from 'i18next'
 
 // A chart registered without its files yet (OurTaiko Database) has hasFiles false.
@@ -321,7 +322,8 @@ function chartMeta(chart: Chart | null, t: TFunction): PageMetaProps {
       (chart.maker.trim()
         ? t('meta.chartBy', { title, maker: chart.maker.trim(), courses })
         : t('meta.chart', { title, courses })),
-    image: coverSource(chart),
+    // A link card's picture is an absolute address every reader can load: the canonical one.
+    image: canonicalFileUrl(coverSource(chart)) || undefined,
     type: 'music.song',
   }
 }
@@ -736,7 +738,7 @@ export function Detail() {
                       >
                         <UserAvatar
                           nickname={owner.nickname}
-                          avatarUrl={owner.avatarUrl}
+                          avatarPath={owner.avatarPath}
                           className="size-6"
                           fallbackClassName="text-xs"
                         />
@@ -1017,9 +1019,9 @@ export function Detail() {
         <CoverDialog
           chart={chart}
           onDismiss={() => setCoverEditing(false)}
-          onSaved={({ coverHash, coverUrl }) =>
+          onSaved={({ coverHash, songCoverPath }) =>
             setChart((current) =>
-              current?.id === chart.id ? { ...current, coverHash, coverUrl } : current,
+              current?.id === chart.id ? { ...current, coverHash, songCoverPath } : current,
             )
           }
         />

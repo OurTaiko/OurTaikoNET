@@ -1,4 +1,3 @@
-import { fetchResource } from './resource-download'
 import { i18n } from './i18n'
 import { useTranslation } from 'react-i18next'
 import { endpoints } from './api/endpoints'
@@ -81,7 +80,7 @@ export function ChartActivity({
     setError('')
     async function load() {
       try {
-        const response = await fetchResource(endpoints.resource({ id }, 'tja'), {
+        const response = await fetch(endpoints.resource({ id }, 'tja'), {
           signal: controller.signal,
           credentials: 'omit',
         })

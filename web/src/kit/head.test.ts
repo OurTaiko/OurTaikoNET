@@ -18,8 +18,8 @@ describe('page head', () => {
   })
 
   it('makes the picture absolute and asks for a large card', () => {
-    const head = headFor({ image: '/api/v1/charts/abc/cover' }, site, address)
-    expect(head.image).toBe('https://net.ourtaiko.org/api/v1/charts/abc/cover')
+    const head = headFor({ image: '/api/v2/charts/abc/cover' }, site, address)
+    expect(head.image).toBe('https://net.ourtaiko.org/api/v2/charts/abc/cover')
     expect(head.card).toBe('summary_large_image')
     expect(headFor({ image: '/avatar.webp', type: 'profile' }, site, address).card).toBe('summary')
   })

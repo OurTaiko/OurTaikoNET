@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react'
 
 export const REWARDS_HEADER = 'X-Pending-Rewards'
-const address = '/api/v1/me/rewards'
+const address = '/api/v2/me/rewards'
 
 export type Reward = {
   id: number
@@ -47,7 +47,7 @@ async function load() {
   try {
     const [list, me] = await Promise.all([
       fetch(address, { credentials: 'include' }),
-      fetch('/api/v1/me', { credentials: 'include' }),
+      fetch('/api/v2/me', { credentials: 'include' }),
     ])
     if (!list.ok) return
     const rewards = ((await json(list)).rewards ?? []) as Reward[]
@@ -68,7 +68,7 @@ export async function dismissRewards() {
   set(empty)
   let answer: Response | null = null
   try {
-    const me = await fetch('/api/v1/me', { credentials: 'include' })
+    const me = await fetch('/api/v2/me', { credentials: 'include' })
     const csrf = me.ok ? String((await json(me)).csrfToken ?? '') : ''
     answer = await fetch(`${address}/seen`, {
       method: 'POST',

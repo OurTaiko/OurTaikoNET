@@ -17,7 +17,7 @@ it('requests the endpoint once with cookies, CSRF and cancellation intact', asyn
     signal: controller.signal,
   }
   expect(await api(endpoints.chart('song'), request)).toEqual({ id: 'song' })
-  expect(fetch).toHaveBeenCalledExactlyOnceWith('/api/v1/sources/fanmade/charts/song', {
+  expect(fetch).toHaveBeenCalledExactlyOnceWith('/api/v2/sources/fanmade/charts/song', {
     credentials: 'include',
     ...request,
   })

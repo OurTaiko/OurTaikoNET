@@ -21,7 +21,7 @@ import { Label } from '@sitekit/components/ui/label'
 
 type Kind = TitleRule['kind']
 type SourceId = (typeof ruleSources)[number]
-/** A rule as the backend takes it (POST /api/v1/admin/titles/{id}/rules). */
+/** A rule as the backend takes it (POST /api/v2/admin/titles/{id}/rules). */
 export type RuleDraft = {
   kind: Kind
   source?: SourceId

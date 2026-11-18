@@ -1,4 +1,10 @@
-import { donSource, type DonCatalog, type DonCatalogFile, type DonSource } from './catalog'
+import {
+  donSource,
+  type DonCatalog,
+  type DonCatalogFile,
+  type DonRoot,
+  type DonSource,
+} from './catalog'
 import { parseFaceTimelines, type FaceTimeline } from './face'
 import { DonMotions } from './motions'
 import { isOtanim, parseOtanim, type Otanim } from './otanim'
@@ -65,9 +71,9 @@ function remember<K, V>(map: Map<K, Promise<V>>, key: K, make: () => Promise<V>)
 
 const bases = new Map<string, Promise<DonBase>>()
 
-export function loadBase(catalog: DonCatalog, baseUrl: string): Promise<DonBase> {
+export function loadBase(catalog: DonCatalog, root: DonRoot): Promise<DonBase> {
   const { animations, face, faceAnimations } = catalog.base
-  const source = (file: DonCatalogFile) => donSource(baseUrl, file, catalog)
+  const source = (file: DonCatalogFile) => donSource(root, file)
   // kept by the canonical addresses: a mirror's copy has the same bytes
   return remember(
     bases,

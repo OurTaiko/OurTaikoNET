@@ -334,7 +334,7 @@ export default function DonBuddy({
             >
               <DonPreview
                 catalog={don.catalog}
-                baseUrl={don.catalog.baseUrl}
+                root={don.catalog.root}
                 look={don.look}
                 motion={motion}
                 frame={frame}

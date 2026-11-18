@@ -38,7 +38,7 @@ export function DonItemsCard({
     const file = it?.icon ?? (p === 'puchi' || p === 'paint' ? it?.file : undefined)
     return file && catalog ? (
       <img
-        {...donImage(donSource(catalog.baseUrl, file, catalog))}
+        {...donImage(donSource(catalog.root, file))}
         alt=""
         className="size-12 rounded-lg border object-contain"
       />

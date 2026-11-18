@@ -55,7 +55,7 @@ export function useSiteRoles(userId: string | undefined): SiteRoles {
   useEffect(() => {
     if (!userId) return
     const controller = new AbortController()
-    fetch('/api/v1/me', { signal: controller.signal, headers: { Accept: 'application/json' } })
+    fetch('/api/v2/me', { signal: controller.signal, headers: { Accept: 'application/json' } })
       .then((response) => {
         // The first answer of a signed-in page: rewards waiting since last time (../rewards).
         noticeRewards(response)

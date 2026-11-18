@@ -31,7 +31,7 @@ export function PublicUserCard({
       <div className="flex min-w-0 items-center gap-4">
         <UserAvatar
           nickname={nickname}
-          avatarUrl={user.avatarUrl}
+          avatarPath={user.avatarPath}
           className="size-12 shrink-0"
           fallbackClassName="text-lg"
         />

@@ -10,7 +10,7 @@ export type UserBase = {
   emailVerified: boolean
   isAdmin: boolean
   preferredLanguage?: string
-  avatarUrl?: string
+  avatarPath?: string
 }
 export type Session<U extends UserBase = UserBase> = { user: U | null; csrfToken: string }
 /** A category with its published charts (a chart may be in several). */
@@ -76,11 +76,12 @@ export type ChartBase = {
   difficulties: Difficulty[]
   categoryIds: string[]
   ownerIds?: string[]
-  owners?: { id: string; nickname: string; avatarUrl?: string }[]
+  owners?: { id: string; nickname: string; avatarPath?: string }[]
   /** Original uploader; use ownerIds for ownership. */
   ownerId: string
-  uploader: string
-  uploaderAvatarUrl?: string
+  /** The original uploader's name and avatar (a path under the distribution root). */
+  author: string
+  authorAvatarPath?: string
   description: string
   createdAt: string
   /** When the chart or anything about it last changed (votes, comments, files, blocks). */
@@ -91,8 +92,8 @@ export type ChartBase = {
   audioHash: string
   audioSize: number
   coverHash?: string
-  /** The cover's address in the public bucket, the only place a cover is read from. */
-  coverUrl?: string
+  /** The cover's path under the distribution root (distribution.ts), where it is read from. */
+  songCoverPath?: string
   /** Transcoded background movie; absent when the chart has none. */
   movieHash?: string
   movieSize?: number
@@ -126,7 +127,7 @@ export type Comment = {
   depth: number
   authorId: string
   author: string
-  authorAvatarUrl?: string
+  authorAvatarPath?: string
   body: string
   createdAt: string
   editedAt: string | null
@@ -162,7 +163,7 @@ export type AppNotification = {
   kind: NotificationKind | (string & {})
   createdAt: string
   read: boolean
-  actor: { id: string; nickname: string; avatarUrl?: string } | null
+  actor: { id: string; nickname: string; avatarPath?: string } | null
   chart: { id: string; title: string } | null
   dan: { id: string; title: Record<string, string> } | null
   comment: { id: string; parentId: string | null; excerpt: string } | null
@@ -184,10 +185,10 @@ export type Collaboration = {
   createdAt: string
   /** When it was answered or revoked. */
   respondedAt: string | null
-  inviter: { id: string; nickname: string; avatarUrl?: string }
-  recipient: { id: string; nickname: string; avatarUrl?: string }
+  inviter: { id: string; nickname: string; avatarPath?: string }
+  recipient: { id: string; nickname: string; avatarPath?: string }
   /** The owner who revoked it, when revoked. */
-  revokedBy: { id: string; nickname: string; avatarUrl?: string } | null
+  revokedBy: { id: string; nickname: string; avatarPath?: string } | null
 }
 export type CollaborationHistory = { items: Collaboration[] }
 export type NotificationPage = {
@@ -203,7 +204,7 @@ export type LeaderboardEntry = {
   id: string
   userId: string
   nickname: string
-  avatarUrl?: string
+  avatarPath?: string
   rank: number
   score: number
   good: number
@@ -234,7 +235,7 @@ export type ScoreReplay = {
     submittedAt: string
   }
   nickname: string
-  avatarUrl?: string
+  avatarPath?: string
   replay: unknown
 }
 export type Leaderboard = {
@@ -252,7 +253,7 @@ export type Leaderboard = {
 export type PublicUser = {
   id: string
   nickname: string | null
-  avatarUrl?: string
+  avatarPath?: string
   firstLoginAt: string | null
   lastActiveAt: string | null
   /** Published charts the user uploaded. */
@@ -282,10 +283,10 @@ export type Playlist<C extends ChartBase = ChartBase> = {
   categoryId: string
   genre: string
   ownerId?: string
-  owner: { id: string; nickname: string; avatarUrl?: string } | null
+  owner: { id: string; nickname: string; avatarPath?: string } | null
   coverHash?: string
-  /** As ChartBase.coverUrl. */
-  coverUrl?: string
+  /** As ChartBase.songCoverPath. */
+  songListCoverPath?: string
   chartCount: number
   favoriteCount: number
   favorited: boolean
@@ -309,7 +310,7 @@ export type MyPlaylists<C extends ChartBase = ChartBase> = {
   maxItems: number
 }
 
-// 段位 courses (OurTaikoPlay's course format, as GET /api/v1/dans returns them).
+// 段位 courses (OurTaikoPlay's course format, as GET /api/v2/dans returns them).
 export type DanExamType = 'gauge' | 'good' | 'ok' | 'bad' | 'hits' | 'score' | 'combo' | 'rolls'
 export type DanExam = {
   type: DanExamType

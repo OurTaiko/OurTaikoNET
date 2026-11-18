@@ -39,7 +39,14 @@ import {
   partPixels,
   type DonBase,
 } from './assets'
-import { catalogUrl, donSource, resolveDonLook, type DonCatalog, type DonLook } from './catalog'
+import {
+  catalogUrl,
+  donSource,
+  resolveDonLook,
+  type DonCatalog,
+  type DonLook,
+  type DonRoot,
+} from './catalog'
 import {
   DonAnim,
   DonAnimator,
@@ -89,7 +96,8 @@ export type DonRendererState = { loading: boolean; error: Error | null }
 
 export type DonRendererOptions = {
   catalog: DonCatalog
-  baseUrl: string
+  // Where the catalog's files are read from (catalog.ts DonRoot).
+  root: DonRoot
   bpm?: number
   frame?: Partial<DonFrame>
   // Keeps the canvas's picture readable after it is shown (toBlob / toDataURL), at some cost.
@@ -158,7 +166,7 @@ export function createDonRenderer(
   canvas: HTMLCanvasElement,
   options: DonRendererOptions,
 ): DonRenderer {
-  const { catalog, baseUrl } = options
+  const { catalog, root } = options
   const frame: DonFrame = { ...defaultDonFrame, ...options.frame }
   const renderer = new WebGLRenderer({
     canvas,
@@ -270,7 +278,7 @@ export function createDonRenderer(
 
   async function ensureBase(): Promise<DonBase> {
     if (base) return base
-    const loaded = await loadBase(catalog, baseUrl)
+    const loaded = await loadBase(catalog, root)
     if (disposed || base) return base ?? loaded
     base = loaded
     faceTexture = faceSheetTexture(loaded.faceSheet)
@@ -386,16 +394,10 @@ export function createDonRenderer(
       const [loadedBase, datas, puchiFile, paintBitmap] = await Promise.all([
         ensureBase(),
         Promise.all(
-          resolved.parts.map((p) =>
-            loadPart(donSource(baseUrl, p.item.file, catalog), p.normalizeFace),
-          ),
+          resolved.parts.map((p) => loadPart(donSource(root, p.item.file), p.normalizeFace)),
         ),
-        resolved.puchi
-          ? loadPuchi(donSource(baseUrl, resolved.puchi.file, catalog))
-          : Promise.resolve(null),
-        resolved.paint
-          ? loadPaint(donSource(baseUrl, resolved.paint.file, catalog))
-          : Promise.resolve(null),
+        resolved.puchi ? loadPuchi(donSource(root, resolved.puchi.file)) : Promise.resolve(null),
+        resolved.paint ? loadPaint(donSource(root, resolved.paint.file)) : Promise.resolve(null),
       ])
       const bitmaps = await Promise.all(
         datas.map((data) =>
@@ -409,7 +411,7 @@ export function createDonRenderer(
       let puchi: Texture | null = null
       if (resolved.puchi && puchiFile) {
         // textures are kept by the canonical address, as the files are (assets.ts)
-        const url = catalogUrl(baseUrl, resolved.puchi.file)
+        const url = catalogUrl(root, resolved.puchi.file)
         puchi = puchiTextures.get(url) ?? null
         if (!puchi) {
           // drawn straight onto the canvas: no colour space
@@ -422,7 +424,7 @@ export function createDonRenderer(
       // the makeup's sheet in place of the plain face (YataiDON Chara3D::set_paint)
       let face = { texture: faceTexture, count: loadedBase.faceCount }
       if (resolved.paint && paintBitmap) {
-        const url = catalogUrl(baseUrl, resolved.paint.file)
+        const url = catalogUrl(root, resolved.paint.file)
         let sheet = paintTextures.get(url)
         if (!sheet) {
           sheet = {

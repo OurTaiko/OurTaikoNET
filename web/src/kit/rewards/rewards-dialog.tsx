@@ -65,7 +65,7 @@ function useViews(catalog: ServedDonCatalog | null): Record<string, View> {
             <span className="text-xs text-muted-foreground">{t('rewards.donItem')}</span>
             {file && catalog ? (
               <img
-                {...donImage(donSource(catalog.baseUrl, file, catalog))}
+                {...donImage(donSource(catalog.root, file))}
                 alt=""
                 className="size-20 rounded-xl border object-contain"
               />

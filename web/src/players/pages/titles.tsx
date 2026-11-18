@@ -130,7 +130,7 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
                   plate={{
                     userId: user.id,
                     nickname: user.nickname,
-                    avatarUrl: '',
+                    avatarPath: '',
                     title,
                     dan: null,
                     showDan: false,
@@ -251,7 +251,7 @@ function MyTitles({ titles, reload }: { titles: Title[]; reload: () => void }) {
               plate={{
                 userId: user.id,
                 nickname: user.nickname,
-                avatarUrl: '',
+                avatarPath: '',
                 dan: null,
                 showDan: false,
                 title: {
@@ -309,7 +309,7 @@ export function TitlesPage() {
                     plate={{
                       userId: '',
                       nickname: titleName(title, language),
-                      avatarUrl: '',
+                      avatarPath: '',
                       title,
                       dan: null,
                       showDan: false,

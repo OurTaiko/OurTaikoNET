@@ -27,8 +27,8 @@ export function usePlaylistText() {
 }
 
 // As coverSource (cover.ts).
-export const playlistCoverSource = (playlist: Pick<Playlist, 'coverUrl'>) =>
-  playlist.coverUrl || undefined
+export const playlistCoverSource = (playlist: Pick<Playlist, 'songListCoverPath'>) =>
+  playlist.songListCoverPath || undefined
 
 export function PlaylistFacts({ playlist }: { playlist: Playlist }) {
   const { t } = useTranslation()
@@ -100,7 +100,7 @@ export function PlaylistCard({ playlist }: { playlist: Playlist }) {
             <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
               <UserAvatar
                 nickname={playlist.owner.nickname || t('messages.unknownMember')}
-                avatarUrl={playlist.owner.avatarUrl}
+                avatarPath={playlist.owner.avatarPath}
                 className="size-5 shrink-0"
                 fallbackClassName="text-[10px]"
               />

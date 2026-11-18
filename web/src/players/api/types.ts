@@ -3,7 +3,7 @@ export type User = {
   username: string
   nickname: string
   emailVerified: boolean
-  avatarUrl?: string
+  avatarPath?: string
   preferredLanguage?: string
   // Keeps the title catalog (the TITLE_MANAGER group).
   isAdmin: boolean
@@ -19,7 +19,7 @@ export type GroupMember = {
   id: string
   username?: string
   nickname: string
-  avatarUrl: string
+  avatarPath: string
   groups: string[]
   bits: number
 }
@@ -48,14 +48,14 @@ export type DanBadge = {
 export type Nameplate = {
   userId: string
   nickname: string
-  avatarUrl: string
+  avatarPath: string
   title: Title | null
   dan: DanBadge | null
   showDan: boolean
 }
 export type Source = { id: string; name: string; site: string }
 export type PublicProfile = {
-  user: { id: string; nickname: string; avatarUrl: string }
+  user: { id: string; nickname: string; avatarPath: string }
   nameplate: Nameplate
   sources: Source[]
   profilesAvailable: boolean
@@ -91,8 +91,8 @@ export type Activity = {
   kind: 'score' | 'upload'
   at: string
   source: string
-  /** nickname and avatarUrl are empty while the site has none for the player. */
-  user: { id: string; nickname: string; avatarUrl: string }
+  /** nickname and avatarPath are empty while the site has none for the player. */
+  user: { id: string; nickname: string; avatarPath: string }
   chart: { id: string; title: string; titleTranslations: Record<string, string> }
   /** The play of a 'score'. */
   play?: {

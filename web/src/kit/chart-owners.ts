@@ -3,7 +3,7 @@ import type { ChartBase } from './api/types'
 export function chartOwners(chart: ChartBase) {
   return (
     chart.owners ?? [
-      { id: chart.ownerId, nickname: chart.uploader, avatarUrl: chart.uploaderAvatarUrl },
+      { id: chart.ownerId, nickname: chart.author, avatarPath: chart.authorAvatarPath },
     ]
   )
 }

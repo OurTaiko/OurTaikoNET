@@ -148,7 +148,7 @@ export function NotificationIcon({ n }: { n: AppNotification }) {
       <span className="relative shrink-0">
         <UserAvatar
           nickname={n.actor.nickname || '?'}
-          avatarUrl={n.actor.avatarUrl}
+          avatarPath={n.actor.avatarPath}
           className="size-9"
         />
         <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-background border border-border [&_svg]:size-3">

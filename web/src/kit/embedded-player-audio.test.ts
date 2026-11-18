@@ -10,15 +10,17 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function setup(movieUrl?: string) {
+function setup(movieUrl?: string, fallbackUrl?: string) {
   const fetchMock = vi.fn().mockResolvedValue(new Response(new Uint8Array([79, 103, 103, 83, 1])))
   vi.stubGlobal('fetch', fetchMock)
   const sent: ReturnType<typeof playerLoad>[] = []
   const onRequest = vi.fn()
   const onError = vi.fn()
   const load = new PlayerAudioLoad({
-    audioUrl: 'https://assets.example/song.ogg',
-    movieUrl,
+    files: async () => ({
+      audio: { url: 'https://assets.example/song.ogg', fallbackUrl },
+      movie: movieUrl ? { url: movieUrl } : undefined,
+    }),
     chartText: 'TITLE:test\n#START\n1000,\n#END',
     course: 'Oni',
     mode: 'auto',
@@ -113,6 +115,8 @@ describe('embedded audio loading', () => {
         }),
     )
     const pending = load.start()
+    // The files are asked for first; the download starts once they are known.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     load.dispose()
     expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
     finish(new Response(new Uint8Array([1])))
@@ -169,5 +173,26 @@ describe('embedded audio loading', () => {
       expect(sent[0].payload).not.toHaveProperty('movieBytes')
       expect(onError).not.toHaveBeenCalled()
     }
+  })
+
+  it('downloads the audio from its fallback address once the first fails', async () => {
+    const { load, sent, fetchMock, onError } = setup(
+      undefined,
+      'https://canonical.example/song.ogg',
+    )
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('https://canonical.example/')
+          ? new Response(new Uint8Array([79, 103, 103]))
+          : new Response('', { status: 404 }),
+      ),
+    )
+    await load.start()
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://assets.example/song.ogg',
+      'https://canonical.example/song.ogg',
+    ])
+    expect(sent).toHaveLength(1)
+    expect(onError).not.toHaveBeenCalled()
   })
 })

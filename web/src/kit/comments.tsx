@@ -385,7 +385,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
             <PlayerLink id={comment.authorId} tabIndex={-1} aria-hidden="true">
               <UserAvatar
                 nickname={author}
-                avatarUrl={comment.authorAvatarUrl}
+                avatarPath={comment.authorAvatarPath}
                 className="size-6"
                 fallbackClassName="text-xs"
               />
@@ -735,7 +735,7 @@ export function CommentSection({
               body: '',
               author: '',
               authorId: '',
-              authorAvatarUrl: '',
+              authorAvatarPath: '',
               deleted: !removed,
               removed,
             })),

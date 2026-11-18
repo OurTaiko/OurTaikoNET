@@ -1,4 +1,3 @@
-import { fetchResource } from './resource-download'
 import { chartText } from './chart-language'
 import { i18n } from './i18n'
 import { useTranslation } from 'react-i18next'
@@ -90,7 +89,7 @@ export function ChartEditorPage() {
     async function load() {
       try {
         const loaded = await api<ChartBase>(endpoints.chartDetail(id!), { signal: aborter.signal })
-        const response = await fetchResource(endpoints.resource(loaded, 'tja'), {
+        const response = await fetch(endpoints.resource(loaded, 'tja'), {
           signal: aborter.signal,
           credentials: 'omit',
         })

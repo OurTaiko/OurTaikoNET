@@ -6,8 +6,9 @@ import { endpoints } from './api/endpoints'
 import type { ChartBase, ScoreReplay } from './api/types'
 import { formatLocale } from './i18n'
 import { canonicalPlayerUrl, resolvePlayerUrl } from './embedded-player-source'
-import { askSource, canonicalBaseUrl } from './distribution'
-import { PlayerAudioLoad } from './embedded-player-audio'
+import { askSource } from './distribution'
+import { PlayerAudioLoad, type PlayerFiles } from './embedded-player-audio'
+import { pathResource, readChartResources } from './resource-download'
 import {
   defaultDrumVolume,
   isPlayerMessage,
@@ -17,6 +18,27 @@ import {
   type PlayerMode,
   type PlayerReplayResult,
 } from './embedded-player-protocol'
+
+// The chart's audio and movie for the player: from their paths in the chart's manifest, so a
+// mainland visitor takes them from the mirror (the canonical root once that fails); from the
+// API's own file routes when there is no manifest.
+async function playerFiles(
+  chartId: string,
+  hasMovie: boolean,
+  signal: AbortSignal,
+): Promise<PlayerFiles> {
+  const route = (kind: 'audio' | 'movie') => ({
+    url: new URL(endpoints.resource({ id: chartId }, kind), window.location.href).href,
+  })
+  const resources = await readChartResources(chartId, signal).catch((error: unknown) => {
+    if (signal.aborted) throw error
+    return null
+  })
+  if (!resources?.audio)
+    return { audio: route('audio'), movie: hasMovie ? route('movie') : undefined }
+  const movie = hasMovie && resources.movie ? await pathResource(resources.movie.path) : undefined
+  return { audio: await pathResource(resources.audio.path), movie }
+}
 
 // `replay`: a recorded play of this block to show instead of practice or the chart alone; the
 // other two modes close it (onReplayClose).
@@ -82,8 +104,8 @@ export default function EmbeddedPlayer({
         try {
           url = await resolve(source.baseUrl)
         } catch (error) {
-          if (!source.mirror || controller.signal.aborted) throw error
-          url = await resolve(canonicalBaseUrl)
+          if (source.baseUrl === source.canonicalBaseUrl || controller.signal.aborted) throw error
+          url = await resolve(source.canonicalBaseUrl)
         }
         if (!controller.signal.aborted) setPlayerUrl(url)
       } catch {
@@ -174,13 +196,8 @@ export default function EmbeddedPlayer({
 
   useEffect(() => {
     if (!ready || !mode || !source || (mode === 'replay' && !replayData)) return
-    const audio = new URL(endpoints.resource({ id: chartId }, 'audio'), window.location.href).href
-    const movie = hasMovie
-      ? new URL(endpoints.resource({ id: chartId }, 'movie'), window.location.href).href
-      : undefined
     const load = new PlayerAudioLoad({
-      audioUrl: audio,
-      movieUrl: movie,
+      files: (signal) => playerFiles(chartId, hasMovie, signal),
       chartText: source,
       course,
       mode,

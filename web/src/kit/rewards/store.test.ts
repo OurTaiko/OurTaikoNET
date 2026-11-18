@@ -33,7 +33,7 @@ describe('rewards', () => {
 
   it('fetches only when an answer says something is waiting, and once', async () => {
     server = (url) =>
-      url === '/api/v1/me'
+      url === '/api/v2/me'
         ? answer('2', { user: { id: 'p1' }, csrfToken: 'c' })
         : answer('2', { rewards: [reward(1), reward(2)] })
     noticeRewards(answer(null))
@@ -43,28 +43,28 @@ describe('rewards', () => {
     noticeRewards(answer('2'))
     noticeRewards(answer('2'))
     await settle()
-    expect(calls.filter((c) => c.url === '/api/v1/me/rewards')).toHaveLength(1)
+    expect(calls.filter((c) => c.url === '/api/v2/me/rewards')).toHaveLength(1)
     expect(current().rewards.map((r) => r.id)).toEqual([1, 2])
     expect(current().player).toBe('p1')
     // While they are on show, more answers fetch nothing.
     noticeRewards(answer('2'))
     await settle()
-    expect(calls.filter((c) => c.url === '/api/v1/me/rewards')).toHaveLength(1)
+    expect(calls.filter((c) => c.url === '/api/v2/me/rewards')).toHaveLength(1)
   })
 
   it('marks what was shown seen with the CSRF token, and fetches again if more wait', async () => {
     let left = '1'
     let lists = 0
     server = (url) => {
-      if (url === '/api/v1/me') return answer(null, { user: { id: 'p1' }, csrfToken: 'token' })
-      if (url === '/api/v1/me/rewards/seen') return answer(left, { marked: 1 })
+      if (url === '/api/v2/me') return answer(null, { user: { id: 'p1' }, csrfToken: 'token' })
+      if (url === '/api/v2/me/rewards/seen') return answer(left, { marked: 1 })
       lists += 1
       return answer('1', { rewards: [reward(lists)] })
     }
     noticeRewards(answer('1'))
     await settle()
     await dismissRewards()
-    const seen = calls.find((c) => c.url === '/api/v1/me/rewards/seen')
+    const seen = calls.find((c) => c.url === '/api/v2/me/rewards/seen')
     expect(seen?.init?.method).toBe('POST')
     expect((seen?.init?.headers as Record<string, string>)['X-CSRF-Token']).toBe('token')
     expect(JSON.parse(String(seen?.init?.body))).toEqual({ ids: [1] })
@@ -81,8 +81,8 @@ describe('rewards', () => {
     let release = () => {}
     let lists = 0
     server = (url) => {
-      if (url === '/api/v1/me') return answer('1', { user: { id: 'p1' }, csrfToken: 't' })
-      if (url === '/api/v1/me/rewards/seen') return answer('0', { marked: 1 })
+      if (url === '/api/v2/me') return answer('1', { user: { id: 'p1' }, csrfToken: 't' })
+      if (url === '/api/v2/me/rewards/seen') return answer('0', { marked: 1 })
       lists += 1
       return answer('1', { rewards: [reward(7)] })
     }
@@ -92,7 +92,7 @@ describe('rewards', () => {
     // The marking waits on the server; an older answer still counting the reward arrives.
     const slow = server
     server = (url, init) => {
-      if (url === '/api/v1/me/rewards/seen')
+      if (url === '/api/v2/me/rewards/seen')
         return new Promise<Response>(
           (resolve) => (release = () => resolve(slow(url, init))),
         ) as never
@@ -113,7 +113,7 @@ describe('rewards', () => {
   it('shows nothing when the fetch fails, and tries again on a later answer', async () => {
     let fail = true
     server = (url) =>
-      url === '/api/v1/me/rewards' && fail
+      url === '/api/v2/me/rewards' && fail
         ? answer(null, {}, 500)
         : answer('1', { rewards: [reward(3)], user: { id: 'p1' } })
     noticeRewards(answer('1'))

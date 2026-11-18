@@ -1,11 +1,15 @@
 import { playerLoad, type PlayerAudioDecode, type PlayerMode } from './embedded-player-protocol'
 import { maxMovie } from './tja-limits'
-import { fetchResource } from './resource-download'
+import { fetchWithFallback } from './distribution'
+
+/** A file to download: its address, and the one to try once that fails (if any). */
+export type PlayerFile = { url: string; fallbackUrl?: string }
+/** The chart's audio, and its background movie when it has one. */
+export type PlayerFiles = { audio: PlayerFile; movie?: PlayerFile }
 
 type Options = {
-  audioUrl: string
-  // The chart's background movie, when it has one. A movie that fails to download is left out.
-  movieUrl?: string
+  // Where the files are, asked once a load starts. A movie that fails to download is left out.
+  files: (signal: AbortSignal) => Promise<PlayerFiles>
   chartText: string
   course: string
   mode: PlayerMode
@@ -34,9 +38,10 @@ export class PlayerAudioLoad {
   async start() {
     this.begin('native')
     const id = this.id
-    const movie = this.downloadMovie()
     try {
-      const response = await fetchResource(this.options.audioUrl, {
+      const files = await this.options.files(this.controller.signal)
+      const movie = this.downloadMovie(files.movie)
+      const response = await fetchWithFallback(files.audio.url, files.audio.fallbackUrl, {
         signal: this.controller.signal,
         credentials: 'omit',
         mode: 'cors',
@@ -92,11 +97,10 @@ export class PlayerAudioLoad {
   }
 
   // The movie is optional, as on upload: any failure plays the chart without it.
-  private async downloadMovie(): Promise<Blob | null> {
-    const url = this.options.movieUrl
-    if (!url) return null
+  private async downloadMovie(file?: PlayerFile): Promise<Blob | null> {
+    if (!file) return null
     try {
-      const response = await fetchResource(url, {
+      const response = await fetchWithFallback(file.url, file.fallbackUrl, {
         signal: this.controller.signal,
         credentials: 'omit',
         mode: 'cors',

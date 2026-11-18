@@ -32,6 +32,7 @@ import { useNotification } from './notification-context'
 import { useSession } from './session-context'
 import { PlaylistSongSearchDialog } from './playlist-song-search'
 import { usePageMeta, type PageMetaProps } from './head'
+import { canonicalFileUrl } from './distribution'
 import type { TFunction } from 'i18next'
 import {
   usePlaylistText,
@@ -428,7 +429,8 @@ function playlistMeta(
       (owner
         ? t('meta.playlistBy', { name: text.name, owner, songs })
         : t('meta.playlist', { name: text.name, songs })),
-    image: playlistCoverSource(playlist),
+    // A link card's picture is an absolute address every reader can load: the canonical one.
+    image: canonicalFileUrl(playlistCoverSource(playlist)) || undefined,
     type: 'music.playlist',
     // A private playlist is its owner's alone.
     noindex: !playlist.public && !playlist.system,
@@ -662,7 +664,7 @@ export function PlaylistPage() {
                 >
                   <UserAvatar
                     nickname={playlist.owner.nickname || t('messages.unknownMember')}
-                    avatarUrl={playlist.owner.avatarUrl}
+                    avatarPath={playlist.owner.avatarPath}
                     className="size-6 shrink-0"
                     fallbackClassName="text-xs"
                   />
@@ -719,11 +721,11 @@ export function PlaylistPage() {
         <PlaylistCoverDialog
           playlist={playlist}
           onDismiss={() => setDialog('')}
-          onSaved={({ coverHash, coverUrl }) =>
+          onSaved={({ coverHash, songListCoverPath }) =>
             setPlaylist({
               ...playlist,
               coverHash: coverHash || undefined,
-              coverUrl: coverUrl || undefined,
+              songListCoverPath: songListCoverPath || undefined,
             })
           }
         />

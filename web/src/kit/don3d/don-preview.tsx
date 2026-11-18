@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
-import type { DonCatalog, DonLook } from './catalog'
+import type { DonCatalog, DonLook, DonRoot } from './catalog'
 import type { DonMotionName } from './chara'
 import {
   createDonRenderer,
@@ -12,8 +12,9 @@ import {
 
 export type DonPreviewProps = {
   catalog: DonCatalog
-  // Where the catalog's paths are, e.g. https://distrib.ourtaiko.org/3dchara/
-  baseUrl: string
+  // Where the catalog's files are read from (catalog.ts DonRoot); keep the same object while it
+  // does not change, as a new one makes a new renderer.
+  root: DonRoot
   look: DonLook
   motion?: DonMotionName
   mirrored?: boolean
@@ -30,7 +31,7 @@ export type DonPreviewProps = {
 // bottom centre; a small label shows while its parts download.
 export function DonPreview({
   catalog,
-  baseUrl,
+  root,
   look,
   motion = 'Normal',
   mirrored = false,
@@ -57,7 +58,7 @@ export function DonPreview({
     try {
       created = createDonRenderer(canvas, {
         catalog,
-        baseUrl,
+        root,
         frame: JSON.parse(frameKey) as Partial<DonFrame>,
         repeatMotion,
         onStateChange: setState,
@@ -94,7 +95,7 @@ export function DonPreview({
       created.dispose()
       canvas.remove()
     }
-  }, [catalog, baseUrl, frameKey, repeatMotion])
+  }, [catalog, root, frameKey, repeatMotion])
 
   const lookKey = JSON.stringify([
     look.costume,
