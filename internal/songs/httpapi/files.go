@@ -51,9 +51,6 @@ func (s *Server) serveObject(w http.ResponseWriter, r *http.Request, key, name, 
 			return
 		}
 		if target != "" {
-			if r.URL.Query().Get("origin") != "1" {
-				target = s.Config.Distribution.Select(r, target, digest, 0)
-			}
 			if disposition == "attachment" {
 				u, _ := url.Parse(target)
 				q := u.Query()

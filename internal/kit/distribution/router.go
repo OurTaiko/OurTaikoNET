@@ -1,18 +1,21 @@
-// Package distribution selects public resource mirrors using one trusted client-IP policy.
+// Package distribution decides, by where a request comes from (one trusted client-IP policy),
+// which root a client reads the public files from (package files): the canonical CDN, or the
+// mirror for a visitor in mainland China.
 package distribution
 
 import (
-	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/netip"
 	"net/url"
-	"path"
 	"strings"
 
+	"ourtaiko.dev/net/internal/files"
 	"ourtaiko.dev/net/internal/web"
 )
 
-const CanonicalBase = "https://distrib.ourtaiko.org/"
+// CanonicalBase is the canonical root, the CDN in front of the public bucket.
+const CanonicalBase = files.Root
 
 type Router struct {
 	Base           string
@@ -40,49 +43,27 @@ func (r *Router) IsMainland(request *http.Request) bool {
 	return err == nil && ip.IsGlobalUnicast() && !ip.IsPrivate() && r.Country(ip) == "CN"
 }
 
-// Candidate maps only public, content-addressed song objects. Signed URLs, external
-// origins, mutable objects and unknown extensions always keep their canonical route.
-func (r *Router) Candidate(request *http.Request, canonical, digest string) string {
-	if r == nil || r.Base == "" || !r.IsMainland(request) {
-		return canonical
-	}
-	u, err := url.Parse(canonical)
-	if err != nil || u.Scheme != "https" || u.Host != "distrib.ourtaiko.org" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" {
-		return canonical
-	}
-	if !(strings.HasPrefix(u.Path, "/fanmade/") || strings.HasPrefix(u.Path, "/database/")) {
-		return canonical
-	}
-	if len(digest) != 64 {
-		return canonical
-	}
-	if _, err := hex.DecodeString(digest); err != nil {
-		return canonical
-	}
-	name := path.Base(u.Path)
-	ext := path.Ext(name)
-	if strings.TrimSuffix(name, ext) != digest || path.Clean(u.Path) != u.Path {
-		return canonical
-	}
-	switch ext {
-	case ".tja", ".ogg", ".mp3", ".webp", ".png", ".jpg", ".jpeg", ".mp4":
-	default:
-		return canonical
-	}
-	return strings.TrimRight(r.Base, "/") + u.Path
-}
-
-// Select is the address a request uses: the mirror's for a mainland visitor, otherwise the
-// canonical one. The country decides alone; nothing is probed or compared (OSS fetches a missing
-// object from the origin on first request, and clients fall back to FallbackURL if it fails).
-func (r *Router) Select(request *http.Request, canonical, digest string, _ int64) string {
-	return r.Candidate(request, canonical, digest)
-}
-
 // MirrorBase is the mirror root (ending in "/") for a mainland visitor, or "" for everyone else.
 func (r *Router) MirrorBase(request *http.Request) string {
 	if r == nil || r.Base == "" || !r.IsMainland(request) {
 		return ""
 	}
 	return strings.TrimRight(r.Base, "/") + "/"
+}
+
+// Regional reports whether the router tells a mainland visitor at all: a mirror root and a
+// country lookup are both configured.
+func (r *Router) Regional() bool {
+	return r != nil && r.Base != "" && r.Country != nil
+}
+
+// ParseMirrorCatalogURL checks DON_MIRROR_CATALOG_URL, the mirror's 3D Don catalog, whose folder's
+// parent is the mirror's root (FromDonCatalog).
+func ParseMirrorCatalogURL(address string) (*url.URL, error) {
+	u, err := url.Parse(address)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil ||
+		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return nil, errors.New("DON_MIRROR_CATALOG_URL must be an HTTPS URL without credentials, query or fragment")
+	}
+	return u, nil
 }

@@ -1,12 +1,14 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"regexp"
 	"strings"
 	"time"
@@ -40,14 +42,14 @@ type DonLook struct {
 	Colors  *[]string `json:"colors"`
 }
 
-// DonFile is one file a look needs: its kind (cos, head, body, puchi, paint), number, address and
-// content.
+// DonFile is one file a look needs: its kind (cos, head, body, puchi, paint), number, file
+// under the distribution root (package files) and content.
 type DonFile struct {
-	Kind   string `json:"kind"`
-	ID     int    `json:"id"`
-	URL    string `json:"url"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	Kind            string `json:"kind"`
+	ID              int    `json:"id"`
+	ThreeDCharaPath string `json:"3dCharaPath"`
+	Size            int64  `json:"size"`
+	SHA256          string `json:"sha256"`
 }
 
 // DonAnswer is what the look endpoints answer.
@@ -73,10 +75,10 @@ type donCatalog struct {
 	Version int                   `json:"version"`
 	Base    map[string]donFileRef `json:"base"`
 	Items   map[string][]donItem  `json:"items"`
-	// The bytes as read, answered as they are (with baseUrl added).
+	// The bytes as read, answered with their paths rooted (rooted).
 	raw json.RawMessage
-	// Where the catalog's paths are relative to.
-	baseURL string
+	// The catalog's folder under the distribution root ("3dchara/"), which its paths are in.
+	folder string
 }
 
 func (c *donCatalog) item(kind string, id int) (donItem, bool) {
@@ -88,10 +90,10 @@ func (c *donCatalog) item(kind string, id int) (donItem, bool) {
 	return donItem{}, false
 }
 
-// url is a file's address. A published file is never replaced (a changed file gets a new path),
-// so the path alone names its bytes.
-func (c *donCatalog) url(ref donFileRef) string {
-	return c.baseURL + ref.Path
+// path is a file's path under the distribution root (package files): the catalog's folder and
+// the file's path in it. A published file is never replaced (a changed file gets a new path).
+func (c *donCatalog) path(ref donFileRef) string {
+	return c.folder + ref.Path
 }
 
 var errNoDonCatalog = errors.New("the 3dchara catalog cannot be read")
@@ -153,7 +155,11 @@ func (s *Server) readDonCatalog(ctx context.Context, address string) (*donCatalo
 		return nil, fmt.Errorf("catalog version %d", c.Version)
 	}
 	c.raw = body
-	c.baseURL = address[:strings.LastIndex(address, "/")+1]
+	// The catalog is at <root>/3dchara/catalog.json; one read from elsewhere (tests) is taken to
+	// stand for that folder.
+	if c.folder = files.Path(address[:strings.LastIndex(address, "/")+1]); c.folder == "" {
+		c.folder = "3dchara/"
+	}
 	return &c, nil
 }
 
@@ -197,9 +203,8 @@ func (c *donCatalog) check(l *DonLook) string {
 }
 
 // files are what the game needs to draw the look: the costume, or the head and the body, and
-// the puchichara and the makeup. A mainland visitor's come from the mirror's catalog; an item it
-// does not list yet keeps its canonical file.
-func (c *donCatalog) files(l DonLook, mirror *donCatalog) []DonFile {
+// the puchichara and the makeup.
+func (c *donCatalog) files(l DonLook) []DonFile {
 	var want [][2]any
 	if l.Costume {
 		want = append(want, [2]any{"cos", l.Cos})
@@ -215,14 +220,8 @@ func (c *donCatalog) files(l DonLook, mirror *donCatalog) []DonFile {
 	files := []DonFile{}
 	for _, w := range want {
 		kind, id := w[0].(string), w[1].(int)
-		from := c
-		if mirror != nil {
-			if _, ok := mirror.item(kind, id); ok {
-				from = mirror
-			}
-		}
-		if it, ok := from.item(kind, id); ok {
-			files = append(files, DonFile{Kind: kind, ID: id, URL: from.url(it.File), Size: it.File.Size, SHA256: it.File.SHA256})
+		if it, ok := c.item(kind, id); ok {
+			files = append(files, DonFile{Kind: kind, ID: id, ThreeDCharaPath: c.path(it.File), Size: it.File.Size, SHA256: it.File.SHA256})
 		}
 	}
 	return files
@@ -253,18 +252,15 @@ func (s *Server) donLook(ctx context.Context, q interface {
 // (the game then keeps the plain Don), but the look is still told.
 func (s *Server) answerDon(w http.ResponseWriter, r *http.Request, l DonLook) {
 	answer := DonAnswer{Look: l, Files: []DonFile{}}
-	if s.donRegional() {
-		// the files' addresses depend on where the request comes from
-		w.Header().Set("Cache-Control", "private, no-store")
-	}
 	if c, err := s.donCatalog(r.Context()); err == nil {
-		answer.Files = c.files(l, s.donMirrorFor(r))
+		answer.Files = c.files(l)
 	}
 	web.Respond(w, 200, answer)
 }
 
-// donCatalogAnswer is GET /api/don/catalog: the bucket's catalog as it is, with baseUrl, the
-// address its paths are relative to. Readable from any website.
+// donCatalogAnswer is GET /api/don/catalog: the bucket's catalog as it is, but with every file's
+// path under the distribution root (package files), so that a client joins it to its own root.
+// Readable from any website.
 func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	c, err := s.donCatalog(r.Context())
@@ -272,33 +268,47 @@ func (s *Server) donCatalogAnswer(w http.ResponseWriter, r *http.Request) {
 		problem(w, 503, "DON_CATALOG_UNAVAILABLE", "服装目录暂时读不到")
 		return
 	}
-	// A mainland visitor's catalog is the mirror's own; baseUrl stays canonical for fallback.
-	mirror := s.donMirrorFor(r)
-	raw := c.raw
-	if mirror != nil {
-		raw = mirror.raw
-	}
-	var all map[string]json.RawMessage
-	if err = json.Unmarshal(raw, &all); err != nil {
+	all, err := c.rooted()
+	if err != nil {
 		internal(w, err)
 		return
 	}
-	base, _ := json.Marshal(c.baseURL)
-	all["baseUrl"] = base
-	// mirrorBaseUrl and mirrorPaths: the files a mainland visitor fetches from the mirror, at
-	// mirrorBaseUrl + path, like baseUrl's.
-	delete(all, "mirrorBaseUrl")
-	delete(all, "mirrorPaths")
-	if s.donRegional() {
-		w.Header().Set("Cache-Control", "private, max-age=60")
-		if mirror != nil {
-			p := s.mirrorPaths(mirror)
-			all["mirrorBaseUrl"], all["mirrorPaths"] = p.base, p.paths
-		}
-	} else {
-		w.Header().Set("Cache-Control", "public, max-age=60")
-	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	web.Respond(w, 200, all)
+}
+
+// rooted is the catalog as read, its files' paths put under the distribution root.
+func (c *donCatalog) rooted() (map[string]any, error) {
+	decoder := json.NewDecoder(bytes.NewReader(c.raw))
+	decoder.UseNumber()
+	var all map[string]any
+	if err := decoder.Decode(&all); err != nil {
+		return nil, err
+	}
+	root := func(ref any) {
+		if file, ok := ref.(map[string]any); ok {
+			if p, ok := file["path"].(string); ok {
+				file["path"] = c.folder + p
+			}
+		}
+	}
+	if base, ok := all["base"].(map[string]any); ok {
+		for _, ref := range base {
+			root(ref)
+		}
+	}
+	if parts, ok := all["items"].(map[string]any); ok {
+		for _, items := range parts {
+			list, _ := items.([]any)
+			for _, it := range list {
+				if item, ok := it.(map[string]any); ok {
+					root(item["file"])
+					root(item["icon"])
+				}
+			}
+		}
+	}
+	return all, nil
 }
 
 // userDon is GET /api/users/{id}/don: a player's Don and its files, for the game. Readable

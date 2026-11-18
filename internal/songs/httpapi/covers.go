@@ -100,7 +100,7 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 	}
 	// The new cover's own address too, so a page shows it without reading the chart again.
 	digest := web.Hash(string(encoded))
-	web.Respond(w, 200, map[string]string{"coverHash": digest, "coverUrl": s.coverURL(digest + ".webp")})
+	web.Respond(w, 200, map[string]string{"coverHash": digest, "songCoverPath": s.filePath(digest + ".webp")})
 }
 
 // storeCover stores an encoded WebP cover and returns its file ID.

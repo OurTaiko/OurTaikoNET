@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"ourtaiko.dev/net/internal/files"
 	"context"
 	"encoding/json"
 	"errors"
@@ -245,10 +246,16 @@ func TestSSOProfilesCarryOnlyValidAvatars(t *testing.T) {
 		profiles[b] != (account.PublicProfile{Nickname: "B"}) {
 		t.Fatalf("%#v", profiles)
 	}
+	// A chart names its author's avatar by its file under the distribution root, where the
+	// account center keeps avatars; an address elsewhere names none.
 	chart := Chart{OwnerID: a}
-	chart.setUploader(profiles[a])
+	chart.setUploader(account.PublicProfile{Nickname: "A", AvatarURL: files.Root + "sso/avatars/" + a + "/" + digest + ".webp"})
 	data, _ := json.Marshal(chart)
-	if !strings.Contains(string(data), `"uploaderAvatarUrl":"`+profiles[a].AvatarURL+`"`) {
+	if !strings.Contains(string(data), `"authorAvatarPath":"sso/avatars/`+a+"/"+digest+`.webp"`) {
+		t.Fatal(string(data))
+	}
+	chart.setUploader(profiles[a])
+	if data, _ = json.Marshal(chart); !strings.Contains(string(data), `"authorAvatarPath":""`) {
 		t.Fatal(string(data))
 	}
 }

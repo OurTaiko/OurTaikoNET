@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/cover"
-	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/kit/video"
@@ -22,7 +21,6 @@ import (
 )
 
 type Config struct {
-	Distribution *distribution.Router
 	// Source is the song source this server serves; nil is the Fanmade source.
 	Source          *Source
 	Origin, Storage string
@@ -50,18 +48,6 @@ type Config struct {
 	// SessionCookie names the cookie a website session is kept in; empty is this site's own
 	// name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
 	SessionCookie string
-	// APIBase is the address clients reach this source's API at, up to but not including
-	// /charts and the like; empty is Origin + "/api". Links this API gives to its own
-	// routes are built on it.
-	APIBase string
-}
-
-// apiBase is the address of this source's API (Config.APIBase).
-func (s *Server) apiBase() string {
-	if s.Config.APIBase != "" {
-		return s.Config.APIBase
-	}
-	return s.Config.Origin + "/api"
 }
 
 func (s *Server) sessionCookie() string {

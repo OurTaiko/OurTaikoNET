@@ -25,6 +25,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
+
+	"ourtaiko.dev/net/internal/files"
 )
 
 type Config struct {
@@ -297,4 +299,22 @@ func (c *Client) OIDC(ctx context.Context) (*oidc.Provider, *oauth2.Config, erro
 	}
 	cfg := &oauth2.Config{ClientID: c.Config.ClientID, ClientSecret: c.Config.ClientSecret, RedirectURL: c.Config.RedirectURL, Endpoint: c.provider.Endpoint(), Scopes: []string{oidc.ScopeOpenID, "profile"}}
 	return c.provider, cfg, nil
+}
+
+// Shown is a signed-in user as the API shows them to their client: the avatar as its file under
+// the distribution root (package files) rather than an address.
+type Shown struct {
+	PreferredLanguage string `json:"preferredLanguage"`
+	ID                string `json:"id"`
+	Username          string `json:"username"`
+	Nickname          string `json:"nickname"`
+	AvatarPath        string `json:"avatarPath"`
+	EmailVerified     bool   `json:"emailVerified"`
+	IsAdmin           bool   `json:"isAdmin"`
+}
+
+// Show is u as its client is shown it.
+func Show(u User) Shown {
+	return Shown{PreferredLanguage: u.PreferredLanguage, ID: u.ID, Username: u.Username, Nickname: u.Nickname,
+		AvatarPath: files.Path(u.AvatarURL), EmailVerified: u.EmailVerified, IsAdmin: u.IsAdmin}
 }

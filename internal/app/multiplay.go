@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand/v2"
+	apiv1 "ourtaiko.dev/net/internal/api/v1"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/multiplay"
@@ -70,6 +71,8 @@ func roomSong(source string, c songs.Chart) (*multiplay.Song, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Released games read the chart as version 1 of the API gives it.
+	body = apiv1.ConvertJSON(body)
 	song := &multiplay.Song{Source: source, ChartID: c.ID, Title: c.Title, Subtitle: c.Subtitle, ChartJSON: body}
 	for _, name := range multiplay.CourseNames() {
 		level, found := 0, false

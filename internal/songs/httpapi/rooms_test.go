@@ -36,7 +36,7 @@ func TestRoomsReadPlayableCharts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ID != w.song || c.Title != "Song" || c.Uploader != "owner" || len(c.Owners) != 1 || c.Upvotes != 1 || c.MyVote != 0 {
+	if c.ID != w.song || c.Title != "Song" || c.Author != "owner" || len(c.Owners) != 1 || c.Upvotes != 1 || c.MyVote != 0 {
 		t.Fatalf("chart: %+v", c)
 	}
 	var blocks []string
@@ -128,8 +128,8 @@ func TestRoomsDrawFromTheGameCatalog(t *testing.T) {
 			if err != nil {
 				t.Fatal(i, err)
 			}
-			if c.ID <= last || c.Uploader != "owner" {
-				t.Fatalf("chart %d is %s after %s, uploaded by %q", i, c.ID, last, c.Uploader)
+			if c.ID <= last || c.Author != "owner" {
+				t.Fatalf("chart %d is %s after %s, uploaded by %q", i, c.ID, last, c.Author)
 			}
 			ids[c.ID], last = true, c.ID
 		}

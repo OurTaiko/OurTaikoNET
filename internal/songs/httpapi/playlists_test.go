@@ -84,7 +84,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 		}
 		return v
 	}
-	if v := detail("owner"); named(playlistIDs(v.Charts)) != "song,other" || v.ChartCount != 2 || v.Charts[0].Uploader == "" {
+	if v := detail("owner"); named(playlistIDs(v.Charts)) != "song,other" || v.ChartCount != 2 || v.Charts[0].Author == "" {
 		t.Fatalf("order %s %+v", playlistIDs(v.Charts), v)
 	}
 	order := func(body string, want int) {

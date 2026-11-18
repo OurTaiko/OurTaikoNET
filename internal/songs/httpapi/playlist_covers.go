@@ -49,7 +49,7 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 	}
 	s.releaseCovers(r.Context(), previous)
 	digest := web.Hash(string(encoded))
-	web.Respond(w, 200, map[string]string{"coverHash": digest, "coverUrl": s.coverURL(digest + ".webp")})
+	web.Respond(w, 200, map[string]string{"coverHash": digest, "songListCoverPath": s.filePath(digest + ".webp")})
 }
 
 func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
@@ -67,5 +67,5 @@ func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(r.Context(), previous)
-	web.Respond(w, 200, map[string]string{"coverHash": "", "coverUrl": ""})
+	web.Respond(w, 200, map[string]string{"coverHash": "", "songListCoverPath": ""})
 }

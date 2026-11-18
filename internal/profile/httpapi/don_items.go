@@ -222,19 +222,13 @@ func (s *Server) DescribeReward(r *http.Request, kind string, data json.RawMessa
 		return data
 	}
 	fields["name"] = item.Name
-	// A mainland visitor's picture is the mirror catalog's entry, as for the files (don.go).
-	from := c
-	if mirror := s.donMirrorFor(r); mirror != nil {
-		if m, ok := mirror.item(it.Part, it.ItemID); ok {
-			from, item = mirror, m
-		}
-	}
 	picture := item.Icon
 	if picture == nil && (it.Part == "puchi" || it.Part == "paint") {
 		picture = &item.File
 	}
 	if picture != nil {
-		fields["picture"] = from.url(*picture)
+		// The part's icon, a file of the 3D Don's (package files).
+		fields["3dCharaPath"] = c.path(*picture)
 	}
 	described, err := json.Marshal(fields)
 	if err != nil {

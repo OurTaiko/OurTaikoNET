@@ -29,7 +29,7 @@ func TestAudioPreviewWindow(t *testing.T) {
 	} {
 		c := Chart{ID: "song", AudioName: "track.mp3", Duration: tc.duration, Metadata: tja.Metadata{DemoStart: tc.start}}
 		p := audioPreview(c)
-		if p == nil || p.StartSeconds != tc.wantStart || p.DurationSeconds != tc.wantLength || p.ContentType != "audio/mpeg" || p.URL != "/api/v1/charts/song/audio" {
+		if p == nil || p.StartSeconds != tc.wantStart || p.DurationSeconds != tc.wantLength || p.ContentType != "audio/mpeg" {
 			t.Fatalf("window %+v: %+v", tc, p)
 		}
 	}
@@ -168,7 +168,7 @@ func testAudioStreamHTTP(t *testing.T, remote bool) {
 			}
 			// The advertised URL also works after loading a normal chart response.
 			chart, err := app.chart(ctx, song)
-			if err != nil || chart.AudioPreview == nil || chart.AudioPreview.URL != "/api/v1/charts/"+song+"/audio" || chart.AudioPreview.StartSeconds != 30 || chart.AudioPreview.DurationSeconds != 15 || chart.AudioHash != digest || chart.AudioSize != int64(len(data)) {
+			if err != nil || chart.AudioPreview == nil || chart.AudioPreview.Path != app.filePath(chart.AudioKey) || chart.AudioPreview.Path == "" || chart.AudioPreview.StartSeconds != 30 || chart.AudioPreview.DurationSeconds != 15 || chart.AudioHash != digest || chart.AudioSize != int64(len(data)) {
 				t.Fatalf("chart preview: %+v, %v", chart, err)
 			}
 			w = call("GET", "/api/game/catalog", nil)

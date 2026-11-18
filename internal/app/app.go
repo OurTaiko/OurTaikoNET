@@ -103,6 +103,8 @@ type App struct {
 	// rewards tells players what they were given (Handler); shared is the pool it listens on (Start).
 	rewards rewards.Store
 	shared  *pgxpool.Pool
+	// v1 is what version 1 of the API needs (package apiv1).
+	v1 apiv1.Config
 }
 
 // sourceAwards records a source's awards with the players' part, under the source's name, in
@@ -182,12 +184,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	a.rewards = rewards.NewStore(shared)
 	a.shared = shared
-	resources := distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
+	// Version 1 gives full addresses, a mainland visitor's on the mirror (package apiv1).
+	_, bucket := cfg.FanmadeObjects.(*objectstore.S3)
+	a.v1 = apiv1.Config{Router: distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies), FilesOnDisk: !bucket, Origin: cfg.Origin}
 	a.Players = profile.New(shared, profile.Config{
 		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		SessionCookie: SessionCookie, Groups: true, DonCatalogURL: cfg.DonCatalogURL,
-		DonMirrorCatalogURL: cfg.DonMirrorCatalogURL, DonIPCountry: cfg.DonIPCountry,
-		Distribution: resources,
 		Sources: []profile.Source{
 			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite, Categories: songs.Fanmade.CategoryBits()},
 			{ID: "official", Name: "OurTaiko Database", Site: officialSite, Categories: songs.Official.CategoryBits()},
@@ -216,14 +218,12 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	officialProfile.UseTransport(catalog)
 
 	a.Fanmade = songs.New(fanmadePool, songs.Config{
-		Distribution: resources,
-		Source:       songs.Fanmade, Origin: cfg.Origin, APIBase: cfg.Origin + "/api/v1/sources/fanmade", Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
+		Source: songs.Fanmade, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "fanmade"), Objects: cfg.FanmadeObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: fanmadeProfile, Awards: sourceAwards{a.Players, "fanmade"}, SessionCookie: SessionCookie, Manager: in(groups.FanmadeManager),
 	})
 	a.Official = songs.New(officialPool, songs.Config{
-		Distribution: resources,
-		Source:       songs.Official, Origin: cfg.Origin, APIBase: cfg.Origin + "/api/v1/sources/official", Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
+		Source: songs.Official, Origin: cfg.Origin, Storage: filepath.Join(cfg.StorageDir, "official"), Objects: cfg.OfficialObjects,
 		CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
 		Profile: officialProfile, Awards: sourceAwards{a.Players, "official"}, SessionCookie: SessionCookie, Manager: in(groups.OfficialManager),
 	})
@@ -233,13 +233,13 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	// Each old host still answers its API; its pages are those of the new site now.
 	if cfg.LegacyFanmadeHost != "" {
-		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: versions(a.withRewards(a.Fanmade.Handler())), Page: legacy.Under(cfg.Origin, "/fanmade")}
+		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.versions(a.withRewards(a.Fanmade.Handler()), "/api/v1/sources/fanmade"), Page: legacy.Under(cfg.Origin, "/fanmade")}
 	}
 	if cfg.LegacyOfficialHost != "" {
-		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: versions(a.withRewards(a.Official.Handler())), Page: legacy.Under(cfg.Origin, "/official")}
+		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.versions(a.withRewards(a.Official.Handler()), "/api/v1/sources/official"), Page: legacy.Under(cfg.Origin, "/official")}
 	}
 	if cfg.LegacyProfileHost != "" {
-		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(versions(a.Players.Handler())), Page: legacy.Players(cfg.Origin)}
+		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.versions(a.Players.Handler(), "")), Page: legacy.Players(cfg.Origin)}
 	}
 	if cfg.Multiplay.ListenAddr != "" {
 		timings := multiplay.DefaultTimings
@@ -275,15 +275,19 @@ func (a *App) Handler() http.Handler {
 	ready := a.Fanmade.Handler()
 	routes := http.NewServeMux()
 	routes.Handle("/readyz", ready)
-	routes.Handle("/", versions(a.withRewards(current)))
+	routes.Handle("/", a.versions(a.withRewards(current), ""))
 	// Every answer, the old domains' too, says how many rewards its player has not seen.
 	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
 }
 
 // versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
 // (package apiv1). Health checks and /internal/ reach api as they are.
-func versions(api http.Handler) http.Handler {
-	return mount.Serve(map[string]http.Handler{apiv1.Version: apiv1.Handler(api)}, api)
+// An old host serves one source at /api/v1/ itself; sourceBase is that source's routes on the
+// new site, which version 1 linked to.
+func (a *App) versions(api http.Handler, sourceBase string) http.Handler {
+	v1 := a.v1
+	v1.SourceBase = sourceBase
+	return mount.Serve(map[string]http.Handler{apiv1.Version: apiv1.Handler(api, v1)}, api)
 }
 
 // withRewards serves the rewards' routes (package rewards) in front of an API: the website asks

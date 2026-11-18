@@ -10,20 +10,21 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"net/url"
-	"slices"
-	"sort"
+	"ourtaiko.dev/net/internal/files"
 	"strings"
 	"time"
 
-	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/web"
 )
+
+// How long a failed read of the nameplate catalog waits before the next try.
+const nameplateRetry = 30 * time.Second
 
 type nameplateCatalog struct {
 	Version int                   `json:"version"`
 	Files   map[string]donFileRef `json:"files"`
-	base    string
+	// The catalog's folder under the distribution root ("nameplate/"), which its paths are in.
+	folder string
 }
 
 func (s *Server) readNameplateCatalog(ctx context.Context, address string) (*nameplateCatalog, error) {
@@ -59,11 +60,11 @@ func (s *Server) readNameplateCatalog(ctx context.Context, address string) (*nam
 			return nil, errors.New("invalid nameplate file")
 		}
 	}
-	u, err := url.Parse(address)
-	if err != nil {
-		return nil, err
+	// The catalog is at <root>/nameplate/catalog.json; one read from elsewhere (tests) is taken
+	// to stand for that folder.
+	if catalog.folder = files.Path(address[:strings.LastIndex(address, "/")+1]); catalog.folder == "" {
+		catalog.folder = "nameplate/"
 	}
-	catalog.base = u.ResolveReference(&url.URL{Path: "."}).String()
 	return &catalog, nil
 }
 
@@ -74,8 +75,6 @@ type nameplateSlot struct {
 	catalog *nameplateCatalog
 	until   time.Time
 	done    chan struct{}
-	// How long a good read is kept; donCatalogTTL when zero.
-	ttl time.Duration
 }
 
 // nameplateNow answers the catalog at address, waiting for a read only when none has
@@ -111,12 +110,9 @@ func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan
 	catalog, err := s.readNameplateCatalog(context.Background(), address)
 	s.nameplateMu.Lock()
 	defer s.nameplateMu.Unlock()
-	ttl := slot.ttl
-	if ttl == 0 {
-		ttl = donCatalogTTL
-	}
+	ttl := donCatalogTTL
 	if err != nil {
-		ttl = donMirrorRetry
+		ttl = nameplateRetry
 		log.Printf("reading nameplate catalog %s: %v", address, err)
 	} else {
 		slot.catalog = catalog
@@ -126,37 +122,23 @@ func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan
 	close(done)
 }
 
+// nameplateArtAnswer is GET /api/nameplate-art/catalog: the bucket's nameplate catalog with
+// every file's path under the distribution root (package files).
 func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
-	router := s.Config.Distribution
-	regional := router != nil && router.Base != "" && router.Country != nil
-	if regional {
-		w.Header().Set("Cache-Control", "private, max-age=60")
-	} else {
-		w.Header().Set("Cache-Control", "public, max-age=60")
-	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	address := s.Config.NameplateCatalogURL
 	if address == "" {
-		address = distribution.CanonicalBase + "nameplate/catalog.json"
+		address = files.Root + "nameplate/catalog.json"
 	}
-	canonical := s.nameplateNow(r.Context(), &s.nameplateArt, address)
-	if canonical == nil {
+	catalog := s.nameplateNow(r.Context(), &s.nameplateArt, address)
+	if catalog == nil {
 		problem(w, http.StatusServiceUnavailable, "NAMEPLATE_CATALOG_UNAVAILABLE", "名牌资源清单暂时不可用")
 		return
 	}
-	answer := map[string]any{"version": canonical.Version, "files": canonical.Files, "baseUrl": canonical.base}
-	if regional && router.IsMainland(r) && r.URL.Query().Get("origin") != "1" {
-		// The mirror's own catalog (its CDN keeps it 60 seconds) and every file it lists, at the
-		// mirror's root; nothing is compared with the canonical one. baseUrl stays canonical for
-		// fallback. Until the mirror's catalog has been read once, the canonical one is answered.
-		if mirror := s.nameplateNow(r.Context(), &s.nameplateMirror, router.MirrorBase(r)+"nameplate/catalog.json"); mirror != nil {
-			paths := make([]string, 0, len(mirror.Files))
-			for _, ref := range mirror.Files {
-				paths = append(paths, ref.Path)
-			}
-			sort.Strings(paths)
-			answer["version"], answer["files"] = mirror.Version, mirror.Files
-			answer["mirrorBaseUrl"], answer["mirrorPaths"] = mirror.base, slices.Compact(paths)
-		}
+	rooted := make(map[string]donFileRef, len(catalog.Files))
+	for key, ref := range catalog.Files {
+		ref.Path = catalog.folder + ref.Path
+		rooted[key] = ref
 	}
-	web.Respond(w, http.StatusOK, answer)
+	web.Respond(w, http.StatusOK, map[string]any{"version": catalog.Version, "files": rooted})
 }

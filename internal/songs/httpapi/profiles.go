@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"ourtaiko.dev/net/internal/files"
 	"slices"
 	"time"
 
@@ -67,7 +68,7 @@ func (c *Chart) setOwners(profiles map[string]account.PublicProfile) {
 		if !ok {
 			p.Nickname = "未知用户"
 		}
-		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL})
+		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarPath: files.Path(p.AvatarURL)})
 	}
 	p, ok := profiles[c.OwnerID]
 	if !ok {
@@ -77,6 +78,6 @@ func (c *Chart) setOwners(profiles map[string]account.PublicProfile) {
 }
 
 func (c *Chart) setUploader(p account.PublicProfile) {
-	c.Uploader = p.Nickname
-	c.UploaderAvatarURL = p.AvatarURL
+	c.Author = p.Nickname
+	c.AuthorAvatarPath = files.Path(p.AvatarURL)
 }

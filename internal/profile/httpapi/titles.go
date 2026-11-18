@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"regexp"
 	"strings"
 	"time"
@@ -50,12 +51,12 @@ func (d *DanBadge) tiers() {
 
 // Nameplate is what a player wears, as the game and the websites draw it.
 type Nameplate struct {
-	UserID    string    `json:"userId"`
-	Nickname  string    `json:"nickname"`
-	AvatarURL string    `json:"avatarUrl"`
-	Title     *Title    `json:"title"`
-	Dan       *DanBadge `json:"dan"`
-	ShowDan   bool      `json:"showDan"`
+	UserID     string    `json:"userId"`
+	Nickname   string    `json:"nickname"`
+	AvatarPath string    `json:"avatarPath"`
+	Title      *Title    `json:"title"`
+	Dan        *DanBadge `json:"dan"`
+	ShowDan    bool      `json:"showDan"`
 }
 
 var titleStyles = map[string]bool{"wood": true, "teal": true, "wood2": true, "purple": true, "gold": true, "rainbow": true}
@@ -148,7 +149,7 @@ func (s *Server) userNameplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, _, _ := s.profile(r.Context(), id)
-	plate.Nickname, plate.AvatarURL = p.Nickname, p.AvatarURL
+	plate.Nickname, plate.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	web.Respond(w, 200, plate)
 }
 
@@ -197,9 +198,9 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	plate.Nickname, plate.AvatarURL = p.Nickname, p.AvatarURL
+	plate.Nickname, plate.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	web.Respond(w, 200, map[string]any{
-		"user":              map[string]any{"id": id, "nickname": p.Nickname, "avatarUrl": p.AvatarURL},
+		"user":              map[string]any{"id": id, "nickname": p.Nickname, "avatarPath": files.Path(p.AvatarURL)},
 		"nameplate":         plate,
 		"sources":           s.Config.Sources,
 		"profilesAvailable": answered,
@@ -378,7 +379,7 @@ func (s *Server) wearNameplate(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	plate.Nickname, plate.AvatarURL = v.User.Nickname, v.User.AvatarURL
+	plate.Nickname, plate.AvatarPath = v.User.Nickname, files.Path(v.User.AvatarURL)
 	web.Respond(w, 200, plate)
 }
 

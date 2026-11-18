@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/constants"
-	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/web"
 )
@@ -34,12 +32,13 @@ type Chart struct {
 	OfficialID *string             `json:"officialId"`
 	OwnerIDs   []string            `json:"ownerIds"`
 	Owners     []NotificationActor `json:"owners"`
-	// Deprecated: original uploader only; authorization uses OwnerIDs.
-	OwnerID  string `json:"ownerId"`
-	Uploader string `json:"uploader"`
-	// UploaderAvatarURL is empty when the uploader has no avatar or SSO is unavailable.
-	UploaderAvatarURL string `json:"uploaderAvatarUrl"`
-	Description       string `json:"description"`
+	// Deprecated: original author only; authorization uses OwnerIDs.
+	OwnerID string `json:"ownerId"`
+	// Author is who uploaded the chart, AuthorAvatarPath their avatar's file (package files),
+	// empty when they have none or SSO is unavailable.
+	Author           string `json:"author"`
+	AuthorAvatarPath string `json:"authorAvatarPath"`
+	Description      string `json:"description"`
 	// Votes and comments; MyVote is only filled for the signed-in detail view.
 	Score        int       `json:"score"`
 	Upvotes      int       `json:"upvotes"`
@@ -62,9 +61,8 @@ type Chart struct {
 	AudioHash string `json:"audioHash"`
 	AudioSize int64  `json:"audioSize"`
 	CoverHash string `json:"coverHash,omitempty"`
-	// CoverURL is the cover's address in the public bucket (coverURL), the only place it is read
-	// from; empty when the bucket has no public address.
-	CoverURL string `json:"coverUrl,omitempty"`
+	// SongCoverPath is the cover's file (package files), the only way a cover is read.
+	SongCoverPath string `json:"songCoverPath,omitempty"`
 	// HasFiles is false for a song registered without a TJA and audio, which only the
 	// official source accepts: it has no blocks, no duration, and the file fields are empty.
 	// Official source only.
@@ -115,7 +113,8 @@ func (c Chart) MarshalJSON() ([]byte, error) {
 // AudioPreview describes the original audio stream, not a transcoded excerpt.
 // Times are in seconds; SHA-256 and byte size remain Chart.AudioHash/AudioSize.
 type AudioPreview struct {
-	URL             string  `json:"url"`
+	// Path is the audio's file (package files).
+	Path            string  `json:"path"`
 	ContentType     string  `json:"contentType"`
 	StartSeconds    float64 `json:"startSeconds"`
 	DurationSeconds float64 `json:"durationSeconds"`
@@ -130,7 +129,6 @@ func audioPreview(c Chart) *AudioPreview {
 		start = 0
 	}
 	return &AudioPreview{
-		URL:             "/api/v1/charts/" + url.PathEscape(c.ID) + "/audio",
 		ContentType:     audio.MediaType(c.AudioName),
 		StartSeconds:    start,
 		DurationSeconds: math.Min(15, c.Duration-start),
@@ -171,18 +169,17 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
 		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey)
 	if e == nil {
-		c.CoverURL = s.coverURL(coverKey)
+		c.SongCoverPath = s.filePath(coverKey)
 		c.OwnerID = c.OwnerIDs[0]
 		c.Score = c.Upvotes - c.Downvotes
 		c.HasFiles = c.TJAKey != ""
 		c.CategoryIDs = s.source().categoryIDs(flags)
 		e = json.Unmarshal(difficulties, &c.Difficulties)
 		c.Maker = difficultyMakers(c.Difficulties)
-		c.AudioPreview = audioPreview(c)
-		// A bucket's files are reached under its public address.
-		if remote, ok := s.Config.Objects.(*objectstore.S3); ok && c.PreviewPath != "" {
-			c.PreviewPath = remote.Prefix + c.PreviewPath
+		if c.AudioPreview = audioPreview(c); c.AudioPreview != nil {
+			c.AudioPreview.Path = s.filePath(c.AudioKey)
 		}
+		c.PreviewPath = s.filePath(c.PreviewPath)
 	}
 	return c, e
 }

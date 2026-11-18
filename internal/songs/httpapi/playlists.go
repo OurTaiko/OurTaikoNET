@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,9 +30,9 @@ const (
 
 // PlaylistOwner is the public profile of a playlist's owner.
 type PlaylistOwner struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
+	ID         string `json:"id"`
+	Nickname   string `json:"nickname"`
+	AvatarPath string `json:"avatarPath"`
 }
 
 // Playlist is an ordered list of songs. A stored playlist's ID is 32 hex digits;
@@ -49,11 +50,11 @@ type Playlist struct {
 	OwnerID    string         `json:"ownerId,omitempty"`
 	Owner      *PlaylistOwner `json:"owner"`
 	CoverHash  string         `json:"coverHash,omitempty"`
-	// CoverURL is as a chart's (Chart.CoverURL).
-	CoverURL      string `json:"coverUrl,omitempty"`
-	coverKey      string
-	ChartCount    int `json:"chartCount"`
-	FavoriteCount int `json:"favoriteCount"`
+	// SongListCoverPath is the cover's file (package files), as a chart's SongCoverPath.
+	SongListCoverPath string `json:"songListCoverPath,omitempty"`
+	coverKey          string
+	ChartCount        int `json:"chartCount"`
+	FavoriteCount     int `json:"favoriteCount"`
 	// Favorited is only filled for a signed-in viewer.
 	Favorited bool       `json:"favorited"`
 	CreatedAt *time.Time `json:"createdAt"`
@@ -152,7 +153,7 @@ func (s *Server) profiles(ctx context.Context, ids []string) map[string]account.
 func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
 	// Every playlist answer passes here, so the cover addresses are filled here too.
 	for _, items := range lists {
-		s.withCoverURLs(items)
+		s.withCoverPaths(items)
 	}
 	ids, seen := []string{}, map[string]bool{}
 	for _, items := range lists {
@@ -174,7 +175,7 @@ func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
 				if !ok {
 					p.Nickname = "未知用户"
 				}
-				items[i].Owner = &PlaylistOwner{ID: id, Nickname: p.Nickname, AvatarURL: p.AvatarURL}
+				items[i].Owner = &PlaylistOwner{ID: id, Nickname: p.Nickname, AvatarPath: files.Path(p.AvatarURL)}
 			}
 		}
 	}

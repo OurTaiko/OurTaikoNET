@@ -507,7 +507,7 @@ func TestTheAdministratorFindsPlayersByName(t *testing.T) {
 	ctx := context.Background()
 	boss, drummer, master, percent := strings.Repeat("a", 31)+"1", strings.Repeat("b", 31)+"2", strings.Repeat("d", 31)+"4", strings.Repeat("e", 31)+"5"
 	if _, err := pool.Exec(ctx, `INSERT INTO net.users(id,nickname,avatar_url,groups,last_active_at,profile_checked_at) VALUES
- ($1,'太鼓小将','https://cdn.example/a.webp',1,now(),now()),($2,'Taiko_Master','',0,now()-interval '1 day',now()),($3,'taiko 100%','',0,NULL,now())`, drummer, master, percent); err != nil {
+ ($1,'太鼓小将','https://distrib.ourtaiko.org/sso/avatars/a.webp',1,now(),now()),($2,'Taiko_Master','',0,now()-interval '1 day',now()),($3,'taiko 100%','',0,NULL,now())`, drummer, master, percent); err != nil {
 		t.Fatal(err)
 	}
 	cookie, _, err := a.Players.OpenSession(ctx, boss, "adm:"+boss, "refresh", time.Now().Add(time.Hour))
@@ -567,7 +567,7 @@ func TestTheAdministratorFindsPlayersByName(t *testing.T) {
 	}
 	// What the panel shows of each: the name and avatar kept here, their groups, and the login
 	// name only when that is what was typed.
-	if _, users := find(cookie, "q="+url.QueryEscape("小将")); len(users) != 1 || users[0].Nickname != "太鼓小将" || users[0].AvatarURL != "https://cdn.example/a.webp" ||
+	if _, users := find(cookie, "q="+url.QueryEscape("小将")); len(users) != 1 || users[0].Nickname != "太鼓小将" || users[0].AvatarURL != "https://distrib.ourtaiko.org/sso/avatars/a.webp" ||
 		users[0].Username != "" || strings.Join(users[0].Groups, ",") != "OFFICIAL_MANAGER" {
 		t.Errorf("found by nickname: %+v", users)
 	}

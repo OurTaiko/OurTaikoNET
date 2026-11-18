@@ -80,12 +80,12 @@ func TestLockedPartsOfTheDonAreEarned(t *testing.T) {
 	ask := httptest.NewRequest("GET", "/api/game/rewards", nil)
 	raw := string(app.DescribeReward(ask, "don_item", []byte(`{"part":"cos","itemId":30,"service":"admin"}`)))
 	// Costume 30 has no icon in this catalog: a name and no picture.
-	if !strings.Contains(raw, `"鏡もち"`) || !strings.Contains(raw, `"service":"admin"`) || strings.Contains(raw, `"picture"`) {
+	if !strings.Contains(raw, `"鏡もち"`) || !strings.Contains(raw, `"service":"admin"`) || strings.Contains(raw, `"3dCharaPath"`) {
 		t.Fatal(raw)
 	}
 	// A puchichara is its own picture.
 	raw = string(app.DescribeReward(ask, "don_item", []byte(`{"part":"puchi","itemId":1}`)))
-	if !strings.Contains(raw, `"picture":"`+bucket.URL+`/3dchara/puchi/1.png"`) {
+	if !strings.Contains(raw, `"3dCharaPath":"3dchara/puchi/1.png"`) {
 		t.Fatal(raw)
 	}
 	// A part the catalog does not have is answered as it is.

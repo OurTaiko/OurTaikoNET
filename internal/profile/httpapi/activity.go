@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"sort"
 	"strconv"
 	"time"
@@ -29,9 +30,9 @@ type Activity struct {
 // ActivityPlayer is who did it. Nickname and avatar are empty while the site has no copy of
 // them (account, profiles.go).
 type ActivityPlayer struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
+	ID         string `json:"id"`
+	Nickname   string `json:"nickname"`
+	AvatarPath string `json:"avatarPath"`
 }
 
 type ActivityChart struct {
@@ -148,7 +149,7 @@ func (s *Server) recentActivity(ctx context.Context) []Activity {
 	names := s.profiles(ctx, ids)
 	for i := range rows {
 		p := names[rows[i].User.ID]
-		rows[i].User.Nickname, rows[i].User.AvatarURL = p.Nickname, p.AvatarURL
+		rows[i].User.Nickname, rows[i].User.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	}
 	return rows
 }

@@ -9,7 +9,7 @@ import (
 // chart is held: alone, by pointer, or in a list.
 func TestChartFieldsOfItsSource(t *testing.T) {
 	for _, official := range []bool{false, true} {
-		c := Chart{ID: "a", official: official, PreviewPath: "clip.ogg", AudioPreview: &AudioPreview{URL: "/audio"}, TJASize: 7, HasFiles: true}
+		c := Chart{ID: "a", official: official, PreviewPath: "clip.ogg", AudioPreview: &AudioPreview{Path: "fanmade/a.ogg"}, TJASize: 7, HasFiles: true}
 		c.Title = "Song"
 		for holder, value := range map[string]any{"value": c, "pointer": &c, "list": map[string]any{"items": []Chart{c}}} {
 			data, e := json.Marshal(value)

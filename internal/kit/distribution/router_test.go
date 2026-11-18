@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"strings"
 	"testing"
 )
 
@@ -22,7 +21,6 @@ func mainland() *http.Request {
 
 func TestRegionalCandidates(t *testing.T) {
 	router := testRouter()
-	digest := strings.Repeat("a", 64)
 	if router.Base != "https://mirror.example/ourtaiko/" {
 		t.Fatal(router.Base)
 	}
@@ -38,51 +36,8 @@ func TestRegionalCandidates(t *testing.T) {
 	if router.IsMainland(spoof) {
 		t.Fatal("untrusted header accepted")
 	}
-	for _, collection := range []string{"fanmade", "database"} {
-		for _, ext := range []string{"tja", "ogg", "mp3", "webp", "png", "jpg", "jpeg", "mp4"} {
-			original := CanonicalBase + collection + "/" + digest + "." + ext
-			if got := router.Candidate(mainland(), original, digest); got != router.Base+collection+"/"+digest+"."+ext {
-				t.Fatal(got)
-			}
-		}
-	}
-	for _, address := range []string{
-		CanonicalBase + "fanmade/" + digest + ".ogg?X-Amz-Signature=secret",
-		CanonicalBase + "fanmade/" + digest + ".ogg#fragment",
-		CanonicalBase + "fanmade/../database/" + digest + ".ogg",
-		CanonicalBase + "fanmade/%2e%2e/database/" + digest + ".ogg",
-		CanonicalBase + "fanmade/catalog.json", CanonicalBase + "other/" + digest + ".ogg",
-		"https://cdn.example/fanmade/" + digest + ".ogg", "http://distrib.ourtaiko.org/fanmade/" + digest + ".ogg",
-		CanonicalBase + "fanmade/" + digest + ".exe", CanonicalBase + "fanmade/" + strings.Repeat("b", 64) + ".ogg",
-	} {
-		if got := router.Candidate(mainland(), address, digest); got != address {
-			t.Fatalf("unsafe mapping: %s", got)
-		}
-	}
 	custom := FromDonCatalog("https://mirror.example/custom.json", router.Country, nil)
 	if custom.Base != "" {
 		t.Fatal("guessed siblings of custom Don catalog")
-	}
-}
-
-func TestSelectUsesCountryAlone(t *testing.T) {
-	router := testRouter()
-	digest := strings.Repeat("a", 64)
-	original := CanonicalBase + "fanmade/" + digest + ".ogg"
-	// No HTTP client is involved: an unreachable mirror is still chosen for mainland visitors.
-	if got := router.Select(mainland(), original, digest, 3); got != router.Base+"fanmade/"+digest+".ogg" {
-		t.Fatal(got)
-	}
-	overseas := mainland()
-	overseas.Header.Set("X-Real-IP", "203.0.113.2")
-	if got := router.Select(overseas, original, digest, 3); got != original {
-		t.Fatal(got)
-	}
-	if router.MirrorBase(overseas) != "" || router.MirrorBase(mainland()) != router.Base {
-		t.Fatal("mirror base policy")
-	}
-	var none *Router
-	if none.Select(mainland(), original, digest, 3) != original || none.MirrorBase(mainland()) != "" {
-		t.Fatal("nil router must keep canonical addresses")
 	}
 }

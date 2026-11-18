@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strconv"
 	"strings"
 	"time"
@@ -30,24 +31,24 @@ const (
 type Comment struct {
 	ID string `json:"id"`
 	// A comment hangs on a song or on a 段位 course; the other is empty.
-	ChartID         string            `json:"chartId,omitempty"`
-	ChartTitle      string            `json:"chartTitle,omitempty"`
-	DanID           string            `json:"danId,omitempty"`
-	DanTitle        map[string]string `json:"danTitle,omitempty"`
-	ParentID        *string           `json:"parentId"`
-	Depth           int               `json:"depth"`
-	AuthorID        string            `json:"authorId"`
-	Author          string            `json:"author"`
-	AuthorAvatarURL string            `json:"authorAvatarUrl"`
-	Body            string            `json:"body"`
-	CreatedAt       time.Time         `json:"createdAt"`
-	EditedAt        *time.Time        `json:"editedAt"`
-	Deleted         bool              `json:"deleted"`
-	Removed         bool              `json:"removed"`
-	Score           int               `json:"score"`
-	MyVote          int               `json:"myVote"`
-	ReplyCount      int               `json:"replyCount"`
-	Replies         []*Comment        `json:"replies"`
+	ChartID          string            `json:"chartId,omitempty"`
+	ChartTitle       string            `json:"chartTitle,omitempty"`
+	DanID            string            `json:"danId,omitempty"`
+	DanTitle         map[string]string `json:"danTitle,omitempty"`
+	ParentID         *string           `json:"parentId"`
+	Depth            int               `json:"depth"`
+	AuthorID         string            `json:"authorId"`
+	Author           string            `json:"author"`
+	AuthorAvatarPath string            `json:"authorAvatarPath"`
+	Body             string            `json:"body"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	EditedAt         *time.Time        `json:"editedAt"`
+	Deleted          bool              `json:"deleted"`
+	Removed          bool              `json:"removed"`
+	Score            int               `json:"score"`
+	MyVote           int               `json:"myVote"`
+	ReplyCount       int               `json:"replyCount"`
+	Replies          []*Comment        `json:"replies"`
 }
 
 // The viewer is always $1 so every query can report the viewer's own vote.
@@ -250,7 +251,7 @@ func (s *Server) fillAuthors(ctx context.Context, items []*Comment) {
 	for _, c := range all {
 		if c.AuthorID != "" {
 			p := profiles[c.AuthorID]
-			c.Author, c.AuthorAvatarURL = p.Nickname, p.AvatarURL
+			c.Author, c.AuthorAvatarPath = p.Nickname, files.Path(p.AvatarURL)
 		}
 	}
 }
@@ -553,7 +554,7 @@ func (s *Server) createSubjectComment(w http.ResponseWriter, r *http.Request, lo
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
+	items[0].Author, items[0].AuthorAvatarPath = u.User.Nickname, files.Path(s.Config.SSO.AvatarURL(u.User))
 	web.Respond(w, 201, items[0])
 }
 
@@ -603,7 +604,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	items[0].Author, items[0].AuthorAvatarURL = u.User.Nickname, s.Config.SSO.AvatarURL(u.User)
+	items[0].Author, items[0].AuthorAvatarPath = u.User.Nickname, files.Path(s.Config.SSO.AvatarURL(u.User))
 	web.Respond(w, 200, items[0])
 }
 

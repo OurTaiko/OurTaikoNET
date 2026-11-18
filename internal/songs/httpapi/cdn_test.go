@@ -64,22 +64,20 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/cdn-song/resources", nil))
 	var payload struct {
-		URLsExpire bool    `json:"urlsExpire"`
-		ExpiresAt  *string `json:"expiresAt"`
-		Resources  map[string]struct {
-			URL     string `json:"url"`
-			HeadURL string `json:"headUrl"`
+		Resources map[string]struct {
+			Path string `json:"path"`
 		} `json:"resources"`
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &payload) != nil {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if payload.URLsExpire || payload.ExpiresAt != nil || len(payload.Resources) != 3 {
-		t.Fatal(payload)
+	if len(payload.Resources) != 3 || strings.Contains(w.Body.String(), "Url") || strings.Contains(w.Body.String(), "urlsExpire") {
+		t.Fatal(w.Body.String())
 	}
-	for _, r := range payload.Resources {
-		if r.URL != r.HeadURL || !strings.HasPrefix(r.URL, "https://cdn.example/fanmade/") || strings.Contains(r.URL, "?") {
-			t.Fatal(r)
+	// Files under the distribution root, in the bucket's prefix: no address, no signature.
+	for kind, want := range map[string]string{"tja": "fanmade/test/objects/song/tja", "audio": "fanmade/test/objects/song/audio", "cover": "fanmade/test/covers/song/cover.webp"} {
+		if payload.Resources[kind].Path != want {
+			t.Fatal(kind, payload.Resources[kind])
 		}
 	}
 	for _, method := range []string{"GET", "HEAD"} {
@@ -92,18 +90,19 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 			}
 		}
 	}
-	// A cover is given as its bucket address, whatever its key; no API route reads it.
+	// A cover is given as its file under the distribution root, whatever its key; no API route
+	// reads it.
 	if _, err := pool.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file,cover_file) VALUES('cdn-hashed',ARRAY['owner'],'CDN',120,100,
  test_file('objects/hashed/tja','song.tja',repeat('a',64),12),test_file('objects/hashed/audio','audio.ogg',repeat('b',64),20),
  test_file(repeat('e',64)||'.webp','cover.webp',repeat('e',64),14));`); err != nil {
 		t.Fatal(err)
 	}
-	for id, want := range map[string]string{"cdn-song": "https://cdn.example/fanmade/covers/song/cover.webp", "cdn-hashed": "https://cdn.example/fanmade/" + strings.Repeat("e", 64) + ".webp"} {
+	for id, want := range map[string]string{"cdn-song": "fanmade/test/covers/song/cover.webp", "cdn-hashed": "fanmade/test/" + strings.Repeat("e", 64) + ".webp"} {
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+id+"?by=id", nil))
 		var detail Chart
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &detail) != nil || detail.CoverURL != want {
-			t.Fatalf("%s: %d coverUrl %q", id, w.Code, detail.CoverURL)
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &detail) != nil || detail.SongCoverPath != want {
+			t.Fatalf("%s: %d songCoverPath %q", id, w.Code, detail.SongCoverPath)
 		}
 	}
 	if _, err := pool.Exec(ctx, `UPDATE charts SET status='deleted' WHERE id='cdn-song'`); err != nil {

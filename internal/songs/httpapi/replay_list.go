@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strconv"
 
 	"ourtaiko.dev/net/internal/web"
@@ -18,7 +19,7 @@ type ReplayListing struct {
 	Subtitle          string          `json:"subtitle"`
 	Level             int             `json:"level"`
 	Nickname          string          `json:"nickname"`
-	AvatarURL         string          `json:"avatarUrl"`
+	AvatarPath        string          `json:"avatarPath"`
 }
 
 const replayListPageSize = 20
@@ -109,7 +110,7 @@ func (s *Server) replayList(w http.ResponseWriter, r *http.Request) {
 	profiles := s.publicProfiles(r.Context(), ids)
 	for i := range items {
 		p := profiles[items[i].UserID]
-		items[i].Nickname, items[i].AvatarURL = p.Nickname, p.AvatarURL
+		items[i].Nickname, items[i].AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	}
 	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": replayListPageSize, "sort": sort})
 }

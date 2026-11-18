@@ -3,6 +3,7 @@ package httpapi
 import (
 	"log"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"regexp"
 	"strings"
 
@@ -80,7 +81,7 @@ func (s *Server) findPlayers(w http.ResponseWriter, r *http.Request, text string
 				internal(w, err)
 				return
 			}
-			known[0].Username, known[0].Nickname, known[0].AvatarURL = u.Username, u.Nickname, u.AvatarURL
+			known[0].Username, known[0].Nickname, known[0].AvatarPath = u.Username, u.Nickname, files.Path(u.AvatarURL)
 			found = append(found, known[0])
 		}
 	}

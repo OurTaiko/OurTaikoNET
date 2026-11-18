@@ -103,7 +103,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	web.Respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
+	web.Respond(w, 200, map[string]any{"user": account.Show(v.User), "csrfToken": v.CSRF})
 }
 
 // Require is who a request is from, for routes outside this server (such as package rewards'):

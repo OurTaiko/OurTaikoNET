@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strconv"
 	"time"
 
@@ -33,9 +34,9 @@ var chatWait = 25 * time.Second
 
 // ChatPerson is a member of a chat as the site shows them.
 type ChatPerson struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
+	ID         string `json:"id"`
+	Nickname   string `json:"nickname"`
+	AvatarPath string `json:"avatarPath"`
 }
 
 // ChatView is a chat with its peer shown.
@@ -56,7 +57,7 @@ func (s *Server) chatViews(ctx context.Context, chats ...chat.Chat) []ChatView {
 	out := make([]ChatView, len(chats))
 	for i, c := range chats {
 		p := names[c.PeerID]
-		out[i] = ChatView{Chat: c, Peer: ChatPerson{ID: c.PeerID, Nickname: p.Nickname, AvatarURL: p.AvatarURL}}
+		out[i] = ChatView{Chat: c, Peer: ChatPerson{ID: c.PeerID, Nickname: p.Nickname, AvatarPath: files.Path(p.AvatarURL)}}
 	}
 	return out
 }

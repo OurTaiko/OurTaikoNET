@@ -35,24 +35,24 @@ func TestPlayersDressTheirDon(t *testing.T) {
 	defer bucket.Close()
 	app := New(testDB(t), Config{Origin: origin, DevUserID: player, DonCatalogURL: bucket.URL + "/3dchara/catalog.json", DonClient: bucket.Client()})
 	c := &client{t: t, handler: app.Handler()}
-	base := bucket.URL + "/3dchara/"
+	base := "3dchara/" // the files' folder under the distribution root (package files)
 
 	// Nobody has chosen: the plain Don, whose one file is costume 0.
 	var answer DonAnswer
 	c.json("GET", "/api/users/"+other+"/don", "", 200, &answer)
 	if !answer.Look.Costume || answer.Look.Cos != 0 || answer.Look.Colors != nil || len(answer.Files) != 1 ||
-		answer.Files[0].URL != base+"cos/0.glb" || answer.Files[0].Size != 1 {
+		answer.Files[0].ThreeDCharaPath != base+"cos/0.glb" || answer.Files[0].Size != 1 {
 		t.Fatalf("plain Don %+v", answer)
 	}
 	c.json("GET", "/api/users/not-an-id/don", "", 404, nil)
 
-	// The catalog, as the bucket has it, with the address its paths are relative to.
+	// The catalog, as the bucket has it, its paths under the distribution root.
 	var catalog struct {
-		BaseURL string `json:"baseUrl"`
+		BaseURL *string `json:"baseUrl"`
 		Items   map[string][]donItem
 	}
 	c.json("GET", "/api/don/catalog", "", 200, &catalog)
-	if catalog.BaseURL != base || len(catalog.Items["cos"]) != 2 || catalog.Items["cos"][1].Name["ja"] != "鏡もち" {
+	if catalog.BaseURL != nil || len(catalog.Items["cos"]) != 2 || catalog.Items["cos"][1].Name["ja"] != "鏡もち" || catalog.Items["cos"][1].File.Path != base+"cos/30.glb" {
 		t.Fatalf("catalog %+v", catalog)
 	}
 
@@ -94,7 +94,7 @@ func TestPlayersDressTheirDon(t *testing.T) {
 	c.json("PUT", "/api/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":3}`, 422, nil)
 	c.json("PUT", "/api/me/don", `{"costume":true,"cos":30,"head":3,"body":4,"paint":2}`, 200, &answer)
 	if answer.Look.Paint != 2 || len(answer.Files) != 2 || answer.Files[1].Kind != "paint" ||
-		answer.Files[1].URL != base+"paint/2.png" {
+		answer.Files[1].ThreeDCharaPath != base+"paint/2.png" {
 		t.Fatalf("makeup %+v", answer)
 	}
 	c.json("GET", "/api/users/"+player+"/don", "", 200, &answer)

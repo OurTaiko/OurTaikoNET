@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ourtaiko.dev/net/internal/files"
 	"sort"
 	"strings"
 
@@ -112,12 +113,12 @@ func Of(ctx context.Context, db Querier, user string) (Set, error) {
 // name; the site keeps no copy of it, so it is there only when the account center was asked
 // for a player by that name.
 type Member struct {
-	ID        string   `json:"id"`
-	Username  string   `json:"username,omitempty"`
-	Nickname  string   `json:"nickname"`
-	AvatarURL string   `json:"avatarUrl"`
-	Groups    []string `json:"groups"`
-	Bits      Set      `json:"bits"`
+	ID         string   `json:"id"`
+	Username   string   `json:"username,omitempty"`
+	Nickname   string   `json:"nickname"`
+	AvatarPath string   `json:"avatarPath"`
+	Groups     []string `json:"groups"`
+	Bits       Set      `json:"bits"`
 }
 
 // Give sets a player's groups to exactly set, on behalf of by, and records the change. The
@@ -192,9 +193,11 @@ func scanMembers(rows pgx.Rows, err error) ([]Member, error) {
 	for rows.Next() {
 		var m Member
 		var bits int64
-		if err = rows.Scan(&m.ID, &bits, &m.Nickname, &m.AvatarURL); err != nil {
+		var avatar string
+		if err = rows.Scan(&m.ID, &bits, &m.Nickname, &avatar); err != nil {
 			return nil, err
 		}
+		m.AvatarPath = files.Path(avatar)
 		m.Groups, m.Bits = Set(bits).Names(), Set(bits)&Known()
 		members = append(members, m)
 	}

@@ -121,18 +121,18 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 		return items
 	}
 	// The song outside the catalog is not in the game's folder.
-	if own := folders(s)[0]; own.Cover != nil || strings.Join(own.ChartIDs, ",") != w.song || own.Owner == "" {
-		t.Fatalf("folder without direct downloads %+v", own)
+	// Its cover is named by its file, kept on this server's disk here.
+	if own := folders(s)[0]; own.SongListCoverPath != s.source().Folder+coverKey || strings.Join(own.ChartIDs, ",") != w.song || own.Owner == "" {
+		t.Fatalf("folder on disk %+v", own)
 	}
 	personal := personalGamePlaylists(folders(s))
 	if len(personal) != 1 || personal[0].ID != p.ID {
 		t.Fatal("the account's own folders", personal)
 	}
-	// A bucket without a public address gets signed links.
+	// In a bucket, under the bucket's prefix, with what the game checks it by.
 	direct := &Server{DB: s.DB, Config: Config{Source: s.source(), Objects: teststore.New(t), SSO: s.Config.SSO}}
-	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, coverKey) || link.HeadURL == "" ||
-		link.SHA256 != result.CoverHash || link.Size != coverSize || link.ContentType != "image/webp" {
-		t.Fatalf("cover link %+v", link)
+	if own := folders(direct)[0]; own.SongListCoverPath != "fanmade/test/"+coverKey || own.SongListCoverSHA256 != result.CoverHash || own.SongListCoverSize != coverSize {
+		t.Fatalf("cover %+v", own)
 	}
 
 	covers := func() int {

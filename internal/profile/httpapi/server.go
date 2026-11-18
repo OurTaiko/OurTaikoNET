@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/chat"
-	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -42,10 +41,6 @@ type Config struct {
 	// reads it (nil: http.DefaultClient; tests give their own).
 	DonCatalogURL string
 	DonClient     *http.Client
-	// Optional inventory of the published mirror and an IP-to-country lookup for routing Don files.
-	DonMirrorCatalogURL string
-	DonIPCountry        func(netip.Addr) string
-	Distribution        *distribution.Router
 	// Override the canonical nameplate catalog in tests or a separate distribution.
 	NameplateCatalogURL string
 	// Now is the clock of the visit count (visits.go); nil: time.Now. Tests move it.
@@ -64,16 +59,9 @@ type Server struct {
 	donMu sync.Mutex
 	don   *donCatalog
 	donAt time.Time
-	// The mirror's own catalog as last read (don_mirror.go); donMirrorDone is open while a refresh runs.
-	donMirrorMu    sync.Mutex
-	donMirror      *donCatalog
-	donMirrorUntil time.Time
-	donMirrorDone  chan struct{}
-	donMirrorPaths *donMirrorPaths
-	// The nameplate art catalogs as last read (nameplate_art.go), under nameplateMu.
-	nameplateMu     sync.Mutex
-	nameplateArt    nameplateSlot
-	nameplateMirror nameplateSlot
+	// The nameplate art catalog as last read (nameplate_art.go), under nameplateMu.
+	nameplateMu  sync.Mutex
+	nameplateArt nameplateSlot
 	// The visit count (visits.go): the totals of each time zone as last read, and each
 	// visitor's views this minute (under mu).
 	visitMu     sync.Mutex
@@ -88,12 +76,7 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
-	if cfg.Distribution == nil {
-		cfg.Distribution = distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies)
-	}
-	s := &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
-	s.nameplateMirror.ttl = donMirrorTTL // the mirror's CDN keeps its catalog 60 seconds
-	return s
+	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
 }
 
 func (s *Server) sessionCookie() string {
@@ -142,7 +125,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/don/items", s.donItems)
 	mux.HandleFunc("GET /api/me/don/items", s.myDonItems)
 	mux.HandleFunc("GET /api/nameplate-art/catalog", s.nameplateArtAnswer)
-	mux.HandleFunc("GET /api/distribution/", s.Config.Distribution.Public)
 	mux.HandleFunc("GET /api/nameplates", s.nameplates)
 	mux.HandleFunc("GET /api/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/users/{id}/titles", s.userTitles)
