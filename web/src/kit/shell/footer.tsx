@@ -21,7 +21,7 @@ import {
   sourceCodeAddress,
 } from './community'
 import { useVisitSummary } from './visits'
-import { useDistributionSource } from '../distribution'
+import { refreshSource, useDistributionSource } from '../distribution'
 
 const playerAddress = 'https://play.ourtaiko.org/'
 const licenseAddress = 'https://www.gnu.org/licenses/agpl-3.0.html'
@@ -205,6 +205,16 @@ export function FrameFooter({ source }: { source: SourceId }) {
                   host: new URL(files.baseUrl).host,
                 })}
               </span>
+              <a
+                href="#"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={(event) => {
+                  event.preventDefault()
+                  void refreshSource()
+                }}
+              >
+                {t('shell.footer.sourceRefresh')}
+              </a>
             </p>
           )}
         </div>

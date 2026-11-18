@@ -57,33 +57,87 @@ export function readSource(answer: unknown): DistributionSource {
 export type FileRoot = Pick<DistributionSource, 'baseUrl' | 'canonicalBaseUrl'>
 
 let known: DistributionSource | null = null
+const listeners = new Set<(source: DistributionSource) => void>()
 
-// Asked once per page load: every picture, download and the footer share the answer.
+// The answer is kept in the browser, so later visits use it at once; refreshSource asks again
+// (after moving between networks, say). A browser that keeps nothing asks once per page load.
+const storageKey = 'ourtaiko.distributionSource'
+
+function stored(): DistributionSource | null {
+  try {
+    const text = localStorage.getItem(storageKey)
+    if (!text) return null
+    const answer = readSource(JSON.parse(text))
+    // A stored answer this page cannot trust (readSource's fallback) is asked again.
+    return answer === canonicalSource ? null : answer
+  } catch {
+    return null
+  }
+}
+
+function store(answer: DistributionSource) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(answer))
+  } catch {
+    // Kept for this page load only.
+  }
+}
+
+// Asked once per page load unless the browser kept the answer: every picture, download and the
+// footer share it.
 let asked: Promise<DistributionSource> | null = null
 export function askSource(): Promise<DistributionSource> {
-  asked ??= fetch(`${SITE_API_ROOT}/distribution/source`, {
+  if (asked) return asked
+  const kept = stored()
+  if (kept) {
+    known = kept
+    asked = Promise.resolve(kept)
+    return asked
+  }
+  asked = fetch(`${SITE_API_ROOT}/distribution/source`, {
     headers: { Accept: 'application/json' },
     credentials: 'omit',
     cache: 'no-store',
   })
     .then((response) => (response.ok ? response.json() : null))
-    .then(readSource)
+    .then((answer) => {
+      const source = readSource(answer)
+      // Only an answer the server gave is kept; a failed request is asked again next time.
+      if (answer) store(source)
+      return source
+    })
     .catch(() => canonicalSource)
     .then((answer) => (known = answer))
   return asked
 }
 
-/** This visitor's source; null only until the one request of this page load is answered. */
+/** Forgets the kept answer and asks the server again; every page part shows the new root. */
+export async function refreshSource(): Promise<DistributionSource> {
+  try {
+    localStorage.removeItem(storageKey)
+  } catch {
+    // Nothing was kept.
+  }
+  asked = null
+  known = null
+  const answer = await askSource()
+  listeners.forEach((listener) => listener(answer))
+  return answer
+}
+
+/** This visitor's source; null only until it is known (kept, or the one request answered). */
 export function useDistributionSource(): DistributionSource | null {
-  const [source, setSource] = useState<DistributionSource | null>(known)
+  const [source, setSource] = useState<DistributionSource | null>(known ?? stored())
   useEffect(() => {
-    if (known) return
     let gone = false
-    void askSource().then((answer) => {
+    const listener = (answer: DistributionSource) => {
       if (!gone) setSource(answer)
-    })
+    }
+    listeners.add(listener)
+    void askSource().then(listener)
     return () => {
       gone = true
+      listeners.delete(listener)
     }
   }, [])
   return source

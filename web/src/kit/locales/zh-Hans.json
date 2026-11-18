@@ -1000,6 +1000,7 @@
       "source": "资源来源：{{name}}（{{host}}）",
       "sourceMirror": "中国大陆镜像",
       "sourceCanonical": "全球 CDN",
+      "sourceRefresh": "刷新",
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     }
   },
