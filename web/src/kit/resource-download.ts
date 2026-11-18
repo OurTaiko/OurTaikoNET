@@ -1,5 +1,6 @@
 import { endpoints } from './api/endpoints'
-import { fileUrls } from './distribution'
+import { useEffect, useState } from 'react'
+import { fetchWithFallback, fileUrls } from './distribution'
 
 /** One of a chart's stored files as its manifest lists it: a path under the distribution root. */
 export type ChartResource = { path: string; sha256: string; size: number; contentType: string }
@@ -21,6 +22,63 @@ export async function readChartResources(
   if (!response.ok) throw new Error('RESOURCES_UNAVAILABLE')
   const { resources } = (await response.json()) as { resources?: ChartResources }
   return resources ?? {}
+}
+
+/** A kind of file a chart's manifest lists. */
+export type ChartFileKind = keyof ChartResources
+
+/**
+ * Where to read one of a chart's files: its address on the visitor's root and, when that differs,
+ * the canonical one to try once it fails. Null when the chart has no such file.
+ */
+export async function chartFile(
+  chartId: string,
+  kind: ChartFileKind,
+  signal?: AbortSignal,
+): Promise<{ url: string; fallbackUrl: string } | null> {
+  const resource = (await readChartResources(chartId, signal))?.[kind]
+  return resource ? fileUrls(resource.path) : null
+}
+
+/** Fetches one of a chart's files from the visitor's root, then the canonical one. */
+export async function fetchChartFile(
+  chartId: string,
+  kind: ChartFileKind,
+  init?: RequestInit,
+): Promise<Response> {
+  const file = await chartFile(chartId, kind, init?.signal ?? undefined)
+  if (!file) return new Response(null, { status: 404 })
+  return fetchWithFallback(file.url, file.fallbackUrl, init)
+}
+
+/**
+ * chartFile for a component (an audio element): empty addresses until the manifest is read, or
+ * when the chart has no such file. `version` names the file's content (its hash), so a replaced
+ * file is read again.
+ */
+export function useChartFile(
+  chartId: string | undefined,
+  kind: ChartFileKind,
+  version?: string,
+): { url: string; fallbackUrl: string } {
+  const [file, setFile] = useState({ key: '', url: '', fallbackUrl: '' })
+  const key = chartId ? `${chartId}/${kind}/${version ?? ''}` : ''
+  useEffect(() => {
+    if (!chartId) return
+    const controller = new AbortController()
+    chartFile(chartId, kind, controller.signal)
+      .then((found) => {
+        if (!controller.signal.aborted)
+          setFile({ key, url: found?.url ?? '', fallbackUrl: found?.fallbackUrl ?? '' })
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFile({ key, url: '', fallbackUrl: '' })
+      })
+    return () => controller.abort()
+  }, [chartId, kind, key])
+  return file.key === key
+    ? { url: file.url, fallbackUrl: file.fallbackUrl }
+    : { url: '', fallbackUrl: '' }
 }
 
 /** A file to download: its address, and the address to try once that fails (if any). */

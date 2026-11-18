@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './components/ui/button'
 import { Slider } from './components/ui/slider'
-import { endpoints } from './api/endpoints'
 import type { ChartBase, ScoreReplay } from './api/types'
 import { formatLocale } from './i18n'
 import { canonicalPlayerUrl, resolvePlayerUrl } from './embedded-player-source'
@@ -20,22 +19,14 @@ import {
 } from './embedded-player-protocol'
 
 // The chart's audio and movie for the player: from their paths in the chart's manifest, so a
-// mainland visitor takes them from the mirror (the canonical root once that fails); from the
-// API's own file routes when there is no manifest.
+// mainland visitor takes them from the mirror (the canonical root once that fails).
 async function playerFiles(
   chartId: string,
   hasMovie: boolean,
   signal: AbortSignal,
 ): Promise<PlayerFiles> {
-  const route = (kind: 'audio' | 'movie') => ({
-    url: new URL(endpoints.resource({ id: chartId }, kind), window.location.href).href,
-  })
-  const resources = await readChartResources(chartId, signal).catch((error: unknown) => {
-    if (signal.aborted) throw error
-    return null
-  })
-  if (!resources?.audio)
-    return { audio: route('audio'), movie: hasMovie ? route('movie') : undefined }
+  const resources = await readChartResources(chartId, signal)
+  if (!resources?.audio) throw new Error('RESOURCES_UNAVAILABLE')
   const movie = hasMovie && resources.movie ? await pathResource(resources.movie.path) : undefined
   return { audio: await pathResource(resources.audio.path), movie }
 }

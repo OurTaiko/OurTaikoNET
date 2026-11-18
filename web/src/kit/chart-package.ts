@@ -1,5 +1,4 @@
 import { downloadZip } from 'client-zip'
-import { endpoints } from './api/endpoints'
 import type { ChartBase } from './api/types'
 import { withChartTitles } from './tja-titles'
 import { pathResource, readChartResources, verifiedResource } from './resource-download'
@@ -35,35 +34,6 @@ export function entryName(path: string, sha256: string) {
   return `${sha256}.${extension.toLowerCase()}`
 }
 
-/** Without a manifest the API serves the same stored files itself. */
-async function apiFiles(chart: ChartBase): Promise<PackageFile[]> {
-  // The API does not publish the stored TJA's hash any more (a chart's identity is each
-  // block's chartHash); the fallback trusts the API's own file route for it.
-  const files: PackageFile[] = [
-    { url: endpoints.resource(chart, 'tja'), name: chart.tjaName, tja: true },
-    { url: endpoints.resource(chart, 'audio'), name: chart.wave, sha256: chart.audioHash },
-  ]
-  if (chart.movieHash)
-    files.push({
-      url: endpoints.resource(chart, 'movie'),
-      name: `${chart.movieHash}.mp4`,
-      sha256: chart.movieHash,
-    })
-  if (chart.coverHash && chart.songCoverPath)
-    files.push({
-      ...(await pathResource(chart.songCoverPath)),
-      name: `${chart.coverHash}.webp`,
-      sha256: chart.coverHash,
-    })
-  if (chart.bgimageHash)
-    files.push({
-      url: endpoints.resource(chart, 'bgimage'),
-      name: `${chart.bgimageHash}.webp`,
-      sha256: chart.bgimageHash,
-    })
-  return files
-}
-
 async function packageFiles(chart: ChartBase, signal: AbortSignal): Promise<PackageFile[]> {
   let resources
   try {
@@ -73,7 +43,8 @@ async function packageFiles(chart: ChartBase, signal: AbortSignal): Promise<Pack
       throw new Error('PACKAGE_RESOURCES_UNAVAILABLE', { cause: error })
     throw error
   }
-  if (!resources) return apiFiles(chart)
+  // Every chart with files has a manifest; none means there is nothing to pack.
+  if (!resources) throw new Error('PACKAGE_RESOURCES_UNAVAILABLE')
   // The page may be older than the files it would name the archive after.
   if (!resources.tja || resources.audio?.sha256 !== chart.audioHash)
     throw new Error('PACKAGE_CHART_CHANGED')

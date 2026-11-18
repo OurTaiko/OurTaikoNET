@@ -4,7 +4,7 @@ import { i18n } from '@sitekit/i18n'
 import { useTranslation } from 'react-i18next'
 import { endpoints } from '@sitekit/api/endpoints'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
-import { AudioPlayer } from '@sitekit/components/audio-player'
+import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { Card } from '@sitekit/components/ui/card'
 import { Label } from '@sitekit/components/ui/label'
 import { Input } from '@sitekit/components/ui/input'
@@ -691,9 +691,11 @@ export function UploadPage({
                         </Label>
                       </div>
                       {(audioUrl || existing) && (
-                        <AudioPlayer
+                        <ChartAudioPlayer
                           label={t('messages.localAudioPreview')}
-                          src={audioUrl || endpoints.resource(existing!, 'audio')}
+                          src={audioUrl || undefined}
+                          chartId={existing?.id}
+                          version={existing?.audioHash}
                           startAt={demoStart.trim() ? Number(demoStart) : NaN}
                           endAt={demoEnd.trim() ? Number(demoEnd) : NaN}
                           disabled={busy || Number(demoEnd) > 1215}

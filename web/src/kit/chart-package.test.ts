@@ -159,29 +159,6 @@ describe('chart package', () => {
     expect(Object.keys(await entries(archive))).toEqual([`${hash(tja)}.tja`, `${hash(audio)}.ogg`])
   })
 
-  it('reads the stored files through the API when there are no direct links', async () => {
-    serve({
-      '/api/v2/sources/fanmade/charts/song/tja': tja,
-      '/api/v2/sources/fanmade/charts/song/audio': audio,
-      '/api/v2/sources/fanmade/charts/song/movie': 'ftyp movie',
-      [`${cdn}/${hash(cover)}.webp`]: cover,
-    })
-    // A cover is read from its path under the distribution root only; the API has no route for it.
-    const withMovie = {
-      ...chart,
-      movieHash: hash('ftyp movie'),
-      songCoverPath: `fanmade/${hash(cover)}.webp`,
-    }
-    const archive = await buildChartPackage(withMovie, new AbortController().signal)
-    // Without a manifest the TJA keeps its uploaded name: the API no longer tells its hash.
-    expect(await entries(archive)).toEqual({
-      'song.tja': packagedTja,
-      [`${hash(audio)}.ogg`]: audio,
-      [`${hash('ftyp movie')}.mp4`]: 'ftyp movie',
-      [`${hash(cover)}.webp`]: cover,
-    })
-  })
-
   it('reads the files from the mirror for a mainland visitor, else from the canonical root', async () => {
     vi.resetModules()
     const { buildChartPackage } = await import('./chart-package')

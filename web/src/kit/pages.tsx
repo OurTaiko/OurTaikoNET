@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { endpoints } from './api/endpoints'
 import { DialogClose } from './components/ui/dialog'
 import { ChartCover, CoverDialog } from './components/chart-cover'
-import { AudioPlayer } from './components/audio-player'
+import { ChartAudioPlayer } from './components/audio-player'
 import { buttonVariants, Button } from './components/ui/button'
 import { readChartFilters } from './components/chart-search'
 import { Skeleton } from './components/ui/skeleton'
@@ -597,11 +597,12 @@ export function Detail() {
           {/* Below lg the cover is kept small, so what one does with the song is on screen. */}
           <ChartCover chart={chart} className="max-lg:w-48 sm:max-lg:w-64" />
           {hasFiles ? (
-            <AudioPlayer
+            <ChartAudioPlayer
               compact
               className="rounded-[20px] border-0 bg-card px-4 py-3 shadow-elev-1"
               label={t('messages.audioPreview')}
-              src={endpoints.resource(chart, 'audio')}
+              chartId={chart.id}
+              version={chart.audioHash}
               startAt={chart.demoStart}
               knownDuration={chart.duration}
             />

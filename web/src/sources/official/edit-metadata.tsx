@@ -7,7 +7,7 @@ import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 import { Textarea } from '@sitekit/components/ui/textarea'
 import { endpoints } from '@sitekit/api/endpoints'
-import { AudioPlayer } from '@sitekit/components/audio-player'
+import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { api, jsonRequest, replaceMovie } from '@sitekit/api/client'
 import { MovieSettings, movieChanges, movieDraft } from '@sitekit/components/movie-settings'
 import { useNotification } from '@sitekit/notification-context'
@@ -252,9 +252,10 @@ export function EditMetadata({
                 />
               </Label>
             </div>
-            <AudioPlayer
+            <ChartAudioPlayer
               label={t('messages.audioPreview')}
-              src={endpoints.resource(chart, 'audio')}
+              chartId={chart.id}
+              version={chart.audioHash}
               startAt={demoStart.trim() ? Number(demoStart) : NaN}
               endAt={demoEnd.trim() ? Number(demoEnd) : NaN}
               knownDuration={chart.duration}
