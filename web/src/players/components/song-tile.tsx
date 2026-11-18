@@ -15,16 +15,7 @@ export const songPage = (source: SourceId, id: string) => `/${source}/charts/${i
 export const coverOf = (chart: ChartBase) => chart.songCoverPath || undefined
 
 /** A song of a named source: the tile of the song lists, linking to the song's page there. */
-export function SongTile({
-  source,
-  chart,
-  tag = false,
-}: {
-  source: SourceId
-  chart: ChartBase
-  /** Say the source on the tile: for a list that mixes both. */
-  tag?: boolean
-}) {
+export function SongTile({ source, chart }: { source: SourceId; chart: ChartBase }) {
   const { i18n } = useTranslation()
   const text = chartText(chart, i18n.resolvedLanguage)
   return (
@@ -49,11 +40,6 @@ export function SongTile({
           </p>
         </div>
         <LevelChips difficulties={chart.difficulties} />
-        {tag && (
-          <div className="mt-auto">
-            <SourceTag source={source} />
-          </div>
-        )}
       </div>
     </a>
   )

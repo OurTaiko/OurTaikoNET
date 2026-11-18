@@ -113,6 +113,7 @@ function SourceWorks<T extends { id: string }>({
   source,
   address,
   layout,
+  named,
   onTotal,
   children,
 }: {
@@ -120,6 +121,8 @@ function SourceWorks<T extends { id: string }>({
   /** The list's address without its page. */
   address: string
   layout: string
+  /** Head the part with its source and count: for a list that has more than one source. */
+  named: boolean
   onTotal: (total: number) => void
   children: (item: T) => ReactNode
 }) {
@@ -163,14 +166,16 @@ function SourceWorks<T extends { id: string }>({
   const more = !!list && list.page * list.pageSize < list.total
   return (
     <section className="space-y-3" data-testid={`works-${source}`}>
-      <h3 className="flex items-center gap-2 font-bold text-sm">
-        <SourceTag source={source} />
-        {list && (
-          <span className="text-muted-foreground tabular-nums">
-            {list.total.toLocaleString(formatLocale(i18n.resolvedLanguage ?? 'zh-Hans'))}
-          </span>
-        )}
-      </h3>
+      {named && (
+        <h3 className="flex items-center gap-2 font-bold text-sm">
+          <SourceTag source={source} />
+          {list && (
+            <span className="text-muted-foreground tabular-nums">
+              {list.total.toLocaleString(formatLocale(i18n.resolvedLanguage ?? 'zh-Hans'))}
+            </span>
+          )}
+        </h3>
+      )}
       {list ? (
         <div className={layout}>{list.items.map(children)}</div>
       ) : (
@@ -211,6 +216,7 @@ function Works<T extends { id: string }>({
           source={source}
           address={address(source)}
           layout={layout}
+          named={of.length > 1}
           onTotal={(total) =>
             setTotals((current) =>
               current[source] === total ? current : { ...current, [source]: total },
