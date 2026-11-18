@@ -250,19 +250,22 @@ export type Leaderboard = {
   pageSize: number
 }
 
-export type PublicUser = {
-  id: string
-  nickname: string | null
-  avatarPath?: string
+/** What a player did on all sources together. */
+export type PlayerTotals = {
   firstLoginAt: string | null
   lastActiveAt: string | null
-  /** Published charts the user uploaded. */
+  /** Published charts the player uploaded. */
   chartCount: number
   scoreCount: number
   commentCount: number
   karma: number
   /** Public playlists only. */
   playlistCount: number
+}
+export type PublicUser = PlayerTotals & {
+  id: string
+  nickname: string | null
+  avatarPath?: string
 }
 export type UserDirectory = {
   items: PublicUser[]
@@ -271,7 +274,6 @@ export type UserDirectory = {
   pageSize: number
   profilesAvailable: boolean
 }
-export type UserSpace = { user: PublicUser; profilesAvailable: boolean }
 
 /** System playlists are computed by the server: no owner, read-only. */
 export type Playlist<C extends ChartBase = ChartBase> = {

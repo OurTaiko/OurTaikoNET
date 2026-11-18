@@ -180,11 +180,11 @@ func (s *Server) nameplates(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"nameplates": plates})
 }
 
-// userProfile is GET /api/users/{id}: who the player is, their nameplate and the services
-// shown. 404 when the account center knows no such active user.
+// userProfile is GET /api/users/{id}: who the player is, what they did on all sources together,
+// their nameplate and the services shown. 404 when the account center knows no such active user.
 func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !account.ValidSubject(id) {
+	if !account.ValidSubject(id) || id == account.SystemUserID {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -199,8 +199,18 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plate.Nickname, plate.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
+	totals, err := s.playerTotals(r.Context(), id)
+	if err != nil {
+		internal(w, err)
+		return
+	}
 	web.Respond(w, 200, map[string]any{
-		"user":              map[string]any{"id": id, "nickname": p.Nickname, "avatarPath": files.Path(p.AvatarURL)},
+		"user": struct {
+			ID         string `json:"id"`
+			Nickname   string `json:"nickname"`
+			AvatarPath string `json:"avatarPath"`
+			PlayerTotals
+		}{id, p.Nickname, files.Path(p.AvatarURL), totals},
 		"nameplate":         plate,
 		"sources":           s.Config.Sources,
 		"profilesAvailable": answered,

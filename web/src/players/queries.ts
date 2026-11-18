@@ -3,7 +3,7 @@
 // song source names that source itself, in its key and in its address.
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { api as sourceRead } from '@sitekit/api/client'
-import type { ChartBase, ChartList, PublicUser, UserSpace } from '@sitekit/api/types'
+import type { ChartBase, ChartList } from '@sitekit/api/types'
 import { supportsChart } from '@sitekit/courses'
 import { queryClient } from '@sitekit/query/client'
 import type { SourceId } from '@sitekit/source'
@@ -60,8 +60,6 @@ export const playerKeys = {
   visits: (period: number, zone: string) => [...playerKeys.all(), 'visits', period, zone] as const,
   // What a song source says, which the pages of that source can change.
   ofSource: (source: SourceId) => [source, 'players'] as const,
-  sourceProfile: (source: SourceId, id: string) =>
-    [...playerKeys.ofSource(source), 'profile', id] as const,
   ownerCharts: (source: SourceId, id: string) =>
     [...playerKeys.ofSource(source), 'charts', id] as const,
   works: (source: SourceId, address: string, page: number) =>
@@ -78,6 +76,8 @@ export const playerQueries = {
     queryOptions({
       queryKey: playerKeys.profile(id),
       queryFn: ({ signal }) => api<PublicProfile>(endpoints.user(id), { signal }),
+      // Its numbers count what is done on the pages of the sources.
+      staleTime: askedOnEachOpening,
     }),
   /** A page of a player's scores; the page before stays on show until the next one comes. */
   scores: (id: string, filter: ScoreFilter) => {
@@ -150,17 +150,6 @@ export const playerQueries = {
         report: await api<VisitReport>(endpoints.visitReport(period, zone), { signal }),
       }),
       placeholderData: keepPreviousData,
-    }),
-  /** What a source knows of a player; a source that does not know them is not asked twice. */
-  sourceProfile: (source: SourceId, id: string) =>
-    queryOptions({
-      queryKey: playerKeys.sourceProfile(source, id),
-      queryFn: async ({ signal }): Promise<PublicUser | null> => {
-        const address = `${sourceApi(source)}/users/${encodeURIComponent(id)}`
-        return (await sourceRead<UserSpace>(address, { signal })).user
-      },
-      staleTime: askedOnEachOpening,
-      retry: false,
     }),
   /** The charts a player uploaded to a source that this site can show. */
   ownerCharts: (source: SourceId, id: string) =>

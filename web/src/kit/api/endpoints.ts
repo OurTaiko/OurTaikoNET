@@ -31,9 +31,6 @@ const build = () =>
     dan: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}`,
     danOfficial: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/official`,
     danVote: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/vote`,
-    users: (query: { q: string; sort: string; page: number }) =>
-      withQuery(`${API_ROOT}/users`, query),
-    user: (id: string) => `${API_ROOT}/users/${encodeURIComponent(id)}`,
     categories: `${API_ROOT}/categories`,
     uploadRules: `${API_ROOT}/upload-rules`,
     // The site has one sign-in, outside any source. It returns to a page of this source.

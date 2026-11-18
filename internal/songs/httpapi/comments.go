@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"ourtaiko.dev/net/internal/files"
+	"ourtaiko.dev/net/internal/netdb"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,7 @@ const commentTitles = `,c.title,d.title`
 const commentSubjects = ` LEFT JOIN charts c ON c.id=m.chart_id LEFT JOIN dan_courses d ON d.id=m.dan_id`
 
 // publishedSubject keeps comments of hidden songs and deleted courses out of sight.
-const publishedSubject = `((m.chart_id IS NOT NULL AND ` + publishedChart + `) OR (m.dan_id IS NOT NULL AND d.status='published'))`
+const publishedSubject = netdb.PublishedCommentSubject
 
 // commentSubject is what a thread hangs on: a published song or 段位 course.
 type commentSubject struct {
@@ -681,7 +682,7 @@ type CommentList struct {
 
 // visibleComment selects live comments on published songs and courses; m is
 // the comment, c its song and d its course (see commentSubjects).
-const visibleComment = `m.deleted_at IS NULL AND m.removed_at IS NULL AND ` + publishedSubject
+const visibleComment = netdb.VisibleComment
 
 // userComments is a user's public comment history, newest or top first.
 func (s *Server) userComments(w http.ResponseWriter, r *http.Request) {

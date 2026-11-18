@@ -9,10 +9,10 @@ import { PageMeta } from '@sitekit/head'
 import { ChatsPage } from '@sitekit/chat-center'
 import { NotificationProvider } from '@sitekit/notifications'
 import { RouterBridge } from '@sitekit/navigation'
+import { UsersPage } from '@sitekit/users'
 import { catalogues } from './i18n'
 import { Layout } from '@players/components/layout'
 import { HomePage } from './pages/home'
-import { DirectoryPage } from './pages/directory'
 import { UserPage } from './pages/user'
 import { TitlesPage } from './pages/titles'
 import { AdminPage } from './pages/admin'
@@ -63,7 +63,7 @@ function App() {
                 element={
                   <>
                     <PageMeta title={t('shell.directory')} description={t('meta.players')} />
-                    <DirectoryPage />
+                    <UsersPage />
                   </>
                 }
               />

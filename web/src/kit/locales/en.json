@@ -317,7 +317,7 @@
     "unknownMember": "Unknown member",
     "noActivityRecord": "Not recorded",
     "publicScoreCount": "Public score records",
-    "lastFanmadeActivity": "Last active",
+    "lastActive": "Last active",
     "viewMemberCharts": "View {{nickname}}’s public charts",
     "viewPublicCharts": "View public charts",
     "refreshUsers": "Refresh",

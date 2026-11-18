@@ -1,3 +1,7 @@
+import type { PlayerTotals } from '@sitekit/api/types'
+
+export type { PlayerTotals }
+
 export type User = {
   id: string
   username: string
@@ -55,7 +59,7 @@ export type Nameplate = {
 }
 export type Source = { id: string; name: string; site: string }
 export type PublicProfile = {
-  user: { id: string; nickname: string; avatarPath: string }
+  user: PlayerTotals & { id: string; nickname: string; avatarPath: string }
   nameplate: Nameplate
   sources: Source[]
   profilesAvailable: boolean
