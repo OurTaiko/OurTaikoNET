@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { CrownSimpleIcon, PauseIcon, PlayIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
 import { chartText } from '@sitekit/chart-language'
+import { SYSTEM_OWNER_ID } from '@sitekit/chart-owners'
 import { RelativeTime } from '@sitekit/comments'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { Button } from '@sitekit/components/ui/button'
@@ -78,31 +79,43 @@ function useDrift(
 function Row({ item, copy = false }: { item: Activity; copy?: boolean }) {
   const { t, i18n } = useTranslation()
   const source = item.source === 'official' ? 'official' : 'fanmade'
-  const name = item.user.nickname || t('profile.unknownPlayer')
+  const system = item.user.id === SYSTEM_OWNER_ID
+  const name = system
+    ? t('home.officialUploader')
+    : item.user.nickname || t('profile.unknownPlayer')
   const title = chartText({ ...item.chart, subtitle: '' }, i18n.resolvedLanguage).title
   const play = item.kind === 'score' ? item.play : undefined
   const crown = play ? Math.min(Math.max(play.clearStatus, 1), 3) - 1 : 0
+  const who = (
+    <>
+      <UserAvatar nickname={name} avatarPath={item.user.avatarPath} className="size-10" />
+      {/* What happened, on the corner of who did it: a crown for a play, an arrow for an upload. */}
+      <span
+        data-accent={source}
+        className="-right-1 -bottom-1 absolute place-items-center grid bg-card rounded-full size-5"
+      >
+        {play ? (
+          <CrownSimpleIcon weight="fill" className={cn('size-3.5', crownColors[crown])} />
+        ) : (
+          <UploadSimpleIcon weight="bold" className="size-3 text-primary" />
+        )}
+      </span>
+    </>
+  )
   return (
     <li className="flex items-center gap-3 hover:bg-muted px-3 py-2.5 rounded-[16px] transition-colors">
-      <Link
-        to={`/players/${item.user.id}`}
-        aria-label={name}
-        tabIndex={copy ? -1 : undefined}
-        className="relative rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring shrink-0"
-      >
-        <UserAvatar nickname={name} avatarPath={item.user.avatarPath} className="size-10" />
-        {/* What happened, on the corner of who did it: a crown for a play, an arrow for an upload. */}
-        <span
-          data-accent={source}
-          className="-right-1 -bottom-1 absolute place-items-center grid bg-card rounded-full size-5"
+      {system ? (
+        <span className="relative shrink-0">{who}</span>
+      ) : (
+        <Link
+          to={`/players/${item.user.id}`}
+          aria-label={name}
+          tabIndex={copy ? -1 : undefined}
+          className="relative rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring shrink-0"
         >
-          {play ? (
-            <CrownSimpleIcon weight="fill" className={cn('size-3.5', crownColors[crown])} />
-          ) : (
-            <UploadSimpleIcon weight="bold" className="size-3 text-primary" />
-          )}
-        </span>
-      </Link>
+          {who}
+        </Link>
+      )}
       <a
         href={songPage(source, item.chart.id)}
         tabIndex={copy ? -1 : undefined}

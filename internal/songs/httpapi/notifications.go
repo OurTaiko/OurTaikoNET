@@ -6,10 +6,12 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"ourtaiko.dev/net/internal/files"
 	"slices"
 	"strconv"
 	"time"
+
+	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/files"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -57,7 +59,7 @@ func nullable(s string) *string {
 // notify records a notice in the caller's transaction. Nobody is notified
 // about their own actions, and muted kinds are skipped.
 func notify(ctx context.Context, db execer, n Notice) error {
-	if n.Recipient == "" || n.Recipient == n.Actor {
+	if n.Recipient == "" || n.Recipient == n.Actor || n.Recipient == account.SystemUserID {
 		return nil
 	}
 	if !slices.Contains(notificationKinds, n.Kind) && !slices.Contains(systemNotificationKinds, n.Kind) {

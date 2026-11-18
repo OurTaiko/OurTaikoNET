@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { CaretLeftIcon, CaretRightIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
 import type { ChartBase } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
+import { chartOwners } from '@sitekit/chart-owners'
 import { RelativeTime } from '@sitekit/comments'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { SongCover } from '@sitekit/components/song-cover'
@@ -67,14 +68,18 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
           </p>
         )}
         <div className="flex justify-between items-center gap-3 mt-auto">
-          <span className="flex items-center gap-2 min-w-0">
-            <UserAvatar
-              nickname={chart.author}
-              avatarPath={chart.authorAvatarPath}
-              className="size-7"
-            />
-            <span className="font-semibold text-sm truncate">{chart.author}</span>
-          </span>
+          {chartOwners(chart).length > 0 ? (
+            <span className="flex items-center gap-2 min-w-0">
+              <UserAvatar
+                nickname={chart.author}
+                avatarPath={chart.authorAvatarPath}
+                className="size-7"
+              />
+              <span className="font-semibold text-sm truncate">{chart.author}</span>
+            </span>
+          ) : (
+            <span />
+          )}
           <a className={cn(buttonVariants(), 'shrink-0')} href={page}>
             {t('home.openChart')}
           </a>

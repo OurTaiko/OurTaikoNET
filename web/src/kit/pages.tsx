@@ -728,25 +728,29 @@ export function Detail() {
                       <dd className="tabular-nums">{Math.round((chart.upvotes / votes) * 100)}%</dd>
                     </>
                   )}
-                  {/* Centred inside, so its rule still runs along the top of the row. */}
-                  <dt className="flex items-center">{t('collaboration.owners')}</dt>
-                  <dd className="flex flex-wrap justify-end gap-3">
-                    {chartOwners(chart).map((owner) => (
-                      <PlayerLink
-                        key={owner.id}
-                        className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
-                        id={owner.id}
-                      >
-                        <UserAvatar
-                          nickname={owner.nickname}
-                          avatarPath={owner.avatarPath}
-                          className="size-6"
-                          fallbackClassName="text-xs"
-                        />
-                        <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
-                      </PlayerLink>
-                    ))}
-                  </dd>
+                  {chartOwners(chart).length > 0 && (
+                    <>
+                      {/* Centred inside, so its rule still runs along the top of the row. */}
+                      <dt className="flex items-center">{t('collaboration.owners')}</dt>
+                      <dd className="flex flex-wrap justify-end gap-3">
+                        {chartOwners(chart).map((owner) => (
+                          <PlayerLink
+                            key={owner.id}
+                            className="inline-flex max-w-full items-center gap-2 align-middle text-link hover:underline"
+                            id={owner.id}
+                          >
+                            <UserAvatar
+                              nickname={owner.nickname}
+                              avatarPath={owner.avatarPath}
+                              className="size-6"
+                              fallbackClassName="text-xs"
+                            />
+                            <span className="min-w-0 wrap-anywhere">{owner.nickname}</span>
+                          </PlayerLink>
+                        ))}
+                      </dd>
+                    </>
+                  )}
                   {chartRecord?.(chart)}
                   <dt>{t('messages.createdAt')}</dt>
                   <dd>

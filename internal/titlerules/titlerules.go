@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 )
 
 // The kinds of rule.
@@ -193,9 +194,9 @@ func (r Rule) met() (string, []any, error) {
   WHERE c2.status='published' AND c2.tja_file IS NOT NULL AND (c2.category_flags & $4)<>0
   AND EXISTS(SELECT 1 FROM ` + s + `.chart_difficulties d2 WHERE d2.chart_id=c2.id AND ` + courseRank("d2.course") + `>=$3)))`,
 			append(args, *r.Clear, r.lowestCourse(), *r.CategoryFlag, r.Count), nil
-	default: // ChartsUploaded: the uploader is the first owner.
+	default: // ChartsUploaded: the uploader is the first owner, unless that is the built-in account.
 		return `SELECT c.owner_ids[1] AS user_id FROM ` + s + `.charts c
- WHERE c.status='published' AND c.tja_file IS NOT NULL AND ($1='' OR c.owner_ids[1]=$1) GROUP BY c.owner_ids[1] HAVING count(*)>=$2`, append(args, *r.Count), nil
+ WHERE c.status='published' AND c.tja_file IS NOT NULL AND c.owner_ids[1]<>'` + account.SystemUserID + `' AND ($1='' OR c.owner_ids[1]=$1) GROUP BY c.owner_ids[1] HAVING count(*)>=$2`, append(args, *r.Count), nil
 	}
 }
 

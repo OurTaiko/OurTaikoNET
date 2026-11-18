@@ -21,6 +21,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"ourtaiko.dev/net/internal/account"
 )
 
 const (
@@ -126,6 +127,9 @@ func (s Store) Get(ctx context.Context, me, id string) (Chat, error) {
 func (s Store) Open(ctx context.Context, me, peer, id string) (Chat, error) {
 	if me == peer {
 		return Chat{}, ErrSelf
+	}
+	if peer == account.SystemUserID {
+		return Chat{}, ErrNoPlayer
 	}
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {

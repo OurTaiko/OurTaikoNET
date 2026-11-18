@@ -121,6 +121,9 @@ func sendInvitation(ctx context.Context, tx pgx.Tx, chart, inviter, recipient st
 	return invitation, e
 }
 
+// invitable reports whether id can be asked to co-create a chart.
+func invitable(id string) bool { return account.ValidSubject(id) && id != account.SystemUserID }
+
 // uploadCollaborators reads the co-creators chosen with a new upload, a JSON
 // array of user IDs, and applies the checks of inviteCollaborator while the
 // uploader is still there to be told. They are invited once the chart is published.
@@ -138,7 +141,11 @@ func (s *Server) uploadCollaborators(w http.ResponseWriter, r *http.Request, raw
 	if len(ids) == 0 {
 		return nil, true
 	}
-	if slices.ContainsFunc(ids, func(id string) bool { return !account.ValidSubject(id) }) {
+	if s.source().Official {
+		problem(w, 409, "OFFICIAL_CHART", "官方谱面没有共同创作者")
+		return nil, false
+	}
+	if slices.ContainsFunc(ids, func(id string) bool { return !invitable(id) }) {
 		problem(w, 400, "USER_INVALID", "请选择有效的用户")
 		return nil, false
 	}
@@ -212,7 +219,7 @@ func (s *Server) inviteCollaborator(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if !account.ValidSubject(req.UserID) {
+	if !invitable(req.UserID) {
 		problem(w, 400, "USER_INVALID", "请选择有效的用户")
 		return
 	}

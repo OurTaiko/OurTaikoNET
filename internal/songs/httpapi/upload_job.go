@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/kit/audio"
 	"ourtaiko.dev/net/internal/kit/cover"
 	"ourtaiko.dev/net/internal/kit/tja"
@@ -313,7 +314,7 @@ func (s *Server) processUpload(ctx context.Context, j *uploadJob) uploadResult {
 		id = web.NewID()
 		_, err = tx.Exec(ctx, `INSERT INTO charts(id,nijiiro_id,official_id,owner_ids,tja_file,audio_file,cover_file,description,title,subtitle,bpm,offset_seconds,demo_start,duration,title_translations,subtitle_translations,category_flags,demo_end,movie_file,movie_offset,bgimage_file)
  VALUES($20,$1,$2,ARRAY[$3::text],$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$21)`,
-			j.nijiiroID, j.officialID, j.user, tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
+			j.nijiiroID, j.officialID, s.newChartOwner(j.user), tjaFile, audioFile, coverFile, j.description, j.meta.Title, j.meta.Subtitle, j.meta.BPM, j.meta.Offset, demoStart, duration, titles, subtitles, j.flags, demoEnd, movieFile, j.meta.MovieOffset, id, backgroundFile)
 	}
 	if nijiiroConflict(err) {
 		return rejected(409, "NIJIIRO_ID_TAKEN", nijiiroTakenMessage)
@@ -533,7 +534,7 @@ func (s *Server) acceptUpload(w http.ResponseWriter, r *http.Request, j *uploadJ
 func (s *Server) titlesAfterUpload(ctx context.Context, chart string) {
 	var owner string
 	err := s.DB.QueryRow(ctx, `SELECT c.owner_ids[1] FROM charts c WHERE c.id=$1 AND `+playableChart, chart).Scan(&owner)
-	if err == nil {
+	if err == nil && owner != account.SystemUserID {
 		_, err = titlerules.Uploaded(ctx, s.DB, s.source().schema(), owner)
 	}
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {

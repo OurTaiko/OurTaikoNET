@@ -26,9 +26,7 @@ import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { Tabs, TabsList, TabsTrigger } from '@sitekit/components/ui/tabs'
 import { CategoryPicker } from '@sitekit/categories'
 import { api, previewReplacement, uploadChart } from '@sitekit/api/client'
-import type { PublicUser } from '@sitekit/api/types'
 import type { Chart } from './api/types'
-import { UploadCollaborators } from '@sitekit/collaborations'
 import { EmptyState } from '@sitekit/components/empty-state'
 import { Notice } from '@sitekit/notifications'
 import { useNotification } from '@sitekit/notification-context'
@@ -166,7 +164,6 @@ export function UploadPage({
   // Makers typed in the makers table, by slot; the others are the file's.
   const [typedMakers, setTypedMakers] = useState<Record<string, string>>({})
   // Users a new chart invites as co-creators once it is published.
-  const [collaborators, setCollaborators] = useState<PublicUser[]>([])
   const [audioUrl, setAudioUrl] = useState('')
   const [audioDuration, setAudioDuration] = useState<number | null>(null)
   // The background image, which the TJA must name with BGIMAGE.
@@ -419,8 +416,6 @@ export function UploadPage({
       form.append('categoryIds', JSON.stringify(fields.categoryIds))
       form.append('nijiiroId', fields.nijiiroId)
       form.append('officialId', fields.officialId)
-      if (!existing && collaborators.length)
-        form.append('collaboratorIds', JSON.stringify(collaborators.map((user) => user.id)))
       if (mode === 'files') form.append('difficultyMakers', JSON.stringify(fields.difficultyMakers))
       // A typed or kept range is sent; otherwise the server takes the new file's DEMOSTART.
       if (mode === 'files' && (typedDemo || kept.has('demo'))) {
@@ -824,19 +819,6 @@ export function UploadPage({
                 </p>
               </div>
             </Card>
-            {/* An existing chart invites from its own page. */}
-            {!existing && (
-              <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
-                <UploadCollaborators
-                  value={collaborators}
-                  disabled={busy}
-                  onChange={(users) => {
-                    setCollaborators(users)
-                    requestKey.current = createRequestKey()
-                  }}
-                />
-              </Card>
-            )}
           </div>
           {/* Sending it stays in view while the form scrolls. */}
           <aside className="space-y-4 rounded-[28px] bg-card p-5 shadow-elev-1 lg:sticky lg:top-24">

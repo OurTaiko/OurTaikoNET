@@ -142,7 +142,7 @@ func (c *Client) RefreshProfiles(ctx context.Context) (int, error) {
 	if c.kept == nil {
 		return 0, nil
 	}
-	rows, err := c.kept.Query(ctx, `SELECT id FROM net.users ORDER BY id`)
+	rows, err := c.kept.Query(ctx, `SELECT id FROM net.users WHERE id<>$1 ORDER BY id`, SystemUserID)
 	if err != nil {
 		return 0, err
 	}

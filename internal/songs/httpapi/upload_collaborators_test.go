@@ -16,18 +16,12 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Co-creators chosen with a new upload are invited when the chart is published: also when
-// the uploader did not wait, and on the official source for a song registered without files.
-func TestUploadInvitesCollaborators(t *testing.T) { bothSources(t, testUploadInvitesCollaborators) }
-
-func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
+// Co-creators chosen with a new upload are invited when the chart is published, also when
+// the uploader did not wait. The official source's charts have none (system_owner_test.go).
+func TestUploadInvitesCollaborators(t *testing.T) {
+	world := interactionWorldOf(t, Fanmade)
 	c, s := world.c, world.s
-	// Only the official source registers a song without its files.
-	registers := s.source().Official
 	kinds := []bool{true}
-	if registers {
-		kinds = append(kinds, false)
-	}
 	ctx := context.Background()
 	uploader, alice, bob := testUsers["admin"].ID, testUsers["alice"].ID, testUsers["bob"].ID
 	audio, err := os.ReadFile("../../kit/audio/testdata/vorbis.ogg")
@@ -155,24 +149,6 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 
-	// A song registered without files invites the same way, once however often it is sent.
-	if registers {
-		key = web.NewID()
-		var song Chart
-		w := send("POST", "/api/charts", key, "Song only", ids(bob), false, false)
-		if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &song) != nil || song.ID == "" {
-			t.Fatal(w.Code, w.Body.String())
-		}
-		if w := send("POST", "/api/charts", key, "Song only", ids(bob), false, false); w.Code != 200 || !strings.Contains(w.Body.String(), song.ID) {
-			t.Fatal(w.Code, w.Body.String())
-		}
-		if w := send("POST", "/api/charts", key, "Song only", "", false, false); w.Code != 409 || !strings.Contains(w.Body.String(), "IDEMPOTENCY_CONFLICT") {
-			t.Fatal(w.Code, w.Body.String())
-		}
-		if n := count(`SELECT count(*) FROM chart_collaborations c JOIN notifications n ON n.collaboration_id=c.id WHERE c.chart_id=$1 AND c.recipient_id=$2 AND c.status='pending'`, song.ID, bob); n != 1 {
-			t.Fatal("invitation of a registered song", n)
-		}
-	}
 	// Invitations sent with an upload count toward the day's limit like any other.
 	sent := count(`SELECT count(*) FROM chart_collaborations WHERE inviter_id=$1`, uploader)
 	if _, err = s.DB.Exec(ctx, `INSERT INTO chart_collaborations(id,chart_id,inviter_id,recipient_id,status,responded_at)
@@ -200,16 +176,11 @@ func testUploadInvitesCollaborators(t *testing.T, world interactionWorld) {
 	if w = send("POST", "/api/charts", web.NewID(), "Alone", "", true, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if w = send("POST", "/api/charts", web.NewID(), "Nobody", "[]", !registers, false); w.Code != 201 {
+	if w = send("POST", "/api/charts", web.NewID(), "Nobody", "[]", true, false); w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	// Together, Last one, Alone and Nobody; bob still asked about the first two. The official
-	// source has the registered song and its invitation besides.
-	wantCharts, wantPending := charts+4, 2
-	if registers {
-		wantCharts, wantPending = wantCharts+1, wantPending+1
-	}
-	if count(`SELECT count(*) FROM charts`) != wantCharts || count(`SELECT count(*) FROM chart_collaborations WHERE status='pending'`) != wantPending {
+	// Together, Last one, Alone and Nobody; bob still asked about the first two.
+	if count(`SELECT count(*) FROM charts`) != charts+4 || count(`SELECT count(*) FROM chart_collaborations WHERE status='pending'`) != 2 {
 		t.Fatal("unexpected charts or invitations")
 	}
 }

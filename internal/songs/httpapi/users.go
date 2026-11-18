@@ -59,7 +59,7 @@ type UserSpace struct {
 
 func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !account.ValidSubject(id) {
+	if !account.ValidSubject(id) || id == account.SystemUserID {
 		problem(w, 404, "USER_NOT_FOUND", "用户不存在")
 		return
 	}
@@ -129,7 +129,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	result := UserDirectory{Items: []PublicUser{}, Page: page, PageSize: 12, ProfilesAvailable: s.Config.SSO != nil}
-	const filter = ` WHERE ($1='' OR u.id=ANY($2::text[]))`
+	const filter = ` WHERE u.id<>'` + account.SystemUserID + `' AND ($1='' OR u.id=ANY($2::text[]))`
 	if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM users u`+filter, q, matching).Scan(&result.Total); err != nil {
 		internal(w, err)
 		return

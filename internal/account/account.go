@@ -239,6 +239,10 @@ func ValidSubject(id string) bool {
 	return e == nil && len(b) == 16 && strings.ToLower(id) == id
 }
 
+// SystemUserID is the built-in account that owns every chart of the official source. Nobody
+// signs in to it and it is not shown as a player.
+const SystemUserID = "00000000000000000000000000000000"
+
 // PublicProfile is what SSO publishes about any user: nickname and avatar only.
 type PublicProfile struct {
 	Nickname  string `json:"nickname"`

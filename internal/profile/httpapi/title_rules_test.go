@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/account"
 )
 
 // The administrators of the titles say what gives a title by itself; everyone can read it.
@@ -110,5 +112,27 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	guest.json("GET", "/api/titles", "", 200, &catalog)
 	if len(catalog.Rules) != 0 {
 		t.Fatal(catalog.Rules)
+	}
+}
+
+// The built-in account owns the official charts but has uploaded nothing: no rule gives it a title.
+func TestTheBuiltInAccountEarnsNoUploadTitles(t *testing.T) {
+	pool := testDB(t)
+	ctx := context.Background()
+	app := New(pool, Config{Origin: origin, DevUserID: player, Sources: []Source{{ID: "official", Categories: map[string]int{"namco": 1}}}})
+	c := &client{t: t, handler: app.Handler()}
+	c.signIn()
+	if _, err := pool.Exec(ctx, `INSERT INTO official.chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES(repeat('a',64)||'.tja','a.tja',repeat('a',64),1,'tja'),(repeat('b',64)||'.ogg','a.ogg',repeat('b',64),1,'ogg')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO official.charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,audio_file,category_flags)
+ SELECT repeat('c',32),ARRAY[$1::text],'Song',120,10,10,(SELECT id FROM official.chart_resources WHERE extension='tja'),(SELECT id FROM official.chart_resources WHERE extension='ogg'),1`, account.SystemUserID); err != nil {
+		t.Fatal(err)
+	}
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","style":"wood","official":true}`, 200, nil)
+	var made struct{ Granted int }
+	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","source":"official","count":1}`, 201, &made)
+	if made.Granted != 0 {
+		t.Fatal(made)
 	}
 }

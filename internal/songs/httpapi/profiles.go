@@ -61,20 +61,34 @@ func (s *Server) chartNames(ctx context.Context, charts []Chart) {
 
 func (c *Chart) hasOwner(id string) bool { return slices.Contains(c.OwnerIDs, id) }
 
-func (c *Chart) setOwners(profiles map[string]account.PublicProfile) {
-	c.Owners = []NotificationActor{}
-	for _, id := range c.OwnerIDs {
-		p, ok := profiles[id]
-		if !ok {
-			p.Nickname = "未知用户"
-		}
-		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarPath: files.Path(p.AvatarURL)})
+// newChartOwner is who owns a chart uploader adds: the official source's charts all belong to
+// the built-in account.
+func (s *Server) newChartOwner(uploader string) string {
+	if s.source().Official {
+		return account.SystemUserID
 	}
-	p, ok := profiles[c.OwnerID]
+	return uploader
+}
+
+// ownerProfile is what a chart shows of an owner. The built-in account has no name to show.
+func ownerProfile(profiles map[string]account.PublicProfile, id string) account.PublicProfile {
+	if id == account.SystemUserID {
+		return account.PublicProfile{}
+	}
+	p, ok := profiles[id]
 	if !ok {
 		p.Nickname = "未知用户"
 	}
-	c.setUploader(p)
+	return p
+}
+
+func (c *Chart) setOwners(profiles map[string]account.PublicProfile) {
+	c.Owners = []NotificationActor{}
+	for _, id := range c.OwnerIDs {
+		p := ownerProfile(profiles, id)
+		c.Owners = append(c.Owners, NotificationActor{ID: id, Nickname: p.Nickname, AvatarPath: files.Path(p.AvatarURL)})
+	}
+	c.setUploader(ownerProfile(profiles, c.OwnerID))
 }
 
 func (c *Chart) setUploader(p account.PublicProfile) {
