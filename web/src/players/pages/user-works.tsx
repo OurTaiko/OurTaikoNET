@@ -3,65 +3,31 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HeartIcon, MusicNotesIcon, PlaylistIcon } from '@phosphor-icons/react'
 import { api } from '@sitekit/api/client'
-import type { ChartBase, Comment, Playlist, PublicUser, UserSpace } from '@sitekit/api/types'
+import type { ChartBase, Comment, Playlist } from '@sitekit/api/types'
 import { CommentBody, RelativeTime, commentPermalink, commentSubjectPath } from '@sitekit/comments'
 import { supportsChart } from '@sitekit/courses'
 import { danTitle } from '@sitekit/dan-title'
 import { Button } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import type { SourceId } from '@sitekit/source'
+import type { PlayerTotals } from '@players/api/types'
 import { formatLocale } from '@players/i18n'
 import { Notice } from '@players/notice'
 import { SongTile, SourceTag, sourceApi, sources } from '@players/components/song-tile'
 
 type Page<T> = { items: T[]; total: number; page: number; pageSize: number }
-export type SourceProfiles = Partial<Record<SourceId, PublicUser | null>>
-
-/**
- * What each source knows of a player: counts of charts, plays, comments and when they were
- * there. Absent while loading; null when that source does not know them or did not answer.
- */
-export function useSourceProfiles(id: string): SourceProfiles {
-  const [profiles, setProfiles] = useState<{ id: string; of: SourceProfiles }>({ id, of: {} })
-  useEffect(() => {
-    const controller = new AbortController()
-    for (const source of sources) {
-      const put = (user: PublicUser | null) =>
-        !controller.signal.aborted &&
-        setProfiles((current) => ({
-          id,
-          of: { ...(current.id === id ? current.of : {}), [source]: user },
-        }))
-      api<UserSpace>(`${sourceApi(source)}/users/${encodeURIComponent(id)}`, {
-        signal: controller.signal,
-      })
-        .then((space) => put(space.user))
-        .catch(() => put(null))
-    }
-    return () => controller.abort()
-  }, [id])
-  return profiles.id === id ? profiles.of : {}
-}
-
 // Players upload their own charts to Fanmade only; Official's charts are the official ones.
 export const chartSources: SourceId[] = ['fanmade']
 
-/** The numbers under a player's name: their plays in both sources together, then what they made. */
-export function SourceStats({ profiles }: { profiles: SourceProfiles }) {
+/** The numbers under a player's name, over all sources. */
+export function PlayerStats({ totals }: { totals: PlayerTotals }) {
   const { t, i18n } = useTranslation()
   const locale = formatLocale(i18n.resolvedLanguage ?? 'zh-Hans')
-  const loading = sources.some((source) => profiles[source] === undefined)
-  const sum = (field: 'scoreCount' | 'chartCount' | 'commentCount' | 'karma', of = sources) =>
-    of.reduce((total, source) => total + (profiles[source]?.[field] ?? 0), 0)
   const tiles: { key: string; value: number; label: string }[] = [
-    { key: 'plays', value: sum('scoreCount'), label: t('profile.stats.plays') },
-    {
-      key: 'charts',
-      value: sum('chartCount', chartSources),
-      label: t('profile.stats.charts'),
-    },
-    { key: 'comments', value: sum('commentCount'), label: t('profile.stats.comments') },
-    { key: 'karma', value: sum('karma'), label: t('interactions.karma') },
+    { key: 'plays', value: totals.scoreCount, label: t('profile.stats.plays') },
+    { key: 'charts', value: totals.chartCount, label: t('profile.stats.charts') },
+    { key: 'comments', value: totals.commentCount, label: t('profile.stats.comments') },
+    { key: 'karma', value: totals.karma, label: t('interactions.karma') },
   ]
   return (
     <dl className="gap-3 grid grid-cols-2 lg:grid-cols-4" data-testid="player-stats">
@@ -71,11 +37,7 @@ export function SourceStats({ profiles }: { profiles: SourceProfiles }) {
           className="flex flex-col gap-1 bg-card shadow-elev-1 p-4 rounded-[20px] min-w-0"
         >
           <dd className="font-extrabold text-3xl tabular-nums tracking-tight">
-            {loading ? (
-              <Skeleton className="rounded-md w-12 h-9" />
-            ) : (
-              tile.value.toLocaleString(locale)
-            )}
+            {tile.value.toLocaleString(locale)}
           </dd>
           <dt className="text-muted-foreground text-sm">{tile.label}</dt>
         </div>
@@ -84,13 +46,10 @@ export function SourceStats({ profiles }: { profiles: SourceProfiles }) {
   )
 }
 
-/** When the player first came and was last seen, over both sources; nothing when neither says. */
-export function Seen({ profiles }: { profiles: SourceProfiles }) {
+/** When the player first came and was last seen; nothing when the site does not know. */
+export function Seen({ totals }: { totals: PlayerTotals }) {
   const { t, i18n } = useTranslation()
-  const times = (field: 'firstLoginAt' | 'lastActiveAt') =>
-    sources.flatMap((source) => profiles[source]?.[field] ?? []).sort()
-  const first = times('firstLoginAt')[0]
-  const last = times('lastActiveAt').at(-1)
+  const { firstLoginAt: first, lastActiveAt: last } = totals
   if (!first || !last) return null
   const date = new Intl.DateTimeFormat(formatLocale(i18n.resolvedLanguage ?? 'zh-Hans'), {
     dateStyle: 'medium',

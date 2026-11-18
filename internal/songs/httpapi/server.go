@@ -144,8 +144,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/game/catalog", s.gameCatalog)
 	mux.HandleFunc("GET /api/game/search", s.gameSearch)
 	mux.HandleFunc("GET /api/game/scores", s.gameScoreList)
-	mux.HandleFunc("GET /api/users", s.listUsers)
-	mux.HandleFunc("GET /api/users/{id}", s.userSpace)
 	mux.HandleFunc("GET /api/users/{id}/scores", s.userScores)
 	mux.HandleFunc("GET /api/users/{id}/comments", s.userComments)
 	mux.HandleFunc("GET /api/charts/{id}/leaderboard", s.leaderboard)

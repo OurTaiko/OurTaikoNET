@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowClockwiseIcon, UsersIcon } from '@phosphor-icons/react'
 import { api } from './api/client'
-import { endpoints, withQuery } from './api/endpoints'
-import { SITE_API_ROOT } from './api/config'
+import { endpoints } from './api/endpoints'
 import type { UserDirectory } from './api/types'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
@@ -12,10 +11,9 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-import type { SourceId } from './source'
 
-/** source: whose players to list; the page's own source when left out. */
-export function UsersPage({ source }: { source?: SourceId }) {
+/** The site's players, whichever source they play. */
+export function UsersPage() {
   const { t } = useTranslation()
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -49,12 +47,7 @@ export function UsersPage({ source }: { source?: SourceId }) {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    api<UserDirectory>(
-      source
-        ? withQuery(`${SITE_API_ROOT}/sources/${source}/users`, { q, sort, page })
-        : endpoints.users({ q, sort, page }),
-      { signal: controller.signal },
-    )
+    api<UserDirectory>(endpoints.users({ q, sort, page }), { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) setResult(data)
       })
@@ -65,7 +58,7 @@ export function UsersPage({ source }: { source?: SourceId }) {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [q, sort, page, refresh, source])
+  }, [q, sort, page, refresh])
   const update = (values: Record<string, string>) => setParams({ q, sort, page: '1', ...values })
   const busy = loading || searchPending
   return (

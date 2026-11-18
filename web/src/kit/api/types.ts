@@ -271,7 +271,6 @@ export type UserDirectory = {
   pageSize: number
   profilesAvailable: boolean
 }
-export type UserSpace = { user: PublicUser; profilesAvailable: boolean }
 
 /** System playlists are computed by the server: no owner, read-only. */
 export type Playlist<C extends ChartBase = ChartBase> = {

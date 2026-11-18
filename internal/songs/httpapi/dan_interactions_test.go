@@ -105,12 +105,6 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 	if len(inbox.Items) != 1 || inbox.Items[0].Kind != "comment_reply" || inbox.Items[0].Dan == nil {
 		t.Fatalf("alice inbox %+v", inbox.Items)
 	}
-	// Karma counts others' votes on the course; the maker's own songs got none here.
-	var space struct{ User PublicUser }
-	c.do("", "GET", "/api/users/d46774d30dd13b92d9e536808da468a4", "", &space)
-	if space.User.Karma != 1 {
-		t.Fatal("karma", space.User.Karma)
-	}
 	// A deleted course hides its comments, notices and votes.
 	if _, err := s.DB.Exec(ctx, `UPDATE dan_courses SET status='deleted' WHERE id=$1`, dan); err != nil {
 		t.Fatal(err)

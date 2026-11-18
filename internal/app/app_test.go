@@ -540,6 +540,25 @@ func wholeSite(t *testing.T) (*App, http.Handler, *pgxpool.Pool) {
 	return a, a.Handler(), pool
 }
 
+// The players' list is the site's, not a source's: the sources no longer have one of their own.
+func TestThePlayersListIsTheWholeSites(t *testing.T) {
+	_, h, _ := wholeSite(t)
+	for path, want := range map[string]int{
+		"/api/v2/users":                  200,
+		"/api/v1/users":                  200,
+		"/api/v2/sources/fanmade/users":  404,
+		"/api/v2/sources/official/users": 404,
+		"/api/v2/sources/fanmade/users/" + strings.Repeat("a", 32):  404,
+		"/api/v2/sources/official/users/" + strings.Repeat("a", 32): 404,
+	} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		if w.Code != want {
+			t.Errorf("%s: %d, want %d: %s", path, w.Code, want, w.Body.String())
+		}
+	}
+}
+
 // The manage panel finds a player by what an administrator can remember: part of a nickname,
 // or a login name in full, in any case. An id still works.
 func TestTheAdministratorFindsPlayersByName(t *testing.T) {

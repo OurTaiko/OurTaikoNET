@@ -182,10 +182,6 @@ func TestPlaylistLifecycle(t *testing.T) {
 			t.Fatal("invalid query", query, code)
 		}
 	}
-	var space UserSpace
-	if code := c.do("", "GET", "/api/users/"+playlistOwner, "", &space); code != 200 || space.User.PlaylistCount != 2 {
-		t.Fatal("public playlist count", code, space.User.PlaylistCount)
-	}
 
 	resetRateLimit(s)
 	// A playlist that turns private hides from those who keep it, and returns with it.
