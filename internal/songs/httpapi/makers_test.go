@@ -50,7 +50,7 @@ func TestDifficultyMakersFlow(t *testing.T) {
 			}
 		}
 		form.Close()
-		r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+		r := httptest.NewRequest("POST", "/api/charts", &body)
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -121,7 +121,7 @@ func TestDifficultyMakersFlow(t *testing.T) {
 	if blank.Maker != "" {
 		t.Fatal("blank should not fall back to original", blank.Maker)
 	}
-	for _, path := range []string{"/api/v1/charts/" + c.ID + "?by=id", "/api/v1/charts?q=B", "/api/v1/me/charts", "/api/v1/game/catalog"} {
+	for _, path := range []string{"/api/charts/" + c.ID + "?by=id", "/api/charts?q=B", "/api/me/charts", "/api/game/catalog"} {
 		r := httptest.NewRequest("GET", path, nil)
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: token})
 		r.Header.Set("Authorization", "Bearer "+token)
@@ -185,7 +185,7 @@ func TestDifficultyMakers(t *testing.T) {
 		return names
 	}
 	typed := `[{"course":"Hard","side":"single","maker":"A"},{"course":"Oni","side":"single","maker":" B "}]`
-	rec := send("POST", "/api/v1/charts", true, map[string]string{"difficultyMakers": typed})
+	rec := send("POST", "/api/charts", true, map[string]string{"difficultyMakers": typed})
 	var c Chart
 	if rec.Code != 201 || json.Unmarshal(rec.Body.Bytes(), &c) != nil {
 		t.Fatal("upload", rec.Code, rec.Body.String())
@@ -194,7 +194,7 @@ func TestDifficultyMakers(t *testing.T) {
 		t.Fatal("typed makers", got, c.Maker)
 	}
 	for _, bad := range []string{`[{"course":"Hard","side":"single","maker":"A"}]`, `{}`, `[{"course":"Tower","side":"single","maker":"A"},{"course":"Oni","side":"single","maker":"B"}]`} {
-		if rec = send("POST", "/api/v1/charts", true, map[string]string{"difficultyMakers": bad}); rec.Code != 422 || !bytes.Contains(rec.Body.Bytes(), []byte("MAKERS_INVALID")) {
+		if rec = send("POST", "/api/charts", true, map[string]string{"difficultyMakers": bad}); rec.Code != 422 || !bytes.Contains(rec.Body.Bytes(), []byte("MAKERS_INVALID")) {
 			t.Fatal("bad makers accepted", bad, rec.Code, rec.Body.String())
 		}
 	}

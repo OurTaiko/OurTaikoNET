@@ -147,7 +147,7 @@ export function ChartLeaderboard({
                     >
                       <UserAvatar
                         nickname={entry.nickname}
-                        avatarUrl={entry.avatarUrl}
+                        avatarPath={entry.avatarPath}
                         className="size-6"
                         fallbackClassName="text-xs"
                       />

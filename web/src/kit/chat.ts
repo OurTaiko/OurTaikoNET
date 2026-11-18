@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react'
 import { api, ApiError } from './api/client'
 import { SITE_API_ROOT } from './api/config'
 
-export type ChatPerson = { id: string; nickname: string; avatarUrl?: string }
+export type ChatPerson = { id: string; nickname: string; avatarPath?: string }
 export type ChatMessage = {
   seq: number
   chatId: string

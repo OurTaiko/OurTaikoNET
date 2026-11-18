@@ -1,5 +1,8 @@
 // The 3dchara folder's catalog.json (written by tools/3dchara/catalog.py): every file with its
-// path, size and SHA-256, so a file is asked for as "<path>?v=<first 12 of the hash>".
+// path, size and SHA-256. A published file is never replaced (a changed file gets a new path), so
+// a file is asked for by its path alone. The API answers it with every path from the
+// distribution root; the raw file in the folder has them from the folder (dev-page.tsx).
+import { canonicalFileUrl, fileUrl, type FileRoot } from '../distribution'
 
 export type DonCatalogFile = { path: string; size: number; sha256: string }
 
@@ -14,10 +17,6 @@ export type DonPartKind = 'cos' | 'head' | 'body' | 'puchi' | 'paint'
 
 export type DonCatalog = {
   version: number
-  // Added by the API for a mainland visitor: the files to fetch from the mirror, at
-  // mirrorBaseUrl + path + "?v=..." like the canonical ones.
-  mirrorBaseUrl?: string
-  mirrorPaths?: string[]
   base: { animations: DonCatalogFile; face: DonCatalogFile; faceAnimations: DonCatalogFile }
   defaultColors: { p1: [string, string, string]; p2: [string, string, string] }
   // paint: absent from catalogs written before makeup was added
@@ -36,34 +35,25 @@ export type DonLook = {
   colors: [string, string, string] | null
 }
 
-export type DonMirror = Pick<DonCatalog, 'mirrorBaseUrl' | 'mirrorPaths'>
+// Where a catalog's files are read from: a file is root.baseUrl + its path (the visitor's root,
+// the mirror for mainland visitors) and root.canonicalBaseUrl + its path once that fails. The
+// API's catalog gives every path from the distribution root ("3dchara/cos/0.glb").
+export type DonRoot = FileRoot
 
-const mirrored = new WeakMap<string[], Set<string>>()
-
-// A file's address: on the mirror when the API listed it there, else under baseUrl.
-export function catalogUrl(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): string {
-  const paths = mirror?.mirrorPaths
-  if (mirror?.mirrorBaseUrl && paths) {
-    let set = mirrored.get(paths)
-    if (!set) {
-      set = new Set(paths)
-      mirrored.set(paths, set)
-    }
-    if (set.has(file.path)) baseUrl = mirror.mirrorBaseUrl
-  }
-  const base = baseUrl.endsWith('/') || baseUrl === '' ? baseUrl : baseUrl + '/'
-  return base + file.path + '?v=' + file.sha256.slice(0, 12)
+/** A file's canonical address, which also names it in the caches (a copy has the same bytes). */
+export function catalogUrl(root: DonRoot, file: DonCatalogFile): string {
+  return canonicalFileUrl(file.path, root)
 }
 
-// Where a file is fetched: its canonical address, and the mirror's when the API listed one. The
-// mirror is someone else's bucket, so its bytes are checked against sha256 (assets.ts
-// fetchDonFile) and the canonical address is used when it fails.
+// Where a file is fetched: its canonical address, and the visitor's root's when that is another
+// (the mirror). The mirror is someone else's bucket, so its bytes are checked against sha256
+// (assets.ts fetchDonFile) and the canonical address is used when it fails.
 export type DonSource = { url: string; mirror: string | null; sha256: string }
 
-export function donSource(baseUrl: string, file: DonCatalogFile, mirror?: DonMirror): DonSource {
-  const url = catalogUrl(baseUrl, file)
-  const mirrored = catalogUrl(baseUrl, file, mirror)
-  return { url, mirror: mirrored === url ? null : mirrored, sha256: file.sha256 }
+export function donSource(root: DonRoot, file: DonCatalogFile): DonSource {
+  const url = catalogUrl(root, file)
+  const visitor = fileUrl(file.path, root)
+  return { url, mirror: visitor === url ? null : visitor, sha256: file.sha256 }
 }
 
 // An <img> of a catalog picture: the mirror's, back on the canonical one if it fails to load.

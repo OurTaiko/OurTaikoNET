@@ -38,7 +38,7 @@ var userScoreOrders = map[string]string{
 	"level":  "level DESC,score DESC,id",
 }
 
-// userScores is GET /api/v1/users/{id}/scores, public like the leaderboards. view=best (the
+// userScores is GET /api/users/{id}/scores, public like the leaderboards. view=best (the
 // default) gives one row per chart block: the highest score among the plays of the song's
 // current files, or of replaced files while the block has none of the current ones, with the
 // best clear status of those plays and their count. view=all gives every play. sort is

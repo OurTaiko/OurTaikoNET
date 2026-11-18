@@ -18,15 +18,15 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 	if _, err := s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,code,exams) VALUES($1,'d46774d30dd13b92d9e536808da468a4','{"ja":"初段","en":"1st Dan"}','SHODAN','[]')`, dan); err != nil {
 		t.Fatal(err)
 	}
-	path := "/api/v1/dans/" + dan
+	path := "/api/dans/" + dan
 	var v VoteResult
 	if code := c.do("", "PUT", path+"/vote", `{"value":1}`, nil); code != 401 {
 		t.Fatal("guest vote", code)
 	}
-	if code := c.do("alice", "PUT", "/api/v1/dans/999999/vote", `{"value":1}`, nil); code != 404 {
+	if code := c.do("alice", "PUT", "/api/dans/999999/vote", `{"value":1}`, nil); code != 404 {
 		t.Fatal("missing course", code)
 	}
-	if code := c.do("alice", "PUT", "/api/v1/dans/abc/vote", `{"value":1}`, nil); code != 404 {
+	if code := c.do("alice", "PUT", "/api/dans/abc/vote", `{"value":1}`, nil); code != 404 {
 		t.Fatal("non-numeric course", code)
 	}
 	c.do("alice", "PUT", path+"/vote", `{"value":1}`, &v)
@@ -80,34 +80,34 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 		t.Fatal("course comment count", course.CommentCount)
 	}
 	var thread struct{ Item Comment }
-	if code := c.do("", "GET", "/api/v1/comments/"+reply.ID, "", &thread); code != 200 || thread.Item.DanTitle["ja"] != "初段" || thread.Item.DanID != dan {
+	if code := c.do("", "GET", "/api/comments/"+reply.ID, "", &thread); code != 200 || thread.Item.DanTitle["ja"] != "初段" || thread.Item.DanID != dan {
 		t.Fatalf("thread %d %+v", code, thread.Item)
 	}
 	var history CommentList
-	c.do("", "GET", "/api/v1/users/5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69/comments", "", &history)
+	c.do("", "GET", "/api/users/5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69/comments", "", &history)
 	if len(history.Items) != 1 || history.Items[0].DanTitle["en"] != "1st Dan" || history.Items[0].ChartTitle != "" {
 		t.Fatalf("history %+v", history.Items)
 	}
 	// Comment votes work the same on a course's comments.
-	c.do("bob", "PUT", "/api/v1/comments/"+top.ID+"/vote", `{"value":1}`, &v)
+	c.do("bob", "PUT", "/api/comments/"+top.ID+"/vote", `{"value":1}`, &v)
 	if v.Score != 2 {
 		t.Fatal("comment vote", v.Score)
 	}
 	// The maker heard about the comment; the reply went to alice.
 	var inbox NotificationPage
-	if code := c.do("owner", "GET", "/api/v1/me/notifications", "", &inbox); code != 200 {
+	if code := c.do("owner", "GET", "/api/me/notifications", "", &inbox); code != 200 {
 		t.Fatal("owner inbox status", code)
 	}
 	if len(inbox.Items) != 2 || inbox.Items[1].Kind != "dan_comment" || inbox.Items[1].Dan == nil || inbox.Items[1].Dan.Title["ja"] != "初段" || inbox.Items[1].Chart != nil {
 		t.Fatalf("owner inbox %+v", inbox.Items)
 	}
-	c.do("alice", "GET", "/api/v1/me/notifications", "", &inbox)
+	c.do("alice", "GET", "/api/me/notifications", "", &inbox)
 	if len(inbox.Items) != 1 || inbox.Items[0].Kind != "comment_reply" || inbox.Items[0].Dan == nil {
 		t.Fatalf("alice inbox %+v", inbox.Items)
 	}
 	// Karma counts others' votes on the course; the maker's own songs got none here.
 	var space struct{ User PublicUser }
-	c.do("", "GET", "/api/v1/users/d46774d30dd13b92d9e536808da468a4", "", &space)
+	c.do("", "GET", "/api/users/d46774d30dd13b92d9e536808da468a4", "", &space)
 	if space.User.Karma != 1 {
 		t.Fatal("karma", space.User.Karma)
 	}
@@ -118,14 +118,14 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 	if code := c.do("", "GET", path+"/comments", "", nil); code != 404 {
 		t.Fatal("deleted course comments", code)
 	}
-	if code := c.do("", "GET", "/api/v1/comments/"+top.ID, "", nil); code != 404 {
+	if code := c.do("", "GET", "/api/comments/"+top.ID, "", nil); code != 404 {
 		t.Fatal("deleted course thread", code)
 	}
-	c.do("owner", "GET", "/api/v1/me/notifications", "", &inbox)
+	c.do("owner", "GET", "/api/me/notifications", "", &inbox)
 	if len(inbox.Items) != 1 || inbox.Items[0].Kind != "chart_comment" {
 		t.Fatalf("notices after deletion %+v", inbox.Items)
 	}
-	c.do("", "GET", "/api/v1/users/5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69/comments", "", &history)
+	c.do("", "GET", "/api/users/5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69/comments", "", &history)
 	if len(history.Items) != 0 {
 		t.Fatal("history after deletion", len(history.Items))
 	}

@@ -1,15 +1,11 @@
 import { SITE_API_ROOT } from './api/config'
 import { verifiedResource, type ResourceFile } from './resource-download'
+import { askSource, fallbackFileUrl, fetchFile, fileUrl } from './distribution'
 
-const canonical = 'https://distrib.ourtaiko.org/nameplate/'
+// The nameplate art's catalog: every file with its path under the distribution root
+// ("nameplate/shadow.png"), size and SHA-256.
 type File = { path: string; size: number; sha256: string }
-type Catalog = {
-  version: number
-  baseUrl?: string
-  mirrorBaseUrl?: string
-  mirrorPaths?: string[]
-  files: Record<string, File>
-}
+type Catalog = { version: number; files: Record<string, File> }
 
 export async function nameplateArtSources(): Promise<Record<string, ResourceFile>> {
   let catalog: Catalog
@@ -18,9 +14,14 @@ export async function nameplateArtSources(): Promise<Record<string, ResourceFile
     if (!response.ok) throw new Error('NAMEPLATE_CATALOG_UNAVAILABLE')
     catalog = (await response.json()) as Catalog
   } catch {
-    const response = await fetch(canonical + 'catalog.json', { credentials: 'omit' })
+    // Without the API, the catalog comes straight from the bucket, like its files. That file
+    // names them from the nameplate folder, so they are given the folder.
+    const response = await fetchFile('nameplate/catalog.json', { credentials: 'omit' })
     if (!response.ok) throw new Error('NAMEPLATE_CATALOG_UNAVAILABLE')
     catalog = (await response.json()) as Catalog
+    if (catalog.files && typeof catalog.files === 'object')
+      for (const file of Object.values(catalog.files))
+        if (file && typeof file.path === 'string') file.path = 'nameplate/' + file.path
   }
   if (
     catalog.version !== 1 ||
@@ -29,26 +30,22 @@ export async function nameplateArtSources(): Promise<Record<string, ResourceFile
     Object.keys(catalog.files).length > 128
   )
     throw new Error('NAMEPLATE_CATALOG_INVALID')
-  const paths = new Set(catalog.mirrorPaths)
+  const source = await askSource()
   return Object.fromEntries(
     Object.entries(catalog.files).map(([key, file]) => {
       if (
-        !/^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\.png$/.test(file.path) ||
+        !/^nameplate\/[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\.png$/.test(file.path) ||
         !/^[a-f0-9]{64}$/.test(file.sha256) ||
         !Number.isSafeInteger(file.size) ||
         file.size <= 0 ||
         file.size > 8 * 1024 * 1024
       )
         throw new Error('NAMEPLATE_CATALOG_INVALID')
-      const suffix = file.path + '?v=' + file.sha256.slice(0, 12)
-      const original = (catalog.baseUrl ?? canonical) + suffix
-      const mirrored =
-        catalog.mirrorBaseUrl && paths.has(file.path) ? catalog.mirrorBaseUrl + suffix : original
       return [
         key,
         {
-          url: mirrored,
-          fallbackUrl: mirrored === original ? undefined : original,
+          url: fileUrl(file.path, source),
+          fallbackUrl: fallbackFileUrl(file.path, source) || undefined,
           size: file.size,
           sha256: file.sha256,
         },

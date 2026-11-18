@@ -14,7 +14,7 @@ export function ChartCard({ chart }: { chart: Chart }) {
       chart={chart}
       facts={
         <>
-          <MakerBadge name={chart.maker || chart.uploader} />
+          <MakerBadge name={chart.maker || chart.author} />
         </>
       }
       footer={

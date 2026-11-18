@@ -131,7 +131,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	web.Respond(w, 200, map[string]any{"user": v.User, "csrfToken": v.CSRF})
+	shown := struct {
+		account.Shown
+		SiteAdmin bool     `json:"siteAdmin"`
+		Groups    []string `json:"groups"`
+	}{account.Show(v.User.User), v.User.SiteAdmin, v.User.Groups}
+	web.Respond(w, 200, map[string]any{"user": shown, "csrfToken": v.CSRF})
 }
 
 // Require is who a website's request is from, for routes outside this server (such as package

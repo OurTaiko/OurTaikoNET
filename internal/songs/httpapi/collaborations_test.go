@@ -21,7 +21,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	const bob = "5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69"
 	invite := func(user, chart, recipient string, want int) {
 		t.Helper()
-		if code := c.do(user, "POST", "/api/v1/charts/"+chart+"/collaborations", fmt.Sprintf(`{"userId":%q}`, recipient), nil); code != want {
+		if code := c.do(user, "POST", "/api/charts/"+chart+"/collaborations", fmt.Sprintf(`{"userId":%q}`, recipient), nil); code != want {
 			t.Fatalf("invite %s: %d want %d", user, code, want)
 		}
 	}
@@ -39,7 +39,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	list := func(user string, want int) []Collaboration {
 		t.Helper()
 		var h history
-		if code := c.do(user, "GET", "/api/v1/charts/"+song+"/collaborations", "", &h); code != want {
+		if code := c.do(user, "GET", "/api/charts/"+song+"/collaborations", "", &h); code != want {
 			t.Fatalf("list %s: %d want %d", user, code, want)
 		}
 		return h.Items
@@ -47,22 +47,22 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	list("", 401)
 	list("alice", 403)
 	list("admin", 403)
-	if code := c.do("owner", "GET", "/api/v1/charts/missing/collaborations", "", nil); code != 404 {
+	if code := c.do("owner", "GET", "/api/charts/missing/collaborations", "", nil); code != 404 {
 		t.Fatal("missing chart history", code)
 	}
 	if items := list("owner", 200); len(items) != 1 || items[0].Status != "pending" || items[0].Recipient.ID != alice || items[0].Inviter.ID != "d46774d30dd13b92d9e536808da468a4" || items[0].RespondedAt != nil {
 		t.Fatalf("pending history %+v", items)
 	}
 	var notices NotificationPage
-	if code := c.do("alice", "GET", "/api/v1/me/notifications", "", &notices); code != 200 || len(notices.Items) != 1 {
+	if code := c.do("alice", "GET", "/api/me/notifications", "", &notices); code != 200 || len(notices.Items) != 1 {
 		t.Fatalf("notices %d %+v", code, notices)
 	}
 	n := notices.Items[0]
 	if n.Kind != "chart_collaboration" || n.Data["status"] != "pending" {
 		t.Fatalf("notice %+v", n)
 	}
-	path := "/api/v1/me/notifications/" + n.ID + "/respond"
-	if code := c.do("alice", "PATCH", "/api/v1/charts/"+song+"", `{"description":"not yet"}`, nil); code != 403 {
+	path := "/api/me/notifications/" + n.ID + "/respond"
+	if code := c.do("alice", "PATCH", "/api/charts/"+song+"", `{"description":"not yet"}`, nil); code != 403 {
 		t.Fatal("pending invitation grants edits", code)
 	}
 	if code := c.do("bob", "POST", path, `{"accept":true}`, nil); code != 404 {
@@ -80,7 +80,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	if w.Code != 403 {
 		t.Fatal("missing csrf", w.Code)
 	}
-	if code := c.do("alice", "DELETE", "/api/v1/me/notifications/"+n.ID, `{}`, nil); code != 404 {
+	if code := c.do("alice", "DELETE", "/api/me/notifications/"+n.ID, `{}`, nil); code != 404 {
 		t.Fatal("dismissed actionable invitation", code)
 	}
 	var wg sync.WaitGroup
@@ -97,7 +97,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 		}
 	}
 	var chart Chart
-	if code := c.do("alice", "GET", "/api/v1/charts/"+song+"?by=id", "", &chart); code != 200 || len(chart.OwnerIDs) != 2 || !chart.hasOwner(alice) || len(chart.Owners) != 2 {
+	if code := c.do("alice", "GET", "/api/charts/"+song+"?by=id", "", &chart); code != 200 || len(chart.OwnerIDs) != 2 || !chart.hasOwner(alice) || len(chart.Owners) != 2 {
 		t.Fatalf("accepted chart: %d %+v", code, chart)
 	}
 	if code := c.do("alice", "POST", path, `{"accept":false}`, nil); code != 409 {
@@ -108,22 +108,22 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 		Items []Chart
 		Total int
 	}
-	if code := c.do("alice", "GET", "/api/v1/me/charts", "", &mine); code != 200 || mine.Total != 1 || len(mine.Items) != 1 || mine.Items[0].ID != song {
+	if code := c.do("alice", "GET", "/api/me/charts", "", &mine); code != 200 || mine.Total != 1 || len(mine.Items) != 1 || mine.Items[0].ID != song {
 		t.Fatalf("co-owner library %d %+v", code, mine)
 	}
-	if code := c.do("", "GET", "/api/v1/charts?owner="+alice, "", &mine); code != 200 || mine.Total != 1 {
+	if code := c.do("", "GET", "/api/charts?owner="+alice, "", &mine); code != 200 || mine.Total != 1 {
 		t.Fatal("owner filter", code, mine.Total)
 	}
 	var space UserSpace
-	if code := c.do("", "GET", "/api/v1/users/"+alice, "", &space); code != 200 || space.User.ChartCount != 1 {
+	if code := c.do("", "GET", "/api/users/"+alice, "", &space); code != 200 || space.User.ChartCount != 1 {
 		t.Fatal("co-owner chart count", code, space)
 	}
-	if code := c.do("alice", "PATCH", "/api/v1/charts/"+song+"", `{"description":"co-created"}`, nil); code != 200 {
+	if code := c.do("alice", "PATCH", "/api/charts/"+song+"", `{"description":"co-created"}`, nil); code != 200 {
 		t.Fatal("co-owner metadata", code)
 	}
 	invite("alice", song, bob, 201)
-	c.do("bob", "GET", "/api/v1/me/notifications", "", &notices)
-	declined := "/api/v1/me/notifications/" + notices.Items[0].ID + "/respond"
+	c.do("bob", "GET", "/api/me/notifications", "", &notices)
+	declined := "/api/me/notifications/" + notices.Items[0].ID + "/respond"
 	for range 2 {
 		if code := c.do("bob", "POST", declined, `{"accept":false}`, nil); code != 200 {
 			t.Fatal("decline", code)
@@ -132,7 +132,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	if code := c.do("bob", "POST", declined, `{"accept":true}`, nil); code != 409 {
 		t.Fatal("accept declined", code)
 	}
-	c.do("bob", "GET", "/api/v1/charts/"+song+"?by=id", "", &chart)
+	c.do("bob", "GET", "/api/charts/"+song+"?by=id", "", &chart)
 	if chart.hasOwner(bob) {
 		t.Fatal("decline granted ownership")
 	}
@@ -145,11 +145,11 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 		}
 	}
 	// All owners receive comments; a co-owner's own action does not notify them.
-	if code := c.do("bob", "POST", "/api/v1/charts/"+song+"/comments", `{"body":"Both owners should see this"}`, nil); code != 201 {
+	if code := c.do("bob", "POST", "/api/charts/"+song+"/comments", `{"body":"Both owners should see this"}`, nil); code != 201 {
 		t.Fatal("comment", code)
 	}
 	for _, user := range []string{"owner", "alice"} {
-		c.do(user, "GET", "/api/v1/me/notifications", "", &notices)
+		c.do(user, "GET", "/api/me/notifications", "", &notices)
 		found := false
 		for _, n := range notices.Items {
 			if n.Kind == "chart_comment" {
@@ -162,7 +162,7 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	}
 	// Pending invitations cannot survive deleting their chart.
 	invite("alice", song, bob, 201)
-	c.do("bob", "GET", "/api/v1/me/notifications", "", &notices)
+	c.do("bob", "GET", "/api/me/notifications", "", &notices)
 	pending := ""
 	for _, n := range notices.Items {
 		if n.Kind == "chart_collaboration" && n.Data["status"] == "pending" {
@@ -175,10 +175,10 @@ func testChartCollaborations(t *testing.T, world interactionWorld) {
 	if items := list("owner", 200); len(items) != 3 || items[0].Status != "pending" || items[0].Recipient.ID != bob {
 		t.Fatalf("pending invitations come first %+v", items)
 	}
-	if code := c.do("alice", "DELETE", "/api/v1/charts/"+song+"", `{}`, nil); code != 200 {
+	if code := c.do("alice", "DELETE", "/api/charts/"+song+"", `{}`, nil); code != 200 {
 		t.Fatal("co-owner delete", code)
 	}
-	if code := c.do("bob", "POST", "/api/v1/me/notifications/"+pending+"/respond", `{"accept":true}`, nil); code != 404 {
+	if code := c.do("bob", "POST", "/api/me/notifications/"+pending+"/respond", `{"accept":true}`, nil); code != 404 {
 		t.Fatal("accepted deleted chart", code)
 	}
 	var count int
@@ -200,7 +200,7 @@ func testConcurrentCollaboratorInvitations(t *testing.T, world interactionWorld)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			codes <- c.do("owner", "POST", "/api/v1/charts/"+song+"/collaborations", `{"userId":"`+alice+`"}`, nil)
+			codes <- c.do("owner", "POST", "/api/charts/"+song+"/collaborations", `{"userId":"`+alice+`"}`, nil)
 		}()
 	}
 	wg.Wait()
@@ -229,7 +229,7 @@ func testLeaveCoOwnedChart(t *testing.T, world interactionWorld) {
 	c, s, song := world.c, world.s, world.song
 	ctx := context.Background()
 	const owner, alice, bob = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9", "5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69"
-	path := "/api/v1/charts/" + song + "/owners/me"
+	path := "/api/charts/" + song + "/owners/me"
 	owners := func() (ids []string) {
 		t.Helper()
 		if e := s.DB.QueryRow(ctx, `SELECT owner_ids FROM charts WHERE id=$1`, song).Scan(&ids); e != nil {
@@ -249,7 +249,7 @@ func testLeaveCoOwnedChart(t *testing.T, world interactionWorld) {
 			t.Fatal(user, code)
 		}
 	}
-	if code := c.do("alice", "DELETE", "/api/v1/charts/missing/owners/me", `{}`, nil); code != 404 {
+	if code := c.do("alice", "DELETE", "/api/charts/missing/owners/me", `{}`, nil); code != 404 {
 		t.Fatal("missing chart", code)
 	}
 	r := httptest.NewRequest("DELETE", path, strings.NewReader(`{}`))
@@ -271,14 +271,14 @@ func testLeaveCoOwnedChart(t *testing.T, world interactionWorld) {
 	if code := c.do("owner", "DELETE", path, `{}`, nil); code != 403 {
 		t.Fatal("left twice", code)
 	}
-	if code := c.do("owner", "PATCH", "/api/v1/charts/"+song+"", `{"description":"gone"}`, nil); code != 403 {
+	if code := c.do("owner", "PATCH", "/api/charts/"+song+"", `{"description":"gone"}`, nil); code != 403 {
 		t.Fatal("former owner still edits", code)
 	}
-	if code := c.do("alice", "PATCH", "/api/v1/charts/"+song+"", `{"description":"ours"}`, nil); code != 200 {
+	if code := c.do("alice", "PATCH", "/api/charts/"+song+"", `{"description":"ours"}`, nil); code != 200 {
 		t.Fatal("remaining owner cannot edit", code)
 	}
 	var chart Chart
-	if code := c.do("", "GET", "/api/v1/charts/"+song+"?by=id", "", &chart); code != 200 || chart.OwnerID != alice || len(chart.Owners) != 2 {
+	if code := c.do("", "GET", "/api/charts/"+song+"?by=id", "", &chart); code != 200 || chart.OwnerID != alice || len(chart.Owners) != 2 {
 		t.Fatalf("chart after leaving: %d %+v", code, chart.OwnerIDs)
 	}
 	// The last two owners cannot both leave.
@@ -310,7 +310,7 @@ func TestRevokeCollaboration(t *testing.T) { bothSources(t, testRevokeCollaborat
 func testRevokeCollaboration(t *testing.T, world interactionWorld) {
 	c, s, chart, other := world.c, world.s, world.song, world.other
 	const owner, alice, bob = "d46774d30dd13b92d9e536808da468a4", "9b893bc6d9422c93536ff0df503b81e9", "5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69"
-	base := "/api/v1/charts/" + chart + "/collaborations"
+	base := "/api/charts/" + chart + "/collaborations"
 	invite := func(user, recipient string) string {
 		t.Helper()
 		var created struct{ ID string }
@@ -336,7 +336,7 @@ func testRevokeCollaboration(t *testing.T, world interactionWorld) {
 	notice := func(user string) Notification {
 		t.Helper()
 		var page NotificationPage
-		if code := c.do(user, "GET", "/api/v1/me/notifications", "", &page); code != 200 || len(page.Items) == 0 {
+		if code := c.do(user, "GET", "/api/me/notifications", "", &page); code != 200 || len(page.Items) == 0 {
 			t.Fatal("notices", user, code)
 		}
 		return page.Items[0]
@@ -347,8 +347,8 @@ func testRevokeCollaboration(t *testing.T, world interactionWorld) {
 	revoke("bob", path, 403)
 	revoke("admin", path, 403)
 	revoke("owner", base+"/"+strings.Repeat("0", 32), 404)
-	revoke("owner", "/api/v1/charts/"+other+"/collaborations/"+first, 404)
-	revoke("owner", "/api/v1/charts/missing/collaborations/"+first, 404)
+	revoke("owner", "/api/charts/"+other+"/collaborations/"+first, 404)
+	revoke("owner", "/api/charts/missing/collaborations/"+first, 404)
 	revoke("owner", path, 200)
 	revoke("owner", path, 200)
 	items := list()
@@ -360,23 +360,23 @@ func testRevokeCollaboration(t *testing.T, world interactionWorld) {
 		t.Fatalf("revoked notice %+v", n)
 	}
 	var unread struct{ Count int }
-	if code := c.do("alice", "GET", "/api/v1/me/notifications/unread", "", &unread); code != 200 || unread.Count != 0 {
+	if code := c.do("alice", "GET", "/api/me/notifications/unread", "", &unread); code != 200 || unread.Count != 0 {
 		t.Fatal("revoked notice still unread", code, unread)
 	}
-	if code := c.do("alice", "POST", "/api/v1/me/notifications/"+n.ID+"/respond", `{"accept":true}`, nil); code != 409 {
+	if code := c.do("alice", "POST", "/api/me/notifications/"+n.ID+"/respond", `{"accept":true}`, nil); code != 409 {
 		t.Fatal("accepted a revoked invitation", code)
 	}
 	var detail Chart
-	if c.do("alice", "GET", "/api/v1/charts/"+chart+"?by=id", "", &detail); detail.hasOwner(alice) {
+	if c.do("alice", "GET", "/api/charts/"+chart+"?by=id", "", &detail); detail.hasOwner(alice) {
 		t.Fatal("revoked invitation granted ownership")
 	}
 	// A revoked notice is no longer actionable, so it can be dismissed.
-	if code := c.do("alice", "DELETE", "/api/v1/me/notifications/"+n.ID, `{}`, nil); code != 200 {
+	if code := c.do("alice", "DELETE", "/api/me/notifications/"+n.ID, `{}`, nil); code != 200 {
 		t.Fatal("dismiss revoked notice", code)
 	}
 	// The same person can be invited again, and an answered invitation cannot be revoked.
 	second := invite("owner", alice)
-	if code := c.do("alice", "POST", "/api/v1/me/notifications/"+notice("alice").ID+"/respond", `{"accept":true}`, nil); code != 200 {
+	if code := c.do("alice", "POST", "/api/me/notifications/"+notice("alice").ID+"/respond", `{"accept":true}`, nil); code != 200 {
 		t.Fatal("accept second invitation", code)
 	}
 	revoke("owner", base+"/"+second, 409)

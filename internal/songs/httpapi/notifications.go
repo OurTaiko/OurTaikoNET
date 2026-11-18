@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"slices"
 	"strconv"
 	"time"
@@ -97,9 +98,9 @@ func notifyUpvoteMilestone(ctx context.Context, db execer, kind, recipient strin
 }
 
 type NotificationActor struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
+	ID         string `json:"id"`
+	Nickname   string `json:"nickname"`
+	AvatarPath string `json:"avatarPath"`
 }
 type NotificationChart struct {
 	ID    string `json:"id"`
@@ -223,7 +224,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 		for _, n := range result.Items {
 			if n.Actor != nil {
 				p := profiles[n.Actor.ID]
-				n.Actor.Nickname, n.Actor.AvatarURL = p.Nickname, p.AvatarURL
+				n.Actor.Nickname, n.Actor.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 			}
 		}
 	}

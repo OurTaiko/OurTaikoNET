@@ -12,7 +12,7 @@ import (
 // signInAs opens a development session for the server's own player, id.
 func (c *client) signInAs(id string) {
 	c.t.Helper()
-	w := c.do("GET", "/api/v1/auth/sso/login?returnTo=/", "", nil)
+	w := c.do("GET", "/api/auth/sso/login?returnTo=/", "", nil)
 	if w.Code != 303 || len(w.Result().Cookies()) != 1 {
 		c.t.Fatal("dev sign-in", w.Code)
 	}
@@ -21,7 +21,7 @@ func (c *client) signInAs(id string) {
 		User      *User
 		CSRFToken string
 	}
-	c.json("GET", "/api/v1/me", "", 200, &me)
+	c.json("GET", "/api/me", "", 200, &me)
 	if me.User == nil || me.User.ID != id {
 		c.t.Fatal("not signed in", me)
 	}
@@ -47,36 +47,36 @@ func TestPlayersWriteToEachOther(t *testing.T) {
 	a := &client{t: t, handler: alice.Handler()}
 	b := &client{t: t, handler: bob.Handler()}
 
-	a.json("GET", "/api/v1/chats", "", 401, nil)
+	a.json("GET", "/api/chats", "", 401, nil)
 	a.signInAs(player)
 	// Someone who has never been here cannot be written to, nor can oneself.
-	a.json("POST", "/api/v1/chats", `{"userId":"`+other+`"}`, 404, nil)
-	a.json("POST", "/api/v1/chats", `{"userId":"`+player+`"}`, 400, nil)
+	a.json("POST", "/api/chats", `{"userId":"`+other+`"}`, 404, nil)
+	a.json("POST", "/api/chats", `{"userId":"`+player+`"}`, 400, nil)
 	b.signInAs(other)
 
 	var list chatList
-	a.json("GET", "/api/v1/chats", "", 200, &list)
+	a.json("GET", "/api/chats", "", 200, &list)
 	if len(list.Items) != 0 || list.Cursor != 0 {
 		t.Fatalf("before anything %+v", list)
 	}
 	var opened, again ChatView
-	a.json("POST", "/api/v1/chats", `{"userId":"`+other+`"}`, 200, &opened)
-	b.json("POST", "/api/v1/chats", `{"userId":"`+player+`"}`, 200, &again)
+	a.json("POST", "/api/chats", `{"userId":"`+other+`"}`, 200, &opened)
+	b.json("POST", "/api/chats", `{"userId":"`+player+`"}`, 200, &again)
 	if opened.ID == "" || again.ID != opened.ID || opened.Peer.ID != other || again.Peer.ID != player || !opened.CanWrite || opened.LastMessage != nil {
 		t.Fatalf("one chat for two: %+v %+v", opened, again)
 	}
 	// A chat nothing has been written in is not listed.
-	a.json("GET", "/api/v1/chats", "", 200, &list)
+	a.json("GET", "/api/chats", "", 200, &list)
 	if len(list.Items) != 0 {
 		t.Fatalf("an empty chat listed %+v", list)
 	}
-	path := "/api/v1/chats/" + opened.ID
+	path := "/api/chats/" + opened.ID
 
 	// Bob waits for news; Alice writes.
 	waited := make(chan chatUpdate, 1)
 	go func() {
 		var u chatUpdate
-		b.json("GET", "/api/v1/chats/updates?after=0", "", 200, &u)
+		b.json("GET", "/api/chats/updates?after=0", "", 200, &u)
 		waited <- u
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -100,15 +100,15 @@ func TestPlayersWriteToEachOther(t *testing.T) {
 		Count, Chats int
 		Cursor       int64
 	}
-	b.json("GET", "/api/v1/chats/unread", "", 200, &count)
+	b.json("GET", "/api/chats/unread", "", 200, &count)
 	if count.Count != 1 || count.Chats != 1 || count.Cursor != first.Seq {
 		t.Fatalf("Bob's unread %+v", count)
 	}
-	a.json("GET", "/api/v1/chats/unread", "", 200, &count)
+	a.json("GET", "/api/chats/unread", "", 200, &count)
 	if count.Count != 0 {
 		t.Fatalf("one's own message unread %+v", count)
 	}
-	b.json("GET", "/api/v1/chats", "", 200, &list)
+	b.json("GET", "/api/chats", "", 200, &list)
 	if len(list.Items) != 1 || list.Items[0].Unread != 1 || list.Items[0].LastMessage == nil || list.Items[0].LastMessage.Body != "hello, Bob" || list.Cursor != first.Seq {
 		t.Fatalf("Bob's chats %+v", list)
 	}
@@ -137,12 +137,12 @@ func TestPlayersWriteToEachOther(t *testing.T) {
 	}
 	a.json("GET", path+"/messages?limit=0", "", 400, nil)
 	var u chatUpdate
-	a.json("GET", "/api/v1/chats/updates?after="+itoa(first.Seq), "", 200, &u)
+	a.json("GET", "/api/chats/updates?after="+itoa(first.Seq), "", 200, &u)
 	if len(u.Messages) != 2 || u.Cursor != third.Seq {
 		t.Fatalf("updates %+v", u)
 	}
 	a.json("POST", path+"/read", `{"seq":`+itoa(second.Seq)+`}`, 200, nil)
-	a.json("GET", "/api/v1/chats/unread", "", 200, &count)
+	a.json("GET", "/api/chats/unread", "", 200, &count)
 	if count.Count != 1 {
 		t.Fatalf("read up to the second %+v", count)
 	}
@@ -154,7 +154,7 @@ func TestPlayersWriteToEachOther(t *testing.T) {
 	c.json("GET", path, "", 404, nil)
 	c.json("GET", path+"/messages", "", 404, nil)
 	c.json("POST", path+"/messages", `{"body":"hey"}`, 404, nil)
-	c.json("GET", "/api/v1/chats/updates?after=0&wait=0", "", 200, &u)
+	c.json("GET", "/api/chats/updates?after=0&wait=0", "", 200, &u)
 	if len(u.Messages) != 0 {
 		t.Fatalf("a stranger's updates %+v", u)
 	}
@@ -197,9 +197,9 @@ func TestChatUpdatesWaitAndGiveUp(t *testing.T) {
 	c.signInAs(player)
 	var u chatUpdate
 	start := time.Now()
-	c.json("GET", "/api/v1/chats/updates?after=0", "", 200, &u)
+	c.json("GET", "/api/chats/updates?after=0", "", 200, &u)
 	if time.Since(start) < chatWait || len(u.Messages) != 0 || u.Changed {
 		t.Fatalf("gave up with %+v after %v", u, time.Since(start))
 	}
-	c.json("GET", "/api/v1/chats/updates?after=x", "", 400, nil)
+	c.json("GET", "/api/chats/updates?after=x", "", 400, nil)
 }

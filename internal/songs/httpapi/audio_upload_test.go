@@ -55,7 +55,7 @@ func testAudioUploadAndDownload(t *testing.T, remote bool) {
 				af, _ := form.CreateFormFile("audio", filename)
 				af.Write(content)
 				form.Close()
-				r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+				r := httptest.NewRequest("POST", "/api/charts", &body)
 				r.Header.Set("Content-Type", form.FormDataContentType())
 				r.Header.Set("Origin", "http://localhost")
 				r.Header.Set("X-CSRF-Token", "csrf")
@@ -83,7 +83,7 @@ func testAudioUploadAndDownload(t *testing.T, remote bool) {
 			if err := pool.QueryRow(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id=c.audio_file WHERE c.id=$1`, chart.ID).Scan(&storedKey); err != nil || storedKey != stored {
 				t.Fatal("incorrect stored key", storedKey, err)
 			}
-			base := "/api/v1/charts/" + chart.ID + "/"
+			base := "/api/charts/" + chart.ID + "/"
 			get := func(kind, rangeValue string) *httptest.ResponseRecorder {
 				r := httptest.NewRequest("GET", base+kind, nil)
 				r.Header.Set("Range", rangeValue)

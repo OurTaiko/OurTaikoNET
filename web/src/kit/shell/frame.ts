@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { areaOf, type SourceId } from '../source'
 
-export type FrameUser = { id: string; nickname: string; avatarUrl?: string }
+export type FrameUser = { id: string; nickname: string; avatarPath?: string }
 
 export type Told = {
   /** The area shown: a source, or '' for the pages of no source. */
@@ -67,12 +67,12 @@ export function useTellFrame({
   })
   const id = user?.id
   const nickname = user?.nickname
-  const avatarUrl = user?.avatarUrl
+  const avatarPath = user?.avatarPath
   useLayoutEffect(() => {
     const who: FrameUser | null = loading
       ? told.user
       : id && nickname !== undefined
-        ? { id, nickname, avatarUrl }
+        ? { id, nickname, avatarPath }
         : null
     if (
       told.area === area &&
@@ -81,12 +81,12 @@ export function useTellFrame({
       told.uploadsHere === uploadsHere &&
       told.user?.id === who?.id &&
       told.user?.nickname === who?.nickname &&
-      told.user?.avatarUrl === who?.avatarUrl
+      told.user?.avatarPath === who?.avatarPath
     )
       return
     told = { area, path, user: who, loading, uploadsHere }
     tell()
-  }, [area, path, id, nickname, avatarUrl, loading, uploadsHere])
+  }, [area, path, id, nickname, avatarPath, loading, uploadsHere])
 }
 
 /** In an area's layout: shows its notification bell in the frame's top bar. */

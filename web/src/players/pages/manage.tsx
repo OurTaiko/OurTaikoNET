@@ -20,7 +20,7 @@ function Player({ member }: { member: GroupMember }) {
   const nickname = member.nickname || t('manage.unnamed')
   return (
     <span className="flex items-center gap-3 min-w-0">
-      <UserAvatar nickname={nickname} avatarUrl={member.avatarUrl} className="size-9 shrink-0" />
+      <UserAvatar nickname={nickname} avatarPath={member.avatarPath} className="size-9 shrink-0" />
       <span className="min-w-0">
         <Link className="block font-semibold underline truncate" to={`/players/${member.id}`}>
           {nickname}

@@ -4,7 +4,7 @@
 // were (the backend's internal/visits); its days are those of the time zone it is asked in.
 import { useEffect, useState } from 'react'
 
-const address = '/api/v1/visits'
+const address = '/api/v2/visits'
 
 export type VisitCount = { views: number; visitors: number }
 export type VisitSummary = { total: VisitCount; today: VisitCount; since: string }

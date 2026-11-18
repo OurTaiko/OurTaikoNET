@@ -4,13 +4,10 @@ import { endpoints } from './endpoints'
 describe('API addresses', () => {
   it('encodes IDs as path segments for chart, cover and current song resources', () => {
     const id = '曲目/a?b#c'
-    const path = `/api/v1/sources/fanmade/charts/${encodeURIComponent(id)}`
+    const path = `/api/v2/sources/fanmade/charts/${encodeURIComponent(id)}`
     expect(endpoints.chart(id)).toBe(path)
     expect(endpoints.chartFiles(id)).toBe(`${path}/files`)
     expect(endpoints.cover(id)).toBe(`${path}/cover`)
-    const cover = new URL(endpoints.cover(id, 'hash+/?='), 'http://127.0.0.1:5173')
-    expect(cover.pathname).toBe(`${path}/cover`)
-    expect(cover.searchParams.get('v')).toBe('hash+/?=')
     expect(endpoints.resource({ id }, 'tja')).toBe(`${path}/tja`)
     expect(endpoints.resources(id)).toBe(`${path}/resources`)
   })
@@ -19,14 +16,14 @@ describe('API addresses', () => {
     const returnTo = '/charts/曲目?q=a&next=/me/charts#preview'
     const login = new URL(endpoints.login(returnTo), 'http://127.0.0.1:5173')
     // Signing in is the whole site's; it comes back to this source's page.
-    expect(login.pathname).toBe('/api/v1/auth/sso/login')
+    expect(login.pathname).toBe('/api/v2/auth/sso/login')
     expect([...login.searchParams]).toEqual([['returnTo', '/fanmade' + returnTo]])
     for (const mine of [false, true]) {
       const list = new URL(
         endpoints.chartList({ q: 'A&B + 太鼓', order: 'hot', page: 2 }, mine),
         login.origin,
       )
-      expect(list.pathname).toBe(`/api/v1/sources/fanmade/${mine ? 'me/charts' : 'charts'}`)
+      expect(list.pathname).toBe(`/api/v2/sources/fanmade/${mine ? 'me/charts' : 'charts'}`)
       expect(Object.fromEntries(list.searchParams)).toEqual({
         q: 'A&B + 太鼓',
         order: 'hot',
@@ -45,7 +42,7 @@ describe('API addresses', () => {
 
   it('leaves empty and absent chart list filters out', () => {
     expect(endpoints.chartList({ q: '', page: 1, order: undefined, level: '' })).toBe(
-      '/api/v1/sources/fanmade/charts?page=1',
+      '/api/v2/sources/fanmade/charts?page=1',
     )
   })
 })

@@ -62,47 +62,55 @@ func TestCDNResourcesAndRoutes(t *testing.T) {
 	app := New(pool, Config{Objects: remote})
 	handler := app.Handler()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/resources", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/cdn-song/resources", nil))
 	var payload struct {
-		URLsExpire bool    `json:"urlsExpire"`
-		ExpiresAt  *string `json:"expiresAt"`
-		Resources  map[string]struct {
-			URL     string `json:"url"`
-			HeadURL string `json:"headUrl"`
+		Resources map[string]struct {
+			Path string `json:"path"`
 		} `json:"resources"`
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &payload) != nil {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	if payload.URLsExpire || payload.ExpiresAt != nil || len(payload.Resources) != 3 {
-		t.Fatal(payload)
+	if len(payload.Resources) != 3 || strings.Contains(w.Body.String(), "Url") || strings.Contains(w.Body.String(), "urlsExpire") {
+		t.Fatal(w.Body.String())
 	}
-	for _, r := range payload.Resources {
-		if r.URL != r.HeadURL || !strings.HasPrefix(r.URL, "https://cdn.example/fanmade/") || strings.Contains(r.URL, "?") {
-			t.Fatal(r)
+	// Files under the distribution root, in the bucket's prefix: no address, no signature.
+	for kind, want := range map[string]string{"tja": "fanmade/test/objects/song/tja", "audio": "fanmade/test/objects/song/audio", "cover": "fanmade/test/covers/song/cover.webp"} {
+		if payload.Resources[kind].Path != want {
+			t.Fatal(kind, payload.Resources[kind])
 		}
 	}
 	for _, method := range []string{"GET", "HEAD"} {
-		for _, path := range []string{"audio", "tja", "cover"} {
+		for _, path := range []string{"audio", "tja"} {
 			w = httptest.NewRecorder()
-			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/charts/cdn-song/"+path, nil))
+			handler.ServeHTTP(w, httptest.NewRequest(method, "/api/charts/cdn-song/"+path, nil))
 			// A redirect by chart ID is never cached: a replaced or removed chart is asked about again.
 			if w.Code != 302 || !strings.HasPrefix(w.Header().Get("Location"), "https://cdn.example/fanmade/") || w.Header().Get("Cache-Control") != "no-store" {
 				t.Fatalf("%s %s: %d %s", method, path, w.Code, w.Body.String())
 			}
 		}
 	}
-	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/cover?v=obsolete", nil))
-	if w.Code != 404 {
-		t.Fatal(w.Code)
+	// A cover is given as its file under the distribution root, whatever its key; no API route
+	// reads it.
+	if _, err := pool.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file,cover_file) VALUES('cdn-hashed',ARRAY['owner'],'CDN',120,100,
+ test_file('objects/hashed/tja','song.tja',repeat('a',64),12),test_file('objects/hashed/audio','audio.ogg',repeat('b',64),20),
+ test_file(repeat('e',64)||'.webp','cover.webp',repeat('e',64),14));`); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"cdn-song": "fanmade/test/covers/song/cover.webp", "cdn-hashed": "fanmade/test/" + strings.Repeat("e", 64) + ".webp"} {
+		w = httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+id+"?by=id", nil))
+		var detail Chart
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &detail) != nil || detail.SongCoverPath != want {
+			t.Fatalf("%s: %d songCoverPath %q", id, w.Code, detail.SongCoverPath)
+		}
 	}
 	if _, err := pool.Exec(ctx, `UPDATE charts SET status='deleted' WHERE id='cdn-song'`); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"audio", "tja", "download", "cover", "resources"} {
+	for _, path := range []string{"audio", "tja", "download", "resources"} {
 		w = httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/cdn-song/"+path, nil))
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/cdn-song/"+path, nil))
 		if w.Code != 404 {
 			t.Fatalf("removed %s: %d", path, w.Code)
 		}

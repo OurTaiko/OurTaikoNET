@@ -1,8 +1,101 @@
+import { endpoints } from './api/endpoints'
+import { useEffect, useState } from 'react'
+import { fetchWithFallback, fileUrls } from './distribution'
+
+/** One of a chart's stored files as its manifest lists it: a path under the distribution root. */
+export type ChartResource = { path: string; sha256: string; size: number; contentType: string }
+export type ChartResources = Partial<
+  Record<'tja' | 'audio' | 'cover' | 'preview' | 'bgimage' | 'movie', ChartResource>
+>
+
+/**
+ * A chart's stored files (GET .../charts/{id}/resources), or null when the API has no manifest
+ * for it (404). Reading them from their paths lets a mainland visitor take them from the mirror;
+ * the API's own file routes always send the canonical root.
+ */
+export async function readChartResources(
+  chartId: string,
+  signal?: AbortSignal,
+): Promise<ChartResources | null> {
+  const response = await fetch(endpoints.resources(chartId), { signal })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error('RESOURCES_UNAVAILABLE')
+  const { resources } = (await response.json()) as { resources?: ChartResources }
+  return resources ?? {}
+}
+
+/** A kind of file a chart's manifest lists. */
+export type ChartFileKind = keyof ChartResources
+
+/**
+ * Where to read one of a chart's files: its address on the visitor's root and, when that differs,
+ * the canonical one to try once it fails. Null when the chart has no such file.
+ */
+export async function chartFile(
+  chartId: string,
+  kind: ChartFileKind,
+  signal?: AbortSignal,
+): Promise<{ url: string; fallbackUrl: string } | null> {
+  const resource = (await readChartResources(chartId, signal))?.[kind]
+  return resource ? fileUrls(resource.path) : null
+}
+
+/** Fetches one of a chart's files from the visitor's root, then the canonical one. */
+export async function fetchChartFile(
+  chartId: string,
+  kind: ChartFileKind,
+  init?: RequestInit,
+): Promise<Response> {
+  const file = await chartFile(chartId, kind, init?.signal ?? undefined)
+  if (!file) return new Response(null, { status: 404 })
+  return fetchWithFallback(file.url, file.fallbackUrl, init)
+}
+
+/**
+ * chartFile for a component (an audio element): empty addresses until the manifest is read, or
+ * when the chart has no such file. `version` names the file's content (its hash), so a replaced
+ * file is read again.
+ */
+export function useChartFile(
+  chartId: string | undefined,
+  kind: ChartFileKind,
+  version?: string,
+): { url: string; fallbackUrl: string } {
+  const [file, setFile] = useState({ key: '', url: '', fallbackUrl: '' })
+  const key = chartId ? `${chartId}/${kind}/${version ?? ''}` : ''
+  useEffect(() => {
+    if (!chartId) return
+    const controller = new AbortController()
+    chartFile(chartId, kind, controller.signal)
+      .then((found) => {
+        if (!controller.signal.aborted)
+          setFile({ key, url: found?.url ?? '', fallbackUrl: found?.fallbackUrl ?? '' })
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFile({ key, url: '', fallbackUrl: '' })
+      })
+    return () => controller.abort()
+  }, [chartId, kind, key])
+  return file.key === key
+    ? { url: file.url, fallbackUrl: file.fallbackUrl }
+    : { url: '', fallbackUrl: '' }
+}
+
+/** A file to download: its address, and the address to try once that fails (if any). */
 export type ResourceFile = {
   url: string
   fallbackUrl?: string
   size?: number
   sha256?: string
+}
+
+/** The file at `path` under the distribution root, as verifiedResource downloads it. */
+export async function pathResource(
+  path: string,
+  check: { size?: number; sha256?: string } = {},
+): Promise<ResourceFile> {
+  const { url, fallbackUrl } = await fileUrls(path)
+  return { url, fallbackUrl: fallbackUrl || undefined, ...check }
 }
 
 /** How long an attempt may go without receiving a byte before the next address is tried. */
@@ -21,11 +114,7 @@ export async function verifiedResource(
   file: ResourceFile,
   signal?: AbortSignal,
 ): Promise<ArrayBuffer> {
-  const urls = [
-    ...new Set(
-      [file.url, file.fallbackUrl ?? originResource(file.url)].filter((v): v is string => !!v),
-    ),
-  ]
+  const urls = [...new Set([file.url, file.fallbackUrl].filter((v): v is string => !!v))]
   urls.forEach(resourceUrl)
   let error: unknown
   for (const url of urls) {
@@ -83,41 +172,4 @@ export async function verifiedResource(
     }
   }
   throw error ?? new Error('RESOURCE_DOWNLOAD_FAILED')
-}
-
-// API file routes accept origin=1 to bypass regional routing after a client-side
-// CDN error. Never add routing parameters to external or signed object URLs.
-export function originResource(value: string): string | null {
-  const origin = globalThis.location?.origin ?? 'http://localhost'
-  const url = new URL(value, origin)
-  if (
-    url.origin !== origin ||
-    !/^\/api\/v1\/sources\/(fanmade|official)\/(charts|playlists)\/[^/]+\/(tja|audio|preview|cover|bgimage|movie)$/.test(
-      url.pathname,
-    ) ||
-    url.searchParams.get('origin') === '1'
-  )
-    return null
-  url.searchParams.set('origin', '1')
-  return value.startsWith('/') ? url.pathname + url.search : url.toString()
-}
-
-export function retryResourceOrigin(element: {
-  src: string
-  getAttribute(name: string): string | null
-}): boolean {
-  const fallback = originResource(element.getAttribute('src') ?? element.src)
-  if (!fallback) return false
-  element.src = fallback
-  return true
-}
-
-export async function fetchResource(url: string, options?: RequestInit): Promise<Response> {
-  try {
-    const response = await fetch(url, options)
-    if (response.ok || !originResource(url)) return response
-  } catch (error) {
-    if (options?.signal?.aborted || !originResource(url)) throw error
-  }
-  return fetch(originResource(url)!, options)
 }

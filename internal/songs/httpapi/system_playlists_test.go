@@ -31,7 +31,7 @@ func TestSystemPlaylists(t *testing.T) {
 	charts := func(user, id string) []string {
 		t.Helper()
 		var p Playlist
-		if code := c.do(user, "GET", "/api/v1/playlists/"+id, "", &p); code != 200 || !p.System {
+		if code := c.do(user, "GET", "/api/playlists/"+id, "", &p); code != 200 || !p.System {
 			t.Fatal(id, user, code)
 		}
 		ids := []string{}
@@ -40,7 +40,7 @@ func TestSystemPlaylists(t *testing.T) {
 		}
 		return ids
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/liked", "", nil); code != 401 {
+	if code := c.do("", "GET", "/api/playlists/liked", "", nil); code != 401 {
 		t.Fatal("guest Liked Songs", code)
 	}
 	if got := charts("alice", "liked"); len(got) != 1 || got[0] != w.song {
@@ -55,7 +55,7 @@ func TestSystemPlaylists(t *testing.T) {
 	listed := func(user string) map[string]bool {
 		t.Helper()
 		var list struct{ Items []Playlist }
-		if code := c.do(user, "GET", "/api/v1/playlists/system", "", &list); code != 200 {
+		if code := c.do(user, "GET", "/api/playlists/system", "", &list); code != 200 {
 			t.Fatal(code)
 		}
 		ids := map[string]bool{}

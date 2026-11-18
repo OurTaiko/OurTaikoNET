@@ -1,11 +1,8 @@
 package httpapi
 
 import (
-	"context"
 	"errors"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/kit/audio"
@@ -14,47 +11,29 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// resourceLink tells a client where to download one stored file and how to
-// verify it.
+// resourceLink is one stored file a client downloads, and how it checks it: Path is the file
+// under the distribution root (package files), joined by the client to the root it reads from.
 type resourceLink struct {
-	URL         string `json:"url"`
-	HeadURL     string `json:"headUrl"`
+	Path        string `json:"path"`
 	SHA256      string `json:"sha256"`
 	Size        int64  `json:"size"`
 	ContentType string `json:"contentType"`
-	FallbackURL string `json:"fallbackUrl,omitempty"`
 }
 
-// directLink is the public address of an object, or one signed for 15 minutes
-// when the bucket has no public address.
-func directLink(ctx context.Context, remote *objectstore.S3, key, name, media, digest string, size int64) (resourceLink, error) {
-	public, e := remote.PublicURL(key)
-	if e != nil || public != "" {
-		return resourceLink{URL: public, HeadURL: public, SHA256: digest, Size: size, ContentType: media}, e
+// filePath is the file stored at key as clients name it (package files): its path under the
+// distribution root, the source's folder there and the key. "" for no key.
+func (s *Server) filePath(key string) string {
+	if key == "" {
+		return ""
 	}
-	get, e := remote.Sign(ctx, key, "GET", name, media, 15*time.Minute)
-	if e != nil {
-		return resourceLink{}, e
+	if remote, ok := s.Config.Objects.(*objectstore.S3); ok {
+		return remote.Prefix + key
 	}
-	head, e := remote.Sign(ctx, key, "HEAD", name, media, 15*time.Minute)
-	return resourceLink{URL: get, HeadURL: head, SHA256: digest, Size: size, ContentType: media}, e
+	return s.source().Folder + key
 }
 
-func (s *Server) routeResource(r *http.Request, link resourceLink) resourceLink {
-	if r.URL.Query().Get("origin") == "1" {
-		return link
-	}
-	target := s.Config.Distribution.Select(r, link.URL, link.SHA256, link.Size)
-	if target != link.URL {
-		link.FallbackURL, link.URL, link.HeadURL = link.URL, target, target
-	}
-	return link
-}
-
-// resourceLinks lists where a client downloads a chart's current files and how to verify
-// them: the bucket's public address, a link signed for 15 minutes when the bucket has none
-// (urlsExpire), or this API's own file routes (Config.APIBase) when files are kept on this
-// server's disk. A client never sends its API credentials to these links.
+// resourceLinks lists a chart's current files, each with what a client checks it by. A client
+// reads them from its own root (package files) and never sends its API credentials there.
 func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 	// One snapshot: every key, hash and size is of one committed upload, even if a
 	// replacement commits while the list is being put together.
@@ -77,20 +56,10 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "CHART_FILES_MISSING", "该乐曲尚未上传谱面文件")
 		return
 	}
-	remote, _ := s.Config.Objects.(*objectstore.S3)
-	expire := false
 	resources := map[string]resourceLink{}
-	// kind is also the last part of this API's route for the file.
 	add := func(kind, key, name, media, digest string, size int64) error {
-		if remote == nil {
-			route := s.apiBase() + "/charts/" + c.ID + "/" + kind
-			resources[kind] = resourceLink{URL: route, HeadURL: route, SHA256: digest, Size: size, ContentType: media}
-			return nil
-		}
-		link, e := directLink(r.Context(), remote, key, name, media, digest, size)
-		resources[kind] = link
-		expire = expire || link.URL != link.HeadURL
-		return e
+		resources[kind] = resourceLink{Path: s.filePath(key), SHA256: digest, Size: size, ContentType: media}
+		return nil
 	}
 	// stored reads the files a chart read does not carry: its cover and preview clip.
 	stored := func(kind, column, name, media string) error {
@@ -129,22 +98,12 @@ func (s *Server) resourceLinks(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	// Probe only after releasing the DB snapshot, with one shared deadline for all files.
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	request := r.WithContext(ctx)
-	var wait sync.WaitGroup
-	var lock sync.Mutex
-	routed := make(map[string]resourceLink, len(resources))
-	for kind, link := range resources {
-		wait.Go(func() {
-			selected := s.routeResource(request, link)
-			lock.Lock()
-			routed[kind] = selected
-			lock.Unlock()
-		})
+	web.Respond(w, 200, map[string]any{"chartId": c.ID, "resources": resources})
+}
+
+// withCoverPaths fills each playlist's SongListCoverPath.
+func (s *Server) withCoverPaths(playlists []Playlist) {
+	for i := range playlists {
+		playlists[i].SongListCoverPath = s.filePath(playlists[i].coverKey)
 	}
-	wait.Wait()
-	resources = routed
-	web.Respond(w, 200, map[string]any{"urlsExpire": expire, "chartId": c.ID, "resources": resources})
 }

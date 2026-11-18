@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
@@ -14,9 +15,9 @@ import (
 // settled the Fanmade way: slots apart, is_latest only).
 type leaderboardEntry struct {
 	Score
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
-	Rank      int64  `json:"rank"`
+	Nickname   string `json:"nickname"`
+	AvatarPath string `json:"avatarPath"`
+	Rank       int64  `json:"rank"`
 }
 
 type leaderboardResponse struct {
@@ -124,7 +125,7 @@ func (s *Server) leaderboard(w http.ResponseWriter, r *http.Request) {
 	profiles := s.publicProfiles(r.Context(), ids)
 	for i := range result.Items {
 		p := profiles[result.Items[i].UserID]
-		result.Items[i].Nickname, result.Items[i].AvatarURL = p.Nickname, p.AvatarURL
+		result.Items[i].Nickname, result.Items[i].AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	}
 	web.Respond(w, 200, result)
 }

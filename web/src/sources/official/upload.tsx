@@ -22,7 +22,7 @@ import {
 } from '@phosphor-icons/react'
 import { CoverPicker } from '@sitekit/components/cover-picker'
 import { MoviePicker } from '@sitekit/components/movie-picker'
-import { AudioPlayer } from '@sitekit/components/audio-player'
+import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { Tabs, TabsList, TabsTrigger } from '@sitekit/components/ui/tabs'
 import { CategoryPicker } from '@sitekit/categories'
 import { api, previewReplacement, uploadChart } from '@sitekit/api/client'
@@ -721,9 +721,11 @@ export function UploadPage({
                   </Label>
                 </div>
                 {(audioUrl || retainedAudioName) && (
-                  <AudioPlayer
+                  <ChartAudioPlayer
                     label={t('messages.audioPreview')}
-                    src={audioUrl || endpoints.resource(existing!, 'audio')}
+                    src={audioUrl || undefined}
+                    chartId={existing?.id}
+                    version={existing?.audioHash}
                     startAt={demoStart.trim() ? Number(demoStart) : NaN}
                     endAt={demoEnd.trim() ? Number(demoEnd) : NaN}
                     knownDuration={audio ? (audioDuration ?? undefined) : existing?.duration}

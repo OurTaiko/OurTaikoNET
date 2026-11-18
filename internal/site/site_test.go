@@ -21,18 +21,18 @@ func TestSourcesAreReachedUnderTheirName(t *testing.T) {
 		status       int
 		want         string
 	}{
-		{"GET", "/api/v1/sources/fanmade/game/catalog", 200, "fanmade GET /api/v1/game/catalog"},
-		{"GET", "/api/v1/sources/official/charts/abc?by=number", 200, "official GET /api/v1/charts/abc?by=number"},
-		{"POST", "/api/v1/sources/official/game/scores", 200, "official POST /api/v1/game/scores"},
-		{"GET", "/api/v1/sources/nowhere/charts", 404, "SOURCE_NOT_FOUND"},
-		{"GET", "/api/v1/sources/fanmade/auth/sso/login", 404, "/api/v1/auth/sso/login"},
-		{"POST", "/api/v1/sources/official/auth/logout", 404, "/api/v1/auth/sso/login"},
-		{"GET", "/api/v1/sources/official/authors", 200, "official GET /api/v1/authors"},
-		{"GET", "/api/v1/auth/sso/login", 200, "players GET /api/v1/auth/sso/login"},
-		{"GET", "/api/v1/users/abc/nameplate", 200, "players GET /api/v1/users/abc/nameplate"},
+		{"GET", "/api/sources/fanmade/game/catalog", 200, "fanmade GET /api/game/catalog"},
+		{"GET", "/api/sources/official/charts/abc?by=number", 200, "official GET /api/charts/abc?by=number"},
+		{"POST", "/api/sources/official/game/scores", 200, "official POST /api/game/scores"},
+		{"GET", "/api/sources/nowhere/charts", 404, "SOURCE_NOT_FOUND"},
+		{"GET", "/api/sources/fanmade/auth/sso/login", 404, "/api/auth/sso/login"},
+		{"POST", "/api/sources/official/auth/logout", 404, "/api/auth/sso/login"},
+		{"GET", "/api/sources/official/authors", 200, "official GET /api/authors"},
+		{"GET", "/api/auth/sso/login", 200, "players GET /api/auth/sso/login"},
+		{"GET", "/api/users/abc/nameplate", 200, "players GET /api/users/abc/nameplate"},
 		{"POST", "/internal/v1/awards", 404, "NOT_FOUND"},
 		{"GET", "/elsewhere", 404, "NOT_FOUND"},
-		{"GET", "/api/v1/sources", 200, `{"sources":[{"id":"fanmade","name":"OurTaiko Fanmade"},{"id":"official","name":"OurTaiko Database"}]}`},
+		{"GET", "/api/sources", 200, `{"sources":[{"id":"fanmade","name":"OurTaiko Fanmade"},{"id":"official","name":"OurTaiko Database"}]}`},
 		{"GET", "/healthz", 200, `{"ok":true}`},
 	} {
 		w := httptest.NewRecorder()
@@ -46,7 +46,7 @@ func TestSourcesAreReachedUnderTheirName(t *testing.T) {
 func TestWithoutPlayersOnlySourcesAnswer(t *testing.T) {
 	h := Handler([]Source{{"fanmade", "OurTaiko Fanmade", echo("fanmade")}}, nil)
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/titles", nil))
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/titles", nil))
 	if w.Code != 404 {
 		t.Fatal(w.Code, w.Body.String())
 	}

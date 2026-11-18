@@ -75,7 +75,7 @@ export function PlaylistSongSearchDialog<C extends ChartBase>({
               <ToggleRow
                 key={chart.id}
                 title={text.title}
-                detail={[text.subtitle, chart.maker || chart.uploader].filter(Boolean).join(' · ')}
+                detail={[text.subtitle, chart.maker || chart.author].filter(Boolean).join(' · ')}
                 pressed={listed.has(chart.id)}
                 pressedLabel={t('playlists.inPlaylist')}
                 idleLabel={

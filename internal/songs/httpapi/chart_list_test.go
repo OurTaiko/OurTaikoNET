@@ -29,7 +29,7 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 	list := func(query string) page {
 		t.Helper()
 		var p page
-		if code := c.do("", "GET", "/api/v1/charts"+query, "", &p); code != 200 {
+		if code := c.do("", "GET", "/api/charts"+query, "", &p); code != 200 {
 			t.Fatal(query, code)
 		}
 		return p
@@ -62,12 +62,12 @@ func TestChartListFiltersAndOrders(t *testing.T) {
 	}
 	// A number as keyword also finds the chart with that number.
 	var song Chart
-	c.do("", "GET", "/api/v1/charts/"+world.song+"?by=id", "", &song)
+	c.do("", "GET", "/api/charts/"+world.song+"?by=id", "", &song)
 	if p := list("?q=" + strconv.FormatInt(song.NumberID, 10)); p.Total != 1 || p.Items[0].ID != world.song {
 		t.Fatal("keyword number", p.Total)
 	}
 	for _, query := range []string{"?order=newest", "?files=maybe", "?nijiiro=1", "?level=11", "?course=Ura", "?category=missing", "?page=10001"} {
-		if code := c.do("", "GET", "/api/v1/charts"+query, "", nil); code != 400 {
+		if code := c.do("", "GET", "/api/charts"+query, "", nil); code != 400 {
 			t.Fatal(query, code)
 		}
 	}

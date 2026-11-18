@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/web"
@@ -104,7 +105,7 @@ func normalizeScoreReplay(raw json.RawMessage) json.RawMessage {
 	return canonical
 }
 
-// scoreReplay is GET /api/v1/scores/{id}/replay, public like the leaderboards: the play and its
+// scoreReplay is GET /api/scores/{id}/replay, public like the leaderboards: the play and its
 // recording. A score without a recording, or on a chart that is not published, has none. The
 // inputs were played on the files the score was made with, so the reader checks isLatest
 // before showing them over the current chart.
@@ -125,5 +126,5 @@ func (s *Server) scoreReplay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	profile := s.publicProfiles(r.Context(), []string{v.UserID})[v.UserID]
-	web.Respond(w, 200, map[string]any{"score": v, "nickname": profile.Nickname, "avatarUrl": profile.AvatarURL, "replay": json.RawMessage(replay)})
+	web.Respond(w, 200, map[string]any{"score": v, "nickname": profile.Nickname, "avatarPath": files.Path(profile.AvatarURL), "replay": json.RawMessage(replay)})
 }

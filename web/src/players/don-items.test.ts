@@ -16,14 +16,14 @@ describe('Don items', () => {
   it('bars locked parts the player does not own, and finds their rules', async () => {
     const rule = { id: 3, donPart: 'paint', donItem: 2, titleId: null, kind: 'site_login' }
     serve({
-      '/api/v1/don/items': {
+      '/api/v2/don/items': {
         locked: [
           { part: 'cos', id: 30 },
           { part: 'paint', id: 2 },
         ],
         rules: [rule],
       },
-      '/api/v1/me/don/items': { owned: [{ part: 'cos', id: 30, acquiredAt: '' }] },
+      '/api/v2/me/don/items': { owned: [{ part: 'cos', id: 30, acquiredAt: '' }] },
     })
     const items = donItemsOf(await readDonItems(true))
     expect(items.barred('cos', 30)).toBe(false)
@@ -41,7 +41,7 @@ describe('Don items', () => {
       return new Response(JSON.stringify({ locked: [], rules: [] }), { status: 200 })
     })
     await readDonItems(false)
-    expect(asked).toEqual(['/api/v1/don/items'])
+    expect(asked).toEqual(['/api/v2/don/items'])
   })
 
   it('bars nothing when it cannot tell (the server still says no)', async () => {

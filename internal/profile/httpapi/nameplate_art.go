@@ -10,19 +10,21 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"net/url"
-	"sort"
+	"ourtaiko.dev/net/internal/files"
 	"strings"
 	"time"
 
-	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/web"
 )
+
+// How long a failed read of the nameplate catalog waits before the next try.
+const nameplateRetry = 30 * time.Second
 
 type nameplateCatalog struct {
 	Version int                   `json:"version"`
 	Files   map[string]donFileRef `json:"files"`
-	base    string
+	// The catalog's folder under the distribution root ("nameplate/"), which its paths are in.
+	folder string
 }
 
 func (s *Server) readNameplateCatalog(ctx context.Context, address string) (*nameplateCatalog, error) {
@@ -58,11 +60,11 @@ func (s *Server) readNameplateCatalog(ctx context.Context, address string) (*nam
 			return nil, errors.New("invalid nameplate file")
 		}
 	}
-	u, err := url.Parse(address)
-	if err != nil {
-		return nil, err
+	// The catalog is at <root>/nameplate/catalog.json; one read from elsewhere (tests) is taken
+	// to stand for that folder.
+	if catalog.folder = files.Path(address[:strings.LastIndex(address, "/")+1]); catalog.folder == "" {
+		catalog.folder = "nameplate/"
 	}
-	catalog.base = u.ResolveReference(&url.URL{Path: "."}).String()
 	return &catalog, nil
 }
 
@@ -110,7 +112,7 @@ func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan
 	defer s.nameplateMu.Unlock()
 	ttl := donCatalogTTL
 	if err != nil {
-		ttl = donMirrorRetry
+		ttl = nameplateRetry
 		log.Printf("reading nameplate catalog %s: %v", address, err)
 	} else {
 		slot.catalog = catalog
@@ -120,37 +122,23 @@ func (s *Server) refreshNameplate(slot *nameplateSlot, address string, done chan
 	close(done)
 }
 
+// nameplateArtAnswer is GET /api/nameplate-art/catalog: the bucket's nameplate catalog with
+// every file's path under the distribution root (package files).
 func (s *Server) nameplateArtAnswer(w http.ResponseWriter, r *http.Request) {
-	router := s.Config.Distribution
-	regional := router != nil && router.Base != "" && router.Country != nil
-	if regional {
-		w.Header().Set("Cache-Control", "private, max-age=60")
-	} else {
-		w.Header().Set("Cache-Control", "public, max-age=60")
-	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	address := s.Config.NameplateCatalogURL
 	if address == "" {
-		address = distribution.CanonicalBase + "nameplate/catalog.json"
+		address = files.Root + "nameplate/catalog.json"
 	}
-	canonical := s.nameplateNow(r.Context(), &s.nameplateArt, address)
-	if canonical == nil {
+	catalog := s.nameplateNow(r.Context(), &s.nameplateArt, address)
+	if catalog == nil {
 		problem(w, http.StatusServiceUnavailable, "NAMEPLATE_CATALOG_UNAVAILABLE", "名牌资源清单暂时不可用")
 		return
 	}
-	answer := map[string]any{"version": canonical.Version, "files": canonical.Files, "baseUrl": canonical.base}
-	if regional && router.IsMainland(r) && r.URL.Query().Get("origin") != "1" {
-		if mirror := s.nameplateNow(r.Context(), &s.nameplateMirror, router.Base+"nameplate/catalog.json"); mirror != nil {
-			var paths []string
-			for key, ref := range canonical.Files {
-				if mirror.Files[key] == ref {
-					paths = append(paths, ref.Path)
-				}
-			}
-			if len(paths) > 0 {
-				sort.Strings(paths)
-				answer["mirrorBaseUrl"], answer["mirrorPaths"] = mirror.base, paths
-			}
-		}
+	rooted := make(map[string]donFileRef, len(catalog.Files))
+	for key, ref := range catalog.Files {
+		ref.Path = catalog.folder + ref.Path
+		rooted[key] = ref
 	}
-	web.Respond(w, http.StatusOK, answer)
+	web.Respond(w, http.StatusOK, map[string]any{"version": catalog.Version, "files": rooted})
 }

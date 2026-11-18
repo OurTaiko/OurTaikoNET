@@ -8,15 +8,12 @@ const digest = async (data: Uint8Array) =>
     b.toString(16).padStart(2, '0'),
   ).join('')
 
-const base = 'https://distrib.ourtaiko.org/3dchara/'
-const mirror = {
-  mirrorBaseUrl: 'https://static.sakura-bot.cn/3dchara/',
-  mirrorPaths: ['head/3.glb'],
-}
+const base = 'https://distrib.ourtaiko.org/'
+const mirrorBase = 'https://static.sakura-bot.cn/ourtaiko/'
 
 async function source(mirrored: boolean) {
-  const file = { path: 'head/3.glb', size: bytes.length, sha256: await digest(bytes) }
-  return donSource(base, file, mirrored ? mirror : undefined)
+  const file = { path: '3dchara/head/3.glb', size: bytes.length, sha256: await digest(bytes) }
+  return donSource({ baseUrl: mirrored ? mirrorBase : base, canonicalBaseUrl: base }, file)
 }
 
 // fetch answering by address: bytes, an error status, or a thrown error
@@ -38,7 +35,7 @@ afterEach(() => {
 
 describe('fetchDonFile', () => {
   it('fetches a canonical file once and does not hash it', async () => {
-    const fetch = serve({ [base + 'head/3.glb']: bytes })
+    const fetch = serve({ [base + '3dchara/head/3.glb']: bytes })
     const hash = vi.spyOn(crypto.subtle, 'digest')
     const s = await source(false)
     hash.mockClear()
@@ -49,7 +46,7 @@ describe('fetchDonFile', () => {
   })
 
   it('takes the mirror copy when its SHA-256 is the catalog one', async () => {
-    const fetch = serve({ [mirror.mirrorBaseUrl + 'head/3.glb']: bytes })
+    const fetch = serve({ [mirrorBase + '3dchara/head/3.glb']: bytes })
     const s = await source(true)
     expect(new Uint8Array(await (await fetchDonFile(s)).arrayBuffer())).toEqual(bytes)
     expect(fetch.mock.calls.map((c) => c[0])).toEqual([s.mirror])
@@ -61,8 +58,8 @@ describe('fetchDonFile', () => {
     ['a network error', new TypeError('failed to fetch')],
   ])('falls back to the canonical file on %s', async (_, answer) => {
     const fetch = serve({
-      [mirror.mirrorBaseUrl + 'head/3.glb']: answer,
-      [base + 'head/3.glb']: bytes,
+      [mirrorBase + '3dchara/head/3.glb']: answer,
+      [base + '3dchara/head/3.glb']: bytes,
     })
     const s = await source(true)
     expect(new Uint8Array(await (await fetchDonFile(s)).arrayBuffer())).toEqual(bytes)

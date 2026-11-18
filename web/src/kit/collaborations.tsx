@@ -157,7 +157,7 @@ export function CollaborationDialog({
                   >
                     <UserAvatar
                       nickname={nickname}
-                      avatarUrl={item.recipient.avatarUrl}
+                      avatarPath={item.recipient.avatarPath}
                       className="size-8"
                     />
                     <span className="min-w-0 flex-1">
@@ -259,7 +259,7 @@ export function UploadCollaborators({
                   key={user.id}
                   className="flex max-w-full items-center gap-2 rounded-full border py-1 pr-1 pl-2 text-sm"
                 >
-                  <UserAvatar nickname={nickname} avatarUrl={user.avatarUrl} className="size-6" />
+                  <UserAvatar nickname={nickname} avatarPath={user.avatarPath} className="size-6" />
                   <span className="min-w-0 truncate">{nickname}</span>
                   <Button
                     type="button"
@@ -381,7 +381,7 @@ export function UserSearch({
               >
                 <UserAvatar
                   nickname={user.nickname || t('messages.unknownMember')}
-                  avatarUrl={user.avatarUrl}
+                  avatarPath={user.avatarPath}
                   className="size-8"
                 />
                 <span className="min-w-0 flex-1">

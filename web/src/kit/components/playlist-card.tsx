@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { HeartIcon, LockSimpleIcon, MusicNotesIcon, PlaylistIcon } from '@phosphor-icons/react'
-import { endpoints } from '../api/endpoints'
 import type { Playlist } from '../api/types'
 import { CategoryLabels } from '../categories'
 import { Badge } from './ui/badge'
@@ -27,8 +26,9 @@ export function usePlaylistText() {
   }
 }
 
-export const playlistCoverSource = (playlist: Pick<Playlist, 'id' | 'coverHash'>) =>
-  playlist.coverHash ? endpoints.playlistCover(playlist.id, playlist.coverHash) : undefined
+// As coverSource (cover.ts).
+export const playlistCoverSource = (playlist: Pick<Playlist, 'songListCoverPath'>) =>
+  playlist.songListCoverPath || undefined
 
 export function PlaylistFacts({ playlist }: { playlist: Playlist }) {
   const { t } = useTranslation()
@@ -100,7 +100,7 @@ export function PlaylistCard({ playlist }: { playlist: Playlist }) {
             <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
               <UserAvatar
                 nickname={playlist.owner.nickname || t('messages.unknownMember')}
-                avatarUrl={playlist.owner.avatarUrl}
+                avatarPath={playlist.owner.avatarPath}
                 className="size-5 shrink-0"
                 fallbackClassName="text-[10px]"
               />

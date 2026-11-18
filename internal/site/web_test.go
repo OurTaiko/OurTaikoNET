@@ -43,7 +43,7 @@ func TestTheWebsiteIsServedInFrontOfTheAPI(t *testing.T) {
 		{"GET", "/assets/gone-000000.js", 404, "", ""},
 		{"GET", "/robots.txt", 404, "", ""},
 		// The API, its health checks and every write stay the API's.
-		{"GET", "/api/v1/sources", 200, "api GET /api/v1/sources", ""},
+		{"GET", "/api/sources", 200, "api GET /api/sources", ""},
 		{"GET", "/healthz", 200, "api GET /healthz", ""},
 		{"GET", "/readyz", 200, "api GET /readyz", ""},
 		{"POST", "/fanmade/charts/abc", 200, "api POST /fanmade/charts/abc", ""},

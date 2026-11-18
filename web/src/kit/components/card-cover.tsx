@@ -1,14 +1,6 @@
-import { useState } from 'react'
-import type { SyntheticEvent } from 'react'
-import { retryResourceOrigin } from '../resource-download'
+import { useFileUrl } from '../distribution'
 
-// The cover a card shows: `source`, unless there is none or it failed to load.
-export function useCardCover(source?: string) {
-  const [failedSource, setFailedSource] = useState('')
-  return {
-    source: source && failedSource !== source ? source : undefined,
-    onError: (event?: SyntheticEvent<HTMLImageElement>) => {
-      if (!event || !retryResourceOrigin(event.currentTarget)) setFailedSource(source ?? '')
-    },
-  }
-}
+// The cover a card shows, from its path under the distribution root: the visitor's root first
+// (the mirror for mainland visitors), the canonical root once that copy fails, and none (the
+// card's own placeholder) once both failed or when there is no cover.
+export const useCardCover = (path?: string) => useFileUrl(path)

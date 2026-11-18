@@ -2,9 +2,10 @@
 # Uploads a 3dchara folder to the public bucket (s3://ourtaiko-public/3dchara/, read at
 # https://distrib.ourtaiko.org/3dchara/): the files first, the catalog last, so the catalog never
 # names a file that is not there yet. Files may be cached for a day, the catalog for five minutes;
-# CloudFront (distrib.ourtaiko.org) keys its cache on the path alone (not "?v="), so the upload
-# ends by invalidating /3dchara/* there: a replaced file reaches the game and the website at once
-# (the game checks every file's hash and would refuse an old copy). Needs `aws login` with write
+# CloudFront (distrib.ourtaiko.org) keys its cache on the path alone, and the upload ends by
+# invalidating /3dchara/* there so a new catalog is read at once. A published file is never
+# replaced in place (the mirror keeps the first copy it reads; the game would refuse it by its
+# hash): a changed file gets a new path. Needs `aws login` with write
 # access to the bucket and to that distribution.
 #
 # Usage: tools/3dchara/publish.sh <folder>

@@ -1,5 +1,5 @@
 // Browser requests stay on the website origin, which also serves the API.
-const API_ROOT = '/api/v1'
+const API_ROOT = '/api/v2'
 export const endpoints = {
   me: `${API_ROOT}/me`,
   logout: `${API_ROOT}/auth/logout`,

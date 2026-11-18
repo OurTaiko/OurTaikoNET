@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './components/ui/button'
 import { Slider } from './components/ui/slider'
-import { endpoints } from './api/endpoints'
 import type { ChartBase, ScoreReplay } from './api/types'
 import { formatLocale } from './i18n'
-import { resolvePlayerUrl } from './embedded-player-source'
-import { PlayerAudioLoad } from './embedded-player-audio'
+import { canonicalPlayerUrl, resolvePlayerUrl } from './embedded-player-source'
+import { askSource } from './distribution'
+import { PlayerAudioLoad, type PlayerFiles } from './embedded-player-audio'
+import { pathResource, readChartResources } from './resource-download'
 import {
   defaultDrumVolume,
   isPlayerMessage,
@@ -17,7 +18,18 @@ import {
   type PlayerReplayResult,
 } from './embedded-player-protocol'
 
-const playerManifestUrl = 'https://distrib.ourtaiko.org/player-build.json'
+// The chart's audio and movie for the player: from their paths in the chart's manifest, so a
+// mainland visitor takes them from the mirror (the canonical root once that fails).
+async function playerFiles(
+  chartId: string,
+  hasMovie: boolean,
+  signal: AbortSignal,
+): Promise<PlayerFiles> {
+  const resources = await readChartResources(chartId, signal)
+  if (!resources?.audio) throw new Error('RESOURCES_UNAVAILABLE')
+  const movie = hasMovie && resources.movie ? await pathResource(resources.movie.path) : undefined
+  return { audio: await pathResource(resources.audio.path), movie }
+}
 
 // `replay`: a recorded play of this block to show instead of practice or the chart alone; the
 // other two modes close it (onReplayClose).
@@ -70,11 +82,22 @@ export default function EmbeddedPlayer({
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
     async function resolvePlayer() {
       try {
-        const url = await resolvePlayerUrl({
-          manifestUrl: playerManifestUrl,
-          parentOrigin: window.location.origin,
-          signal: controller.signal,
-        })
+        // The manifest and its build both come from the visitor's root (the mirror's CDN keeps
+        // the manifest 60 seconds); the canonical pair is used if the mirror's manifest fails.
+        const source = await askSource()
+        const resolve = (root: string) =>
+          resolvePlayerUrl({
+            manifestUrl: `${root}player-build.json`,
+            parentOrigin: window.location.origin,
+            signal: controller.signal,
+          })
+        let url: string
+        try {
+          url = await resolve(source.baseUrl)
+        } catch (error) {
+          if (source.baseUrl === source.canonicalBaseUrl || controller.signal.aborted) throw error
+          url = await resolve(source.canonicalBaseUrl)
+        }
         if (!controller.signal.aborted) setPlayerUrl(url)
       } catch {
         if (!disposed) {
@@ -93,6 +116,21 @@ export default function EmbeddedPlayer({
       window.clearTimeout(timeout)
     }
   }, [opened, attempt])
+  const retryPlayerOrigin = useCallback(() => {
+    if (!playerUrl) return false
+    const canonical = canonicalPlayerUrl(playerUrl)
+    if (canonical === playerUrl) return false
+    setPlayerUrl(canonical)
+    setReady(false)
+    return true
+  }, [playerUrl])
+  useEffect(() => {
+    if (!opened || !playerUrl || ready || canonicalPlayerUrl(playerUrl) === playerUrl) return
+    // Only a mirror that never starts the player (a missing object shows OSS's own page) is
+    // left for the origin; a slow mainland download of the ~40 MB build is not.
+    const timeout = window.setTimeout(retryPlayerOrigin, 90_000)
+    return () => window.clearTimeout(timeout)
+  }, [opened, playerUrl, ready, retryPlayerOrigin])
   const send = useCallback(
     (type: string) => {
       iframe.current?.contentWindow?.postMessage(
@@ -125,6 +163,7 @@ export default function EmbeddedPlayer({
       if (data.requestId && data.requestId !== request.current) return
       if (audioLoad.current?.receive(data)) return
       if (data.type === 'error') {
+        if (!ready && retryPlayerOrigin()) return
         setError(
           data.payload?.detail
             ? `${data.payload.code}: ${data.payload.detail}`
@@ -144,17 +183,12 @@ export default function EmbeddedPlayer({
     }
     window.addEventListener('message', receive)
     return () => window.removeEventListener('message', receive)
-  }, [playerOrigin, sendDrumVolume])
+  }, [playerOrigin, sendDrumVolume, ready, retryPlayerOrigin])
 
   useEffect(() => {
     if (!ready || !mode || !source || (mode === 'replay' && !replayData)) return
-    const audio = new URL(endpoints.resource({ id: chartId }, 'audio'), window.location.href).href
-    const movie = hasMovie
-      ? new URL(endpoints.resource({ id: chartId }, 'movie'), window.location.href).href
-      : undefined
     const load = new PlayerAudioLoad({
-      audioUrl: audio,
-      movieUrl: movie,
+      files: (signal) => playerFiles(chartId, hasMovie, signal),
       chartText: source,
       course,
       mode,
@@ -303,6 +337,7 @@ export default function EmbeddedPlayer({
       )}
       {mode && playerUrl ? (
         <iframe
+          onError={retryPlayerOrigin}
           key={attempt}
           ref={iframe}
           src={playerUrl}

@@ -121,7 +121,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	const songScores = `SELECT count(*) FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id WHERE d.chart_id=$1`
 	score := func(c Chart, user string, keys ...string) *httptest.ResponseRecorder {
 		body := fmt.Sprintf(`{"difficultyId":%d,"good":1,"ok":0,"bad":0,"score":100,"drumroll":0,"max_combo":1}`, hard(c))
-		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(body))
+		r := httptest.NewRequest("POST", "/api/game/scores", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Authorization", "Bearer "+tokens[user])
 		key := web.NewID()
@@ -133,8 +133,8 @@ func testChartReplacement(t *testing.T, remote bool) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	original := decode(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
-	unrelated := decode(request("9b893bc6d9422c93536ff0df503b81e9", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
+	original := decode(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
+	unrelated := decode(request("9b893bc6d9422c93536ff0df503b81e9", "POST", "/api/charts", web.NewID(), source, "cbr.mp3", audio, nil), 201)
 	originalScoreKey := web.NewID()
 	status(score(original, "d46774d30dd13b92d9e536808da468a4", originalScoreKey), 201)
 	status(score(original, "9b893bc6d9422c93536ff0df503b81e9"), 201)
@@ -143,7 +143,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := "/api/v1/charts/" + original.ID + "/files"
+	path := "/api/charts/" + original.ID + "/files"
 	fields := map[string]string{"confirmReset": "true", "description": "new description", "demoStart": "0.1", "demoEnd": "0.3", "difficultyMakers": `[{"course":"Hard","side":"single","maker":"A"},{"course":"Oni","side":"single","maker":"B"}]`}
 	count := func(sql string, args ...any) int {
 		t.Helper()
@@ -225,14 +225,14 @@ func testChartReplacement(t *testing.T, remote bool) {
 		t.Fatal("cleanup incomplete")
 	}
 
-	status(get("/api/v1/charts/"+updated.ID+"/audio"), 200)
-	gameScores := get("/api/v1/game/scores")
+	status(get("/api/charts/"+updated.ID+"/audio"), 200)
+	gameScores := get("/api/game/scores")
 	status(gameScores, 200)
 	// The Hard block plays the same in the new file, so its scores are still current.
 	if strings.Contains(gameScores.Body.String(), `"isLatest":false`) || !strings.Contains(gameScores.Body.String(), `"isLatest":true`) {
 		t.Fatal("game retired scores of an unchanged block", gameScores.Body.String())
 	}
-	leaderboard := get(fmt.Sprintf("/api/v1/charts/%s/leaderboard?difficultyId=%d", updated.ID, hard(updated)))
+	leaderboard := get(fmt.Sprintf("/api/charts/%s/leaderboard?difficultyId=%d", updated.ID, hard(updated)))
 	status(leaderboard, 200)
 	if strings.Contains(leaderboard.Body.String(), `"items":[]`) {
 		t.Fatal("leaderboard lost scores of an unchanged block")
@@ -290,7 +290,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 	if after, _ := app.chart(ctx, original.ID); kept.Title != "Updated" || kept.TitleTranslations["ja"] != "" || after.TJAHash == before.TJAHash {
 		t.Fatal("keepTitles replaced the names", kept.Title, kept.TitleTranslations)
 	}
-	status(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/v1/charts", web.NewID(), source, "cbr.mp3", audio, map[string]string{"keepTitles": "true"}), 400)
+	status(request("d46774d30dd13b92d9e536808da468a4", "POST", "/api/charts", web.NewID(), source, "cbr.mp3", audio, map[string]string{"keepTitles": "true"}), 400)
 	// Independent replacement requests serialize; both may replace current files.
 	nextFields := map[string]string{"confirmReset": "true"}
 	// Renaming the audio alone would store an identical TJA; change its content too. Its Hard
@@ -350,7 +350,7 @@ func testChartReplacement(t *testing.T, remote bool) {
 
 	// A replacement keeps the description and categories it does not send, as on OurTaiko Database.
 	mustExec(`UPDATE charts SET description='kept',category_flags=1 WHERE id='` + unrelated.ID + `'`)
-	keptChart := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", "/api/v1/charts/"+unrelated.ID+"/files", web.NewID(), replacement, "", nil, map[string]string{"confirmReset": "true"}), 200)
+	keptChart := decode(request("9b893bc6d9422c93536ff0df503b81e9", "PUT", "/api/charts/"+unrelated.ID+"/files", web.NewID(), replacement, "", nil, map[string]string{"confirmReset": "true"}), 200)
 	if keptChart.Description != "kept" || len(keptChart.CategoryIDs) != 1 || keptChart.CategoryIDs[0] != "game" {
 		t.Fatal("unsent description or categories changed", keptChart.Description, keptChart.CategoryIDs)
 	}

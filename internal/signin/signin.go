@@ -245,7 +245,7 @@ func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
 		s.Internal(w, e)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: s.FlowCookie, Value: binding, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
+	http.SetCookie(w, &http.Cookie{Name: s.FlowCookie, Value: binding, Path: "/api", HttpOnly: true, Secure: s.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 300})
 	http.Redirect(w, r, cfg.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusSeeOther)
 }
 
@@ -266,7 +266,7 @@ func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	var nonce, verifier, destination string
 	e = s.DB.QueryRow(r.Context(), `DELETE FROM oidc_flows WHERE state_hash=$1 AND binding_hash=$2 AND expires_at>now() RETURNING nonce,verifier,return_path`, web.Hash(state), web.Hash(c.Value)).Scan(&nonce, &verifier, &destination)
-	http.SetCookie(w, &http.Cookie{Name: s.FlowCookie, Path: "/api/v1/auth/sso", HttpOnly: true, Secure: s.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.FlowCookie, Path: "/api", HttpOnly: true, Secure: s.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	if e != nil || r.URL.Query().Get("error") != "" || r.URL.Query().Get("code") == "" {
 		fail()
 		return

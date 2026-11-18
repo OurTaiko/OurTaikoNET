@@ -165,7 +165,7 @@ export function AdminPage() {
                 plate={{
                   userId: '',
                   nickname: session.user.nickname,
-                  avatarUrl: '',
+                  avatarPath: '',
                   dan: null,
                   showDan: false,
                   title: {

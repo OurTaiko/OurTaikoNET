@@ -1,31 +1,11 @@
 package httpapi
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
 	"ourtaiko.dev/net/internal/web"
 )
-
-func (s *Server) getPlaylistCover(w http.ResponseWriter, r *http.Request) {
-	var digest, key string
-	id, valid := playlistID(r.PathValue("id"))
-	e := pgx.ErrNoRows
-	// The address of a private playlist's cover is its ID and current hash.
-	if valid {
-		e = s.DB.QueryRow(r.Context(), `SELECT cv.sha256,cv.storage_key FROM chart_resources cv JOIN playlists p ON p.cover_file=cv.id WHERE p.id=$1`, id).Scan(&digest, &key)
-	}
-	if errors.Is(e, pgx.ErrNoRows) || (e == nil && r.URL.Query().Get("v") != digest) {
-		problem(w, 404, "COVER_NOT_FOUND", "封面不存在或已被替换")
-		return
-	}
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	s.serveCover(w, r, digest, key)
-}
 
 // setPlaylistCover points a playlist at its cover, or at none, and returns the
 // file it pointed at before.
@@ -68,7 +48,8 @@ func (s *Server) replacePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(r.Context(), previous)
-	web.Respond(w, 200, map[string]string{"coverHash": web.Hash(string(encoded))})
+	digest := web.Hash(string(encoded))
+	web.Respond(w, 200, map[string]string{"coverHash": digest, "songListCoverPath": s.filePath(digest + ".webp")})
 }
 
 func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
@@ -86,5 +67,5 @@ func (s *Server) removePlaylistCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.releaseCovers(r.Context(), previous)
-	web.Respond(w, 200, map[string]string{"coverHash": ""})
+	web.Respond(w, 200, map[string]string{"coverHash": "", "songListCoverPath": ""})
 }

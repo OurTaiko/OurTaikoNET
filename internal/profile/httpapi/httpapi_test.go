@@ -79,7 +79,7 @@ func (c *client) json(method, path, body string, status int, out any, header ...
 // signIn opens a development session for the player.
 func (c *client) signIn() {
 	c.t.Helper()
-	w := c.do("GET", "/api/v1/auth/sso/login?returnTo=/me", "", nil)
+	w := c.do("GET", "/api/auth/sso/login?returnTo=/me", "", nil)
 	if w.Code != 303 || len(w.Result().Cookies()) != 1 {
 		c.t.Fatal("dev sign-in", w.Code)
 	}
@@ -88,7 +88,7 @@ func (c *client) signIn() {
 		User      *User
 		CSRFToken string
 	}
-	c.json("GET", "/api/v1/me", "", 200, &me)
+	c.json("GET", "/api/me", "", 200, &me)
 	if me.User == nil || me.User.ID != player {
 		c.t.Fatal("not signed in", me)
 	}
@@ -107,14 +107,14 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
 
 	// An administrator (the development user is one) keeps the catalog.
-	c.json("PUT", "/api/v1/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 401, nil)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 401, nil)
 	c.signIn()
-	c.json("PUT", "/api/v1/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 200, nil)
-	c.json("PUT", "/api/v1/admin/titles/fan", `{"name":"ファン","style":"wood","official":false}`, 200, nil)
-	c.json("PUT", "/api/v1/admin/titles/Bad", `{"name":"x","style":"wood"}`, 422, nil)
-	c.json("PUT", "/api/v1/admin/titles/odd", `{"name":"x","style":"neon"}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","style":"wood","official":false}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x","style":"wood"}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","style":"neon"}`, 422, nil)
 	var catalog struct{ Titles []Title }
-	c.json("GET", "/api/v1/titles", "", 200, &catalog)
+	c.json("GET", "/api/titles", "", 200, &catalog)
 	if len(catalog.Titles) != 2 || catalog.Titles[0].ID != "kidou" || string(catalog.Titles[0].NameTranslations) != `{"en":"Taiko Master"}` {
 		t.Fatal("catalog", catalog)
 	}
@@ -180,32 +180,32 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	}
 
 	// The player wears one of their titles; the plate is public.
-	c.json("PUT", "/api/v1/me/nameplate", `{"titleId":"nope","showDan":true}`, 422, nil)
+	c.json("PUT", "/api/me/nameplate", `{"titleId":"nope","showDan":true}`, 422, nil)
 	var worn Nameplate
-	c.json("PUT", "/api/v1/me/nameplate", `{"titleId":"kidou","showDan":true}`, 200, &worn)
+	c.json("PUT", "/api/me/nameplate", `{"titleId":"kidou","showDan":true}`, 200, &worn)
 	if worn.Title == nil || worn.Title.Style != "gold" || worn.Dan == nil || worn.Dan.Index != 21 {
 		t.Fatal("worn", worn)
 	}
 	public := &client{t: t, handler: app.Handler()}
 	var plate Nameplate
-	public.json("GET", "/api/v1/users/"+player+"/nameplate", "", 200, &plate)
+	public.json("GET", "/api/users/"+player+"/nameplate", "", 200, &plate)
 	if plate.Title == nil || plate.Title.ID != "kidou" || !plate.Dan.Gold || plate.Dan.Index != 21 || plate.Nickname != "本地开发用户" {
 		t.Fatal("public plate", plate)
 	}
 	var batch struct{ Nameplates map[string]Nameplate }
-	w := public.do("GET", "/api/v1/nameplates?ids="+player+","+other+","+player, "", nil)
+	w := public.do("GET", "/api/nameplates?ids="+player+","+other+","+player, "", nil)
 	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &batch) != nil ||
 		len(batch.Nameplates) != 2 || batch.Nameplates[player].Title.ID != "kidou" || batch.Nameplates[other].Title != nil {
 		t.Fatal("batch plates", w.Code, w.Body.String())
 	}
-	public.json("GET", "/api/v1/nameplates?ids=nope", "", 400, nil)
-	c.json("PUT", "/api/v1/me/nameplate", `{"titleId":null,"showDan":false}`, 200, &worn)
-	public.json("GET", "/api/v1/users/"+player+"/nameplate", "", 200, &plate)
+	public.json("GET", "/api/nameplates?ids=nope", "", 400, nil)
+	c.json("PUT", "/api/me/nameplate", `{"titleId":null,"showDan":false}`, 200, &worn)
+	public.json("GET", "/api/users/"+player+"/nameplate", "", 200, &plate)
 	if plate.Title != nil || plate.Dan != nil || plate.ShowDan {
 		t.Fatal("hidden", plate)
 	}
 	var held struct{ Titles []HeldTitle }
-	public.json("GET", "/api/v1/users/"+player+"/titles", "", 200, &held)
+	public.json("GET", "/api/users/"+player+"/titles", "", 200, &held)
 	if len(held.Titles) != 2 || held.Titles[0].Title.ID != "fan" || held.Titles[0].CourseTitle != "みんなの段位" || held.Titles[1].Service != "fanmade" {
 		t.Fatal("held titles", held)
 	}
@@ -213,24 +213,24 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 		Badges  []DanBadge
 		History []AwardRecord
 	}
-	public.json("GET", "/api/v1/users/"+player+"/dans", "", 200, &dans)
+	public.json("GET", "/api/users/"+player+"/dans", "", 200, &dans)
 	if len(dans.Badges) != 2 || dans.Badges[1].Verdict != 5 || len(dans.History) != 7 {
 		t.Fatalf("dans %+v", dans)
 	}
 
 	// An administrator grants and takes back a title; a revoked key stops working.
-	c.json("POST", "/api/v1/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
-	public.json("GET", "/api/v1/users/"+other+"/titles", "", 200, &held)
+	c.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
+	public.json("GET", "/api/users/"+other+"/titles", "", 200, &held)
 	if len(held.Titles) != 1 || held.Titles[0].Service != "admin" {
 		t.Fatal("granted", held)
 	}
-	c.json("DELETE", "/api/v1/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
-	c.json("DELETE", "/api/v1/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 404, nil)
+	c.json("DELETE", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
+	c.json("DELETE", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 404, nil)
 	if err = DisableService(ctx, pool, "fanmade"); err != nil {
 		t.Fatal(err)
 	}
 	award(`{"key":"attempt-9","userId":"`+player+`","verdict":1}`, 401, nil, auth)
-	c.json("PUT", "/api/v1/me/nameplate", `{"titleId":null,"showDan":true}`, 403, nil, map[string]string{"Origin": "https://evil.test"})
+	c.json("PUT", "/api/me/nameplate", `{"titleId":null,"showDan":true}`, 403, nil, map[string]string{"Origin": "https://evil.test"})
 }
 
 func TestPlayersMakeTheirOwnTitles(t *testing.T) {
@@ -243,24 +243,24 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
-	c.json("POST", "/api/v1/me/titles", `{"name":"x","style":"wood"}`, 401, nil)
+	c.json("POST", "/api/me/titles", `{"name":"x","style":"wood"}`, 401, nil)
 	c.signIn()
 
 	// Up to five community titles, not in the bands kept for official ones.
-	c.json("POST", "/api/v1/me/titles", `{"name":"虹","style":"rainbow"}`, 422, nil)
-	c.json("POST", "/api/v1/me/titles", `{"name":"紫","style":"purple"}`, 422, nil)
-	c.json("POST", "/api/v1/me/titles", `{"name":" ","style":"wood"}`, 422, nil)
+	c.json("POST", "/api/me/titles", `{"name":"虹","style":"rainbow"}`, 422, nil)
+	c.json("POST", "/api/me/titles", `{"name":"紫","style":"purple"}`, 422, nil)
+	c.json("POST", "/api/me/titles", `{"name":" ","style":"wood"}`, 422, nil)
 	made := []Title{}
 	for _, style := range []string{"wood", "teal", "wood2", "gold", "wood"} {
 		var title Title
-		c.json("POST", "/api/v1/me/titles", `{"name":"称号 `+style+`","nameTranslations":{"en":"Title"},"style":"`+style+`"}`, 201, &title)
+		c.json("POST", "/api/me/titles", `{"name":"称号 `+style+`","nameTranslations":{"en":"Title"},"style":"`+style+`"}`, 201, &title)
 		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) {
 			t.Fatal("made", title)
 		}
 		made = append(made, title)
 	}
-	c.json("POST", "/api/v1/me/titles", `{"name":"六","style":"wood"}`, 409, nil)
-	w := c.do("GET", "/api/v1/titles", "", nil)
+	c.json("POST", "/api/me/titles", `{"name":"六","style":"wood"}`, 409, nil)
+	w := c.do("GET", "/api/titles", "", nil)
 	var catalog struct{ Titles []Title }
 	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Titles) != 5 || *catalog.Titles[0].OwnerID != player {
 		t.Fatal("catalog", w.Code, w.Body.String())
@@ -268,32 +268,32 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 
 	// The maker changes their community title; another player's is not theirs to change.
 	var changed Title
-	c.json("PUT", "/api/v1/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","style":"teal"}`, 200, &changed)
+	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","style":"teal"}`, 200, &changed)
 	if changed.Name != "改名" || changed.Style != "teal" || changed.Description != "说明" || string(changed.NameTranslations) != `{}` {
 		t.Fatal("changed", changed)
 	}
-	c.json("PUT", "/api/v1/me/titles/"+made[0].ID, `{"name":"改名","style":"rainbow"}`, 422, nil)
+	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","style":"rainbow"}`, 422, nil)
 	if _, err = pool.Exec(ctx, `INSERT INTO titles(id,name,style,official,owner_id) VALUES('theirs','他人','wood',false,$1)`, other); err != nil {
 		t.Fatal(err)
 	}
-	c.json("PUT", "/api/v1/me/titles/theirs", `{"name":"x","style":"wood"}`, 404, nil)
-	c.json("DELETE", "/api/v1/me/titles/theirs", "", 404, nil)
+	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","style":"wood"}`, 404, nil)
+	c.json("DELETE", "/api/me/titles/theirs", "", 404, nil)
 
 	// An administrator makes one official: it keeps its maker, who may now change its band only,
 	// and it no longer takes one of their five places.
 	var official Title
-	c.json("PUT", "/api/v1/admin/titles/"+made[1].ID, `{"name":"公认","style":"teal","official":true}`, 200, &official)
+	c.json("PUT", "/api/admin/titles/"+made[1].ID, `{"name":"公认","style":"teal","official":true}`, 200, &official)
 	if !official.Official || official.OwnerID == nil || *official.OwnerID != player {
 		t.Fatal("official", official)
 	}
-	c.json("PUT", "/api/v1/me/titles/"+made[1].ID, `{"name":"偷改","style":"rainbow"}`, 200, &official)
+	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","style":"rainbow"}`, 200, &official)
 	if official.Style != "rainbow" || official.Name != "公认" {
 		t.Fatal("an official title's maker changes its band only", official)
 	}
-	c.json("DELETE", "/api/v1/me/titles/"+made[1].ID, "", 403, nil)
+	c.json("DELETE", "/api/me/titles/"+made[1].ID, "", 403, nil)
 	var sixth Title
-	c.json("POST", "/api/v1/me/titles", `{"name":"六","style":"wood"}`, 201, &sixth)
-	c.json("POST", "/api/v1/me/titles", `{"name":"七","style":"wood"}`, 409, nil)
+	c.json("POST", "/api/me/titles", `{"name":"六","style":"wood"}`, 201, &sixth)
+	c.json("POST", "/api/me/titles", `{"name":"七","style":"wood"}`, 409, nil)
 
 	// A community title comes from its maker's courses only; an official one from official
 	// courses, whoever made them.
@@ -315,20 +315,20 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 
 	// Deleting a community title takes it from the players who earned it.
 	c.json("POST", "/internal/v1/awards", `{"key":"a5","userId":"`+player+`","courseOwnerId":"`+player+`","verdict":1,"titles":["`+made[2].ID+`"]}`, 200, nil, auth)
-	c.json("PUT", "/api/v1/me/nameplate", `{"titleId":"`+made[2].ID+`","showDan":true}`, 200, nil)
-	c.json("DELETE", "/api/v1/me/titles/"+made[2].ID, "", 200, nil)
-	c.json("DELETE", "/api/v1/me/titles/"+made[2].ID, "", 404, nil)
+	c.json("PUT", "/api/me/nameplate", `{"titleId":"`+made[2].ID+`","showDan":true}`, 200, nil)
+	c.json("DELETE", "/api/me/titles/"+made[2].ID, "", 200, nil)
+	c.json("DELETE", "/api/me/titles/"+made[2].ID, "", 404, nil)
 	var held struct{ Titles []HeldTitle }
-	c.json("GET", "/api/v1/users/"+other+"/titles", "", 200, &held)
+	c.json("GET", "/api/users/"+other+"/titles", "", 200, &held)
 	if len(held.Titles) != 0 {
 		t.Fatal("still held", held)
 	}
 	var plate Nameplate
-	c.json("GET", "/api/v1/users/"+player+"/nameplate", "", 200, &plate)
+	c.json("GET", "/api/users/"+player+"/nameplate", "", 200, &plate)
 	if plate.Title != nil {
 		t.Fatal("still worn", plate)
 	}
-	c.json("POST", "/api/v1/me/titles", `{"name":"七","style":"wood"}`, 201, nil)
+	c.json("POST", "/api/me/titles", `{"name":"七","style":"wood"}`, 201, nil)
 }
 
 func TestScoresOfEveryServiceInOneList(t *testing.T) {
@@ -389,7 +389,7 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		return strings.Join(out, ",")
 	}
 	var merged page
-	c.json("GET", "/api/v1/users/"+player+"/scores", "", 200, &merged)
+	c.json("GET", "/api/users/"+player+"/scores", "", 200, &merged)
 	if merged.Sort != "level" || merged.Total != 4 || ids(merged) != "fanmade:f2,official:d1,fanmade:f1,fanmade:f3" {
 		t.Fatalf("merged by level: %s %+v", ids(merged), merged)
 	}
@@ -404,11 +404,11 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	if merged.Sources[2].Error == "" || merged.Sources[0].Count != 3 || merged.Sources[1].Count != 1 {
 		t.Fatalf("a source that cannot be read is reported %+v", merged.Sources)
 	}
-	c.json("GET", "/api/v1/users/"+player+"/scores?sort=recent", "", 200, &merged)
+	c.json("GET", "/api/users/"+player+"/scores?sort=recent", "", 200, &merged)
 	if ids(merged) != "fanmade:f1,official:d1,fanmade:f2,fanmade:f3" {
 		t.Fatal("merged by date", ids(merged))
 	}
-	c.json("GET", "/api/v1/users/"+player+"/scores?source=official&sort=score", "", 200, &merged)
+	c.json("GET", "/api/users/"+player+"/scores?source=official&sort=score", "", 200, &merged)
 	if ids(merged) != "official:d1" || len(merged.Sources) != 1 {
 		t.Fatal("one service", ids(merged))
 	}
@@ -418,18 +418,18 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
  SELECT 'official','d2',user_id,1,0,0,100,0,1,repeat('d',64),difficulty_id,3,'2026-01-05' FROM net.scores WHERE id='d1'`); err != nil {
 		t.Fatal(err)
 	}
-	c.json("GET", "/api/v1/users/"+player+"/scores?source=official&view=all", "", 200, &merged)
+	c.json("GET", "/api/users/"+player+"/scores?source=official&view=all", "", 200, &merged)
 	if ids(merged) != "official:d2,official:d1" {
 		t.Fatal("every play, newest first", ids(merged))
 	}
-	c.json("GET", "/api/v1/users/"+player+"/scores?source=official", "", 200, &merged)
+	c.json("GET", "/api/users/"+player+"/scores?source=official", "", 200, &merged)
 	if ids(merged) != "official:d1" || merged.Items[0].BestClearStatus == nil || *merged.Items[0].BestClearStatus != 3 || *merged.Items[0].PlayCount != 2 {
 		t.Fatalf("best of a block: %s %+v", ids(merged), merged.Items)
 	}
 	for _, query := range []string{"?view=x", "?sort=x", "?course=Ura", "?source=nope", "?page=0"} {
-		c.json("GET", "/api/v1/users/"+player+"/scores"+query, "", 400, nil)
+		c.json("GET", "/api/users/"+player+"/scores"+query, "", 400, nil)
 	}
-	c.json("GET", "/api/v1/users/not-a-user/scores", "", 404, nil)
+	c.json("GET", "/api/users/not-a-user/scores", "", 404, nil)
 }
 
 func TestTheWebsiteIsServedWithItsPageRoutes(t *testing.T) {
@@ -452,7 +452,7 @@ func TestTheWebsiteIsServedWithItsPageRoutes(t *testing.T) {
 	if w = c.do("GET", "/assets/missing.js", "", nil); w.Code != 404 {
 		t.Fatal("missing asset", w.Code)
 	}
-	if w = c.do("GET", "/api/v1/nothing", "", nil); w.Code != 404 || !strings.Contains(w.Body.String(), "NOT_FOUND") {
+	if w = c.do("GET", "/api/nothing", "", nil); w.Code != 404 || !strings.Contains(w.Body.String(), "NOT_FOUND") {
 		t.Fatal("unknown API path", w.Code)
 	}
 }

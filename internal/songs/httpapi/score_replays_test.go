@@ -153,7 +153,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		return score
 	}
 	attach := func(raw string) string { return strings.TrimSuffix(base, "}") + `,"replay_data":` + raw + "}" }
-	for index, path := range []string{"/api/v1/game/scores", "/api/v1/scores"} {
+	for index, path := range []string{"/api/game/scores", "/api/scores"} {
 		key := fmt.Sprintf("recording-legacy-%04d", index)
 		legacy := call(path, base, key, 201)
 		var digest string
@@ -205,28 +205,28 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		json.Unmarshal(data, &body)
 		return body
 	}
-	withOptions := call("/api/v1/game/scores", attach(testReplayV2), "recording-v2-0001", 201)
+	withOptions := call("/api/game/scores", attach(testReplayV2), "recording-v2-0001", 201)
 	if !withOptions.HasReplay {
 		t.Fatal("the receipt must say the recording was kept")
 	}
-	read := get("/api/v1/scores/"+withOptions.ID+"/replay", 200)
+	read := get("/api/scores/"+withOptions.ID+"/replay", 200)
 	var readScore Score
 	if !sameJSON(read["replay"], []byte(testReplayV2)) || json.Unmarshal(read["score"], &readScore) != nil || readScore.ID != withOptions.ID || !readScore.HasReplay || readScore.Course != "Oni" || len(read["nickname"]) == 0 {
 		t.Fatalf("recording read back wrong: %s", read)
 	}
-	without := call("/api/v1/game/scores", base, "recording-none-0001", 201)
+	without := call("/api/game/scores", base, "recording-none-0001", 201)
 	if without.HasReplay {
 		t.Fatal("a score without a recording must say so")
 	}
-	get("/api/v1/scores/"+without.ID+"/replay", 404)
-	get("/api/v1/scores/ffffffffffffffffffffffffffffffff/replay", 404)
+	get("/api/scores/"+without.ID+"/replay", 404)
+	get("/api/scores/ffffffffffffffffffffffffffffffff/replay", 404)
 	var board struct {
 		Items []struct {
 			ID        string `json:"id"`
 			HasReplay bool   `json:"hasReplay"`
 		} `json:"items"`
 	}
-	if json.Unmarshal(mustJSON(t, get("/api/v1/charts/"+song+"/leaderboard", 200)), &board) != nil || len(board.Items) != 1 {
+	if json.Unmarshal(mustJSON(t, get("/api/charts/"+song+"/leaderboard", 200)), &board) != nil || len(board.Items) != 1 {
 		t.Fatalf("leaderboard: %+v", board)
 	}
 	var plays struct {
@@ -235,7 +235,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 			HasReplay bool   `json:"hasReplay"`
 		} `json:"items"`
 	}
-	if json.Unmarshal(mustJSON(t, get("/api/v1/users/"+user+"/scores?view=all", 200)), &plays) != nil || len(plays.Items) == 0 {
+	if json.Unmarshal(mustJSON(t, get("/api/users/"+user+"/scores?view=all", 200)), &plays) != nil || len(plays.Items) == 0 {
 		t.Fatalf("user scores: %+v", plays)
 	}
 	kept := map[string]bool{}
@@ -271,7 +271,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		}
 		return v
 	}
-	replays := list("/api/v1/replays")
+	replays := list("/api/replays")
 	listed := map[string]bool{}
 	for _, item := range replays.Items {
 		listed[item.ID] = true
@@ -282,30 +282,30 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	if !listed[withOptions.ID] || listed[without.ID] || replays.Total != len(replays.Items) || replays.Sort != "recent" || replays.PageSize != 20 || replays.Items[0].ID != withOptions.ID {
 		t.Fatalf("replay list: %+v", replays)
 	}
-	if v := list("/api/v1/replays?course=Easy"); len(v.Items) != 0 || v.Total != 0 {
+	if v := list("/api/replays?course=Easy"); len(v.Items) != 0 || v.Total != 0 {
 		t.Fatalf("course filter: %+v", v)
 	}
-	if v := list("/api/v1/replays?sort=score&page=99"); len(v.Items) != 0 || v.Total != replays.Total || v.Page != 99 {
+	if v := list("/api/replays?sort=score&page=99"); len(v.Items) != 0 || v.Total != replays.Total || v.Page != 99 {
 		t.Fatalf("past the last page: %+v", v)
 	}
 	// categoryId narrows to the songs of one category (Game here).
 	if _, err := pool.Exec(ctx, `UPDATE charts SET category_flags=$2 WHERE id=$1`, song, 1); err != nil {
 		t.Fatal(err)
 	}
-	if v := list("/api/v1/replays?categoryId=game"); v.Total != replays.Total || len(v.Items) == 0 || v.Items[0].ID != withOptions.ID {
+	if v := list("/api/replays?categoryId=game"); v.Total != replays.Total || len(v.Items) == 0 || v.Items[0].ID != withOptions.ID {
 		t.Fatalf("category filter: %+v", v)
 	}
-	if v := list("/api/v1/replays?categoryId=pop&course=Oni"); v.Total != 0 || len(v.Items) != 0 {
+	if v := list("/api/replays?categoryId=pop&course=Oni"); v.Total != 0 || len(v.Items) != 0 {
 		t.Fatalf("another category: %+v", v)
 	}
 	for _, bad := range []string{"?sort=level", "?page=0", "?course=oni", "?categoryId=nope"} {
-		get("/api/v1/replays"+bad, 400)
+		get("/api/replays"+bad, 400)
 	}
 	// A play of replaced files is not listed: it no longer matches the chart.
 	if _, err := pool.Exec(ctx, `UPDATE scores SET is_latest=false WHERE id=$1`, withOptions.ID); err != nil {
 		t.Fatal(err)
 	}
-	for _, item := range list("/api/v1/replays").Items {
+	for _, item := range list("/api/replays").Items {
 		if item.ID == withOptions.ID {
 			t.Fatal("a play of replaced files must not be listed")
 		}
@@ -316,8 +316,8 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE charts SET status='hidden' WHERE id=$1`, song); err != nil {
 		t.Fatal(err)
 	}
-	get("/api/v1/scores/"+withOptions.ID+"/replay", 404)
-	if v := list("/api/v1/replays"); v.Total != 0 {
+	get("/api/scores/"+withOptions.ID+"/replay", 404)
+	if v := list("/api/replays"); v.Total != 0 {
 		t.Fatalf("a hidden chart's plays must not be listed: %+v", v)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE charts SET status='published' WHERE id=$1`, song); err != nil {
@@ -326,19 +326,19 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	// Requests larger than the old 8 KB cap are valid. Bound attachment size
 	// independently so an oversized recording still saves the basic score.
 	large := `{"version":1,"audio_offset_ms":0,"visual_offset_ms":0,"inputs":[` + strings.Repeat(`[1234.5,1],`, 5000) + `[1234.5,2]]}`
-	score := call("/api/v1/game/scores", attach(large), "", 201)
+	score := call("/api/game/scores", attach(large), "", 201)
 	var length int
 	if err := pool.QueryRow(ctx, `SELECT jsonb_array_length(replay_data->'inputs') FROM scores WHERE id=$1`, score.ID).Scan(&length); err != nil || length != 5001 {
 		t.Fatal("large recording was lost", err)
 	}
-	oversized := call("/api/v1/game/scores", attach(`"`+strings.Repeat("x", maxReplayBytes)+`"`), "", 201)
+	oversized := call("/api/game/scores", attach(`"`+strings.Repeat("x", maxReplayBytes)+`"`), "", 201)
 	var isNull bool
 	if err := pool.QueryRow(ctx, `SELECT replay_data IS NULL FROM scores WHERE id=$1`, oversized.ID).Scan(&isNull); err != nil || !isNull {
 		t.Fatal("oversized attachment must become NULL", err)
 	}
-	call("/api/v1/game/scores", attach(`"`+strings.Repeat("x", maxScoreRequestBytes)+`"`), "", 413)
-	call("/api/v1/game/scores", strings.TrimSuffix(base, "}")+`,"replay_data":{`, "", 400)
-	for _, path := range []string{"/api/v1/game/catalog", "/api/v1/game/scores"} {
+	call("/api/game/scores", attach(`"`+strings.Repeat("x", maxScoreRequestBytes)+`"`), "", 413)
+	call("/api/game/scores", strings.TrimSuffix(base, "}")+`,"replay_data":{`, "", 400)
+	for _, path := range []string{"/api/game/catalog", "/api/game/scores"} {
 		req, _ := http.NewRequest("GET", server.URL+path, nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		response, err := server.Client().Do(req)
@@ -347,7 +347,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		}
 		data, _ := io.ReadAll(response.Body)
 		response.Body.Close()
-		if response.StatusCode != 200 || strings.Contains(string(data), "replay_data") || path == "/api/v1/game/catalog" && !strings.Contains(string(data), `"scoreReplayVersion":1`) {
+		if response.StatusCode != 200 || strings.Contains(string(data), "replay_data") || path == "/api/game/catalog" && !strings.Contains(string(data), `"scoreReplayVersion":1`) {
 			t.Fatal("capability/score compatibility failed", path)
 		}
 	}
@@ -410,7 +410,7 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 	handler, token := game.Handler(), game.devGameToken()
 	post := func(key string, score int, extra string) Score {
 		t.Helper()
-		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":%d,"drumroll":2,"max_combo":6%s}`, oni, score, extra)))
+		r := httptest.NewRequest("POST", "/api/game/scores", strings.NewReader(fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":%d,"drumroll":2,"max_combo":6%s}`, oni, score, extra)))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Idempotency-Key", key)
@@ -433,23 +433,23 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		Replay   json.RawMessage `json:"replay"`
 	}
 	var want, got any
-	if code := c.do("", "GET", "/api/v1/scores/"+kept.ID+"/replay", "", &read); code != 200 || read.Score.ID != kept.ID || !read.Score.HasReplay || read.Score.Course != "Oni" ||
+	if code := c.do("", "GET", "/api/scores/"+kept.ID+"/replay", "", &read); code != 200 || read.Score.ID != kept.ID || !read.Score.HasReplay || read.Score.Course != "Oni" ||
 		json.Unmarshal(read.Replay, &got) != nil || json.Unmarshal([]byte(officialTestReplayV2), &want) != nil || !reflect.DeepEqual(got, want) {
 		t.Fatal(code, read.Score, string(read.Replay))
 	}
-	if code := c.do("", "GET", "/api/v1/scores/"+plain.ID+"/replay", "", nil); code != 404 {
+	if code := c.do("", "GET", "/api/scores/"+plain.ID+"/replay", "", nil); code != 404 {
 		t.Fatal("a play without a recording has none", code)
 	}
 	var board struct {
 		Items []Score `json:"items"`
 	}
-	if code := c.do("", "GET", "/api/v1/charts/"+w.song+"/leaderboard", "", &board); code != 200 || len(board.Items) != 1 || board.Items[0].ID != kept.ID || !board.Items[0].HasReplay {
+	if code := c.do("", "GET", "/api/charts/"+w.song+"/leaderboard", "", &board); code != 200 || len(board.Items) != 1 || board.Items[0].ID != kept.ID || !board.Items[0].HasReplay {
 		t.Fatal(code, board)
 	}
 	var plays struct {
 		Items []Score `json:"items"`
 	}
-	if code := c.do("", "GET", "/api/v1/users/"+testUsers["alice"].ID+"/scores?view=all", "", &plays); code != 200 || len(plays.Items) != 2 {
+	if code := c.do("", "GET", "/api/users/"+testUsers["alice"].ID+"/scores?view=all", "", &plays); code != 200 || len(plays.Items) != 2 {
 		t.Fatal(code, plays)
 	}
 	for _, play := range plays.Items {
@@ -472,16 +472,16 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		Sort     string `json:"sort"`
 	}
 	var list listing
-	if code := c.do("", "GET", "/api/v1/replays", "", &list); code != 200 || list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != kept.ID ||
+	if code := c.do("", "GET", "/api/replays", "", &list); code != 200 || list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != kept.ID ||
 		list.Items[0].SongID != w.song || list.Items[0].Course != "Oni" || list.Items[0].Level != 5 || list.Items[0].Title == "" || list.Items[0].Nickname == "" || list.Sort != "recent" || list.PageSize != 20 {
 		t.Fatal(code, list)
 	}
 	var empty listing
-	if code := c.do("", "GET", "/api/v1/replays?course=Easy", "", &empty); code != 200 || empty.Total != 0 || len(empty.Items) != 0 {
+	if code := c.do("", "GET", "/api/replays?course=Easy", "", &empty); code != 200 || empty.Total != 0 || len(empty.Items) != 0 {
 		t.Fatal("course filter", code, empty)
 	}
 	empty = listing{}
-	if code := c.do("", "GET", "/api/v1/replays?sort=score&page=9", "", &empty); code != 200 || empty.Total != 1 || len(empty.Items) != 0 || empty.Page != 9 {
+	if code := c.do("", "GET", "/api/replays?sort=score&page=9", "", &empty); code != 200 || empty.Total != 1 || len(empty.Items) != 0 || empty.Page != 9 {
 		t.Fatal("past the last page", code, empty)
 	}
 	// categoryId narrows to the songs of one category (Game here).
@@ -489,15 +489,15 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	var inCategory listing
-	if code := c.do("", "GET", "/api/v1/replays?categoryId=game", "", &inCategory); code != 200 || inCategory.Total != 1 || inCategory.Items[0].ID != kept.ID {
+	if code := c.do("", "GET", "/api/replays?categoryId=game", "", &inCategory); code != 200 || inCategory.Total != 1 || inCategory.Items[0].ID != kept.ID {
 		t.Fatal("category filter", code, inCategory)
 	}
 	empty = listing{}
-	if code := c.do("", "GET", "/api/v1/replays?categoryId=pop&course=Oni", "", &empty); code != 200 || empty.Total != 0 {
+	if code := c.do("", "GET", "/api/replays?categoryId=pop&course=Oni", "", &empty); code != 200 || empty.Total != 0 {
 		t.Fatal("another category", code, empty)
 	}
 	for _, bad := range []string{"?sort=level", "?page=0", "?course=oni", "?categoryId=nope"} {
-		if code := c.do("", "GET", "/api/v1/replays"+bad, "", nil); code != 400 {
+		if code := c.do("", "GET", "/api/replays"+bad, "", nil); code != 400 {
 			t.Fatal(bad, code)
 		}
 	}
@@ -505,7 +505,7 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	empty = listing{}
-	if code := c.do("", "GET", "/api/v1/replays", "", &empty); code != 200 || empty.Total != 0 {
+	if code := c.do("", "GET", "/api/replays", "", &empty); code != 200 || empty.Total != 0 {
 		t.Fatal("a play of replaced files must not be listed", code, empty)
 	}
 	if _, err := s.DB.Exec(ctx, `UPDATE scores SET is_latest=true WHERE id=$1`, kept.ID); err != nil {
@@ -514,11 +514,11 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='hidden' WHERE id=$1`, w.song); err != nil {
 		t.Fatal(err)
 	}
-	if code := c.do("", "GET", "/api/v1/scores/"+kept.ID+"/replay", "", nil); code != 404 {
+	if code := c.do("", "GET", "/api/scores/"+kept.ID+"/replay", "", nil); code != 404 {
 		t.Fatal("an unpublished chart's recordings are not read", code)
 	}
 	empty = listing{}
-	if code := c.do("", "GET", "/api/v1/replays", "", &empty); code != 200 || empty.Total != 0 {
+	if code := c.do("", "GET", "/api/replays", "", &empty); code != 200 || empty.Total != 0 {
 		t.Fatal("a hidden chart's plays must not be listed", code, empty)
 	}
 }

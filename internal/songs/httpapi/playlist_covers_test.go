@@ -24,10 +24,10 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	c, s, ctx := w.c, w.s, context.Background()
 	owner := testUsers["owner"].ID
 	var p Playlist
-	if code := c.do("owner", "POST", "/api/v1/playlists", `{"name":"Covered","public":true}`, &p); code != 201 {
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"Covered","public":true}`, &p); code != 201 {
 		t.Fatal(code)
 	}
-	path := "/api/v1/playlists/" + p.ID + "/cover"
+	path := "/api/playlists/" + p.ID + "/cover"
 	var picture bytes.Buffer
 	if e := png.Encode(&picture, image.NewNRGBA(image.Rect(0, 0, 40, 30))); e != nil {
 		t.Fatal(e)
@@ -58,19 +58,14 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if e := json.Unmarshal(rec.Body.Bytes(), &result); e != nil || rec.Code != 200 || len(result.CoverHash) != 64 {
 		t.Fatal("cover", rec.Code, rec.Body.String())
 	}
-	if code := c.do("", "GET", "/api/v1/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
+	if code := c.do("", "GET", "/api/playlists/"+p.ID, "", &p); code != 200 || p.CoverHash != result.CoverHash {
 		t.Fatal("cover hash", code, p.CoverHash)
 	}
-	get := func(query string) *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		c.handler.ServeHTTP(rec, httptest.NewRequest("GET", path+query, nil))
-		return rec
-	}
-	if rec := get("?v=" + result.CoverHash); rec.Code != 200 || rec.Header().Get("Content-Type") != "image/webp" || web.Hash(rec.Body.String()) != result.CoverHash {
-		t.Fatal("served cover", rec.Code)
-	}
-	if rec := get(""); rec.Code != 404 {
-		t.Fatal("cover without its hash", rec.Code)
+	// Covers are read from the bucket only: there is no API route to read one.
+	rec = httptest.NewRecorder()
+	c.handler.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+	if rec.Code != 404 || web.Hash(string(storedCover(t, s, "playlists", p.ID))) != result.CoverHash {
+		t.Fatal("stored cover", rec.Code)
 	}
 
 	// Only the WebP is stored: the game is given the same file.
@@ -103,10 +98,10 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if e2 != nil {
 		t.Fatal(e2)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.song, `{}`, nil); code != 201 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+p.ID+"/items/"+w.song, `{}`, nil); code != 201 {
 		t.Fatal("add", code)
 	}
-	if code := c.do("owner", "PUT", "/api/v1/playlists/"+p.ID+"/items/"+w.other, `{}`, nil); code != 201 {
+	if code := c.do("owner", "PUT", "/api/playlists/"+p.ID+"/items/"+w.other, `{}`, nil); code != 201 {
 		t.Fatal("add a song outside the catalog", code)
 	}
 	folders := func(app *Server) []GamePlaylist {
@@ -126,18 +121,18 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 		return items
 	}
 	// The song outside the catalog is not in the game's folder.
-	if own := folders(s)[0]; own.Cover != nil || strings.Join(own.ChartIDs, ",") != w.song || own.Owner == "" {
-		t.Fatalf("folder without direct downloads %+v", own)
+	// Its cover is named by its file, kept on this server's disk here.
+	if own := folders(s)[0]; own.SongListCoverPath != s.source().Folder+coverKey || strings.Join(own.ChartIDs, ",") != w.song || own.Owner == "" {
+		t.Fatalf("folder on disk %+v", own)
 	}
 	personal := personalGamePlaylists(folders(s))
 	if len(personal) != 1 || personal[0].ID != p.ID {
 		t.Fatal("the account's own folders", personal)
 	}
-	// A bucket without a public address gets signed links.
+	// In a bucket, under the bucket's prefix, with what the game checks it by.
 	direct := &Server{DB: s.DB, Config: Config{Source: s.source(), Objects: teststore.New(t), SSO: s.Config.SSO}}
-	if link := folders(direct)[0].Cover; link == nil || !strings.Contains(link.URL, coverKey) || link.HeadURL == "" ||
-		link.SHA256 != result.CoverHash || link.Size != coverSize || link.ContentType != "image/webp" {
-		t.Fatalf("cover link %+v", link)
+	if own := folders(direct)[0]; own.SongListCoverPath != "fanmade/test/"+coverKey || own.SongListCoverSHA256 != result.CoverHash || own.SongListCoverSize != coverSize {
+		t.Fatalf("cover %+v", own)
 	}
 
 	covers := func() int {
@@ -154,8 +149,8 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if code := c.do("owner", "DELETE", path, `{}`, nil); code != 200 || covers() != 1 {
 		t.Fatal("removing a cover a song shares", code, covers())
 	}
-	if rec := get("?v=" + result.CoverHash); rec.Code != 404 {
-		t.Fatal("removed cover served", rec.Code)
+	if storedCover(t, s, "playlists", p.ID) != nil {
+		t.Fatal("removed cover still named")
 	}
 	if rec := upload("owner", picture.Bytes()); rec.Code != 200 || covers() != 1 {
 		t.Fatal("cover again", rec.Code, covers())
@@ -168,7 +163,7 @@ func testPlaylistCover(t *testing.T, w interactionWorld) {
 	if covers() != 1 {
 		t.Fatal("playlist cover deleted while referenced", covers())
 	}
-	if code := c.do("owner", "DELETE", "/api/v1/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
+	if code := c.do("owner", "DELETE", "/api/playlists/"+p.ID, `{}`, nil); code != 200 || covers() != 0 {
 		t.Fatal("cover kept after its playlist", code, covers())
 	}
 	if _, e := s.Config.Objects.Open(ctx, coverKey); e == nil {

@@ -62,7 +62,7 @@ func TestCategoriesFlow(t *testing.T) {
 			form.WriteField("categoryIds", selection)
 		}
 		form.Close()
-		r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+		r := httptest.NewRequest("POST", "/api/charts", &body)
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", origin)
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -80,7 +80,7 @@ func TestCategoriesFlow(t *testing.T) {
 		}
 		return c
 	}
-	w := call("GET", "/api/v1/categories", "", "")
+	w := call("GET", "/api/categories", "", "")
 	var catalog struct{ Items []Category }
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Items) != 6 {
 		t.Fatal(w.Body.String())
@@ -128,11 +128,11 @@ func TestCategoriesFlow(t *testing.T) {
 	if _, err = pool.Exec(ctx, `UPDATE charts SET created_at=CASE WHEN id=$1 THEN '2024-01-01'::timestamptz WHEN id=$2 THEN '2020-01-01'::timestamptz ELSE '2022-01-01'::timestamptz END`, c.ID, defaultIDs[1]); err != nil {
 		t.Fatal(err)
 	}
-	if w = call("GET", "/api/v1/game/bootstrap", "", gameToken); w.Code != 404 {
+	if w = call("GET", "/api/game/bootstrap", "", gameToken); w.Code != 404 {
 		t.Fatal("bootstrap has been removed", w.Code, w.Body.String())
 	}
 	// The catalog is the same list for a guest and an account, nothing personal.
-	w = call("GET", "/api/v1/game/catalog", "", gameToken)
+	w = call("GET", "/api/game/catalog", "", gameToken)
 	var songList map[string]json.RawMessage
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &songList) != nil || w.Header().Get("Deprecation") != "" || songList["charts"] == nil || songList["categories"] == nil || songList["scores"] != nil || songList["user"] != nil {
 		t.Fatal("catalog must carry the songs and nothing personal", w.Body.String())
@@ -161,7 +161,7 @@ func TestCategoriesFlow(t *testing.T) {
 	}
 	// The website's catalog counts the same published charts, and its list filters by
 	// category, and by a course and star level that hold for the same block.
-	w = call("GET", "/api/v1/categories", "", "")
+	w = call("GET", "/api/categories", "", "")
 	var site struct {
 		ChartCount int
 		Items      []Category
@@ -176,7 +176,7 @@ func TestCategoriesFlow(t *testing.T) {
 	}
 	listTotal := func(query string) int {
 		t.Helper()
-		w := call("GET", "/api/v1/charts?"+query, "", "")
+		w := call("GET", "/api/charts?"+query, "", "")
 		var list struct{ Total int }
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &list) != nil {
 			t.Fatal(query, w.Code, w.Body.String())
@@ -194,14 +194,14 @@ func TestCategoriesFlow(t *testing.T) {
 		}
 	}
 	for _, query := range []string{"category=missing", "course=Tower", "course=oni", "level=0", "level=11", "level=x"} {
-		if w = call("GET", "/api/v1/charts?"+query, "", ""); w.Code != 400 {
+		if w = call("GET", "/api/charts?"+query, "", ""); w.Code != 400 {
 			t.Fatal("invalid filter accepted", query, w.Code)
 		}
 	}
 	// A category's songs as the game assembles them: the catalog filtered by categoryIds.
 	categoryCharts := func(id string) []Chart {
 		t.Helper()
-		w := call("GET", "/api/v1/game/catalog", "", gameToken)
+		w := call("GET", "/api/game/catalog", "", gameToken)
 		var result struct{ Charts []Chart }
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil {
 			t.Fatal(w.Code, w.Body.String())
@@ -235,8 +235,8 @@ func TestCategoriesFlow(t *testing.T) {
 	if len(categoryCharts("classic")) != 0 {
 		t.Fatal("empty category")
 	}
-	guest := call("GET", "/api/v1/game/catalog", "", "")
-	authed := call("GET", "/api/v1/game/catalog", "", gameToken)
+	guest := call("GET", "/api/game/catalog", "", "")
+	authed := call("GET", "/api/game/catalog", "", gameToken)
 	var guestData, authData map[string]json.RawMessage
 	if guest.Code != 200 || authed.Code != 200 || json.Unmarshal(guest.Body.Bytes(), &guestData) != nil || json.Unmarshal(authed.Body.Bytes(), &authData) != nil {
 		t.Fatal("guest catalog", guest.Code, guest.Body.String())
@@ -244,19 +244,19 @@ func TestCategoriesFlow(t *testing.T) {
 	if !reflect.DeepEqual(guestData, authData) {
 		t.Fatal("guest must receive the same public catalog", guest.Body.String(), authed.Body.String())
 	}
-	if guest := decodeChart(call("GET", "/api/v1/charts/"+c.ID+"?by=id", "", ""), 200); guest.ID != c.ID {
+	if guest := decodeChart(call("GET", "/api/charts/"+c.ID+"?by=id", "", ""), 200); guest.ID != c.ID {
 		t.Fatal("guest chart detail", guest)
 	}
 	for _, kind := range []string{"tja", "audio"} {
-		w := call("GET", "/api/v1/charts/"+c.ID+"/"+kind, "", "")
+		w := call("GET", "/api/charts/"+c.ID+"/"+kind, "", "")
 		if w.Code != 200 || w.Body.Len() == 0 {
 			t.Fatal("guest download", kind, w.Code, w.Body.String())
 		}
 	}
-	if w = call("GET", "/api/v1/game/categories/game/charts", "", gameToken); w.Code != 404 {
+	if w = call("GET", "/api/game/categories/game/charts", "", gameToken); w.Code != 404 {
 		t.Fatal("the per-category list has been removed", w.Code, w.Body.String())
 	}
-	path := "/api/v1/charts/" + c.ID
+	path := "/api/charts/" + c.ID
 	if w = call("PATCH", path, `{"categoryIds":["classic"]}`, otherToken); w.Code != 403 {
 		t.Fatal("nonowner changed categories")
 	}
@@ -308,7 +308,7 @@ func TestCategoriesFlow(t *testing.T) {
 			t.Fatal("deleted chart leaked")
 		}
 	}
-	w = call("GET", "/api/v1/game/catalog", "", gameToken)
+	w = call("GET", "/api/game/catalog", "", gameToken)
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &summary) != nil || summary.ChartCount != 3 {
 		t.Fatal("deleted chart counted", w.Body.String())
 	}

@@ -3,11 +3,8 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/jackc/pgx/v5"
-	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -21,11 +18,13 @@ type GamePlaylist struct {
 	Kind    string `json:"kind"`
 	OwnerID string `json:"ownerId,omitempty"`
 	Owner   string `json:"owner"`
-	// Cover is the folder's picture, the WebP the website shows (the game decodes
-	// WebP); only servers with direct downloads (resourceDownloadVersion 1) provide it.
-	Cover    *resourceLink `json:"cover,omitempty"`
-	ChartIDs []string      `json:"chartIds"`
-	// The stored cover, resolved to Cover after the snapshot.
+	// The folder's picture, the WebP the website shows (the game decodes WebP): its file
+	// (package files), SHA-256 and size; absent without one.
+	SongListCoverPath   string   `json:"songListCoverPath,omitempty"`
+	SongListCoverSHA256 string   `json:"songListCoverSha256,omitempty"`
+	SongListCoverSize   int64    `json:"songListCoverSize,omitempty"`
+	ChartIDs            []string `json:"chartIds"`
+	// The stored cover, resolved after the snapshot.
 	coverKey, coverHash string
 	coverSize           int64
 }
@@ -124,23 +123,17 @@ func (s *Server) gamePlaylistList(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	s.routePlaylistCovers(r, playlists)
 	web.Respond(w, 200, map[string]any{"playlists": playlists, "playlistVersion": 1})
 }
 
 func (s *Server) gamePlaylistDetails(ctx context.Context, items []GamePlaylist) error {
 	ids := []string{}
-	remote, _ := s.Config.Objects.(*objectstore.S3)
 	for i, p := range items {
 		if p.OwnerID != "" {
 			ids = append(ids, p.OwnerID)
 		}
-		if remote != nil && p.coverKey != "" {
-			link, e := directLink(ctx, remote, p.coverKey, "cover.webp", "image/webp", p.coverHash, p.coverSize)
-			if e != nil {
-				return e
-			}
-			items[i].Cover = &link
+		if p.coverKey != "" {
+			items[i].SongListCoverPath, items[i].SongListCoverSHA256, items[i].SongListCoverSize = s.filePath(p.coverKey), p.coverHash, p.coverSize
 		}
 	}
 	if len(ids) == 0 {
@@ -153,17 +146,4 @@ func (s *Server) gamePlaylistDetails(ctx context.Context, items []GamePlaylist) 
 		}
 	}
 	return nil
-}
-
-func (s *Server) routePlaylistCovers(r *http.Request, items []GamePlaylist) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	request := r.WithContext(ctx)
-	var wait sync.WaitGroup
-	for i := range items {
-		if items[i].Cover != nil {
-			wait.Go(func() { link := s.routeResource(request, *items[i].Cover); items[i].Cover = &link })
-		}
-	}
-	wait.Wait()
 }

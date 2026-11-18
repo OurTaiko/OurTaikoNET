@@ -104,7 +104,7 @@ func TestRekeyFiles(t *testing.T) {
 			// The ZIP is built on request and names the audio as the stored TJA does, and the
 			// chart as the site does.
 			w := httptest.NewRecorder()
-			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/a/download", nil))
+			app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/a/download", nil))
 			z, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
 			if w.Code != 200 || err != nil || len(z.File) != 2 {
 				t.Fatal("download", w.Code, err)

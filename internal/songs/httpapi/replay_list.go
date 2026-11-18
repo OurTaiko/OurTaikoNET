@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strconv"
 
 	"ourtaiko.dev/net/internal/web"
 )
 
 // ReplayListing is one recorded play on the public replay list: the score, the song's title and
-// the block's level, and who played it. GET /api/v1/scores/{id}/replay gives its recording.
+// the block's level, and who played it. GET /api/scores/{id}/replay gives its recording.
 type ReplayListing struct {
 	Score
 	Title             string          `json:"title"`
@@ -18,7 +19,7 @@ type ReplayListing struct {
 	Subtitle          string          `json:"subtitle"`
 	Level             int             `json:"level"`
 	Nickname          string          `json:"nickname"`
-	AvatarURL         string          `json:"avatarUrl"`
+	AvatarPath        string          `json:"avatarPath"`
 }
 
 const replayListPageSize = 20
@@ -28,7 +29,7 @@ var replayListOrders = map[string]string{
 	"score":  "sc.score DESC,sc.submitted_at DESC,sc.id",
 }
 
-// replayList is GET /api/v1/replays, public like the leaderboards: the plays whose recording is
+// replayList is GET /api/replays, public like the leaderboards: the plays whose recording is
 // kept, on the current files of published charts, so each can be played back over the chart as
 // it is now (the game's ghost battle). sort is recent (default) or score; course narrows to one
 // course and categoryId to the songs of one category (as the game catalog lists them); 20 a page.
@@ -109,7 +110,7 @@ func (s *Server) replayList(w http.ResponseWriter, r *http.Request) {
 	profiles := s.publicProfiles(r.Context(), ids)
 	for i := range items {
 		p := profiles[items[i].UserID]
-		items[i].Nickname, items[i].AvatarURL = p.Nickname, p.AvatarURL
+		items[i].Nickname, items[i].AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 	}
 	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": replayListPageSize, "sort": sort})
 }

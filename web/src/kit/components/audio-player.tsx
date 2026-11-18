@@ -9,7 +9,7 @@ import {
 import { Button } from './ui/button'
 import { Slider } from './ui/slider'
 import { cn } from '../lib/utils'
-import { retryResourceOrigin } from '../resource-download'
+import { useChartFile } from '../resource-download'
 
 function time(seconds: number) {
   const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0
@@ -17,7 +17,10 @@ function time(seconds: number) {
 }
 
 type AudioPlayerProps = {
+  /** The audio's address; empty while it is not known yet. */
   src: string
+  /** Where to load the audio once src fails (the canonical root behind the mirror). */
+  fallbackSrc?: string
   label: string
   startAt?: number
   endAt?: number
@@ -41,6 +44,7 @@ export function AudioPlayer(props: AudioPlayerProps) {
 
 function AudioPlayerContent({
   src,
+  fallbackSrc,
   label,
   startAt = 0,
   endAt,
@@ -65,6 +69,8 @@ function AudioPlayerContent({
   const [volume, setVolume] = useState(1)
   const [muted, setMuted] = useState(false)
   const [error, setError] = useState('')
+  const [fallen, setFallen] = useState(false)
+  const current = fallen && fallbackSrc ? fallbackSrc : src
   const range = endAt !== undefined
   const rangeStart = Number.isFinite(startAt) ? Math.max(0, startAt) : 0
   const rangeEnd = range ? Math.min(endAt, duration || endAt) : duration
@@ -133,7 +139,7 @@ function AudioPlayerContent({
     >
       <audio
         ref={audio}
-        src={src}
+        src={current || undefined}
         preload="metadata"
         className="hidden"
         onLoadedMetadata={(event) => {
@@ -155,9 +161,10 @@ function AudioPlayerContent({
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
-        onError={(event) => {
-          if (retryResourceOrigin(event.currentTarget)) {
-            if (playing) void event.currentTarget.play().catch(() => setPlaying(false))
+        onError={() => {
+          if (!current) return
+          if (!fallen && fallbackSrc && fallbackSrc !== src) {
+            setFallen(true)
             return
           }
           setPlaying(false)
@@ -243,5 +250,29 @@ function AudioPlayerContent({
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * AudioPlayer for a chart's stored audio, read from its path in the chart's manifest: a mainland
+ * visitor's from the mirror, the canonical root once that fails. `src`, when given (a file just
+ * chosen on this page), is played instead. `version` is the audio's hash, so a replaced file is
+ * read again.
+ */
+export function ChartAudioPlayer({
+  chartId,
+  version,
+  src,
+  ...props
+}: Omit<AudioPlayerProps, 'src' | 'fallbackSrc'> & {
+  chartId: string | undefined
+  version?: string
+  src?: string
+}) {
+  const stored = useChartFile(src ? undefined : chartId, 'audio', version)
+  return src ? (
+    <AudioPlayer {...props} src={src} />
+  ) : (
+    <AudioPlayer {...props} src={stored.url} fallbackSrc={stored.fallbackUrl} />
   )
 }

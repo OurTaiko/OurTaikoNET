@@ -65,7 +65,7 @@ func TestRulesGiveTitles(t *testing.T) {
 	}
 
 	// Being seen on the website gives its title; it says nothing of the game.
-	if code := c.do("alice", "GET", "/api/v1/me", "", nil); code != 200 {
+	if code := c.do("alice", "GET", "/api/me", "", nil); code != 200 {
 		t.Fatal(code)
 	}
 	expect(alice, "site")
@@ -77,7 +77,7 @@ func TestRulesGiveTitles(t *testing.T) {
 	}
 	play := func(slot int64, clear int) {
 		t.Helper()
-		r := httptest.NewRequest("POST", "/api/v1/game/scores", strings.NewReader(fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6,"ClearStatus":%d}`, slot, clear)))
+		r := httptest.NewRequest("POST", "/api/game/scores", strings.NewReader(fmt.Sprintf(`{"difficultyId":%d,"good":5,"ok":1,"bad":0,"score":6000,"drumroll":2,"max_combo":6,"ClearStatus":%d}`, slot, clear)))
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()

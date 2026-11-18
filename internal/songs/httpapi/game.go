@@ -21,7 +21,7 @@ import (
 // route only the website's session counts, so a token kept in a game cannot do what the
 // website can.
 func isGameRequest(r *http.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/api/v1/game/")
+	return strings.HasPrefix(r.URL.Path, "/api/game/")
 }
 
 func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
@@ -70,11 +70,16 @@ func (s *Server) gameLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		result.User.AvatarURL = s.Config.SSO.AvatarURL(result.User)
 	}
+	shown := struct {
+		User    account.Shown `json:"user"`
+		Token   string        `json:"accessToken"`
+		Expires int           `json:"expiresIn"`
+	}{account.Show(result.User), result.Token, result.Expires}
 	if e := signin.RecordActivity(r.Context(), s.DB, result.User.ID, true, titlerules.GameLogin); e != nil {
 		internal(w, e)
 		return
 	}
-	web.Respond(w, 200, result)
+	web.Respond(w, 200, shown)
 }
 
 // gameCatalog is the complete song list for a game client: the categories, every published
@@ -124,7 +129,6 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	s.routePlaylistCovers(r, playlists)
 	body := map[string]any{
 		"categories": categories, "charts": charts, "chartCount": len(charts), "playlists": playlists, "playlistVersion": 1,
 		"chartSlotVersion": 1, "resourceDownloadVersion": 1, "scoreReplayVersion": 1, "danVersion": 1, "danResultsVersion": 1,

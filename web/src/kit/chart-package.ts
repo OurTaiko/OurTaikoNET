@@ -1,8 +1,7 @@
 import { downloadZip } from 'client-zip'
-import { endpoints } from './api/endpoints'
 import type { ChartBase } from './api/types'
 import { withChartTitles } from './tja-titles'
-import { verifiedResource } from './resource-download'
+import { pathResource, readChartResources, verifiedResource } from './resource-download'
 
 type PackageFile = {
   url: string
@@ -11,11 +10,6 @@ type PackageFile = {
   sha256?: string
   size?: number
   tja?: boolean
-}
-type Manifest = {
-  resources: Partial<
-    Record<string, { url: string; fallbackUrl?: string; sha256: string; size: number }>
-  >
 }
 
 /** Stored files that make up a chart package, in archive order. */
@@ -34,53 +28,40 @@ export function packageFilename(title: string) {
 }
 
 /** Files keep their stored names, so the TJA's WAVE finds the audio beside it. */
-export function entryName(url: string, sha256: string) {
-  const extension = /\.([a-z0-9]+)$/i.exec(new URL(url, 'http://localhost').pathname)?.[1]
+export function entryName(path: string, sha256: string) {
+  const extension = /\.([a-z0-9]+)$/i.exec(new URL(path, 'http://localhost').pathname)?.[1]
   if (!extension) throw new Error('PACKAGE_RESOURCE_INVALID')
   return `${sha256}.${extension.toLowerCase()}`
 }
 
-/** Without direct resource links the API serves the same stored files itself. */
-function apiFiles(chart: ChartBase): PackageFile[] {
-  // The API does not publish the stored TJA's hash any more (a chart's identity is each
-  // block's chartHash); the fallback trusts the API's own file route for it.
-  const files: PackageFile[] = [
-    { url: endpoints.resource(chart, 'tja'), name: chart.tjaName, tja: true },
-    { url: endpoints.resource(chart, 'audio'), name: chart.wave, sha256: chart.audioHash },
-  ]
-  if (chart.movieHash)
-    files.push({
-      url: endpoints.resource(chart, 'movie'),
-      name: `${chart.movieHash}.mp4`,
-      sha256: chart.movieHash,
-    })
-  if (chart.coverHash)
-    files.push({
-      url: endpoints.cover(chart.id, chart.coverHash),
-      name: `${chart.coverHash}.webp`,
-      sha256: chart.coverHash,
-    })
-  if (chart.bgimageHash)
-    files.push({
-      url: endpoints.resource(chart, 'bgimage'),
-      name: `${chart.bgimageHash}.webp`,
-      sha256: chart.bgimageHash,
-    })
-  return files
-}
-
 async function packageFiles(chart: ChartBase, signal: AbortSignal): Promise<PackageFile[]> {
-  const response = await fetch(endpoints.resources(chart.id), { signal })
-  if (response.status === 404) return apiFiles(chart)
-  if (!response.ok) throw new Error('PACKAGE_RESOURCES_UNAVAILABLE')
-  const { resources } = (await response.json()) as Manifest
+  let resources
+  try {
+    resources = await readChartResources(chart.id, signal)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'RESOURCES_UNAVAILABLE')
+      throw new Error('PACKAGE_RESOURCES_UNAVAILABLE', { cause: error })
+    throw error
+  }
+  // Every chart with files has a manifest; none means there is nothing to pack.
+  if (!resources) throw new Error('PACKAGE_RESOURCES_UNAVAILABLE')
   // The page may be older than the files it would name the archive after.
   if (!resources.tja || resources.audio?.sha256 !== chart.audioHash)
     throw new Error('PACKAGE_CHART_CHANGED')
-  return packaged.flatMap((kind) => {
-    const file = resources[kind]
-    return file ? [{ ...file, name: entryName(file.url, file.sha256), tja: kind === 'tja' }] : []
-  })
+  const files = await Promise.all(
+    packaged.map(async (kind) => {
+      const file = resources[kind]
+      if (!file) return []
+      return [
+        {
+          ...(await pathResource(file.path, { size: file.size, sha256: file.sha256 })),
+          name: entryName(file.path, file.sha256),
+          tja: kind === 'tja',
+        },
+      ]
+    }),
+  )
+  return files.flat()
 }
 
 /**

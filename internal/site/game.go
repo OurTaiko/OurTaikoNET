@@ -12,13 +12,13 @@ import (
 
 // The game used to load each source by itself: its catalogue, its dan courses and, signed
 // in, the player's scores and playlists there, four requests a source and a sign-in for each.
-// GET /api/v1/game/sources answers all of it for every source at once:
+// GET /api/game/sources answers all of it for every source at once:
 //
 //	{"sources": [{"id": "fanmade", "name": "OurTaiko Fanmade",
 //	              "catalog": …, "dans": …, "scores": …, "playlists": …}, …]}
 //
 // Each part is exactly what the source's own route answers (/game/catalog, /game/dans,
-// /game/scores, /game/playlists under /api/v1/sources/<id>/), so a client reads it as it
+// /game/scores, /game/playlists under /api/sources/<id>/), so a client reads it as it
 // reads those. scores and playlists are the signed-in player's and need the game session in
 // Authorization; one session is good for every source.
 //
@@ -34,10 +34,10 @@ var gameParts = []struct {
 	name, path string
 	personal   bool
 }{
-	{"catalog", "/api/v1/game/catalog", false},
-	{"dans", "/api/v1/game/dans", false},
-	{"scores", "/api/v1/game/scores", true},
-	{"playlists", "/api/v1/game/playlists", true},
+	{"catalog", "/api/game/catalog", false},
+	{"dans", "/api/game/dans", false},
+	{"scores", "/api/game/scores", true},
+	{"playlists", "/api/game/playlists", true},
 }
 
 // answer collects what a source's handler writes.

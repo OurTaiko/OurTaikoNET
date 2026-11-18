@@ -28,18 +28,6 @@ func encodeCover(w http.ResponseWriter, r *http.Request, name string, data []byt
 	return encoded, true
 }
 
-func (s *Server) getCover(w http.ResponseWriter, r *http.Request) {
-	key, _, digest, ok := s.publishedFile(w, r, "cover_file")
-	if !ok {
-		return
-	}
-	if requested := r.URL.Query().Get("v"); requested != "" && requested != digest {
-		problem(w, 404, "COVER_NOT_FOUND", "该封面已被替换")
-		return
-	}
-	s.serveCover(w, r, digest, key)
-}
-
 // replaceCover sets a published chart's cover on its own and points the stored TJA's PREIMAGE
 // at it, as an upload does.
 func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +98,9 @@ func (s *Server) replaceCover(w http.ResponseWriter, r *http.Request) {
 			log.Printf("replaced cover cleanup pending: %v", err)
 		}
 	}
-	web.Respond(w, 200, map[string]string{"coverHash": web.Hash(string(encoded))})
+	// The new cover's own address too, so a page shows it without reading the chart again.
+	digest := web.Hash(string(encoded))
+	web.Respond(w, 200, map[string]string{"coverHash": digest, "songCoverPath": s.filePath(digest + ".webp")})
 }
 
 // storeCover stores an encoded WebP cover and returns its file ID.
@@ -171,11 +161,6 @@ func receiveCover(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 		return nil, false
 	}
 	return encodeCover(w, r, name, data)
-}
-
-// serveCover sends a cover image, or redirects to its CDN address.
-func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, digest, key string) {
-	s.serveObject(w, r, key, "cover.webp", digest, "image/webp", "inline")
 }
 
 // releaseCovers deletes a playlist's former cover files unless something

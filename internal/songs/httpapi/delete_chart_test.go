@@ -49,7 +49,7 @@ func TestDeleteChartRemovesScoresRowAndUnsharedFiles(t *testing.T) {
 	}
 	handler := testServer(t, pool, Config{Objects: store, Storage: t.TempDir(), Origin: "http://localhost"}).Handler()
 	removeChart := func(actor, chart string) int {
-		r := httptest.NewRequest("DELETE", "/api/v1/charts/"+chart, nil)
+		r := httptest.NewRequest("DELETE", "/api/charts/"+chart, nil)
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: tokens[actor]})

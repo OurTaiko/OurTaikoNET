@@ -176,7 +176,7 @@ export function ChatBell() {
               >
                 <UserAvatar
                   nickname={chat.peer.nickname || '?'}
-                  avatarUrl={chat.peer.avatarUrl}
+                  avatarPath={chat.peer.avatarPath}
                   className="size-9"
                 />
                 <span className="min-w-0 flex-1">
@@ -364,7 +364,7 @@ function Chats({ open }: { open?: string }) {
               chat.id,
               <UserAvatar
                 nickname={chat.peer.nickname || '?'}
-                avatarUrl={chat.peer.avatarUrl}
+                avatarPath={chat.peer.avatarPath}
                 className="size-11"
               />,
               <>
@@ -557,7 +557,7 @@ function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onCha
           >
             <UserAvatar
               nickname={chat.peer.nickname || '?'}
-              avatarUrl={chat.peer.avatarUrl}
+              avatarPath={chat.peer.avatarPath}
               className="size-9"
             />
             <h2 className="min-w-0 truncate font-bold">{name}</h2>
@@ -638,7 +638,7 @@ function DirectChat({ id, back, onChange }: { id: string; back: ReactNode; onCha
                       (endsRun && chat ? (
                         <UserAvatar
                           nickname={chat.peer.nickname || '?'}
-                          avatarUrl={chat.peer.avatarUrl}
+                          avatarPath={chat.peer.avatarPath}
                           className="size-8"
                         />
                       ) : (

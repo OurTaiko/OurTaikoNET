@@ -10,7 +10,7 @@ func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 	sources := []Source{{"fanmade", "OurTaiko Fanmade", echo("fanmade")}}
 	on := Handler(sources, echo("players"), WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxProtocol: 2, MaxMembers: 5}))
 	w := httptest.NewRecorder()
-	on.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
+	on.ServeHTTP(w, httptest.NewRequest("GET", "/api/game/multiplay", nil))
 	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxProtocol":2,"maxMembers":5}` {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
@@ -29,7 +29,7 @@ func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 			off = Handler(sources, echo("players"))
 		}
 		w = httptest.NewRecorder()
-		off.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
+		off.ServeHTTP(w, httptest.NewRequest("GET", "/api/game/multiplay", nil))
 		if w.Code != 404 || !strings.Contains(w.Body.String(), `"code":"MULTIPLAY_UNAVAILABLE"`) || !strings.Contains(w.Body.String(), `"message":"`) {
 			t.Fatalf("%s: %d %s", name, w.Code, w.Body.String())
 		}
@@ -37,9 +37,9 @@ func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 
 	// The rest of the site is as it is without the option.
 	for path, want := range map[string]string{
-		"/api/v1/sources/fanmade/game/catalog": "fanmade GET /api/v1/game/catalog",
-		"/api/v1/titles":                       "players GET /api/v1/titles",
-		"/api/v1/game/multiplay/rooms":         "players GET /api/v1/game/multiplay/rooms",
+		"/api/sources/fanmade/game/catalog": "fanmade GET /api/game/catalog",
+		"/api/titles":                       "players GET /api/titles",
+		"/api/game/multiplay/rooms":         "players GET /api/game/multiplay/rooms",
 	} {
 		w = httptest.NewRecorder()
 		on.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
@@ -50,7 +50,7 @@ func TestTheGameIsToldWhereMultiEnsoIs(t *testing.T) {
 	// What the released game loads is answered as before.
 	loads := Handler([]Source{{"fanmade", "OurTaiko Fanmade", &source{name: "fanmade"}}}, nil, WithMultiplay(Multiplay{URL: "https://net.example", Protocol: 1, MaxProtocol: 2, MaxMembers: 5}))
 	w = httptest.NewRecorder()
-	loads.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/sources?parts=catalog", nil))
+	loads.ServeHTTP(w, httptest.NewRequest("GET", "/api/game/sources?parts=catalog", nil))
 	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"sources":[{"id":"fanmade","name":"OurTaiko Fanmade","catalog":{"from":"fanmade","route":"catalog"}}]}` {
 		t.Errorf("game/sources: %d %q", w.Code, w.Body.String())
 	}

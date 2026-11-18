@@ -90,7 +90,7 @@ function Row({ item, copy = false }: { item: Activity; copy?: boolean }) {
         tabIndex={copy ? -1 : undefined}
         className="relative rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring shrink-0"
       >
-        <UserAvatar nickname={name} avatarUrl={item.user.avatarUrl} className="size-10" />
+        <UserAvatar nickname={name} avatarPath={item.user.avatarPath} className="size-10" />
         {/* What happened, on the corner of who did it: a crown for a play, an arrow for an upload. */}
         <span
           data-accent={source}

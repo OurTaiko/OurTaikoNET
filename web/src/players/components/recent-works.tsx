@@ -38,7 +38,7 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
       {/* The title below is the link a keyboard and a screen reader get; this one is for the pointer. */}
       <a href={page} tabIndex={-1} aria-hidden="true" className="group @xl:row-span-2 self-start">
         <SongCover
-          image={cover ? coverOf(source, chart) : undefined}
+          image={cover ? coverOf(chart) : undefined}
           categoryIds={chart.categoryIds}
           className="rounded-[16px] @xl:rounded-none"
         />
@@ -69,11 +69,11 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
         <div className="flex justify-between items-center gap-3 mt-auto">
           <span className="flex items-center gap-2 min-w-0">
             <UserAvatar
-              nickname={chart.uploader}
-              avatarUrl={chart.uploaderAvatarUrl}
+              nickname={chart.author}
+              avatarPath={chart.authorAvatarPath}
               className="size-7"
             />
-            <span className="font-semibold text-sm truncate">{chart.uploader}</span>
+            <span className="font-semibold text-sm truncate">{chart.author}</span>
           </span>
           <a className={cn(buttonVariants(), 'shrink-0')} href={page}>
             {t('home.openChart')}

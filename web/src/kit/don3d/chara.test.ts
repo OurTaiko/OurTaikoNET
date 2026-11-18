@@ -11,7 +11,7 @@ import {
   recolorPixels,
 } from './chara'
 import { FacePlayer, parseFaceTimelines } from './face'
-import { catalogUrl, resolveDonLook, type DonCatalog } from './catalog'
+import { catalogUrl, donSource, resolveDonLook, type DonCatalog } from './catalog'
 import type { DonPartData } from './part'
 import { paintPlaneScale, scaleFacePlates } from './renderer'
 
@@ -313,23 +313,22 @@ describe('resolveDonLook', () => {
     expect(resolveDonLook(catalog, { ...look, paint: 2 }).paint).toBeNull()
   })
 
-  it('builds versioned URLs', () => {
-    expect(catalogUrl('https://distrib.ourtaiko.org/3dchara', file('cos/0.glb'))).toBe(
-      'https://distrib.ourtaiko.org/3dchara/cos/0.glb?v=abcdef012345',
+  it('reads a file from the visitor root, named by its canonical address', () => {
+    const canonicalBaseUrl = 'https://distrib.ourtaiko.org/'
+    const mirror = { baseUrl: 'https://static.sakura-bot.cn/ourtaiko/', canonicalBaseUrl }
+    expect(catalogUrl(mirror, file('3dchara/head/3.glb'))).toBe(
+      'https://distrib.ourtaiko.org/3dchara/head/3.glb',
     )
-  })
-
-  it('uses the mirror only for files listed by the API', () => {
-    const base = 'https://distrib.ourtaiko.org/3dchara/'
-    const mirror = {
-      mirrorBaseUrl: 'https://static.sakura-bot.cn/3dchara/',
-      mirrorPaths: ['head/3.glb'],
-    }
-    expect(catalogUrl(base, file('head/3.glb'), mirror)).toBe(
-      'https://static.sakura-bot.cn/3dchara/head/3.glb?v=abcdef012345',
+    expect(donSource(mirror, file('3dchara/head/3.glb')).mirror).toBe(
+      'https://static.sakura-bot.cn/ourtaiko/3dchara/head/3.glb',
     )
-    expect(catalogUrl(base, file('body/4.glb'), mirror)).toBe(base + 'body/4.glb?v=abcdef012345')
-    expect(catalogUrl(base, file('head/3.glb'), {})).toBe(base + 'head/3.glb?v=abcdef012345')
+    expect(
+      donSource({ baseUrl: canonicalBaseUrl, canonicalBaseUrl }, file('3dchara/cos/0.glb')),
+    ).toEqual({
+      url: canonicalBaseUrl + '3dchara/cos/0.glb',
+      mirror: null,
+      sha256: 'abcdef0123456789',
+    })
   })
 })
 

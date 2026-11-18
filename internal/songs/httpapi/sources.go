@@ -4,6 +4,7 @@ package httpapi
 
 // Fanmade is the source of songs players make and upload themselves.
 var Fanmade = &Source{
+	Folder:        "fanmade/",
 	SessionCookie: "ourtaiko_session",
 	OIDCCookie:    "ourtaiko_oidc",
 	DefaultReturn: "/upload",
@@ -25,6 +26,7 @@ var Fanmade = &Source{
 // Official is the source of the official game's songs, which its managers keep.
 var Official = &Source{
 	Official:      true,
+	Folder:        "database/",
 	SessionCookie: "ourtaiko_db_session",
 	OIDCCookie:    "ourtaiko_db_oidc",
 	DefaultReturn: "/",

@@ -57,7 +57,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 			form.WriteField(fields[i], fields[i+1])
 		}
 		form.Close()
-		r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+		r := httptest.NewRequest("POST", "/api/charts", &body)
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")
@@ -93,7 +93,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 			}
 			for _, kind := range []string{"tja", "download"} {
 				w = httptest.NewRecorder()
-				handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+chart.ID+"/"+kind, nil))
+				handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+chart.ID+"/"+kind, nil))
 				if w.Code != 200 {
 					t.Fatal(w.Code)
 				}
@@ -147,7 +147,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 	}
 	// The package names the chart as the site does once its names are edited there; the
 	// stored file keeps the uploaded headers.
-	edit := httptest.NewRequest("PATCH", "/api/v1/charts/"+started.ID, strings.NewReader(`{"title":"Renamed","titleTranslations":{"en":"Renamed EN"}}`))
+	edit := httptest.NewRequest("PATCH", "/api/charts/"+started.ID, strings.NewReader(`{"title":"Renamed","titleTranslations":{"en":"Renamed EN"}}`))
 	edit.Header.Set("Content-Type", "application/json")
 	edit.Header.Set("Origin", "http://localhost")
 	edit.Header.Set("X-CSRF-Token", "csrf")
@@ -158,7 +158,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 		t.Fatal("rename", w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+started.ID+"/download", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+started.ID+"/download", nil))
 	archive, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
 	if w.Code != 200 || err != nil {
 		t.Fatal("package", w.Code, err)
@@ -173,7 +173,7 @@ func TestUploadStoresCanonicalUTF8(t *testing.T) {
 		t.Fatalf("packaged TJA: %q %v", text, err)
 	}
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+started.ID+"/tja", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+started.ID+"/tja", nil))
 	if w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte("TITLE:初音ミク\r\n")) {
 		t.Fatal("stored TJA changed", w.Code)
 	}
@@ -210,7 +210,7 @@ func TestUploadsAreUTF8Only(t *testing.T) {
 			form.WriteField(fields[i], fields[i+1])
 		}
 		form.Close()
-		r := httptest.NewRequest("POST", "/api/v1/charts", &body)
+		r := httptest.NewRequest("POST", "/api/charts", &body)
 		r.Header.Set("Content-Type", form.FormDataContentType())
 		r.Header.Set("Origin", "http://localhost")
 		r.Header.Set("X-CSRF-Token", "csrf")

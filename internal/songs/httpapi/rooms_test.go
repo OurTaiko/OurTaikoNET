@@ -36,7 +36,7 @@ func TestRoomsReadPlayableCharts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ID != w.song || c.Title != "Song" || c.Uploader != "owner" || len(c.Owners) != 1 || c.Upvotes != 1 || c.MyVote != 0 {
+	if c.ID != w.song || c.Title != "Song" || c.Author != "owner" || len(c.Owners) != 1 || c.Upvotes != 1 || c.MyVote != 0 {
 		t.Fatalf("chart: %+v", c)
 	}
 	var blocks []string
@@ -107,7 +107,7 @@ func TestRoomsDrawFromTheGameCatalog(t *testing.T) {
 	}
 	listed := func() map[string]bool {
 		t.Helper()
-		if status := w.c.do("", "GET", "/api/v1/game/catalog", "", &catalog); status != 200 {
+		if status := w.c.do("", "GET", "/api/game/catalog", "", &catalog); status != 200 {
 			t.Fatal("catalog", status)
 		}
 		ids := map[string]bool{}
@@ -128,8 +128,8 @@ func TestRoomsDrawFromTheGameCatalog(t *testing.T) {
 			if err != nil {
 				t.Fatal(i, err)
 			}
-			if c.ID <= last || c.Uploader != "owner" {
-				t.Fatalf("chart %d is %s after %s, uploaded by %q", i, c.ID, last, c.Uploader)
+			if c.ID <= last || c.Author != "owner" {
+				t.Fatalf("chart %d is %s after %s, uploaded by %q", i, c.ID, last, c.Author)
 			}
 			ids[c.ID], last = true, c.ID
 		}
@@ -179,7 +179,7 @@ func TestGameIdentity(t *testing.T) {
 	// The game signs in without an Origin, as no browser does.
 	var login struct{ AccessToken string }
 	signIn := func(server *Server, credentials string) int {
-		r := httptest.NewRequest("POST", "/api/v1/game/login", strings.NewReader(credentials))
+		r := httptest.NewRequest("POST", "/api/game/login", strings.NewReader(credentials))
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		server.Handler().ServeHTTP(w, r)

@@ -102,12 +102,12 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 	sound := part{"audio", "vorbis.ogg", audio}
 
 	// Fast checks still answer at once, without a notice.
-	if w := send("POST", "/api/v1/charts", web.NewID(), part{"tja", "chart.tja", []byte("broken")}, sound); w.Code != 422 {
+	if w := send("POST", "/api/charts", web.NewID(), part{"tja", "chart.tja", []byte("broken")}, sound); w.Code != 422 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	// Audio that does not decode rejects the whole upload: nothing is stored.
 	key := web.NewID()
-	accepted(send("POST", "/api/v1/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
+	accepted(send("POST", "/api/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
 	if n := outcome(key); n.Data.Status != "failed" || n.Data.Code != "AUDIO_INVALID" || n.Data.Title != "Bad audio" || n.Chart != nil {
 		t.Fatalf("%+v", n)
 	}
@@ -119,11 +119,11 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 		t.Fatal("rejected upload left files", entries, err)
 	}
 	// The released receipt lets the same request be sent again.
-	accepted(send("POST", "/api/v1/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
+	accepted(send("POST", "/api/charts", key, chart("Bad audio", ""), part{"audio", "vorbis.ogg", audio[:len(audio)-11]}))
 
 	// A bad cover and a bad movie are left out; the chart is published and both are named.
 	key = web.NewID()
-	accepted(send("POST", "/api/v1/charts", key, chart("Partial", "BGMOVIE:clip.mp4\n"), sound,
+	accepted(send("POST", "/api/charts", key, chart("Partial", "BGMOVIE:clip.mp4\n"), sound,
 		part{"cover", "cover.png", []byte("not an image")}, part{"movie", "clip.mp4", []byte("not a video")}))
 	n := outcome(key)
 	if n.Data.Status != "published" || n.Chart == nil || len(n.Data.FailedFiles) != 2 ||
@@ -135,7 +135,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 		t.Fatalf("%+v %v", published, err)
 	}
 	// Sending the finished request again returns its chart instead of a second job.
-	retry := send("POST", "/api/v1/charts", key, chart("Partial", "BGMOVIE:clip.mp4\n"), sound,
+	retry := send("POST", "/api/charts", key, chart("Partial", "BGMOVIE:clip.mp4\n"), sound,
 		part{"cover", "cover.png", []byte("not an image")}, part{"movie", "clip.mp4", []byte("not a video")})
 	if retry.Code != 200 || !strings.Contains(retry.Body.String(), published.ID) || count(`SELECT count(*) FROM charts`) != 1 {
 		t.Fatal(retry.Code, retry.Body.String())
@@ -143,7 +143,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 
 	// A replacement is reported the same way and links to the chart.
 	key = web.NewID()
-	accepted(send("PUT", "/api/v1/charts/"+published.ID+"/files", key, chart("Replaced", ""), part{"confirmReset", "", []byte("true")}))
+	accepted(send("PUT", "/api/charts/"+published.ID+"/files", key, chart("Replaced", ""), part{"confirmReset", "", []byte("true")}))
 	if n = outcome(key); n.Data.Status != "updated" || n.Chart == nil || *n.Chart != published.ID || len(n.Data.FailedFiles) != 0 {
 		t.Fatalf("%+v", n)
 	}
@@ -167,7 +167,7 @@ func TestAsyncUploadReportsByNotification(t *testing.T) {
 		t.Fatal("interrupted upload not settled once")
 	}
 	// The outcome cannot be muted and is not offered in the settings.
-	r := httptest.NewRequest("GET", "/api/v1/me/notification-settings", nil)
+	r := httptest.NewRequest("GET", "/api/me/notification-settings", nil)
 	r.AddCookie(&http.Cookie{Name: "ourtaiko_session", Value: cookie})
 	w := httptest.NewRecorder()
 	app.Handler().ServeHTTP(w, r)

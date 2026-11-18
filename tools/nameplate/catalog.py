@@ -14,8 +14,9 @@ from the bucket; the game keeps no copy and caches what it fetches at sign-in:
                                    5 to a row, left to right then top to bottom (0..5 are blank)
     1p.png, 2p.png                 the seat badges, 88x88
 
-Every file is listed with its path (relative to the catalog), size and SHA-256, so the website
-can ask for "<path>?v=<first 12 of the hash>" and a replaced file is never read from an old cache.
+Every file is listed with its path (relative to the catalog), size and SHA-256. A published file
+is never replaced: clients and the mirror keep it by its path alone, so changed art gets a new
+file name.
 
 Usage: catalog.py <folder>   (writes <folder>/catalog.json)
 """

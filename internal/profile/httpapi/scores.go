@@ -70,7 +70,7 @@ type sourceList struct {
 // chart; view=best is one row per chart block: the highest score among the plays of the
 // song's current files, or of replaced files while the block has none of the current ones,
 // with the best clear status of those plays and their count. These are the rules of each
-// source's own list (its GET /api/v1/users/{id}/scores).
+// source's own list (its GET /api/users/{id}/scores).
 func (s *Server) plays(ctx context.Context, source Source, user, view, course string) *sourceList {
 	list := &sourceList{rows: []SourceScore{}}
 	schema := pgx.Identifier{source.ID}.Sanitize()
@@ -146,7 +146,7 @@ var scoreOrders = map[string]func(a, b *SourceScore) bool{
 
 var scoreCourses = map[string]bool{"Easy": true, "Normal": true, "Hard": true, "Oni": true, "Edit": true}
 
-// userScores is GET /api/v1/users/{id}/scores: the player's rows of every source (or one,
+// userScores is GET /api/users/{id}/scores: the player's rows of every source (or one,
 // source=<id>) in one list, public like the sources' own. view=best (default) or all, sort
 // level/score/recent (default level for best, recent for all), course, 50 rows a page. A
 // source that cannot be read is reported in sources[].error while the others still show.

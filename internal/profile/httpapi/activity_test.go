@@ -55,7 +55,7 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 	}
 	c := &client{t: t, handler: New(pool, Config{Origin: origin, Sources: sources, DevUserID: player}).Handler()}
 	var feed struct{ Items []Activity }
-	c.json("GET", "/api/v1/activity", "", 200, &feed)
+	c.json("GET", "/api/activity", "", 200, &feed)
 	got := []string{}
 	for _, item := range feed.Items {
 		row := item.Kind + ":" + item.Source + ":" + item.Chart.Title + ":" + item.User.ID[28:]
@@ -84,7 +84,7 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 		play("official", fmt.Sprint("m", i), player, block, 1, fmt.Sprintf("2026-02-0%dT00:00:00Z", i+1))
 	}
 	c = &client{t: t, handler: New(pool, Config{Origin: origin, Sources: sources}).Handler()}
-	c.json("GET", "/api/v1/activity", "", 200, &feed)
+	c.json("GET", "/api/activity", "", 200, &feed)
 	got = got[:0]
 	for _, item := range feed.Items {
 		if item.Play != nil && item.User.ID == player {

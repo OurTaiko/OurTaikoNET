@@ -4,7 +4,13 @@
 // feedback, and the small print.
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowSquareOutIcon, BugIcon, EyeIcon, GithubLogoIcon } from '@phosphor-icons/react'
+import {
+  ArrowSquareOutIcon,
+  BugIcon,
+  CloudArrowDownIcon,
+  EyeIcon,
+  GithubLogoIcon,
+} from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import type { SourceId } from '../source'
 import {
@@ -15,6 +21,7 @@ import {
   sourceCodeAddress,
 } from './community'
 import { useVisitSummary } from './visits'
+import { useDistributionSource } from '../distribution'
 
 const playerAddress = 'https://play.ourtaiko.org/'
 const licenseAddress = 'https://www.gnu.org/licenses/agpl-3.0.html'
@@ -57,6 +64,8 @@ export function FrameFooter({ source }: { source: SourceId }) {
   const { t, i18n } = useTranslation()
   // How much the site is visited; the line is left out until that is known.
   const visits = useVisitSummary()
+  // Where this visitor's public files (avatars, art, the web player) come from.
+  const files = useDistributionSource()
   const number = new Intl.NumberFormat(i18n.language)
   const places = [
     { href: '/', label: t('shell.home') },
@@ -181,6 +190,19 @@ export function FrameFooter({ source }: { source: SourceId }) {
                   total: number.format(visits.total.views),
                   today: number.format(visits.today.views),
                   visitors: number.format(visits.today.visitors),
+                })}
+              </span>
+            </p>
+          )}
+          {files && (
+            <p className="flex items-center gap-1.5" data-testid="site-file-source">
+              <CloudArrowDownIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                {t('shell.footer.source', {
+                  name: t(
+                    files.mirror ? 'shell.footer.sourceMirror' : 'shell.footer.sourceCanonical',
+                  ),
+                  host: new URL(files.baseUrl).host,
                 })}
               </span>
             </p>

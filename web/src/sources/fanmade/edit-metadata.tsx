@@ -6,7 +6,7 @@ import { DialogClose } from '@sitekit/components/ui/dialog'
 import { Label } from '@sitekit/components/ui/label'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui/tabs'
 import { Textarea } from '@sitekit/components/ui/textarea'
-import { AudioPlayer } from '@sitekit/components/audio-player'
+import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { MovieSettings, movieChanges, movieDraft } from '@sitekit/components/movie-settings'
 import { Input } from '@sitekit/components/ui/input'
 import { Button } from '@sitekit/components/ui/button'
@@ -297,9 +297,10 @@ export function EditMetadata({
                     />
                   </Label>
                 </div>
-                <AudioPlayer
+                <ChartAudioPlayer
                   label={t('messages.audioPreview')}
-                  src={endpoints.resource(chart, 'audio')}
+                  chartId={chart.id}
+                  version={chart.audioHash}
                   startAt={demoStart.trim() ? Number(demoStart) : NaN}
                   endAt={demoEnd.trim() ? Number(demoEnd) : NaN}
                   knownDuration={chart.duration}

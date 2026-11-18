@@ -1,7 +1,6 @@
-import { fetchResource } from './resource-download'
+import { fetchChartFile } from './resource-download'
 import { i18n } from './i18n'
 import { useTranslation } from 'react-i18next'
-import { endpoints } from './api/endpoints'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { cn } from './lib/utils'
 import { Button } from './components/ui/button'
@@ -81,7 +80,7 @@ export function ChartActivity({
     setError('')
     async function load() {
       try {
-        const response = await fetchResource(endpoints.resource({ id }, 'tja'), {
+        const response = await fetchChartFile(id, 'tja', {
           signal: controller.signal,
           credentials: 'omit',
         })

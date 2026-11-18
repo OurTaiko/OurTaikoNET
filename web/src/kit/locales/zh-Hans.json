@@ -997,6 +997,9 @@
       "feedback": "提交反馈 / 报告问题",
       "nonProfit": "非营利社区项目",
       "visits": "总浏览 {{total}} 次 · 今日 {{today}} 次浏览，{{visitors}} 位访客",
+      "source": "资源来源：{{name}}（{{host}}）",
+      "sourceMirror": "中国大陆镜像",
+      "sourceCanonical": "全球 CDN",
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     }
   },

@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"ourtaiko.dev/net/internal/kit/distribution"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -25,7 +26,6 @@ import (
 	"ourtaiko.dev/net/internal/kit/charthash"
 	"ourtaiko.dev/net/internal/kit/objectstore"
 	"ourtaiko.dev/net/internal/kit/tja"
-	"ourtaiko.dev/net/internal/profile/httpapi"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -108,7 +108,7 @@ func main() {
 	cfg.DonMirrorCatalogURL = os.Getenv("DON_MIRROR_CATALOG_URL")
 	// The regional Don mirror needs a good catalog address and the IP country database.
 	if cfg.DonMirrorCatalogURL != "" {
-		if _, err := httpapi.ParseDonMirrorCatalogURL(cfg.DonMirrorCatalogURL); err != nil {
+		if _, err := distribution.ParseMirrorCatalogURL(cfg.DonMirrorCatalogURL); err != nil {
 			log.Fatal(err)
 		}
 		db, err := maxminddb.Open(os.Getenv("DON_GEOIP_DB"))

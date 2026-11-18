@@ -57,6 +57,7 @@ import {
 import { OverviewTab } from '@players/pages/user-overview'
 import { cn } from '@sitekit/lib/utils'
 import { usePageMeta } from '@sitekit/head'
+import { canonicalFileUrl } from '@sitekit/distribution'
 
 // The Don tab draws with three.js: loaded when it is opened, not with every page.
 const DonTab = lazy(() => import('@players/pages/user-don').then((m) => ({ default: m.DonTab })))
@@ -99,7 +100,8 @@ export function UserPage() {
   usePageMeta({
     title: nickname || undefined,
     description: nickname ? t('meta.player', { name: nickname }) : undefined,
-    image: profile?.user.avatarUrl,
+    // A link card's picture is an absolute address every reader can load: the canonical one.
+    image: canonicalFileUrl(profile?.user.avatarPath) || undefined,
     type: 'profile',
   })
   if (error) return <Notice>{error}</Notice>
@@ -107,7 +109,7 @@ export function UserPage() {
   const plate = {
     ...profile.nameplate,
     nickname: profile.user.nickname,
-    avatarUrl: profile.user.avatarUrl,
+    avatarPath: profile.user.avatarPath,
   }
   return (
     <div className="space-y-6">
@@ -115,7 +117,7 @@ export function UserPage() {
         <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <UserAvatar
             nickname={profile.user.nickname || '?'}
-            avatarUrl={profile.user.avatarUrl}
+            avatarPath={profile.user.avatarPath}
             className="size-20"
             fallbackClassName="text-2xl"
           />
@@ -460,7 +462,7 @@ function TitlesTab({
         endpoints.nameplate,
         jsonRequest('PUT', { titleId, showDan }, session.csrfToken),
       )
-      onPlate({ ...next, nickname: plate.nickname, avatarUrl: plate.avatarUrl })
+      onPlate({ ...next, nickname: plate.nickname, avatarPath: plate.avatarPath })
     } catch (e) {
       setError((e as Error).message)
     } finally {

@@ -43,14 +43,14 @@ func TestChartUpdateAt(t *testing.T) {
 		}
 	}
 
-	c.do("alice", "PUT", "/api/v1/charts/"+world.song+"/vote", `{"value":1}`, nil)
+	c.do("alice", "PUT", "/api/charts/"+world.song+"/vote", `{"value":1}`, nil)
 	moved("vote")
 	var comment Comment
-	if code := c.do("alice", "POST", "/api/v1/charts/"+world.song+"/comments", `{"body":"hi"}`, &comment); code != 201 {
+	if code := c.do("alice", "POST", "/api/charts/"+world.song+"/comments", `{"body":"hi"}`, &comment); code != 201 {
 		t.Fatal("comment", code)
 	}
 	moved("comment")
-	c.do("bob", "PUT", "/api/v1/comments/"+comment.ID+"/vote", `{"value":1}`, nil)
+	c.do("bob", "PUT", "/api/comments/"+comment.ID+"/vote", `{"value":1}`, nil)
 	moved("comment vote")
 	exec(`UPDATE charts SET bpm=130 WHERE id='` + world.song + `'`)
 	moved("chart column")
@@ -67,12 +67,12 @@ func TestChartUpdateAt(t *testing.T) {
 	stayed("an older update_at")
 
 	var chart Chart
-	if c.do("", "GET", "/api/v1/charts/"+world.song+"?by=id", "", &chart); !chart.UpdateAt.Equal(at) {
+	if c.do("", "GET", "/api/charts/"+world.song+"?by=id", "", &chart); !chart.UpdateAt.Equal(at) {
 		t.Fatal("detail updateAt", chart.UpdateAt, at)
 	}
 	// world.other is newer, but world.song changed last.
 	var list struct{ Items []Chart }
-	if code := c.do("", "GET", "/api/v1/charts?order=updated", "", &list); code != 200 || len(list.Items) != 2 || list.Items[0].ID != world.song {
+	if code := c.do("", "GET", "/api/charts?order=updated", "", &list); code != 200 || len(list.Items) != 2 || list.Items[0].ID != world.song {
 		t.Fatal("order=updated", code, list.Items)
 	}
 }

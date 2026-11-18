@@ -42,7 +42,7 @@ func testDifficultyConstants(t *testing.T, w interactionWorld) {
 	af, _ := parts.CreateFormFile("audio", "cbr.mp3")
 	af.Write(audio)
 	parts.Close()
-	r := httptest.NewRequest("POST", "/api/v1/charts", &form)
+	r := httptest.NewRequest("POST", "/api/charts", &form)
 	r.Header.Set("Content-Type", parts.FormDataContentType())
 	r.Header.Set("Origin", "http://localhost")
 	r.Header.Set("X-CSRF-Token", "csrf")
@@ -167,7 +167,7 @@ func testDifficultyConstants(t *testing.T, w interactionWorld) {
 			t.Fatalf("%s: constants %+v", d.Course, d.Constants)
 		}
 	}
-	if code, body := w.c.raw("", "/api/v1/charts"); code != 200 || strings.Contains(string(body), `"constants"`) {
+	if code, body := w.c.raw("", "/api/charts"); code != 200 || strings.Contains(string(body), `"constants"`) {
 		t.Fatalf("the list carries constants: %d", code)
 	}
 	if again, err := constants.Recalibrate(ctx, s.DB); err != nil || again.New || again.Rated != 0 {

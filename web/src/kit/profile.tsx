@@ -50,7 +50,7 @@ export function ProfilePage() {
         >
           <UserAvatar
             nickname={user.nickname}
-            avatarUrl={user.avatarUrl}
+            avatarPath={user.avatarPath}
             className="size-16"
             fallbackClassName="text-2xl"
           />

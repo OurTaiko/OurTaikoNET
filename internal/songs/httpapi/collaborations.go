@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"slices"
 	"time"
 
@@ -88,7 +89,7 @@ func (s *Server) listCollaborations(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				p := profiles[a.ID]
-				a.Nickname, a.AvatarURL = p.Nickname, p.AvatarURL
+				a.Nickname, a.AvatarPath = p.Nickname, files.Path(p.AvatarURL)
 			}
 		}
 	}

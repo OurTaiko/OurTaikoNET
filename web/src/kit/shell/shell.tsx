@@ -78,7 +78,7 @@ const groupsKey = 'ourtaiko-net-menu-groups'
 const wideQuery = '(min-width: 1024px)'
 
 const signInAddress = () =>
-  `/api/v1/auth/sso/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`
+  `/api/v2/auth/sso/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`
 
 function readGroups(): Partial<Record<GroupId, boolean>> {
   try {
@@ -392,7 +392,7 @@ export function Frame({ children }: { children: ReactNode }) {
             href={`/players/${user.id}`}
             className="flex flex-1 items-center gap-3 hover:bg-accent p-2 rounded-[20px] outline-none min-w-0 transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
           >
-            <UserAvatar nickname={user.nickname} avatarUrl={user.avatarUrl} className="size-10" />
+            <UserAvatar nickname={user.nickname} avatarPath={user.avatarPath} className="size-10" />
             <span className="flex-1 min-w-0">
               <span data-testid="account-nickname" className="block font-semibold text-sm truncate">
                 {user.nickname}

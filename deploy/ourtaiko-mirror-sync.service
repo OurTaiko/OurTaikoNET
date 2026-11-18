@@ -1,0 +1,24 @@
+[Unit]
+Description=Verify and publish OurTaiko public distribution mirrors
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/ourtaiko-mirror-sync.env
+ExecStart=/usr/bin/flock -n -E 75 /run/lock/taiko-memory-qa.lock /usr/bin/python3 /opt/ourtaiko-mirror/current/tools/sync-distribution-mirror.py --scratch /var/cache/ourtaiko-mirror --state /var/lib/ourtaiko-mirror/last-success.json
+SuccessExitStatus=75
+Slice=development-qa.slice
+MemoryHigh=192M
+MemoryMax=256M
+MemorySwapMax=0
+CPUQuota=50%
+TasksMax=32
+TimeoutStartSec=15min
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/cache/ourtaiko-mirror /var/lib/ourtaiko-mirror /run/lock/taiko-memory-qa.lock

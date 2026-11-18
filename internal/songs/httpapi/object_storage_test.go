@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
+	"strings"
 	"testing"
 
 	"ourtaiko.dev/net/internal/songs/teststore"
@@ -17,15 +16,14 @@ import (
 func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []byte) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/charts/"+chartID+"/resources", nil))
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/charts/"+chartID+"/resources", nil))
 	var payload struct {
 		ChartID string `json:"chartId"`
 
 		Resources map[string]struct {
-			URL     string `json:"url"`
-			HeadURL string `json:"headUrl"`
-			SHA     string `json:"sha256"`
-			Size    int64  `json:"size"`
+			Path string `json:"path"`
+			SHA  string `json:"sha256"`
+			Size int64  `json:"size"`
 		}
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &payload) != nil {
@@ -39,29 +37,19 @@ func verifyResourceLinks(t *testing.T, h http.Handler, chartID string, audio []b
 		t.Fatal("missing direct resources")
 	}
 	for kind, v := range payload.Resources {
-		u, e := url.Parse(v.URL)
-		if e != nil || u.Query().Get("X-Amz-Expires") != "900" || u.Query().Get("X-Amz-Signature") == "" {
-			t.Fatal("unsigned or wrong expiry")
+		// Each is a file under the distribution root: in the bucket, under its prefix.
+		if !strings.HasPrefix(v.Path, "fanmade/test/") || strings.ContainsAny(v.Path, "?#") {
+			t.Fatal("resource path", kind, v.Path)
 		}
-		resp, e := http.Get(v.URL)
-		if e != nil {
-			t.Fatal(e)
-		}
-		data, e := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if e != nil || resp.StatusCode != 200 || int64(len(data)) != v.Size || web.Hash(string(data)) != v.SHA {
-			t.Fatal("direct integrity", kind, e)
+		// Its bytes are what the manifest says, read here through the API's own route.
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest("GET", "/api/charts/"+chartID+"/"+kind, nil))
+		data := r.Body.Bytes()
+		if r.Code != 200 || int64(len(data)) != v.Size || web.Hash(string(data)) != v.SHA {
+			t.Fatal("direct integrity", kind, r.Code)
 		}
 		if kind == "audio" && !bytes.Equal(data, audio) {
 			t.Fatal("direct audio changed")
-		}
-		resp, e = http.Head(v.HeadURL)
-		if e != nil {
-			t.Fatal(e)
-		}
-		resp.Body.Close()
-		if resp.StatusCode != 200 || resp.ContentLength != v.Size {
-			t.Fatal("direct HEAD", kind)
 		}
 	}
 }
@@ -96,7 +84,7 @@ func TestS3PendingRecovery(t *testing.T) {
 		f.Close()
 	}
 	w := httptest.NewRecorder()
-	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/catalog", nil))
+	app.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/game/catalog", nil))
 	if w.Code != 200 {
 		t.Fatal("game inaccessible", w.Code)
 	}

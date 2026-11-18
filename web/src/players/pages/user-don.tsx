@@ -1,7 +1,8 @@
 // A player's 3D Don (the one OurTaikoPlay draws for them): a live preview for everyone, and for the
 // player themself the dressing room, in tabs: the outfit (a whole costume, or a head and a body),
 // the puchichara and the makeup; below them the three colours, picked from the catalog's icons and saved to their profile (PUT /me/don). The
-// models come from the public bucket's 3dchara folder, which the catalog's baseUrl names.
+// models come from the public bucket's 3dchara folder, which the catalog names by
+// path under the distribution root.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
@@ -142,7 +143,7 @@ export function DonTab({ id, mine }: { id: string; mine: boolean }) {
           <div className="relative aspect-[480/560] w-full overflow-hidden rounded-2xl bg-gradient-to-b from-muted/30 to-muted/70">
             <DonPreview
               catalog={catalog}
-              baseUrl={catalog.baseUrl}
+              root={catalog.root}
               look={draft}
               motion={motion}
               repeatMotion
@@ -424,14 +425,14 @@ function IconGrid({
                 // The first of its frames (stacked top to bottom: a puchichara has two, a
                 // makeup sheet one per face).
                 <img
-                  {...donImage(donSource(catalog.baseUrl, item.file, catalog))}
+                  {...donImage(donSource(catalog.root, item.file))}
                   alt=""
                   loading="lazy"
                   className="absolute inset-x-0 top-0 w-full"
                 />
               ) : item.icon ? (
                 <img
-                  {...donImage(donSource(catalog.baseUrl, item.icon, catalog))}
+                  {...donImage(donSource(catalog.root, item.icon))}
                   alt=""
                   loading="lazy"
                   className="size-full object-contain p-1"

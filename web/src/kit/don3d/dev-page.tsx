@@ -12,12 +12,15 @@ import { createRoot } from 'react-dom/client'
 import '../i18n'
 import { DonPreview } from './don-preview'
 import { createDonRenderer } from './renderer'
-import type { DonCatalog, DonLook } from './catalog'
+import type { DonCatalog, DonLook, DonRoot } from './catalog'
 import { donMotionNames, type DonMotionName } from './chara'
 
 const params = new URLSearchParams(location.search)
 const num = (key: string, fallback: number) => Number(params.get(key) ?? fallback)
 const assets = params.get('assets') ?? 'http://127.0.0.1:8765/'
+// The folder's own catalog.json names its files from the folder (the API's from the distribution
+// root), so the folder is the root here, with nothing else to fall back to.
+const root: DonRoot = { baseUrl: assets, canonicalBaseUrl: assets }
 const width = num('w', 240)
 const height = num('h', 280)
 const background = params.get('bg') ?? '#bbbbbb'
@@ -86,7 +89,7 @@ function Snapper({ catalog }: { catalog: DonCatalog }) {
     const upload = params.get('upload') ?? 'http://127.0.0.1:8766/'
     const renderer = createDonRenderer(canvas, {
       catalog,
-      baseUrl: assets,
+      root,
       preserveDrawingBuffer: true,
     })
     renderer.resize(num('sw', 960), num('sh', 1120), 1)
@@ -148,7 +151,7 @@ function Page() {
           <div key={shot.name} data-shot={shot.name} style={box}>
             <DonPreview
               catalog={catalog}
-              baseUrl={assets}
+              root={root}
               look={shot.look}
               motion={shot.motion}
               mirrored={shot.mirror}
@@ -173,7 +176,7 @@ function Page() {
     <div style={box}>
       <DonPreview
         catalog={catalog}
-        baseUrl={assets}
+        root={root}
         look={look}
         motion={
           (donMotionNames as readonly string[]).includes(motion)

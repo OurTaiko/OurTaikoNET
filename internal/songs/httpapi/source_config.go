@@ -3,6 +3,9 @@ package httpapi
 // Source is what a song source has of its own, in code that otherwise serves every source
 // alike.
 type Source struct {
+	// Folder is where the source's files are under the distribution root (package files) when
+	// they are kept on this server's disk; a bucket's own prefix names it otherwise.
+	Folder string
 	// Official is whether this is the official source: only its managers add songs, a song may
 	// be registered before its files, and its songs carry the official game's identifiers.
 	Official bool

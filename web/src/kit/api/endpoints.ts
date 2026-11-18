@@ -68,10 +68,9 @@ const build = () =>
     /** PUT: the background movie on its own, with an optional movieOffset. */
     chartMovie: (id: string) => `${chartPath(id)}/movie`,
     chartFilesPreview: (id: string) => `${chartPath(id)}/files/preview`,
-    /** The stored files' manifest: direct links, sizes and SHA-256. */
+    /** The stored files' manifest: each file's path under the distribution root, size and SHA-256. */
     resources: (id: string) => `${chartPath(id)}/resources`,
-    cover: (id: string, hash?: string) =>
-      withQuery(`${chartPath(id)}/cover`, hash ? { v: hash } : {}),
+    cover: (id: string) => `${chartPath(id)}/cover`,
     leaderboard: (id: string, query: { difficultyId?: number; page: number }) =>
       withQuery(`${chartPath(id)}/leaderboard`, query),
     scoreReplay: (id: string) => `${API_ROOT}/scores/${encodeURIComponent(id)}/replay`,
@@ -91,8 +90,7 @@ const build = () =>
     systemPlaylists: `${API_ROOT}/playlists/system`,
     myPlaylists: (chart?: string) => withQuery(`${API_ROOT}/me/playlists`, chart ? { chart } : {}),
     playlist: playlistPath,
-    playlistCover: (id: string, hash?: string) =>
-      withQuery(`${playlistPath(id)}/cover`, hash ? { v: hash } : {}),
+    playlistCover: (id: string) => `${playlistPath(id)}/cover`,
     playlistItem: (id: string, chart: string) =>
       `${playlistPath(id)}/items/${encodeURIComponent(chart)}`,
     playlistOrder: (id: string) => `${playlistPath(id)}/order`,

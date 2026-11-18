@@ -101,7 +101,7 @@ func one(t *testing.T, tags []headTag, key string) string {
 }
 
 func TestThePageHeadReplacesTheSitesOwnTags(t *testing.T) {
-	head := headFor(pageMeta{title: `A "quoted" <b>song</b> & co`, description: "Line one\n\nline two", image: "/api/v1/sources/fanmade/charts/abc/cover?v=1", kind: "music.song"},
+	head := headFor(pageMeta{title: `A "quoted" <b>song</b> & co`, description: "Line one\n\nline two", image: "/api/v2/sources/fanmade/charts/abc/cover", kind: "music.song"},
 		headAreas["fanmade"], "https://net.ourtaiko.org", "/fanmade/charts/abc")
 	page := string(withHead([]byte(builtIndex), head))
 	tags := headTags(t, page)
@@ -115,12 +115,12 @@ func TestThePageHeadReplacesTheSitesOwnTags(t *testing.T) {
 		"og:description":      "Line one line two",
 		"og:type":             "music.song",
 		"og:url":              "https://net.ourtaiko.org/fanmade/charts/abc",
-		"og:image":            "https://net.ourtaiko.org/api/v1/sources/fanmade/charts/abc/cover?v=1",
+		"og:image":            "https://net.ourtaiko.org/api/v2/sources/fanmade/charts/abc/cover",
 		"og:locale":           "zh_CN",
 		"twitter:card":        "summary_large_image",
 		"twitter:title":       `A "quoted" <b>song</b> & co | OurTaikoNET · 自制`,
 		"twitter:description": "Line one line two",
-		"twitter:image":       "https://net.ourtaiko.org/api/v1/sources/fanmade/charts/abc/cover?v=1",
+		"twitter:image":       "https://net.ourtaiko.org/api/v2/sources/fanmade/charts/abc/cover",
 		// What is not the page's stays.
 		"viewport":    "width=device-width, initial-scale=1.0",
 		"theme-color": "white",
@@ -236,37 +236,39 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "index.html", builtIndex)
 	api := fakeAPI(map[string]any{
-		"/api/v1/sources/fanmade/charts/123": map[string]any{
+		"/api/v2/sources/fanmade/charts/123": map[string]any{
 			"id": "0123456789abcdef0123456789abcdef", "title": "Senbonzakura", "titleTranslations": map[string]string{"zh": "千本樱", "origin": "千本桜"},
 			"description": "", "maker": " Kirisame ", "coverHash": "c0ffee",
-			"difficulties": []map[string]any{{"course": "Oni", "side": "single", "level": 9}, {"course": "Edit", "side": "p1", "level": 10}},
+			"songCoverPath": "fanmade/c0ffee.webp",
+			"difficulties":  []map[string]any{{"course": "Oni", "side": "single", "level": 9}, {"course": "Edit", "side": "p1", "level": 10}},
 		},
-		"/api/v1/sources/official/charts/0123456789abcdef0123456789abcdef": map[string]any{
+		"/api/v2/sources/official/charts/0123456789abcdef0123456789abcdef": map[string]any{
 			"id": "0123456789abcdef0123456789abcdef", "title": "夏祭り", "description": "  An official song.\n", "maker": "", "difficulties": []any{},
 		},
-		"/api/v1/sources/fanmade/playlists/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": map[string]any{
-			"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "name": "Night & Day", "description": "", "public": true, "coverHash": "beef", "chartCount": 12,
+		"/api/v2/sources/fanmade/playlists/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": map[string]any{
+			"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "name": "Night & Day", "description": "", "public": true, "coverHash": "beef",
+			"songListCoverPath": "fanmade/beef.webp", "chartCount": 12,
 			"owner": map[string]string{"nickname": "Don"},
 		},
-		"/api/v1/sources/official/playlists/daily": map[string]any{
+		"/api/v2/sources/official/playlists/daily": map[string]any{
 			"id": "daily", "name": "Daily", "description": "Ten songs a day", "system": true, "chartCount": 10, "owner": nil,
 		},
-		"/api/v1/sources/fanmade/playlists/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": map[string]any{
+		"/api/v2/sources/fanmade/playlists/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": map[string]any{
 			"id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "name": "Secret", "public": false, "chartCount": 1,
 		},
-		"/api/v1/sources/official/dans/dddddddddddddddddddddddddddddddd": map[string]any{
+		"/api/v2/sources/official/dans/dddddddddddddddddddddddddddddddd": map[string]any{
 			"id": "dddddddddddddddddddddddddddddddd", "title": map[string]string{"ja": "十段", "zh": "十段（中）"}, "owner": "",
 			"songs": []map[string]any{{"title": "A"}, {"title": "B"}},
 		},
-		"/api/v1/sources/fanmade/dans/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": map[string]any{
+		"/api/v2/sources/fanmade/dans/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": map[string]any{
 			"id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "title": map[string]string{"en": "Tenth", "ko": "십단"}, "owner": "Ka",
 			"songs": []map[string]any{{"title": "A"}, {"title": "", "hidden": true}, {"title": "C"}},
 		},
-		"/api/v1/users/de000000000000000000000000000001": map[string]any{
-			"user": map[string]string{"id": "de000000000000000000000000000001", "nickname": "Wada", "avatarUrl": "https://account.ourtaiko.org/avatars/1.webp"},
+		"/api/v2/users/de000000000000000000000000000001": map[string]any{
+			"user": map[string]string{"id": "de000000000000000000000000000001", "nickname": "Wada", "avatarPath": "sso/avatars/1.webp"},
 		},
-		"/api/v1/users/de000000000000000000000000000002": map[string]any{
-			"user": map[string]string{"id": "de000000000000000000000000000002", "nickname": "", "avatarUrl": ""},
+		"/api/v2/users/de000000000000000000000000000002": map[string]any{
+			"user": map[string]string{"id": "de000000000000000000000000000002", "nickname": "", "avatarPath": ""},
 		},
 	})
 	h := Web(dir, "https://net.ourtaiko.org", api)
@@ -277,7 +279,7 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 			"description":  "Kirisame 制作的「千本樱」太鼓谱面（魔王 ★9 / 里谱 1P ★10）。在 OurTaikoNET 试听、下载，查看排行榜与评论。",
 			"canonical":    "https://net.ourtaiko.org/fanmade/charts/123",
 			"og:type":      "music.song",
-			"og:image":     "https://net.ourtaiko.org/api/v1/sources/fanmade/charts/0123456789abcdef0123456789abcdef/cover?v=c0ffee",
+			"og:image":     "https://distrib.ourtaiko.org/fanmade/c0ffee.webp",
 			"twitter:card": "summary_large_image",
 		},
 		"/fanmade/charts/123/comments/77": {
@@ -295,7 +297,7 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 			"title":        "Night & Day | OurTaikoNET · 自制",
 			"description":  "Don 整理的歌单「Night & Day」：12 首歌曲。在 OurTaikoNET 试听与游玩。",
 			"og:type":      "music.playlist",
-			"og:image":     "https://net.ourtaiko.org/api/v1/sources/fanmade/playlists/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/cover?v=beef",
+			"og:image":     "https://distrib.ourtaiko.org/fanmade/beef.webp",
 			"twitter:card": "summary_large_image",
 		},
 		"/official/playlists/daily": {
@@ -315,7 +317,7 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 			"title":        "Wada | OurTaikoNET",
 			"description":  "Wada 在 OurTaikoNET 的玩家主页：成绩、作品、歌单、段位与称号。",
 			"og:type":      "profile",
-			"og:image":     "https://account.ourtaiko.org/avatars/1.webp",
+			"og:image":     "https://distrib.ourtaiko.org/sso/avatars/1.webp",
 			"twitter:card": "summary",
 		},
 		"/players/de000000000000000000000000000002": {
@@ -379,7 +381,7 @@ func TestASlowOrBrokenLookupGivesThePlainPage(t *testing.T) {
 		}
 	}
 	// Without a configured origin, the address the page was asked at.
-	w, tags := pageTags(t, Web(dir, "", fakeAPI(map[string]any{"/api/v1/users/u": map[string]any{"user": map[string]string{"id": "u", "nickname": "N"}}})), "/players/u")
+	w, tags := pageTags(t, Web(dir, "", fakeAPI(map[string]any{"/api/v2/users/u": map[string]any{"user": map[string]string{"id": "u", "nickname": "N"}}})), "/players/u")
 	if got := one(t, tags, "canonical"); got != "http://example.com/players/u" {
 		t.Error(got, w.Body.String())
 	}

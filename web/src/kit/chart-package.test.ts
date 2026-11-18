@@ -9,7 +9,8 @@ const tja = `TITLE:Song\nWAVE:${hash(audio)}.ogg\n`
 // The package names the chart as the site does; the stored TJA keeps its headers.
 const packagedTja = `TITLE:Renamed\nSUBTITLE:Artist\nTITLEJA:改名\nWAVE:${hash(audio)}.ogg\n`
 const cover = 'RIFF cover'
-const cdn = 'https://cdn.example/fanmade'
+// Files are read from the visitor's root: the canonical one here (the source request fails).
+const cdn = 'https://distrib.ourtaiko.org/fanmade'
 const chart = {
   id: 'song',
   tjaName: 'song.tja',
@@ -52,7 +53,7 @@ function serve(files: Record<string, string>, manifest?: unknown) {
     'fetch',
     vi.fn(async (input: string, init?: RequestInit) => {
       requested.push(`${init?.credentials ?? 'default'} ${input}`)
-      if (input === '/api/v1/sources/fanmade/charts/song/resources')
+      if (input === '/api/v2/sources/fanmade/charts/song/resources')
         return manifest ? Response.json(manifest) : new Response('{}', { status: 404 })
       return input in files ? new Response(files[input]) : new Response('', { status: 403 })
     }),
@@ -61,9 +62,10 @@ function serve(files: Record<string, string>, manifest?: unknown) {
 }
 
 const resource = (data: string, extension: string) => ({
-  url: `${cdn}/${hash(data)}.${extension}`,
+  path: `fanmade/${hash(data)}.${extension}`,
   sha256: hash(data),
   size: data.length,
+  contentType: 'application/octet-stream',
 })
 const manifest = (resources: Record<string, unknown>) => ({ chartId: 'song', resources })
 const stored = {
@@ -82,11 +84,9 @@ describe('chart package', () => {
     expect(packageFilename('<>|')).toBe('chart.zip')
   })
 
-  it('keeps stored names, ignoring signed URL queries', () => {
-    expect(entryName(`${cdn}/${'a'.repeat(64)}.OGG?X-Amz-Signature=1.zip`, 'a'.repeat(64))).toBe(
-      `${'a'.repeat(64)}.ogg`,
-    )
-    expect(() => entryName(`${cdn}/audio`, 'a'.repeat(64))).toThrow('PACKAGE_RESOURCE_INVALID')
+  it('keeps stored names', () => {
+    expect(entryName(`fanmade/${'a'.repeat(64)}.OGG`, 'a'.repeat(64))).toBe(`${'a'.repeat(64)}.ogg`)
+    expect(() => entryName('fanmade/audio', 'a'.repeat(64))).toThrow('PACKAGE_RESOURCE_INVALID')
   })
 
   it('packs the TJA, audio and cover from the resource manifest', async () => {
@@ -94,7 +94,7 @@ describe('chart package', () => {
       stored,
       manifest({
         cover: resource(cover, 'webp'),
-        preview: { url: `${cdn}/preview.ogg`, sha256: hash('preview'), size: 7 },
+        preview: { ...resource('preview', 'ogg'), path: 'fanmade/preview.ogg' },
         audio: resource(audio, 'ogg'),
         tja: resource(tja, 'tja'),
       }),
@@ -106,7 +106,7 @@ describe('chart package', () => {
       [`${hash(cover)}.webp`]: cover,
     })
     // The preview clip is not part of the package; file hosts get no cookies.
-    expect(requested.slice(1).sort()).toEqual(
+    expect(requested.filter((line) => !line.includes(' /api/')).sort()).toEqual(
       [`${hash(tja)}.tja`, `${hash(audio)}.ogg`, `${hash(cover)}.webp`]
         .map((name) => `omit ${cdn}/${name}`)
         .sort(),
@@ -159,22 +159,35 @@ describe('chart package', () => {
     expect(Object.keys(await entries(archive))).toEqual([`${hash(tja)}.tja`, `${hash(audio)}.ogg`])
   })
 
-  it('reads the stored files through the API when there are no direct links', async () => {
-    serve({
-      '/api/v1/sources/fanmade/charts/song/tja': tja,
-      '/api/v1/sources/fanmade/charts/song/audio': audio,
-      '/api/v1/sources/fanmade/charts/song/movie': 'ftyp movie',
-      [`/api/v1/sources/fanmade/charts/song/cover?v=${hash(cover)}`]: cover,
-    })
-    const withMovie = { ...chart, movieHash: hash('ftyp movie') }
-    const archive = await buildChartPackage(withMovie, new AbortController().signal)
-    // Without a manifest the TJA keeps its uploaded name: the API no longer tells its hash.
-    expect(await entries(archive)).toEqual({
-      'song.tja': packagedTja,
-      [`${hash(audio)}.ogg`]: audio,
-      [`${hash('ftyp movie')}.mp4`]: 'ftyp movie',
-      [`${hash(cover)}.webp`]: cover,
-    })
+  it('reads the files from the mirror for a mainland visitor, else from the canonical root', async () => {
+    vi.resetModules()
+    const { buildChartPackage } = await import('./chart-package')
+    const mirror = 'https://mirror.example/ourtaiko/'
+    const requested: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        requested.push(input)
+        if (input === '/api/v2/distribution/source')
+          return Response.json({
+            mirror: true,
+            baseUrl: mirror,
+            canonicalBaseUrl: 'https://distrib.ourtaiko.org/',
+          })
+        if (input === '/api/v2/sources/fanmade/charts/song/resources')
+          return Response.json(
+            manifest({ audio: resource(audio, 'ogg'), tja: resource(tja, 'tja') }),
+          )
+        // The mirror has the TJA but not (yet) the audio.
+        if (input === `${mirror}fanmade/${hash(tja)}.tja`) return new Response(tja)
+        return input in stored ? new Response(stored[input]) : new Response('', { status: 404 })
+      }),
+    )
+    const archive = await buildChartPackage(chart, new AbortController().signal)
+    expect(Object.keys(await entries(archive))).toEqual([`${hash(tja)}.tja`, `${hash(audio)}.ogg`])
+    expect(requested).toContain(`${mirror}fanmade/${hash(audio)}.ogg`)
+    expect(requested).toContain(`${cdn}/${hash(audio)}.ogg`)
+    expect(requested).not.toContain(`${cdn}/${hash(tja)}.tja`)
   })
 
   it('rejects changed, corrupt or missing files', async () => {

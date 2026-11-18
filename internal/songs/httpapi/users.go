@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"ourtaiko.dev/net/internal/files"
 	"strings"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 type PublicUser struct {
 	ID           string     `json:"id"`
 	Nickname     *string    `json:"nickname"`
-	AvatarURL    string     `json:"avatarUrl"`
+	AvatarPath   string     `json:"avatarPath"`
 	FirstLoginAt *time.Time `json:"firstLoginAt"`
 	LastActiveAt *time.Time `json:"lastActiveAt"`
 	ChartCount   int64      `json:"chartCount"`
@@ -81,7 +82,7 @@ func (s *Server) userSpace(w http.ResponseWriter, r *http.Request) {
 			result.ProfilesAvailable = false
 		}
 		if p, ok := names[id]; ok {
-			u.Nickname, u.AvatarURL = &p.Nickname, p.AvatarURL
+			u.Nickname, u.AvatarPath = &p.Nickname, files.Path(p.AvatarURL)
 		}
 	}
 	web.Respond(w, http.StatusOK, result)
@@ -173,7 +174,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		for i := range result.Items {
 			if p, ok := names[result.Items[i].ID]; ok {
-				result.Items[i].Nickname, result.Items[i].AvatarURL = &p.Nickname, p.AvatarURL
+				result.Items[i].Nickname, result.Items[i].AvatarPath = &p.Nickname, files.Path(p.AvatarURL)
 			}
 		}
 	}

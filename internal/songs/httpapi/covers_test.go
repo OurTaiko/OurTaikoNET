@@ -136,13 +136,13 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 		parts[2] = part{"cover", "cover.webp", data}
 	}
 	key := web.NewID()
-	w := send("POST", "/api/v1/charts", "owner", "csrf", key, parts...)
+	w := send("POST", "/api/charts", "owner", "csrf", key, parts...)
 	status(w, 201)
 	original := decode(w)
 	if original.CoverHash == "" {
 		t.Fatal("upload response missing cover hash")
 	}
-	path := "/api/v1/charts/" + original.ID + "/cover"
+	path := "/api/charts/" + original.ID + "/cover"
 	get := func(url, etag string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", url, nil)
 		r.Header.Set("If-None-Match", etag)
@@ -150,21 +150,20 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	w = get(path, "")
-	status(w, 200)
-	initialBytes := append([]byte(nil), w.Body.Bytes()...)
-	if w.Header().Get("Content-Type") != "image/webp" || len(initialBytes) < 12 || string(initialBytes[8:12]) != "WEBP" {
+	// Covers are read from the bucket only: there is no API route to read one.
+	status(get(path, ""), 404)
+	initialBytes := storedCover(t, app, "charts", original.ID)
+	if len(initialBytes) < 12 || string(initialBytes[8:12]) != "WEBP" {
 		t.Fatal("not WebP")
 	}
 	if web.Hash(string(initialBytes)) != original.CoverHash {
 		t.Fatal("incorrect hash")
 	}
-	status(get(path, w.Header().Get("ETag")), 304)
 	var firstID string
 	if err = pool.QueryRow(ctx, `SELECT r.storage_key FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, original.ID).Scan(&firstID); err != nil {
 		t.Fatal(err)
 	}
-	status(send("POST", "/api/v1/charts", "owner", "csrf", key, parts...), 200)
+	status(send("POST", "/api/charts", "owner", "csrf", key, parts...), 200)
 	if count(`SELECT count(*) FROM chart_resources WHERE extension='webp'`) != 1 || count(`SELECT count(*) FROM chart_resources WHERE extension='tja' OR original_filename='music.ogg'`) != 2 {
 		t.Fatal("retry duplicated records")
 	}
@@ -177,7 +176,7 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 		}
 		changed[2] = part{"cover", "new.WEBP", data}
 	}
-	status(send("POST", "/api/v1/charts", "owner", "csrf", key, changed...), 409)
+	status(send("POST", "/api/charts", "owner", "csrf", key, changed...), 409)
 	for _, tc := range []struct {
 		user, csrf string
 		status     int
@@ -192,7 +191,7 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	}
 	status(send("PUT", path, "owner", "csrf", "", changed[2], changed[2]), 400)
 	status(send("PUT", path, "owner", "csrf", "", changed[2], part{"unexpected", "", []byte("value")}), 400)
-	if !bytes.Equal(get(path, "").Body.Bytes(), initialBytes) {
+	if !bytes.Equal(storedCover(t, app, "charts", original.ID), initialBytes) {
 		t.Fatal("validation changed cover")
 	}
 	// This trigger exists only inside the temporary schema. Force failure after
@@ -202,7 +201,7 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 		t.Fatal(err)
 	}
 	status(send("PUT", path, "owner", "csrf", "", changed[2]), 503)
-	if !bytes.Equal(get(path, "").Body.Bytes(), initialBytes) {
+	if !bytes.Equal(storedCover(t, app, "charts", original.ID), initialBytes) {
 		t.Fatal("transaction lost old cover")
 	}
 	if _, err = pool.Exec(ctx, `DROP TRIGGER reject_cover ON charts; DROP FUNCTION reject_cover()`); err != nil {
@@ -224,13 +223,10 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	if firstID == secondID || count(`SELECT count(*) FROM chart_resources WHERE extension='webp'`) != 1 {
 		t.Fatal("old cover row retained")
 	}
-	status(get(path+"?v="+original.CoverHash, ""), 404)
-	w = get(path+"?v="+result.CoverHash, "")
-	status(w, 200)
-	if bytes.Equal(w.Body.Bytes(), initialBytes) {
+	if bytes.Equal(storedCover(t, app, "charts", original.ID), initialBytes) {
 		t.Fatal("serving old cover")
 	}
-	detail := decode(get("/api/v1/charts/"+original.ID+"?by=id", ""))
+	detail := decode(get("/api/charts/"+original.ID+"?by=id", ""))
 	if detail.CoverHash != result.CoverHash || detail.ID != original.ID || detail.OwnerID != original.OwnerID || detail.AudioHash != original.AudioHash || detail.TJAHash != original.TJAHash {
 		t.Fatal("changed chart resources")
 	}
@@ -239,22 +235,22 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 		t.Fatal(err)
 	}
 	status(send("PUT", path, "admin", "csrf", "", parts[2]), 403)
-	if web.Hash(get(path, "").Body.String()) != result.CoverHash {
+	if web.Hash(string(storedCover(t, app, "charts", original.ID))) != result.CoverHash {
 		t.Fatal("revoked administrator changed cover")
 	}
-	w = get("/api/v1/charts", "")
+	w = get("/api/charts", "")
 	status(w, 200)
 	if !strings.Contains(w.Body.String(), result.CoverHash) {
 		t.Fatal("list missing cover")
 	}
 	// The game's list names the cover as the website's does.
-	w = get("/api/v1/game/catalog", "")
+	w = get("/api/game/catalog", "")
 	status(w, 200)
 	if !strings.Contains(w.Body.String(), result.CoverHash) {
 		t.Fatal("game list missing cover")
 	}
 	replacement := []part{parts[0], {"confirmReset", "", []byte("true")}}
-	w = send("PUT", "/api/v1/charts/"+original.ID+"/files", "owner", "csrf", web.NewID(), replacement...)
+	w = send("PUT", "/api/charts/"+original.ID+"/files", "owner", "csrf", web.NewID(), replacement...)
 	status(w, 200)
 	if decode(w).CoverHash != result.CoverHash {
 		t.Fatal("file replacement lost cover")
@@ -266,7 +262,7 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	if _, err = pool.Exec(ctx, `UPDATE test_sso_users SET is_admin=true WHERE id=repeat('3',32)`); err != nil {
 		t.Fatal(err)
 	}
-	updatePath := "/api/v1/charts/" + original.ID + "/files"
+	updatePath := "/api/charts/" + original.ID + "/files"
 	updateKey := web.NewID()
 	withCover := append(append([]part(nil), replacement...), parts[2])
 	w = send("PUT", updatePath, "admin", "csrf", updateKey, withCover...)
@@ -278,31 +274,30 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	withCover[len(withCover)-1] = changed[2]
 	status(send("PUT", updatePath, "admin", "csrf", updateKey, withCover...), 409)
 	status(send("PUT", updatePath, "admin", "csrf", updateKey, replacement...), 409)
-	if web.Hash(get(path, "").Body.String()) != original.CoverHash {
+	if web.Hash(string(storedCover(t, app, "charts", original.ID))) != original.CoverHash {
 		t.Fatal("conflicting retry changed cover")
 	}
-	status(send("DELETE", "/api/v1/charts/"+original.ID, "owner", "csrf", ""), 200)
-	status(get(path, ""), 404)
+	status(send("DELETE", "/api/charts/"+original.ID, "owner", "csrf", ""), 200)
 	status(send("PUT", path, "owner", "csrf", "", changed[2]), 404)
 	if count(`SELECT count(*) FROM chart_resources WHERE extension='webp'`) != 0 {
 		t.Fatal("deleted song retained cover")
 	}
-	w = send("POST", "/api/v1/charts", "owner", "csrf", web.NewID(), parts[:2]...)
+	w = send("POST", "/api/charts", "owner", "csrf", web.NewID(), parts[:2]...)
 	status(w, 201)
 	if decode(w).CoverHash != "" {
 		t.Fatal("unexpected cover")
 	}
-	status(get("/api/v1/charts/"+decode(w).ID+"/cover", ""), 404)
+	status(get("/api/charts/"+decode(w).ID+"/cover", ""), 404)
 	// Two simultaneous owner changes must leave exactly one complete cover.
 	optionalID := decode(w).ID
 	if _, err = pool.Exec(ctx, `UPDATE charts SET owner_ids=array_append(owner_ids,repeat('2',32)) WHERE id=$1`, optionalID); err != nil {
 		t.Fatal(err)
 	}
-	status(send("PUT", "/api/v1/charts/"+optionalID+"/cover", "other", "csrf", "", parts[2]), 200)
+	status(send("PUT", "/api/charts/"+optionalID+"/cover", "other", "csrf", "", parts[2]), 200)
 	responses := make(chan *httptest.ResponseRecorder, 2)
 	for _, image := range []part{parts[2], changed[2]} {
 		go func(image part) {
-			responses <- send("PUT", "/api/v1/charts/"+optionalID+"/cover", "owner", "csrf", "", image)
+			responses <- send("PUT", "/api/charts/"+optionalID+"/cover", "owner", "csrf", "", image)
 		}(image)
 	}
 	for range 2 {
@@ -311,16 +306,14 @@ func testCoverLifecycle(t *testing.T, useWebP, remote bool) {
 	if count(`SELECT count(*) FROM chart_resources WHERE extension='webp'`) != 1 {
 		t.Fatal("concurrent replacement retained multiple images")
 	}
-	w = get("/api/v1/charts/"+optionalID+"/cover", "")
-	status(w, 200)
 	var storedHash string
-	if err := pool.QueryRow(ctx, `SELECT r.sha256 FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, optionalID).Scan(&storedHash); err != nil || storedHash != web.Hash(w.Body.String()) {
+	if err := pool.QueryRow(ctx, `SELECT r.sha256 FROM charts c JOIN chart_resources r ON r.id=c.cover_file WHERE c.id=$1`, optionalID).Scan(&storedHash); err != nil || storedHash != web.Hash(string(storedCover(t, app, "charts", optionalID))) {
 		t.Fatal("concurrent replacement corrupted cover", err)
 	}
-	status(send("DELETE", "/api/v1/charts/"+optionalID, "owner", "csrf", ""), 200)
+	status(send("DELETE", "/api/charts/"+optionalID, "owner", "csrf", ""), 200)
 	invalid := append([]part(nil), parts...)
 	invalid[0] = part{"tja", "broken.tja", []byte("not a chart")}
-	status(send("POST", "/api/v1/charts", "owner", "csrf", web.NewID(), invalid...), 422)
+	status(send("POST", "/api/charts", "owner", "csrf", web.NewID(), invalid...), 422)
 	if count(`SELECT count(*) FROM charts`) != 0 || count(`SELECT count(*) FROM chart_resources WHERE extension='webp'`) != 0 {
 		t.Fatal("invalid upload persisted data")
 	}

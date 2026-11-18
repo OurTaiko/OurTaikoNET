@@ -40,7 +40,7 @@ func (s *Server) donRules(ctx context.Context) ([]TitleRule, error) {
 	return rules, nil
 }
 
-// donItems is GET /api/v1/don/items, public: {locked: [{part, id}], rules: [rule…]}, the parts that
+// donItems is GET /api/don/items, public: {locked: [{part, id}], rules: [rule…]}, the parts that
 // must be owned to be worn and the rules that give parts.
 func (s *Server) donItems(w http.ResponseWriter, r *http.Request) {
 	locked, err := donitems.Locked(r.Context(), s.DB)
@@ -56,7 +56,7 @@ func (s *Server) donItems(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]any{"locked": locked, "rules": rules})
 }
 
-// myDonItems is GET /api/v1/me/don/items: {owned: [{part, id, acquiredAt}]}.
+// myDonItems is GET /api/me/don/items: {owned: [{part, id, acquiredAt}]}.
 func (s *Server) myDonItems(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, false)
 	if !ok {
@@ -90,7 +90,7 @@ func (s *Server) donItemOf(w http.ResponseWriter, r *http.Request) (donitems.Ite
 	return it, true
 }
 
-// lockDonItem is PUT /api/v1/admin/don/locks/{part}/{id} {locked}: a part must be owned to be
+// lockDonItem is PUT /api/admin/don/locks/{part}/{id} {locked}: a part must be owned to be
 // worn, or is anyone's again. Locking gives it to everyone wearing it: {given} says how many.
 func (s *Server) lockDonItem(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.admin(w, r); !ok {
@@ -132,7 +132,7 @@ type donGrantBody struct {
 	ID     int    `json:"id"`
 }
 
-// grantDonItem is POST /api/v1/admin/don/grants {userId, part, id}: an administrator gives a
+// grantDonItem is POST /api/admin/don/grants {userId, part, id}: an administrator gives a
 // part, recorded as an award of the service "admin". {given} is false when they had it.
 func (s *Server) grantDonItem(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.admin(w, r)
@@ -170,7 +170,7 @@ func (s *Server) grantDonItem(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]bool{"given": given})
 }
 
-// revokeDonItem is DELETE /api/v1/admin/don/grants {userId, part, id}: the part is taken back,
+// revokeDonItem is DELETE /api/admin/don/grants {userId, part, id}: the part is taken back,
 // and off the player if they wear it and it is locked.
 func (s *Server) revokeDonItem(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.admin(w, r); !ok {
@@ -227,13 +227,8 @@ func (s *Server) DescribeReward(r *http.Request, kind string, data json.RawMessa
 		picture = &item.File
 	}
 	if picture != nil {
-		address := c.url(*picture)
-		if mirror := s.mirrorForDonRequest(r); mirror != nil {
-			if m := mirror.url(*picture); m != "" {
-				address = m
-			}
-		}
-		fields["picture"] = address
+		// The part's icon, a file of the 3D Don's (package files).
+		fields["3dCharaPath"] = c.path(*picture)
 	}
 	described, err := json.Marshal(fields)
 	if err != nil {

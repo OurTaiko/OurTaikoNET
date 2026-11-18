@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"ourtaiko.dev/net/internal/files"
 	"context"
 	"encoding/json"
 	"errors"
@@ -43,7 +44,7 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	w := call("GET", "/api/v1/me", "")
+	w := call("GET", "/api/me", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), "公开昵称") {
 		t.Fatal(w.Body.String())
 	}
@@ -51,30 +52,30 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	w = call("GET", "/api/v1/me", "")
+	w = call("GET", "/api/me", "")
 	if !strings.Contains(w.Body.String(), "更新昵称") || !strings.Contains(w.Body.String(), `"isAdmin":true`) {
 		t.Fatal("stale SSO profile", w.Body.String())
 	}
-	for _, path := range []string{"/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/email-code"} {
+	for _, path := range []string{"/api/auth/login", "/api/auth/register", "/api/auth/email-code"} {
 		if w := call("POST", path, ""); w.Code != 410 {
 			t.Fatal(path, w.Code)
 		}
 	}
-	if w := call("PATCH", "/api/v1/me", "csrf"); w.Code != 410 {
+	if w := call("PATCH", "/api/me", "csrf"); w.Code != 410 {
 		t.Fatal(w.Code)
 	}
-	if w := call("POST", "/api/v1/auth/logout", "invalid"); w.Code != 403 {
+	if w := call("POST", "/api/auth/logout", "invalid"); w.Code != 403 {
 		t.Fatal("CSRF accepted", w.Code)
 	}
 	// A remote outage cannot authorize a local cached user, but local logout still succeeds.
 	app.Config.SSO.HTTP = &http.Client{Transport: failingTransport{}, Timeout: time.Second}
-	if w := call("GET", "/api/v1/me", ""); w.Code != 503 {
+	if w := call("GET", "/api/me", ""); w.Code != 503 {
 		t.Fatal("SSO outage bypass", w.Code)
 	}
-	if w := call("POST", "/api/v1/auth/logout", "csrf"); w.Code != 200 {
+	if w := call("POST", "/api/auth/logout", "csrf"); w.Code != 200 {
 		t.Fatal("outage prevented logout", w.Code)
 	}
-	w = call("GET", "/api/v1/me", "")
+	w = call("GET", "/api/me", "")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"user":null`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -96,7 +97,7 @@ func TestSSOCallbackBindingAndEncryption(t *testing.T) {
 		t.Fatal(e)
 	}
 	call := func(cookie, query string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("GET", "/api/v1/auth/sso/callback?state="+state+query, nil)
+		r := httptest.NewRequest("GET", "/api/auth/sso/callback?state="+state+query, nil)
 		r.AddCookie(&http.Cookie{Name: "ourtaiko_oidc", Value: cookie})
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -245,10 +246,16 @@ func TestSSOProfilesCarryOnlyValidAvatars(t *testing.T) {
 		profiles[b] != (account.PublicProfile{Nickname: "B"}) {
 		t.Fatalf("%#v", profiles)
 	}
+	// A chart names its author's avatar by its file under the distribution root, where the
+	// account center keeps avatars; an address elsewhere names none.
 	chart := Chart{OwnerID: a}
-	chart.setUploader(profiles[a])
+	chart.setUploader(account.PublicProfile{Nickname: "A", AvatarURL: files.Root + "sso/avatars/" + a + "/" + digest + ".webp"})
 	data, _ := json.Marshal(chart)
-	if !strings.Contains(string(data), `"uploaderAvatarUrl":"`+profiles[a].AvatarURL+`"`) {
+	if !strings.Contains(string(data), `"authorAvatarPath":"sso/avatars/`+a+"/"+digest+`.webp"`) {
+		t.Fatal(string(data))
+	}
+	chart.setUploader(profiles[a])
+	if data, _ = json.Marshal(chart); !strings.Contains(string(data), `"authorAvatarPath":""`) {
 		t.Fatal(string(data))
 	}
 }
