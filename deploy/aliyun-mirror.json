@@ -15,7 +15,10 @@
     "mirrorAllowHeadObject": true,
     "mirrorPassQueryString": false,
     "mirrorFollowRedirect": false,
-    "mirrorCheckMd5": true
+    "mirrorCheckMd5": true,
+    "mirrorJson": [
+      "3dchara/names.json"
+    ]
   },
   "esa": {
     "siteName": "sakura-bot.cn",

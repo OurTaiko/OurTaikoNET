@@ -53,11 +53,13 @@ inventory. OSS's optional Content-MD5 check does not verify the catalog's SHA-25
 OSS keeps what it fetched, with the origin's `Cache-Control`, and never fetches a stored object
 again: OSS has no pass-through option and does not follow origin updates
 ([back-to-origin overview](https://www.alibabacloud.com/help/zh/oss/back-to-origin-rules-overview)).
-Files other than JSON are never replaced in place, so that is right for them. JSON is not:
-the mirror's `player-build.json`, `3dchara/catalog.json` and `nameplate/catalog.json` stay
-current only because the synchronization worker below rewrites them every 15 minutes; any
-other JSON on the mirror keeps the copy first fetched. Delete such an object to have it
-fetched again.
+Files other than JSON are never replaced in place, so that is right for them. JSON is not, so
+the synchronization worker below rewrites every JSON file of the bucket on the mirror every 15
+minutes: `player-build.json`, `3dchara/catalog.json` and `nameplate/catalog.json` with the files
+they list (which include `3dchara/base/face_animations.json`), and the JSON no catalog lists,
+named in `oss.mirrorJson` of `aliyun-mirror.json` (`3dchara/names.json`). A JSON file added to
+the bucket outside a catalog must be added there, or the mirror keeps its first copy (delete
+the object in OSS to have it fetched again).
 
 ## ESA cache rules
 

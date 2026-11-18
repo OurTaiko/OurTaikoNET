@@ -138,7 +138,23 @@ class Publisher:
         self.results[collection] = len(files)
         print(f'{collection}: published catalog after verifying {len(files)} objects', flush=True)
 
-    def sync(self, collections):
+    def copy_json(self, path):
+        """Copies one JSON file the origin may change (it is not in a catalog) as it is now.
+
+        OSS back-to-origin keeps the first copy it fetched and never fetches it again, so every
+        JSON file on the mirror is rewritten here; the files catalogs list are kept by publish.
+        """
+        raw, _ = self.catalog(path)
+        self.bucket().put_object(self.config['prefix'] + path, raw, headers={
+            'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60, no-transform',
+            'Content-MD5': base64.b64encode(hashlib.md5(raw).digest()).decode(),
+        })
+        self.results[path] = 1
+        print(f'{path}: copied', flush=True)
+
+    def sync(self, collections, json_files=()):
         for collection in collections:
             self.publish(collection)
+        for path in json_files:
+            self.copy_json(path)
         return {'collections': self.results, 'verifiedBytesRead': self.downloaded}

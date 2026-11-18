@@ -36,6 +36,7 @@ class PublicationTests(unittest.TestCase):
                 self.results = {}
                 self.config = {'prefix': 'ourtaiko/'}
                 self.reads = 0
+                self.downloaded = 0
             def catalog(self, path):
                 self.reads += 1
                 manifest = {'path': '/player/0123456789abcdef/index.html', 'files': {'index.html': 'a' * 64, 'Build/Web.wasm.unityweb': 'b' * 64}}
@@ -53,6 +54,12 @@ class PublicationTests(unittest.TestCase):
         publisher.publish('player')
         self.assertEqual(publisher.events[-1], ('published', 'ourtaiko/player-build.json'))
         self.assertEqual(sum(event[0] == 'verified' for event in publisher.events), 2)
+
+    def test_json_outside_catalogs_is_copied_as_it_is(self):
+        publisher = self.publisher()
+        result = publisher.sync([], ['3dchara/names.json'])
+        self.assertEqual(publisher.events, [('published', 'ourtaiko/3dchara/names.json')])
+        self.assertEqual(result['collections'], {'3dchara/names.json': 1})
 
     def test_corruption_or_upstream_update_keeps_the_previous_catalog(self):
         for options in [{'fail': True}, {'changed': True}]:

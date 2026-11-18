@@ -21,7 +21,8 @@ def main():
     with (args.scratch / 'sync.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         publisher = Publisher(json.loads(args.config.read_text()), args.credentials, args.scratch)
-        result = publisher.sync(args.collections)
+        config = json.loads(args.config.read_text())
+        result = publisher.sync(args.collections, config['oss'].get('mirrorJson', []))
         result['completedAt'] = datetime.now(timezone.utc).isoformat()
         if args.state:
             args.state.parent.mkdir(parents=True, exist_ok=True)
