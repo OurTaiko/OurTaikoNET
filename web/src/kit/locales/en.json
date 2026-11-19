@@ -326,6 +326,7 @@
     "sortMembers": "Sort members",
     "recentlyActiveMembers": "Recently active",
     "newestMembers": "Newest first login",
+    "highestKarmaMembers": "Highest karma",
     "loadingMembers": "Loading members…",
     "membersUnavailable": "Members are temporarily unavailable",
     "membersTotal": "{{total}} players",

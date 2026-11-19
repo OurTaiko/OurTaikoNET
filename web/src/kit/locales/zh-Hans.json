@@ -326,6 +326,7 @@
     "sortMembers": "用户排序",
     "recentlyActiveMembers": "最近活跃",
     "newestMembers": "首次登录从新到旧",
+    "highestKarmaMembers": "声望从高到低",
     "loadingMembers": "正在加载用户…",
     "membersUnavailable": "暂时无法加载用户",
     "membersTotal": "共 {{total}} 位玩家",

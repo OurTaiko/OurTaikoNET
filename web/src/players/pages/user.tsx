@@ -112,7 +112,7 @@ export function UserPage() {
           <MessageButton userId={id} />
         </CardContent>
       </Card>
-      <PlayerStats totals={profile.user} />
+      {profile.totalsAvailable && <PlayerStats totals={profile.user} />}
       {/* Another player starts afresh: their tabs show nothing of the one before. */}
       <Tabs key={id} value={tab} onValueChange={(value) => open(String(value))} className="gap-5">
         {/* Eight tabs are wider than a phone: the row scrolls sideways there. */}

@@ -6,7 +6,9 @@ import { SITE_API_ROOT } from '../api/config'
 import { withQuery } from '../api/endpoints'
 import type { UserDirectory } from '../api/types'
 
-export type DirectoryQuery = { q: string; sort: 'active' | 'newest'; page: number }
+export const directorySorts = ['active', 'newest', 'karma'] as const
+export type DirectorySort = (typeof directorySorts)[number]
+export type DirectoryQuery = { q: string; sort: DirectorySort; page: number }
 
 export const directoryAddress = (query: DirectoryQuery) =>
   withQuery(`${SITE_API_ROOT}/users`, query)

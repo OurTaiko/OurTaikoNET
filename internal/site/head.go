@@ -199,7 +199,8 @@ func lookupFor(p string) (pageLookup, bool) {
 	commented := len(parts) == 3 || (len(parts) == 5 && parts[3] == "comments")
 	switch {
 	case len(parts) == 2 && parts[0] == "players":
-		return pageLookup{"players", "/api/v2/users/" + url.PathEscape(parts[1]), playerMeta}, true
+		// The nameplate says who they are without adding up all they did.
+		return pageLookup{"players", "/api/v2/users/" + url.PathEscape(parts[1]) + "/nameplate", playerMeta}, true
 	case parts[0] != "fanmade" && parts[0] != "official" || len(parts) < 3:
 		return pageLookup{}, false
 	}
@@ -370,17 +371,15 @@ func danMeta(body []byte) (pageMeta, bool) {
 // playerMeta is what players/pages/user.tsx's UserPage says.
 func playerMeta(body []byte) (pageMeta, bool) {
 	var p struct {
-		User struct {
-			ID         string `json:"id"`
-			Nickname   string `json:"nickname"`
-			AvatarPath string `json:"avatarPath"`
-		} `json:"user"`
+		UserID     string `json:"userId"`
+		Nickname   string `json:"nickname"`
+		AvatarPath string `json:"avatarPath"`
 	}
-	if json.Unmarshal(body, &p) != nil || p.User.ID == "" {
+	if json.Unmarshal(body, &p) != nil || p.UserID == "" {
 		return pageMeta{}, false
 	}
-	meta := pageMeta{image: files.URL("", p.User.AvatarPath), kind: "profile"}
-	if name := p.User.Nickname; name != "" {
+	meta := pageMeta{image: files.URL("", p.AvatarPath), kind: "profile"}
+	if name := p.Nickname; name != "" {
 		meta.title, meta.description = name, word("meta.player", "name", name)
 	}
 	return meta, true

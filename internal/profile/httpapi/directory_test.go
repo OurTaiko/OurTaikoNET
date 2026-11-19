@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,13 @@ import (
 
 // directorySite is the players' part with an account center that finds "鼓手" as the player.
 func directorySite(t *testing.T) (*client, func(string, ...any)) {
+	t.Helper()
+	c, exec, _ := directorySiteKeeping(t, true)
+	return c, exec
+}
+
+// directorySiteKeeping is directorySite; keep is whether the site keeps a copy of the players' names.
+func directorySiteKeeping(t *testing.T, keep bool) (*client, func(string, ...any), *account.Client) {
 	t.Helper()
 	pool := testDB(t)
 	ctx := context.Background()
@@ -32,7 +40,9 @@ func directorySite(t *testing.T) (*client, func(string, ...any)) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sso.KeepProfiles(pool)
+	if keep {
+		sso.KeepProfiles(pool)
+	}
 	exec := func(sql string, args ...any) {
 		t.Helper()
 		if _, err := pool.Exec(ctx, sql, args...); err != nil {
@@ -42,10 +52,15 @@ func directorySite(t *testing.T) (*client, func(string, ...any)) {
 	sources := []Source{
 		{ID: "fanmade", Name: "Fanmade", Site: "https://fanmade.test"},
 		{ID: "official", Name: "Database", Site: "https://database.test"},
-		// A source this database does not have is not counted.
-		{ID: "down", Name: "Down", Site: "https://down.test"},
 	}
-	return &client{t: t, handler: New(pool, Config{Origin: origin, Sources: sources, SSO: sso}).Handler()}, exec
+	return &client{t: t, handler: New(pool, Config{Origin: origin, Sources: sources, SSO: sso}).Handler()}, exec, sso
+}
+
+// noAnswer is an account center that cannot be reached.
+type noAnswer struct{}
+
+func (noAnswer) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("no answer")
 }
 
 // A player's numbers are the two sources' added together, in the list and on their page alike.
@@ -97,6 +112,12 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 	}
 	exec(`INSERT INTO official.playlists(id,owner_id,name,is_public) VALUES ($1,$2,'List',true)`, strings.Repeat("7", 32), player)
 
+	// Votes on what is no longer on show do not count either.
+	exec(`INSERT INTO fanmade.chart_votes(chart_id,user_id,value) VALUES ($1,$2,1)`, hidden, other)
+	exec(`INSERT INTO fanmade.comment_votes(comment_id,user_id,value) VALUES ('c2',$1,1),('c4',$1,1),('c5',$1,1)`, other)
+	exec(`INSERT INTO official.dan_courses(id,owner_id,title,exams,code,status) VALUES ($1,$2,'{"ja":"二段"}','[]','ABC124','deleted')`, strings.Repeat("8", 32), player)
+	exec(`INSERT INTO official.dan_votes(dan_id,user_id,value) VALUES ($1,$2,1)`, strings.Repeat("8", 32), other)
+
 	want := PlayerTotals{ChartCount: 1, ScoreCount: 3, CommentCount: 2, Karma: 1, PlaylistCount: 2}
 	check := func(about string, got PlayerTotals) {
 		t.Helper()
@@ -123,9 +144,10 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 			Nickname string
 			PlayerTotals
 		}
+		TotalsAvailable bool
 	}
 	c.json("GET", "/api/users/"+player, "", 200, &page)
-	if page.User.ID != player || page.User.Nickname != "鼓手" {
+	if page.User.ID != player || page.User.Nickname != "鼓手" || !page.TotalsAvailable {
 		t.Fatalf("%+v", page.User)
 	}
 	check("their page", page.User.PlayerTotals)
@@ -146,6 +168,68 @@ INSERT INTO %[1]s.chart_difficulties(chart_id,course,side,level,content_hash) SE
 	c.json("GET", "/api/users/"+account.SystemUserID, "", 404, nil)
 }
 
+// Without the account center the list still shows the players and their numbers, and a search
+// says it could not be made instead of finding nobody.
+func TestThePlayersDirectoryWithoutTheAccountCenter(t *testing.T) {
+	c, exec, sso := directorySiteKeeping(t, false)
+	exec(`INSERT INTO net.users(id,nickname,profile_checked_at) VALUES ($1,'鼓手',now())`, player)
+	sso.HTTP = &http.Client{Transport: noAnswer{}}
+	var list UserDirectory
+	c.json("GET", "/api/users", "", 200, &list)
+	if list.Total != 1 || len(list.Items) != 1 || list.ProfilesAvailable || list.Items[0].Nickname != nil {
+		t.Fatalf("%+v", list)
+	}
+	c.json("GET", "/api/users?q=hello", "", 503, nil)
+}
+
+// A player's page stays up when their numbers cannot be added up, and says they are missing.
+func TestThePlayersPageOutlivesTheirTotals(t *testing.T) {
+	c, exec := directorySite(t)
+	exec(`INSERT INTO net.users(id,nickname,profile_checked_at) VALUES ($1,'鼓手',now())`, player)
+	exec(`DROP TABLE official.playlists CASCADE`)
+	var page struct {
+		User struct {
+			Nickname string
+			PlayerTotals
+		}
+		TotalsAvailable bool
+	}
+	c.json("GET", "/api/users/"+player, "", 200, &page)
+	if page.User.Nickname != "鼓手" || page.TotalsAvailable || page.User.ChartCount != 0 {
+		t.Fatalf("%+v", page)
+	}
+}
+
+// Karma ranks the players from high to low, below zero last; equals go by their last visit.
+func TestThePlayersDirectoryByKarma(t *testing.T) {
+	c, exec := directorySite(t)
+	third, fourth := strings.Repeat("c", 32), strings.Repeat("d", 32)
+	exec(`INSERT INTO net.users(id,nickname,last_active_at,profile_checked_at) VALUES
+ ($1,'高',  '2026-01-01Z',now()),($2,'低',  '2026-04-01Z',now()),($3,'零新','2026-03-01Z',now()),($4,'零旧','2026-02-01Z',now())`, player, other, third, fourth)
+	course := func(id, owner, code string) {
+		t.Helper()
+		exec(`INSERT INTO official.dan_courses(id,owner_id,title,exams,code) VALUES ($1,$2,'{"ja":"初段"}','[]',$3)`, id, owner, code)
+	}
+	high, low := strings.Repeat("4", 32), strings.Repeat("5", 32)
+	course(high, player, "ABC123")
+	course(low, other, "ABC124")
+	exec(`INSERT INTO official.dan_votes(dan_id,user_id,value) VALUES ($1,$2,1),($1,$3,1),($4,$2,-1)`, high, third, fourth, low)
+	var list UserDirectory
+	c.json("GET", "/api/users?sort=karma", "", 200, &list)
+	want := []string{player, third, fourth, other}
+	if len(list.Items) != len(want) {
+		t.Fatalf("%+v", list.Items)
+	}
+	for i, id := range want {
+		if list.Items[i].ID != id {
+			t.Fatalf("place %d: %+v", i, list.Items)
+		}
+	}
+	if list.Items[0].Karma != 2 || list.Items[3].Karma != -1 {
+		t.Fatalf("%+v", list.Items)
+	}
+}
+
 func TestThePlayersDirectoryPages(t *testing.T) {
 	c, exec := directorySite(t)
 	for i := range 13 {
@@ -160,7 +244,7 @@ func TestThePlayersDirectoryPages(t *testing.T) {
 	if list.Total != 13 || len(list.Items) != 1 || list.Page != 2 {
 		t.Fatalf("%+v", list)
 	}
-	for _, query := range []string{"page=0", "page=bad", "page=1.5", "page=10001", "sort=karma", "q=" + strings.Repeat("x", 201)} {
+	for _, query := range []string{"page=0", "page=bad", "page=1.5", "page=10001", "sort=invalid", "q=" + strings.Repeat("x", 201)} {
 		c.json("GET", "/api/users?"+query, "", 400, nil)
 	}
 	// Only what is public leaves the server.

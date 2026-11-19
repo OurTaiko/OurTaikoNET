@@ -9,7 +9,7 @@ import { Skeleton } from './components/ui/skeleton'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
 import { PublicUserCard } from './components/public-user-card'
-import { directoryQuery } from './queries/directory'
+import { directoryQuery, directorySorts } from './queries/directory'
 /** The site's players, whichever source they play. */
 export function UsersPage() {
   const { t } = useTranslation()
@@ -18,7 +18,7 @@ export function UsersPage() {
   }, [])
   const [params, setParams] = useSearchParams()
   const q = params.get('q') || ''
-  const sort = params.get('sort') === 'newest' ? 'newest' : 'active'
+  const sort = directorySorts.find((value) => value === params.get('sort')) ?? 'active'
   const rawPage = Number(params.get('page'))
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 10000 ? rawPage : 1
   const directory = useQuery(directoryQuery({ q, sort, page }))
@@ -82,6 +82,7 @@ export function UsersPage() {
           items={[
             { value: 'active', label: t('messages.recentlyActiveMembers') },
             { value: 'newest', label: t('messages.newestMembers') },
+            { value: 'karma', label: t('messages.highestKarmaMembers') },
           ]}
         />
       </div>

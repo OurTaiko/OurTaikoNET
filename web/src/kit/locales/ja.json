@@ -326,6 +326,7 @@
     "sortMembers": "ユーザーの並び順",
     "recentlyActiveMembers": "最終アクティブ順",
     "newestMembers": "初回ログインが新しい順",
+    "highestKarmaMembers": "カルマが高い順",
     "loadingMembers": "ユーザーを読み込み中…",
     "membersUnavailable": "ユーザーを読み込めません",
     "membersTotal": "プレイヤー {{total}} 人",

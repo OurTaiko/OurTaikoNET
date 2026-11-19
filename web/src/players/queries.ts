@@ -25,6 +25,7 @@ import type {
 } from '@players/api/types'
 import { sourceApi } from '@players/components/song-tile'
 import { readDonCatalog } from '@players/don-catalog'
+import { withTotals, type ProfileAnswer } from '@players/profile-totals'
 import type { DonLook } from '@sitekit/don3d'
 
 /** One page of a list of a player's things. */
@@ -75,7 +76,8 @@ export const playerQueries = {
   profile: (id: string) =>
     queryOptions({
       queryKey: playerKeys.profile(id),
-      queryFn: ({ signal }) => api<PublicProfile>(endpoints.user(id), { signal }),
+      queryFn: async ({ signal }): Promise<PublicProfile> =>
+        withTotals(await api<ProfileAnswer>(endpoints.user(id), { signal })),
       // Its numbers count what is done on the pages of the sources.
       staleTime: askedOnEachOpening,
     }),

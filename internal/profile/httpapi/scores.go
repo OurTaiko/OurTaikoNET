@@ -171,14 +171,9 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 	if source == "" {
 		source = "all"
 	}
-	page := 1
-	if raw := query.Get("page"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 || n > 10000 {
-			problem(w, 400, "QUERY_INVALID", "页码无效")
-			return
-		}
-		page = n
+	page, ok := queryPage(w, r)
+	if !ok {
+		return
 	}
 	selected := []Source{}
 	for _, src := range s.Config.Sources {

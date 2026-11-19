@@ -326,6 +326,7 @@
     "sortMembers": "사용자 정렬",
     "recentlyActiveMembers": "최근 활동순",
     "newestMembers": "첫 로그인 최신순",
+    "highestKarmaMembers": "카르마 높은순",
     "loadingMembers": "사용자 불러오는 중…",
     "membersUnavailable": "사용자를 불러올 수 없습니다",
     "membersTotal": "플레이어 {{total}}명",

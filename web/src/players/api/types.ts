@@ -63,6 +63,8 @@ export type PublicProfile = {
   nameplate: Nameplate
   sources: Source[]
   profilesAvailable: boolean
+  /** False when the player's numbers could not be added up: their zeros mean nothing. */
+  totalsAvailable: boolean
 }
 
 export type Course = 'Easy' | 'Normal' | 'Hard' | 'Oni' | 'Edit'

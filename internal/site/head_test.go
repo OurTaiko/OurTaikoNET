@@ -264,11 +264,11 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 			"id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "title": map[string]string{"en": "Tenth", "ko": "십단"}, "owner": "Ka",
 			"songs": []map[string]any{{"title": "A"}, {"title": "", "hidden": true}, {"title": "C"}},
 		},
-		"/api/v2/users/de000000000000000000000000000001": map[string]any{
-			"user": map[string]string{"id": "de000000000000000000000000000001", "nickname": "Wada", "avatarPath": "sso/avatars/1.webp"},
+		"/api/v2/users/de000000000000000000000000000001/nameplate": map[string]any{
+			"userId": "de000000000000000000000000000001", "nickname": "Wada", "avatarPath": "sso/avatars/1.webp",
 		},
-		"/api/v2/users/de000000000000000000000000000002": map[string]any{
-			"user": map[string]string{"id": "de000000000000000000000000000002", "nickname": "", "avatarPath": ""},
+		"/api/v2/users/de000000000000000000000000000002/nameplate": map[string]any{
+			"userId": "de000000000000000000000000000002", "nickname": "", "avatarPath": "",
 		},
 	})
 	h := Web(dir, "https://net.ourtaiko.org", api)
@@ -381,7 +381,7 @@ func TestASlowOrBrokenLookupGivesThePlainPage(t *testing.T) {
 		}
 	}
 	// Without a configured origin, the address the page was asked at.
-	w, tags := pageTags(t, Web(dir, "", fakeAPI(map[string]any{"/api/v2/users/u": map[string]any{"user": map[string]string{"id": "u", "nickname": "N"}}})), "/players/u")
+	w, tags := pageTags(t, Web(dir, "", fakeAPI(map[string]any{"/api/v2/users/u/nameplate": map[string]string{"userId": "u", "nickname": "N"}})), "/players/u")
 	if got := one(t, tags, "canonical"); got != "http://example.com/players/u" {
 		t.Error(got, w.Body.String())
 	}

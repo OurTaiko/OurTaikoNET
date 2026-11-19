@@ -5,8 +5,10 @@ package netdb
 const (
 	// PublishedChart selects the charts that are on show.
 	PublishedChart = `c.status='published'`
+	// PublishedDan selects the 段位 courses that are on show.
+	PublishedDan = `d.status='published'`
 	// PublishedCommentSubject keeps comments of hidden songs and deleted courses out of sight.
-	PublishedCommentSubject = `((m.chart_id IS NOT NULL AND ` + PublishedChart + `) OR (m.dan_id IS NOT NULL AND d.status='published'))`
+	PublishedCommentSubject = `((m.chart_id IS NOT NULL AND ` + PublishedChart + `) OR (m.dan_id IS NOT NULL AND ` + PublishedDan + `))`
 	// VisibleComment selects live comments on published songs and courses.
 	VisibleComment = `m.deleted_at IS NULL AND m.removed_at IS NULL AND ` + PublishedCommentSubject
 )
