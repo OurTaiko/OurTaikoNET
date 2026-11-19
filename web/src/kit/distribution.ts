@@ -59,8 +59,10 @@ export type FileRoot = Pick<DistributionSource, 'baseUrl' | 'canonicalBaseUrl'>
 let known: DistributionSource | null = null
 const listeners = new Set<(source: DistributionSource) => void>()
 
-// The answer is kept in the browser, so later visits use it at once; refreshSource asks again
-// (after moving between networks, say). A browser that keeps nothing asks once per page load.
+// A mirror answer is kept in the browser, so later visits use it at once; refreshSource asks
+// again (after moving between networks, say). The canonical root is not kept: it is asked for
+// on every page load, so a visitor the server could not place yet is placed once it can. A
+// browser that keeps nothing asks once per page load.
 const storageKey = 'ourtaiko.distributionSource'
 
 function stored(): DistributionSource | null {
@@ -68,8 +70,9 @@ function stored(): DistributionSource | null {
     const text = localStorage.getItem(storageKey)
     if (!text) return null
     const answer = readSource(JSON.parse(text))
-    // A stored answer this page cannot trust (readSource's fallback) is asked again.
-    return answer === canonicalSource ? null : answer
+    // A stored answer this page cannot trust (readSource's fallback), or a canonical one kept
+    // by an earlier release, is asked again.
+    return answer.mirror ? answer : null
   } catch {
     return null
   }
@@ -77,6 +80,10 @@ function stored(): DistributionSource | null {
 
 function store(answer: DistributionSource) {
   try {
+    if (!answer.mirror) {
+      localStorage.removeItem(storageKey)
+      return
+    }
     localStorage.setItem(storageKey, JSON.stringify(answer))
   } catch {
     // Kept for this page load only.

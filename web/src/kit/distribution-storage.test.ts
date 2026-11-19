@@ -46,7 +46,7 @@ it('asks once, keeps the answer, and a later page uses it without asking', async
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-it('asks again on refresh and keeps the new answer', async () => {
+it('asks again on refresh, and keeps no canonical answer', async () => {
   const kept = storage({ 'ourtaiko.distributionSource': JSON.stringify(mirrorAnswer) })
   const fetch = answering(canonicalAnswer)
   vi.resetModules()
@@ -55,8 +55,24 @@ it('asks again on refresh and keeps the new answer', async () => {
   expect(fetch).not.toHaveBeenCalled()
   expect(await refreshSource()).toEqual(canonicalAnswer)
   expect(fetch).toHaveBeenCalledTimes(1)
-  expect(JSON.parse(kept.get('ourtaiko.distributionSource')!)).toEqual(canonicalAnswer)
+  expect(kept.has('ourtaiko.distributionSource')).toBe(false)
   expect(await askSource()).toEqual(canonicalAnswer)
+})
+
+it('asks again on every page load while the answer is the canonical root', async () => {
+  // As an earlier release kept it, for a visitor the server could not place yet.
+  const kept = storage({ 'ourtaiko.distributionSource': JSON.stringify(canonicalAnswer) })
+  const fetch = answering(canonicalAnswer, mirrorAnswer)
+  vi.resetModules()
+  let { askSource } = await import('./distribution')
+  expect(await askSource()).toEqual(canonicalAnswer)
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(kept.has('ourtaiko.distributionSource')).toBe(false)
+  vi.resetModules()
+  ;({ askSource } = await import('./distribution'))
+  expect(await askSource()).toEqual(mirrorAnswer)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(kept.get('ourtaiko.distributionSource')!)).toEqual(mirrorAnswer)
 })
 
 it('asks again for a kept answer it cannot trust, and keeps nothing from a failed request', async () => {
