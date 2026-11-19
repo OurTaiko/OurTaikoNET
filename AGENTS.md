@@ -1,3 +1,37 @@
+# OurTaikoNet：AI Agent 工作说明
+
+本文件写给在这个仓库里工作的 AI 编程助手（AI Agent）。完整的贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，这里列出 Agent 必须遵守的要点；两者冲突时以更严格的一方为准。
+
+**这个仓库推送到 `main` 即由 CI 发布到正式环境（net.ourtaiko.org）。** 不要直接推送 `main`，一律通过分支和 PR；只在用户明确要求时提交、推送或开 PR。
+
+## 0. 推荐使用 AOCI 建立仓库认知
+
+本仓库维护 AOCI 认知索引（`aoci.txt` 等），推荐用它在动手前掌握系统全貌：新会话先 `aoci_rules`、`aoci_overview`；改动完成后调用一次 `aoci_maintain` 维护受影响的条目。具体规则见下方「AOCI Repository Cognition」一节（该节由 AOCI 管理，不要手工改动它的标记之间的内容）。AOCI 索引文件的更新与业务改动分开提交（`chore(aoci): …`）。
+
+## 1. 修改代码时做最佳实践，不打补丁
+
+- 先找到并说明根因，在产生问题的地方修，不在症状处绕过。
+- 改在负责它的那一层（各包分工见 README 的表格），不把一层的逻辑塞进另一层。
+- 不写针对某条数据、某个 ID 的特例分支；不靠吞错误、硬编码、`sleep`、重试或关掉 lint/类型检查来让问题消失。
+- 复用已有代码，不复制粘贴；数据库只加新迁移，不改已发布的迁移；`proto/`、`contracts/`、`/api/v1/` 这类契约两边一起改并保持兼容。
+- 行为、测试和文档在同一个改动里一起更新，删掉不再使用的代码。
+- 正确的修法超出本次范围时，向用户和审批者说明，而不是悄悄提交临时绕过。
+
+## 2. 开 PR 时写明使用的 AI 模型
+
+PR 描述中必须写明本次工作所使用的 AI 模型名称（尽量写到具体型号或模型 ID，例如 `claude-opus-5-5`；多个模型都列出），供审批者参考。按 [.github/pull_request_template.md](.github/pull_request_template.md) 填写。
+
+## 3. 开 PR 之前完成回归测试
+
+CI 只在推送 `main` 时运行，所以本地测试是合并前唯一的关口。开 PR 之前按改动范围运行并通过：
+
+- 后端：`scripts/test.sh`（`gofmt`、`go vet`、全部 Go 测试）；
+- 网站：在 `web/` 下 `pnpm lint && pnpm format:check && pnpm test && pnpm build`；
+- `contracts/`：两组都跑；`proto/`：先 `scripts/proto.sh`；迁移、旧接口等其他情形见 CONTRIBUTING.md 的表格；
+- 修 bug 先写能复现它的测试。
+
+在 PR 描述的「测试」一栏写明实际运行的命令和结果；无法运行的检查如实说明，不要声称通过。
+
 <!-- aoci:begin -->
 ## AOCI Repository Cognition
 

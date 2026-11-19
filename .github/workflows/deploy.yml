@@ -59,8 +59,10 @@ jobs:
                 *_test.go | *.md) ;;
                 cmd/rooms/* | internal/multiplay/* | deploy/compose.production.yml) rooms=true ;;
               esac
+              # The AOCI index (aoci*.txt, .aoci/) is read by coding agents only: no build, test
+              # or image uses it.
               case "$file" in
-                *.md | .github/workflows/rollback.yml) ;;
+                *.md | aoci*.txt | .aoci/* | .github/workflows/rollback.yml) ;;
                 contracts/* | .github/workflows/deploy.yml) backend=true website=true ;;
                 web/* | deploy/publish-web.sh) website=true ;;
                 *) backend=true ;;
