@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -37,5 +38,30 @@ func TestClientIPTrust(t *testing.T) {
 		if _, err := ParseTrustedProxies(value); err == nil {
 			t.Fatalf("accepted invalid CIDR %q", value)
 		}
+	}
+}
+
+func TestDefaultGateways(t *testing.T) {
+	// A container on two networks whose gateway is the second's (172.21.0.1).
+	table := "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n" +
+		"eth1\t00000000\t010015AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n" +
+		"eth0\t000014AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n" +
+		"eth1\t000015AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n"
+	got := DefaultGateways(strings.NewReader(table))
+	if len(got) != 1 || got[0].String() != "172.21.0.1/32" {
+		t.Fatalf("got %v", got)
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "172.21.0.1:5555"
+	r.Header.Set("X-Real-IP", "114.114.114.114")
+	if ip := ClientIP(r, got); ip != "114.114.114.114" {
+		t.Fatalf("gateway not trusted: %s", ip)
+	}
+	r.RemoteAddr = "172.21.0.3:5555"
+	if ip := ClientIP(r, got); ip != "172.21.0.3" {
+		t.Fatalf("another container trusted: %s", ip)
+	}
+	if got := DefaultGateways(strings.NewReader("garbage\n\n")); len(got) != 0 {
+		t.Fatalf("got %v from garbage", got)
 	}
 }

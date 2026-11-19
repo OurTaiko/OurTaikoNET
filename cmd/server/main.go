@@ -104,6 +104,15 @@ func main() {
 	if cfg.TrustedProxies, err = web.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		log.Fatal(err)
 	}
+	// The image sets it: the proxy is on the host, whichever network is the container's gateway.
+	if os.Getenv("TRUSTED_PROXY_GATEWAY") == "true" {
+		gateways := web.ReadDefaultGateways()
+		if len(gateways) == 0 {
+			log.Print("TRUSTED_PROXY_GATEWAY: no default gateway found")
+		}
+		cfg.TrustedProxies = append(cfg.TrustedProxies, gateways...)
+	}
+	log.Printf("trusted proxies: %v", cfg.TrustedProxies)
 	cfg.DonCatalogURL = os.Getenv("DON_CATALOG_URL")
 	cfg.DonMirrorCatalogURL = os.Getenv("DON_MIRROR_CATALOG_URL")
 	// The regional Don mirror needs a good catalog address and the IP country database.
