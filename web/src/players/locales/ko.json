@@ -59,7 +59,7 @@
     "pausePlaylists": "전환 멈춤",
     "resumePlaylists": "전환 계속",
     "playlistOf": "{{total}}개 중 {{n}}번째: {{title}}",
-    "playlistSongs": "플레이리스트의 첫 곡들"
+    "playlistSongs": "플레이리스트의 곡"
   },
   "profile": {
     "unknownPlayer": "플레이어",
