@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-20T21:42:31Z",
+  "updated_at": "2026-11-20T22:20:01Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ac50dddfb5926cef3a77e8c1ab6a44b12e8a1693bb788f2edf471edae35148ed",
-      "size": 177714,
-      "normalized_sha256": "ac50dddfb5926cef3a77e8c1ab6a44b12e8a1693bb788f2edf471edae35148ed"
+      "sha256": "3fb7e42d4a47d23ad184727624c69c480c4cc67693fa9c44791da666bc65e4c9",
+      "size": 178305,
+      "normalized_sha256": "3fb7e42d4a47d23ad184727624c69c480c4cc67693fa9c44791da666bc65e4c9"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -2758,6 +2758,12 @@
       "size": 11194,
       "normalized_sha256": "b096a4b079e4bfc7e25f960e7341466a61c0e53f30049f8dedcda527f35c0bea"
     },
+    "web/src/kit/assets/difficulty/NOTICE": {
+      "role": "index",
+      "sha256": "d184231bf7db03f1a3f474ffcbf7d3c4b55d66eabbd39977e48de15e22651052",
+      "size": 663,
+      "normalized_sha256": "d184231bf7db03f1a3f474ffcbf7d3c4b55d66eabbd39977e48de15e22651052"
+    },
     "web/src/kit/assets/donder/ChillRoundF.woff2": {
       "role": "index",
       "sha256": "5ca8f9e6ee73651a425c5e2b80cabf6b8c27df9da68887014d277a69a87dbfbf",
@@ -2972,9 +2978,9 @@
     },
     "web/src/kit/components/difficulty-badges.tsx": {
       "role": "index",
-      "sha256": "e5eb44df9413956c25505b795e683524895948a124d9dd71ea3f928110619129",
-      "size": 3819,
-      "normalized_sha256": "e5eb44df9413956c25505b795e683524895948a124d9dd71ea3f928110619129"
+      "sha256": "69d5856667cf5613a9fed73f377238cc7ddb4bc3f58ed58471cb87456186a008",
+      "size": 5781,
+      "normalized_sha256": "69d5856667cf5613a9fed73f377238cc7ddb4bc3f58ed58471cb87456186a008"
     },
     "web/src/kit/components/empty-state.tsx": {
       "role": "index",
@@ -3212,15 +3218,15 @@
     },
     "web/src/kit/dans.tsx": {
       "role": "index",
-      "sha256": "377692adb25513cad0bfb36b7b8cedd1317532a45f04e9060884274eab71c843",
-      "size": 48445,
-      "normalized_sha256": "377692adb25513cad0bfb36b7b8cedd1317532a45f04e9060884274eab71c843"
+      "sha256": "91061de68db11a1e6890e0dcb140f4e1ced226874597ac4167cb194b36e6a01b",
+      "size": 48183,
+      "normalized_sha256": "91061de68db11a1e6890e0dcb140f4e1ced226874597ac4167cb194b36e6a01b"
     },
     "web/src/kit/difficulty-constants.tsx": {
       "role": "index",
-      "sha256": "720b3d48db1adc9123cf081ed24b6c8b4191386ace39eb3eb34a0a8196643004",
-      "size": 8199,
-      "normalized_sha256": "720b3d48db1adc9123cf081ed24b6c8b4191386ace39eb3eb34a0a8196643004"
+      "sha256": "fa61a4b6c1ca44867979bd62de5a702027255b56319bb424d10490a1f2781072",
+      "size": 7745,
+      "normalized_sha256": "fa61a4b6c1ca44867979bd62de5a702027255b56319bb424d10490a1f2781072"
     },
     "web/src/kit/distribution-storage.test.ts": {
       "role": "observe",
@@ -3512,9 +3518,9 @@
     },
     "web/src/kit/pages.tsx": {
       "role": "index",
-      "sha256": "6b79c62d7c3aac58578d3f2e7b3de5ecd40b418c6eaccc17435ca4ddfb0ebcfc",
-      "size": 43577,
-      "normalized_sha256": "6b79c62d7c3aac58578d3f2e7b3de5ecd40b418c6eaccc17435ca4ddfb0ebcfc"
+      "sha256": "c71864a8a3f37a09494c51ba0eb2374fb2484498c04f26cb2e5bb5702da73d03",
+      "size": 43318,
+      "normalized_sha256": "c71864a8a3f37a09494c51ba0eb2374fb2484498c04f26cb2e5bb5702da73d03"
     },
     "web/src/kit/playlist-dialogs.tsx": {
       "role": "index",
@@ -3920,9 +3926,9 @@
     },
     "web/src/players/components/recent-works.tsx": {
       "role": "index",
-      "sha256": "e1f98b509b0c08291f4c9a629d3ad53adf9e8bed9fb7c95c5a598a7817230c9b",
-      "size": 6301,
-      "normalized_sha256": "e1f98b509b0c08291f4c9a629d3ad53adf9e8bed9fb7c95c5a598a7817230c9b"
+      "sha256": "48179761e46e1172aeb59afe17202142d0671ec78d3b9e7f90dfbcbcbb503424",
+      "size": 6595,
+      "normalized_sha256": "48179761e46e1172aeb59afe17202142d0671ec78d3b9e7f90dfbcbcbb503424"
     },
     "web/src/players/components/song-tile.tsx": {
       "role": "index",
@@ -4064,9 +4070,9 @@
     },
     "web/src/players/pages/user-overview.tsx": {
       "role": "index",
-      "sha256": "f6ed6d65c5bb69b9baf964414f222787bc89918e24fd2fee059bb6bcee938791",
-      "size": 11133,
-      "normalized_sha256": "f6ed6d65c5bb69b9baf964414f222787bc89918e24fd2fee059bb6bcee938791"
+      "sha256": "1cca9409d5657625ce7f980def2a544a90d05f57ae6b67c0bbedc57ab38c0e79",
+      "size": 10796,
+      "normalized_sha256": "1cca9409d5657625ce7f980def2a544a90d05f57ae6b67c0bbedc57ab38c0e79"
     },
     "web/src/players/pages/user-works.tsx": {
       "role": "index",
@@ -4076,9 +4082,9 @@
     },
     "web/src/players/pages/user.tsx": {
       "role": "index",
-      "sha256": "efdbd088fc27173ca7daca5404474db6e9ce95e3f005fba4575992485b6bafe8",
-      "size": 24612,
-      "normalized_sha256": "efdbd088fc27173ca7daca5404474db6e9ce95e3f005fba4575992485b6bafe8"
+      "sha256": "e2d055dd90bb16dd2d1ac02e5b532a243131f414ab8c8c2023e9bc48f4b7dbfb",
+      "size": 24866,
+      "normalized_sha256": "e2d055dd90bb16dd2d1ac02e5b532a243131f414ab8c8c2023e9bc48f4b7dbfb"
     },
     "web/src/players/pages/visits.tsx": {
       "role": "index",
