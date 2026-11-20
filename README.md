@@ -14,7 +14,7 @@ Status: the database layer and a first backend exist and pass their tests locall
 | `internal/multiplay`, `cmd/rooms`, `proto/` | Multi-Enso, the game's online rooms: a gRPC service, in production the program `cmd/rooms` in a container of its own, in development optionally inside the site's program. See "Multi-Enso" below |
 | `internal/inproc` | The one call the parts still make over HTTP inside the program: the sources reading the title catalog. A stage: it is to become a direct call |
 | `web/` | The website (React): both song sources and the players' pages in one app; see `web/README.md` |
-| `contracts/` | Cases both sides run: `validation.json`, the upload rules of the Go package `tja` and of the website's `src/kit/tja.ts` |
+| `contracts/` | Cases both sides run: `validation.json`, the upload rules of the Go package `tja` and of the website's `src/kit/tja.ts`; `chart-text.json`, how a song's name is picked by language (`internal/site/chart_text.go` for link cards, the website's `src/kit/chart-language.ts`) |
 | `Dockerfile`, `deploy/`, `.github/workflows/` | The image, how the backend and the website are published to the server and rolled back; see `deploy/README.md` |
 
 ## API versions

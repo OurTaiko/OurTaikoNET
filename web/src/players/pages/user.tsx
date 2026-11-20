@@ -44,6 +44,7 @@ import { cn } from '@sitekit/lib/utils'
 import { usePageMeta } from '@sitekit/head'
 import { queryClient } from '@sitekit/query/client'
 import { canonicalFileUrl } from '@sitekit/distribution'
+import { chartText } from '@sitekit/chart-language'
 
 // The Don tab draws with three.js: loaded when it is opened, not with every page.
 const DonTab = lazy(() => import('@players/pages/user-don').then((m) => ({ default: m.DonTab })))
@@ -299,11 +300,11 @@ function ScoresTab({ id, profile }: { id: string; profile: PublicProfile }) {
                             rel="noopener noreferrer"
                             className="truncate font-medium hover:underline"
                           >
-                            {row.titleTranslations?.[language] || row.title}
+                            {chartText(row, i18n.resolvedLanguage).title}
                           </a>
                         ) : (
                           <span className="truncate font-medium">
-                            {row.titleTranslations?.[language] || row.title}
+                            {chartText(row, i18n.resolvedLanguage).title}
                           </span>
                         )}
                         {row.chartUrl && (

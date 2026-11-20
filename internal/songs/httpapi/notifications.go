@@ -104,9 +104,11 @@ type NotificationActor struct {
 	Nickname   string `json:"nickname"`
 	AvatarPath string `json:"avatarPath"`
 }
+
+// NotificationChart is the song a notice is about, by its ID: the website reads the chart for
+// its names in each language.
 type NotificationChart struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	ID string `json:"id"`
 }
 type NotificationDan struct {
 	ID    string            `json:"id"`
@@ -179,8 +181,8 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	rows, e := tx.Query(ctx, `SELECT n.id,n.kind,n.created_at,n.read_at IS NOT NULL,n.actor_id,n.chart_id,c.title,n.dan_id,d.title,n.comment_id,m.parent_id,left(m.body,200),n.data || CASE WHEN i.id IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('status',i.status) END
-	 FROM notifications n LEFT JOIN charts c ON c.id=n.chart_id LEFT JOIN dan_courses d ON d.id=n.dan_id LEFT JOIN comments m ON m.id=n.comment_id LEFT JOIN chart_collaborations i ON i.id=n.collaboration_id
+	rows, e := tx.Query(ctx, `SELECT n.id,n.kind,n.created_at,n.read_at IS NOT NULL,n.actor_id,n.chart_id,n.dan_id,d.title,n.comment_id,m.parent_id,left(m.body,200),n.data || CASE WHEN i.id IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('status',i.status) END
+	 FROM notifications n LEFT JOIN dan_courses d ON d.id=n.dan_id LEFT JOIN comments m ON m.id=n.comment_id LEFT JOIN chart_collaborations i ON i.id=n.collaboration_id
 	 WHERE `+filter+` ORDER BY n.created_at DESC,n.id LIMIT $2 OFFSET $3`, u.User.ID, notificationPageSize, (page-1)*notificationPageSize)
 	if e != nil {
 		internal(w, e)
@@ -189,10 +191,10 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	actors := []string{}
 	for rows.Next() {
 		var n Notification
-		var actor, chartID, chartTitle, commentID, parentID, excerpt *string
+		var actor, chartID, commentID, parentID, excerpt *string
 		var danID *string
 		var danTitle []byte
-		if e = rows.Scan(&n.ID, &n.Kind, &n.CreatedAt, &n.Read, &actor, &chartID, &chartTitle, &danID, &danTitle, &commentID, &parentID, &excerpt, &n.Data); e != nil {
+		if e = rows.Scan(&n.ID, &n.Kind, &n.CreatedAt, &n.Read, &actor, &chartID, &danID, &danTitle, &commentID, &parentID, &excerpt, &n.Data); e != nil {
 			rows.Close()
 			internal(w, e)
 			return
@@ -201,8 +203,8 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 			n.Actor = &NotificationActor{ID: *actor}
 			actors = append(actors, *actor)
 		}
-		if chartID != nil && chartTitle != nil {
-			n.Chart = &NotificationChart{ID: *chartID, Title: *chartTitle}
+		if chartID != nil {
+			n.Chart = &NotificationChart{ID: *chartID}
 		}
 		if danID != nil && len(danTitle) > 0 {
 			n.Dan = &NotificationDan{ID: *danID}

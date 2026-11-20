@@ -120,7 +120,6 @@ export type Comment = {
   id: string
   /** The chart the comment is on, or (for a 段位 course) the course. */
   chartId?: string
-  chartTitle?: string
   danId?: string
   danTitle?: Record<string, string>
   parentId: string | null
@@ -164,7 +163,8 @@ export type AppNotification = {
   createdAt: string
   read: boolean
   actor: { id: string; nickname: string; avatarPath?: string } | null
-  chart: { id: string; title: string } | null
+  /** The song, by its ID: useChartTitle names it. */
+  chart: { id: string } | null
   dan: { id: string; title: Record<string, string> } | null
   comment: { id: string; parentId: string | null; excerpt: string } | null
   data: {
@@ -333,6 +333,12 @@ export type DanSong = {
   }
   title: string
   subtitle: string
+  titleTranslations: TitleTexts
+  subtitleTranslations: TitleTexts
+  /**
+   * A hidden song is blank (no chart ID, no names) for everyone but the course's maker and the
+   * administrators; the course, side and level stay.
+   */
   hidden: boolean
   level: number
   /** False once the block's content changed or went, until the maker picks a block again. */

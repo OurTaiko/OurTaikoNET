@@ -176,6 +176,32 @@ func TestDanCourses(t *testing.T) {
 		t.Fatalf("created %+v", created)
 	}
 
+	// The website names a song in every language its chart has; a hidden song is blanked for
+	// everyone but the maker and the administrators, and the game still gets it whole.
+	if _, err = pool.Exec(ctx, `UPDATE charts SET title_translations='{"ja":"ベータ"}' WHERE id=$1`, songB); err != nil {
+		t.Fatal(err)
+	}
+	for _, viewer := range []string{"", carol, alice, boss} {
+		var seen DanCourse
+		expect(call("GET", "/api/dans/"+created.ID, "", viewer), 200, &seen)
+		var listed struct{ Dans []DanCourse }
+		expect(call("GET", "/api/dans", "", viewer), 200, &listed)
+		for _, c := range append(listed.Dans, seen) {
+			if c.ID != created.ID {
+				continue
+			}
+			open, hidden := c.Songs[0], c.Songs[1]
+			if open.Chart.ID != songA || open.Title != "Alpha" || hidden.Level != 10 || hidden.Chart.Course != "Oni" {
+				t.Fatalf("%q sees %+v", viewer, c.Songs)
+			}
+			whole := viewer == alice || viewer == boss
+			if whole != (hidden.Chart.ID == songB && hidden.Title == "Beta" && hidden.TitleTranslations["ja"] == "ベータ") ||
+				!whole && (hidden.Chart.ID != "" || hidden.Title != "" || len(hidden.TitleTranslations) != 0) {
+				t.Fatalf("%q sees the hidden song as %+v", viewer, hidden)
+			}
+		}
+	}
+
 	// Every course gets a six-character code; makers may choose a free one.
 	if !danCodePattern.MatchString(created.Code) {
 		t.Fatal("code", created.Code)

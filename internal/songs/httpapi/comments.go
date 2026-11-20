@@ -31,9 +31,9 @@ const (
 // by an administrator keeps its place while replies remain, without author or text.
 type Comment struct {
 	ID string `json:"id"`
-	// A comment hangs on a song or on a 段位 course; the other is empty.
+	// A comment hangs on a song or on a 段位 course; the other is empty. A song is named by
+	// its chart, which the website reads for its names in each language.
 	ChartID          string            `json:"chartId,omitempty"`
-	ChartTitle       string            `json:"chartTitle,omitempty"`
 	DanID            string            `json:"danId,omitempty"`
 	DanTitle         map[string]string `json:"danTitle,omitempty"`
 	ParentID         *string           `json:"parentId"`
@@ -57,9 +57,9 @@ const commentColumns = `m.id,m.chart_id,m.dan_id,m.parent_id,m.depth,m.author_id
  m.deleted_at IS NOT NULL,m.removed_at IS NOT NULL,m.upvotes-m.downvotes,m.reply_count,
  COALESCE((SELECT value FROM comment_votes v WHERE v.comment_id=m.id AND v.user_id=$1),0)`
 
-// commentTitles follows commentColumns when the thread's subject is wanted:
-// the song's title, or the course's localized titles.
-const commentTitles = `,c.title,d.title`
+// commentTitles follows commentColumns when the thread's subject is wanted: the course's
+// localized titles (a song is named by its chart ID alone).
+const commentTitles = `,d.title`
 
 // commentSubjects joins a comment m to its song c or its course d.
 const commentSubjects = ` LEFT JOIN charts c ON c.id=m.chart_id LEFT JOIN dan_courses d ON d.id=m.dan_id`
@@ -169,7 +169,7 @@ type rowQuerier interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
-// readComments scans rows of commentColumns, optionally followed by the song title.
+// readComments scans rows of commentColumns, optionally followed by commentTitles.
 func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string, args ...any) ([]*Comment, error) {
 	rows, e := db.Query(ctx, sql, args...)
 	if e != nil {
@@ -179,16 +179,16 @@ func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string
 	items := []*Comment{}
 	for rows.Next() {
 		c := &Comment{Replies: []*Comment{}}
-		var chartID, chartTitle, danID *string
+		var chartID, danID *string
 		var danTitle []byte
 		dest := []any{&c.ID, &chartID, &danID, &c.ParentID, &c.Depth, &c.AuthorID, &c.Body, &c.CreatedAt, &c.EditedAt, &c.Deleted, &c.Removed, &c.Score, &c.ReplyCount, &c.MyVote}
 		if withTitle {
-			dest = append(dest, &chartTitle, &danTitle)
+			dest = append(dest, &danTitle)
 		}
 		if e = rows.Scan(dest...); e != nil {
 			return nil, e
 		}
-		c.setSubject(chartID, danID, chartTitle, danTitle)
+		c.setSubject(chartID, danID, danTitle)
 		if c.Deleted || c.Removed {
 			c.AuthorID, c.Body = "", ""
 		}
@@ -198,12 +198,9 @@ func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string
 }
 
 // setSubject fills the song or course fields from their nullable columns.
-func (c *Comment) setSubject(chartID *string, danID *string, chartTitle *string, danTitle []byte) {
+func (c *Comment) setSubject(chartID *string, danID *string, danTitle []byte) {
 	if chartID != nil {
 		c.ChartID = *chartID
-	}
-	if chartTitle != nil {
-		c.ChartTitle = *chartTitle
 	}
 	if danID != nil {
 		c.DanID = *danID

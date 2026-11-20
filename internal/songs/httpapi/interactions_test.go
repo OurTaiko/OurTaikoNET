@@ -144,7 +144,7 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	// Permalink of the middle reply contains its subtree only.
 	var thread struct{ Item Comment }
 	c.do("", "GET", "/api/comments/"+reply.ID, "", &thread)
-	if thread.Item.ID != reply.ID || thread.Item.ChartTitle != "Song" || len(thread.Item.Replies) != 1 || thread.Item.Replies[0].ID != deep.ID {
+	if thread.Item.ID != reply.ID || thread.Item.ChartID != w.song || len(thread.Item.Replies) != 1 || thread.Item.Replies[0].ID != deep.ID {
 		t.Fatalf("permalink: %+v", thread.Item)
 	}
 
@@ -167,7 +167,7 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	var notes NotificationPage
 	c.do("owner", "GET", "/api/me/notifications", "", &notes)
 	if notes.Total != 2 || notes.Unread != 2 || notes.Items[0].Kind != "chart_comment" || notes.Items[0].Read ||
-		notes.Items[0].Actor == nil || notes.Items[0].Actor.Nickname != "alice" || notes.Items[0].Chart.Title != "Song" || notes.Items[0].Comment.ID != top.ID {
+		notes.Items[0].Actor == nil || notes.Items[0].Actor.Nickname != "alice" || notes.Items[0].Chart.ID != w.song || notes.Items[0].Comment.ID != top.ID {
 		t.Fatalf("owner notifications: %+v", notes)
 	}
 	if code := c.do("owner", "POST", "/api/me/notifications/read", `{}`, nil); code != 200 {
@@ -229,7 +229,7 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	alice := testUsers["alice"].ID
 	var history CommentList
 	c.do("", "GET", "/api/users/"+alice+"/comments", "", &history)
-	if history.Total != 1 || history.Items[0].ID != top.ID || history.Items[0].ChartTitle != "Song" {
+	if history.Total != 1 || history.Items[0].ID != top.ID || history.Items[0].ChartID != w.song {
 		t.Fatalf("history: %+v", history)
 	}
 

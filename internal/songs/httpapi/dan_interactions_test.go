@@ -85,7 +85,7 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 	}
 	var history CommentList
 	c.do("", "GET", "/api/users/5f0c4a0b0e7b4d3c9a6f1e2d3c4b5a69/comments", "", &history)
-	if len(history.Items) != 1 || history.Items[0].DanTitle["en"] != "1st Dan" || history.Items[0].ChartTitle != "" {
+	if len(history.Items) != 1 || history.Items[0].DanTitle["en"] != "1st Dan" || history.Items[0].ChartID != "" {
 		t.Fatalf("history %+v", history.Items)
 	}
 	// Comment votes work the same on a course's comments.

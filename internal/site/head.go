@@ -26,7 +26,9 @@ import (
 // the browser (web/src/kit/head.tsx, usePageMeta); here the server writes them into index.html
 // before sending it, for a song, a playlist, a 段位 course and a player. The values are the
 // ones the website writes for a visitor whose language is the site's own, Chinese (an address
-// says no language), so the script finds them already right.
+// says no language), with the languages their browser asks for (Accept-Language) as their
+// system's: a song is named as chartText names it, which looks there for a name the chart has
+// no Chinese for.
 //
 // The page is looked up through the site's own API, as a visitor who is not signed in: what
 // that visitor may not see (a private playlist) is not told. A lookup that fails or takes
@@ -183,7 +185,8 @@ func lastIndex(units []uint16, u uint16) int {
 type pageLookup struct {
 	area string
 	api  string
-	meta func(body []byte) (pageMeta, bool)
+	// languages are the ones the visitor's browser asks for, most wanted first.
+	meta func(body []byte, languages []string) (pageMeta, bool)
 }
 
 // lookupFor matches the website's routes (web/src/songs.tsx, web/src/players/app.tsx) for the
@@ -200,7 +203,7 @@ func lookupFor(p string) (pageLookup, bool) {
 	switch {
 	case len(parts) == 2 && parts[0] == "players":
 		// The nameplate says who they are without adding up all they did.
-		return pageLookup{"players", "/api/v2/users/" + url.PathEscape(parts[1]) + "/nameplate", playerMeta}, true
+		return pageLookup{"players", "/api/v2/users/" + url.PathEscape(parts[1]) + "/nameplate", func(b []byte, _ []string) (pageMeta, bool) { return playerMeta(b) }}, true
 	case parts[0] != "fanmade" && parts[0] != "official" || len(parts) < 3:
 		return pageLookup{}, false
 	}
@@ -208,25 +211,24 @@ func lookupFor(p string) (pageLookup, bool) {
 	api := "/api/v2/sources/" + source + "/" + kind + "/" + url.PathEscape(id)
 	switch {
 	case kind == "charts" && commented:
-		return pageLookup{source, api, func(b []byte) (pageMeta, bool) { return chartMeta(source, b) }}, true
+		return pageLookup{source, api, func(b []byte, l []string) (pageMeta, bool) { return chartMeta(source, b, l) }}, true
 	case kind == "dans" && commented && id != "new":
 		return pageLookup{source, api, danMeta}, true
 	case kind == "playlists" && len(parts) == 3:
-		return pageLookup{source, api, func(b []byte) (pageMeta, bool) { return playlistMeta(source, b) }}, true
+		return pageLookup{source, api, func(b []byte, _ []string) (pageMeta, bool) { return playlistMeta(source, b) }}, true
 	}
 	return pageLookup{}, false
 }
 
 // chartMeta is pages.tsx's chartMeta.
-func chartMeta(source string, body []byte) (pageMeta, bool) {
+func chartMeta(source string, body []byte, languages []string) (pageMeta, bool) {
 	var c struct {
-		ID                string            `json:"id"`
-		Title             string            `json:"title"`
-		TitleTranslations map[string]string `json:"titleTranslations"`
-		Description       string            `json:"description"`
-		Maker             string            `json:"maker"`
-		SongCoverPath     string            `json:"songCoverPath"`
-		Difficulties      []struct {
+		localizedChart
+		ID            string `json:"id"`
+		Description   string `json:"description"`
+		Maker         string `json:"maker"`
+		SongCoverPath string `json:"songCoverPath"`
+		Difficulties  []struct {
 			Course string `json:"course"`
 			Side   string `json:"side"`
 			Level  int    `json:"level"`
@@ -235,14 +237,7 @@ func chartMeta(source string, body []byte) (pageMeta, bool) {
 	if json.Unmarshal(body, &c) != nil || c.ID == "" {
 		return pageMeta{}, false
 	}
-	// chart-language.ts's chartText for Chinese: the Chinese name, else the original.
-	title := ""
-	for _, v := range []string{c.TitleTranslations["zh"], c.TitleTranslations["origin"], c.Title} {
-		if jsTrim(v) != "" {
-			title = v
-			break
-		}
-	}
+	title, _ := chartText(c.localizedChart, "", languages)
 	courses := make([]string, len(c.Difficulties))
 	for i, d := range c.Difficulties {
 		name := d.Course
@@ -315,14 +310,14 @@ func playlistMeta(source string, body []byte) (pageMeta, bool) {
 }
 
 // danMeta is what dans.tsx's DanPage says.
-func danMeta(body []byte) (pageMeta, bool) {
+func danMeta(body []byte, languages []string) (pageMeta, bool) {
 	var d struct {
 		ID    string            `json:"id"`
 		Title map[string]string `json:"title"`
 		Owner string            `json:"owner"`
 		Songs []struct {
-			Title  string `json:"title"`
-			Hidden bool   `json:"hidden"`
+			localizedChart
+			Hidden bool `json:"hidden"`
 		} `json:"songs"`
 	}
 	if json.Unmarshal(body, &d) != nil || d.ID == "" {
@@ -358,7 +353,7 @@ func danMeta(body []byte) (pageMeta, bool) {
 	titles := make([]string, len(d.Songs))
 	hidden := false
 	for i, s := range d.Songs {
-		titles[i] = s.Title
+		titles[i], _ = chartText(s.localizedChart, "", languages)
 		hidden = hidden || s.Hidden
 	}
 	songs := strings.Join(titles, " / ")
@@ -421,7 +416,7 @@ func lookUpHead(r *http.Request, api http.Handler, origin string) (pageHead, boo
 	if answer.code != 0 && answer.code != http.StatusOK || answer.over {
 		return pageHead{}, false
 	}
-	meta, ok := page.meta(answer.body.Bytes())
+	meta, ok := page.meta(answer.body.Bytes(), acceptLanguages(r.Header.Get("Accept-Language")))
 	if !ok {
 		return pageHead{}, false
 	}

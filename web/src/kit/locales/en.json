@@ -315,6 +315,7 @@
     "uploadProgressPercent": "Uploading {{progress}}%",
     "userSquare": "All players",
     "unknownMember": "Unknown member",
+    "unknownSong": "Unknown song",
     "noActivityRecord": "Not recorded",
     "publicScoreCount": "Public score records",
     "lastActive": "Last active",

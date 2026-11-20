@@ -315,6 +315,7 @@
     "uploadProgressPercent": "업로드 중 {{progress}}%",
     "userSquare": "플레이어 목록",
     "unknownMember": "알 수 없는 사용자",
+    "unknownSong": "알 수 없는 곡",
     "noActivityRecord": "기록 없음",
     "publicScoreCount": "공개 점수 기록",
     "lastActive": "최근 활동",
