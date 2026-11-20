@@ -2,7 +2,8 @@
 // under the distribution root ("fanmade/<sha256>.webp", "3dchara/cos/0.glb", ...); the server
 // says once per page load which root this visitor reads (GET /api/v2/distribution/source): the
 // mirror for mainland visitors, the canonical root otherwise, this server's own in development.
-// This file is the one place that joins a path to a root. Nothing is kept in the browser.
+// This file is the one place that joins a path to a root. The answer is kept in the browser for
+// a day (keptFor).
 import { useEffect, useState } from 'react'
 import { SITE_API_ROOT } from './api/config'
 
@@ -59,32 +60,34 @@ export type FileRoot = Pick<DistributionSource, 'baseUrl' | 'canonicalBaseUrl'>
 let known: DistributionSource | null = null
 const listeners = new Set<(source: DistributionSource) => void>()
 
-// A mirror answer is kept in the browser, so later visits use it at once; refreshSource asks
-// again (after moving between networks, say). The canonical root is not kept: it is asked for
-// on every page load, so a visitor the server could not place yet is placed once it can. A
+// The answer is kept in the browser, so later visits use it at once, but only for keptFor: the
+// server's choice can change (its country database, its proxy settings, the visitor's network)
+// and a wrong answer, either way, mends itself within a day. refreshSource asks at once. A
 // browser that keeps nothing asks once per page load.
 const storageKey = 'ourtaiko.distributionSource'
+export const keptFor = 24 * 60 * 60 * 1000
+
+type Kept = { source: DistributionSource; until: number }
 
 function stored(): DistributionSource | null {
   try {
     const text = localStorage.getItem(storageKey)
     if (!text) return null
-    const answer = readSource(JSON.parse(text))
-    // A stored answer this page cannot trust (readSource's fallback), or a canonical one kept
-    // by an earlier release, is asked again.
-    return answer.mirror ? answer : null
+    const kept = JSON.parse(text) as Partial<Kept> | null
+    // An expired answer, one without an expiry (kept by an earlier release) or one this page
+    // cannot trust (readSource's fallback) is asked again.
+    if (typeof kept?.until !== 'number' || !(Date.now() < kept.until)) return null
+    const answer = readSource(kept.source)
+    return answer === canonicalSource ? null : answer
   } catch {
     return null
   }
 }
 
-function store(answer: DistributionSource) {
+function store(source: DistributionSource) {
   try {
-    if (!answer.mirror) {
-      localStorage.removeItem(storageKey)
-      return
-    }
-    localStorage.setItem(storageKey, JSON.stringify(answer))
+    const kept: Kept = { source, until: Date.now() + keptFor }
+    localStorage.setItem(storageKey, JSON.stringify(kept))
   } catch {
     // Kept for this page load only.
   }
