@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from 'react'
+import { useRef, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { HeartIcon, MusicNotesIcon } from '@phosphor-icons/react'
-import type { Playlist } from '@sitekit/api/types'
+import type { ChartBase, Playlist } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { Badge } from '@sitekit/components/ui/badge'
@@ -20,27 +20,80 @@ import {
   usePlaylistsNamed,
 } from '@players/featured'
 import { playerQueries } from '@players/queries'
-import { CarouselBar, useCarousel } from './carousel'
+import { CarouselBar, useCarousel, useDrift } from './carousel'
 import { SourceTag, songPage } from './song-tile'
 
 type Recommended = { source: SourceId; playlist: Playlist; note: string }
 
-// Where the page is wide enough for a slide to list a playlist's first songs. Narrower, the
-// list is not shown and its songs are not asked for.
-const roomForSongs = '(min-width: 48rem)'
-const watchRoom = (changed: () => void) => {
-  const query = window.matchMedia(roomForSongs)
-  query.addEventListener('change', changed)
-  return () => query.removeEventListener('change', changed)
-}
-const useRoomForSongs = () =>
-  useSyncExternalStore(
-    watchRoom,
-    () => window.matchMedia(roomForSongs).matches,
-    () => false,
-  )
+// How many of a playlist's songs a narrow slide shows at once. A wide slide has a height of its
+// own and gives the list what is left of it, which is no more than this.
+const rowsShown = 4
 
-const songsShown = 3
+/**
+ * Every song of a playlist, in its order, in a few rows: a list longer than that scrolls down
+ * by itself while `moving` and begins again at its end (useDrift, as the community's activity
+ * does), and the visitor can scroll it themselves. `songs` is absent while they are read.
+ */
+function Songs({
+  source,
+  songs,
+  rows,
+  moving,
+}: {
+  source: SourceId
+  songs: ChartBase[] | undefined
+  rows: number
+  moving: boolean
+}) {
+  const { t, i18n } = useTranslation()
+  const box = useRef<HTMLDivElement>(null)
+  const copy = useRef<HTMLOListElement>(null)
+  const loops = !!songs && songs.length > rowsShown
+  useDrift(box, copy, loops && moving)
+  const row = 'flex items-center gap-3 border-muted border-t h-[2.125rem]'
+  const list = (again: boolean) =>
+    songs?.map((chart, index) => (
+      <li key={chart.id} className={row}>
+        <span className="w-6 text-muted-foreground tabular-nums">{index + 1}</span>
+        <a
+          href={songPage(source, chart.id)}
+          tabIndex={again ? -1 : undefined}
+          className="flex-1 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring min-w-0 font-semibold hover:underline truncate underline-offset-4"
+        >
+          {chartText(chart, i18n.resolvedLanguage).title}
+        </a>
+        <span className="shrink-0">
+          <LevelChips difficulties={chart.difficulties} />
+        </span>
+      </li>
+    ))
+  return (
+    <div
+      ref={box}
+      style={{ '--rows': rows } as CSSProperties}
+      className={cn(
+        '@xl:flex-1 -mx-1 mt-1 px-1 h-[calc(var(--rows)*2.125rem)] @xl:h-auto @xl:min-h-0 overflow-y-auto overscroll-contain text-sm [scrollbar-width:none]',
+        loops && 'activity-fade',
+      )}
+    >
+      <ol aria-label={t('home.playlistSongs')}>
+        {list(false) ??
+          Array.from({ length: rows }, (_, index) => (
+            <li key={index} className={row}>
+              <Skeleton className="w-2/3 h-3.5" />
+            </li>
+          ))}
+      </ol>
+      {loops && (
+        // The same songs again, only to scroll into: a pointer can use them, a keyboard and a
+        // screen reader have the first.
+        <ol ref={copy} aria-hidden="true">
+          {list(true)}
+        </ol>
+      )}
+    </div>
+  )
+}
 
 /** The cover on a stack of two sheets: a playlist is several songs. */
 function CoverStack({ playlist, large = false }: { playlist: Playlist; large?: boolean }) {
@@ -69,16 +122,23 @@ function CoverStack({ playlist, large = false }: { playlist: Playlist; large?: b
   )
 }
 
-function Slide({ item, shown, songs }: { item: Recommended; shown: boolean; songs: boolean }) {
-  const { t, i18n } = useTranslation()
+function Slide({
+  item,
+  shown,
+  moving,
+}: {
+  item: Recommended
+  shown: boolean
+  /** Whether what moves by itself may: not while paused or while the visitor is at it. */
+  moving: boolean
+}) {
+  const { t } = useTranslation()
   const { source, playlist, note } = item
   const page = playlistPage(source, playlist.id)
   // Its songs are read once it is shown, and kept: the playlist's own page reads the same.
-  const detail = useQuery({
-    ...playerQueries.playlist(source, playlist.id),
-    enabled: shown && songs,
-  })
-  const first = detail.data?.charts?.filter(supportsChart).slice(0, songsShown)
+  const detail = useQuery({ ...playerQueries.playlist(source, playlist.id), enabled: shown })
+  const songs = detail.data?.charts?.filter(supportsChart)
+  const rows = Math.min(songs?.length ?? playlist.chartCount, rowsShown)
   const owner = playlist.owner?.nickname || t('profile.unknownPlayer')
   return (
     <article
@@ -131,33 +191,8 @@ function Slide({ item, shown, songs }: { item: Recommended; shown: boolean; song
             {note}
           </p>
         )}
-        {songs && (
-          <ol aria-label={t('home.playlistSongs')} className="hidden @xl:block mt-1 text-sm">
-            {first
-              ? first.map((chart, index) => (
-                  <li
-                    key={chart.id}
-                    className="flex items-center gap-3 border-muted border-t h-[2.125rem]"
-                  >
-                    <span className="w-4 text-muted-foreground tabular-nums">{index + 1}</span>
-                    <a
-                      href={songPage(source, chart.id)}
-                      className="flex-1 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring min-w-0 font-semibold hover:underline truncate underline-offset-4"
-                    >
-                      {chartText(chart, i18n.resolvedLanguage).title}
-                    </a>
-                    <span className="shrink-0">
-                      <LevelChips difficulties={chart.difficulties} />
-                    </span>
-                  </li>
-                ))
-              : detail.isPending &&
-                Array.from({ length: Math.min(playlist.chartCount, songsShown) }, (_, index) => (
-                  <li key={index} className="flex items-center border-muted border-t h-[2.125rem]">
-                    <Skeleton className="w-2/3 h-3.5" />
-                  </li>
-                ))}
-          </ol>
+        {rows > 0 && (songs || detail.isPending) && (
+          <Songs source={source} songs={songs} rows={rows} moving={shown && moving} />
         )}
         <div className="flex justify-between items-center gap-3 mt-auto pt-1">
           {playlist.owner ? (
@@ -214,7 +249,7 @@ function Row({ item, shown, onShow }: { item: Recommended; shown: boolean; onSho
 
 /**
  * The playlists the site's administrator recommends, of either source: one at a time (./carousel)
- * with the administrator's line and its first songs, and beside them, where there is room, all of
+ * with the administrator's line and its songs scrolling by, and beside them, where there is room, all of
  * them to choose from. Nothing is shown while none is recommended or the list cannot be read:
  * the home page is whole without it.
  */
@@ -232,7 +267,6 @@ export function FeaturedPlaylists() {
   })
   const count = shown.length
   const carousel = useCarousel(count)
-  const songs = useRoomForSongs()
   if (!items.length || (!count && !named.loading)) return null
   return (
     <section aria-labelledby="featured-heading" data-testid="home-featured" className="space-y-4">
@@ -268,7 +302,7 @@ export function FeaturedPlaylists() {
                   key={playlistKey(item.source, item.playlist.id)}
                   item={item}
                   shown={index === carousel.current}
-                  songs={songs}
+                  moving={!carousel.still}
                 />
               ))}
             </div>

@@ -59,7 +59,7 @@
     "pausePlaylists": "切り替えを止める",
     "resumePlaylists": "切り替えを再開",
     "playlistOf": "{{total}} 件中 {{n}} 件目：{{title}}",
-    "playlistSongs": "プレイリストの最初の曲"
+    "playlistSongs": "プレイリストの曲"
   },
   "profile": {
     "unknownPlayer": "プレイヤー",

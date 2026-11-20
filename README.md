@@ -73,7 +73,7 @@ The home page recommends a few playlists the site's administrator chose (`intern
 - `PUT /api/v1/admin/featured-playlists {"items": […]}`, the site's administrator → the same. The list sent replaces the one kept; an empty list recommends nothing. 422 `FEATURED_INVALID` (more than 6, an unknown source, an id that is no stored playlist's, one named twice, a note over 40 characters or of several lines), 422 `FEATURED_PLAYLIST_UNAVAILABLE` (a playlist that does not exist or is private).
 - `GET /api/v1/sources/<source>/playlists?ids=a,b` (public, at most 12) → the public ones of the playlists named, as the playlist list gives them (without songs), in the order named. One that is private or gone is left out.
 
-The website shows them under the newest charts (`web/src/players/components/featured-playlists.tsx`): one at a time, moving on by itself as the newest charts do (`carousel.tsx` is what both share), with the first songs of the one shown and, on a wide page, all of them beside it. It asks for the list, then each source once for its playlists, then the songs of the one shown. The administrator sets them at `/manage/featured` (`web/src/players/pages/featured.tsx`).
+The website shows them under the newest charts (`web/src/players/components/featured-playlists.tsx`): one at a time, moving on by itself as the newest charts do (`carousel.tsx` is what both share), with every song of the one shown in a list that scrolls by itself, as the community's activity does, and, on a wide page, all the playlists beside it. It asks for the list, then each source once for its playlists, then the songs of the one shown (not of the others until they are shown). The administrator sets them at `/manage/featured` (`web/src/players/pages/featured.tsx`).
 
 ## Titles by rule
 

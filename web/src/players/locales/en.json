@@ -59,7 +59,7 @@
     "pausePlaylists": "Pause",
     "resumePlaylists": "Resume",
     "playlistOf": "{{n}} of {{total}}: {{title}}",
-    "playlistSongs": "First songs of the playlist"
+    "playlistSongs": "Songs of the playlist"
   },
   "profile": {
     "unknownPlayer": "Player",

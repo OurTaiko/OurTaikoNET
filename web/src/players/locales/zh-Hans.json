@@ -59,7 +59,7 @@
     "pausePlaylists": "暂停轮换",
     "resumePlaylists": "继续轮换",
     "playlistOf": "第 {{n}} 个，共 {{total}} 个：{{title}}",
-    "playlistSongs": "歌单里的前几首"
+    "playlistSongs": "歌单里的歌曲"
   },
   "profile": {
     "unknownPlayer": "玩家",

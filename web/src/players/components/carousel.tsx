@@ -1,4 +1,12 @@
-import { useRef, useState, type FocusEvent, type PointerEvent, type TouchEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type PointerEvent,
+  type RefObject,
+  type TouchEvent,
+} from 'react'
 import { CaretLeftIcon, CaretRightIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
 import { Button } from '@sitekit/components/ui/button'
 import type { SourceId } from '@sitekit/source'
@@ -25,6 +33,8 @@ export function useCarousel(count: number) {
     go,
     paused,
     setPaused,
+    /** Nothing is to move by itself now: paused, or the visitor is at it. */
+    still: paused || hovered || focused,
     moving: !paused && !hovered && !focused && count > 1,
     /** For the element around all of it. */
     hold: {
@@ -118,4 +128,58 @@ export function CarouselBar({
       </Button>
     </div>
   )
+}
+
+/**
+ * Scrolls box down by itself while `moving`, a line every second or so. The list is in it
+ * twice (`loop` is the second copy), so that reaching the copy and jumping back by its
+ * distance shows no seam. The visitor's own scrolling always wins, and holds it a moment.
+ */
+export function useDrift(
+  box: RefObject<HTMLElement | null>,
+  loop: RefObject<HTMLElement | null>,
+  moving: boolean,
+) {
+  useEffect(() => {
+    const element = box.current
+    if (!element) return
+    let touched = 0
+    const touch = () => (touched = performance.now())
+    // The seam, for the visitor's scrolling as for ours.
+    const wrap = () => {
+      const length = loop.current?.offsetTop
+      if (length && element.scrollTop >= length) element.scrollTop -= length
+    }
+    element.addEventListener('wheel', touch, { passive: true })
+    element.addEventListener('touchstart', touch, { passive: true })
+    element.addEventListener('touchmove', touch, { passive: true })
+    element.addEventListener('scroll', wrap, { passive: true })
+    let frame = 0
+    if (moving) {
+      let last = performance.now()
+      let at = element.scrollTop
+      const step = (now: number) => {
+        // A tab that was in the background comes back with one long frame.
+        const passed = Math.min(now - last, 100)
+        last = now
+        if (now - touched > 2000) {
+          // Browsers round scrollTop; ours is kept apart unless the visitor moved it.
+          if (Math.abs(element.scrollTop - at) > 2) at = element.scrollTop
+          at += (28 * passed) / 1000
+          const length = loop.current?.offsetTop
+          if (length && at >= length) at -= length
+          element.scrollTop = at
+        }
+        frame = requestAnimationFrame(step)
+      }
+      frame = requestAnimationFrame(step)
+    }
+    return () => {
+      cancelAnimationFrame(frame)
+      element.removeEventListener('wheel', touch)
+      element.removeEventListener('touchstart', touch)
+      element.removeEventListener('touchmove', touch)
+      element.removeEventListener('scroll', wrap)
+    }
+  }, [box, loop, moving])
 }

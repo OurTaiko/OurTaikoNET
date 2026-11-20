@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -14,66 +14,12 @@ import { cn } from '@sitekit/lib/utils'
 import type { Activity } from '@players/api/types'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
-import { prefersStill } from './carousel'
+import { prefersStill, useDrift } from './carousel'
 import { SourceTag, songPage } from './song-tile'
 
 // The crown's colours, as on a player's scores: cleared, full combo, all good.
 const crownColors = ['text-zinc-400', 'text-amber-500', 'text-fuchsia-500']
 const did = ['home.cleared', 'home.fullCombo', 'home.allGood'] as const
-
-/**
- * Scrolls box down by itself while `moving`, a line every second or so. The list is in it
- * twice (`loop` is the second copy), so that reaching the copy and jumping back by its
- * distance shows no seam. The visitor's own scrolling always wins, and holds it a moment.
- */
-function useDrift(
-  box: RefObject<HTMLDivElement | null>,
-  loop: RefObject<HTMLUListElement | null>,
-  moving: boolean,
-) {
-  useEffect(() => {
-    const element = box.current
-    if (!element) return
-    let touched = 0
-    const touch = () => (touched = performance.now())
-    // The seam, for the visitor's scrolling as for ours.
-    const wrap = () => {
-      const length = loop.current?.offsetTop
-      if (length && element.scrollTop >= length) element.scrollTop -= length
-    }
-    element.addEventListener('wheel', touch, { passive: true })
-    element.addEventListener('touchstart', touch, { passive: true })
-    element.addEventListener('touchmove', touch, { passive: true })
-    element.addEventListener('scroll', wrap, { passive: true })
-    let frame = 0
-    if (moving) {
-      let last = performance.now()
-      let at = element.scrollTop
-      const step = (now: number) => {
-        // A tab that was in the background comes back with one long frame.
-        const passed = Math.min(now - last, 100)
-        last = now
-        if (now - touched > 2000) {
-          // Browsers round scrollTop; ours is kept apart unless the visitor moved it.
-          if (Math.abs(element.scrollTop - at) > 2) at = element.scrollTop
-          at += (28 * passed) / 1000
-          const length = loop.current?.offsetTop
-          if (length && at >= length) at -= length
-          element.scrollTop = at
-        }
-        frame = requestAnimationFrame(step)
-      }
-      frame = requestAnimationFrame(step)
-    }
-    return () => {
-      cancelAnimationFrame(frame)
-      element.removeEventListener('wheel', touch)
-      element.removeEventListener('touchstart', touch)
-      element.removeEventListener('touchmove', touch)
-      element.removeEventListener('scroll', wrap)
-    }
-  }, [box, loop, moving])
-}
 
 /** One row. `copy` is the second showing of it, which the keyboard passes over. */
 function Row({ item, copy = false }: { item: Activity; copy?: boolean }) {
