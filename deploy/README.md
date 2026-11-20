@@ -151,7 +151,10 @@ With `DON_MIRROR_CATALOG_URL` set, the server refuses to start if it is not a pl
 or the country database cannot be opened; check `docker logs` after recreating.
 
 The reverse proxy must keep overwriting `X-Real-IP` with the actual client IP and
-`TRUSTED_PROXY_CIDRS` must identify the proxy. Mainland China (`CN`) requests get mirror URLs
+`TRUSTED_PROXY_CIDRS` must identify the proxy. The proxy reaches the published port from the
+gateway of the container's gateway network, which the Compose file pins to `ourtaiko-shared`
+(`gw_priority`, Docker Engine 28+), so `TRUSTED_PROXY_CIDRS=172.20.0.1/32`; the site logs
+`trusted proxies: …` at start. Mainland China (`CN`) requests get mirror URLs
 for exact Don/nameplate catalog matches, and for public content-addressed chart media
 after a bounded mirror HEAD check. Overseas, Hong Kong, Macao, Taiwan and unknown locations get
 canonical URLs. Unlisted or changed art stays canonical; failed refreshes retain the last

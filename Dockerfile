@@ -48,9 +48,6 @@ COPY --from=build /out/ourtaiko-net /out/ourtaiko-rooms /usr/local/bin/
 COPY --from=tjaparser /out/tjaparser /usr/local/bin/tjaparser
 USER 10001:10001
 ENV LISTEN_ADDR=0.0.0.0:8080 STORAGE_DIR=/data/files
-# The proxy in front reaches a published port from the container's default gateway, the host;
-# it is trusted besides TRUSTED_PROXY_CIDRS, however the networks change (internal/web).
-ENV TRUSTED_PROXY_GATEWAY=true
 # 8080: the API and the website. 8081: Multi-Enso, the game's online rooms (gRPC in clear
 # text), served by the same image with the entrypoint ourtaiko-rooms (deploy/compose.production.yml).
 EXPOSE 8080 8081
