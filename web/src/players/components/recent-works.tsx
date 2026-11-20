@@ -4,7 +4,7 @@ import type { ChartBase } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
 import { chartOwners } from '@sitekit/chart-owners'
 import { RelativeTime } from '@sitekit/comments'
-import { LevelChips } from '@sitekit/components/difficulty-badges'
+import { LevelChips, LevelBoxes } from '@sitekit/components/difficulty-badges'
 import { SongCover } from '@sitekit/components/song-cover'
 import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
@@ -54,7 +54,13 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
           </a>
         </h3>
         {text.subtitle && <p className="text-muted-foreground text-sm truncate">{text.subtitle}</p>}
-        <LevelChips difficulties={chart.difficulties} />
+        {/* A narrow slide has no room for the level boxes beside its cover, so it keeps the squares. */}
+        <div className="@xl:hidden">
+          <LevelChips difficulties={chart.difficulties} />
+        </div>
+        <div className="hidden @xl:block mt-1">
+          <LevelBoxes difficulties={chart.difficulties} />
+        </div>
       </div>
       <div className="flex flex-col gap-3 col-span-2 @xl:col-span-1 @xl:col-start-2 @xl:px-6 @xl:pt-3 @xl:pb-6 min-w-0 min-h-0">
         {/* Where the card is narrow the slides differ in height by this much, so it is left out. */}

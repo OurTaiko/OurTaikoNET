@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { RelativeTime } from '@sitekit/comments'
-import { difficultyColors } from '@sitekit/components/difficulty-badges'
+import { LevelBox } from '@sitekit/components/difficulty-badges'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { cn } from '@sitekit/lib/utils'
 import type { SourceId } from '@sitekit/source'
@@ -120,15 +120,7 @@ function RecentPlays({ id, onMore }: { id: string; onMore: () => void }) {
                     <RelativeTime value={row.submittedAt} />
                   </p>
                 </div>
-                <span
-                  title={t(`courses.${row.course}`)}
-                  className={cn(
-                    'inline-flex justify-center items-center px-1.5 rounded-[7px] min-w-[1.625rem] h-[1.375rem] font-bold text-white text-xs tabular-nums shrink-0',
-                    difficultyColors[row.course] ?? 'bg-muted',
-                  )}
-                >
-                  {row.level}
-                </span>
+                <LevelBox course={row.course} level={row.level} name={t(`courses.${row.course}`)} />
                 <Crown status={row.ClearStatus} />
                 <span className="sm:w-[5.5rem] font-mono font-semibold text-sm text-right tabular-nums shrink-0">
                   {row.score.toLocaleString(formatLocale(language))}

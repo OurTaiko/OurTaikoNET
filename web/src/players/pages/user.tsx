@@ -2,13 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  ArrowSquareOutIcon,
-  CaretLeftIcon,
-  CaretRightIcon,
-  PlayIcon,
-  StarIcon,
-} from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, CaretLeftIcon, CaretRightIcon, PlayIcon } from '@phosphor-icons/react'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type {
@@ -21,6 +15,7 @@ import type {
 import { Nameplate } from '@players/components/nameplate'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
+import { LevelBox } from '@sitekit/components/difficulty-badges'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { Badge } from '@sitekit/components/ui/badge'
 import { Button } from '@sitekit/components/ui/button'
@@ -337,13 +332,18 @@ function ScoresTab({ id, profile }: { id: string; profile: PublicProfile }) {
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {t(`courses.${row.course}`)}
-                      {row.side !== 'single' && (
-                        <span className="text-muted-foreground"> · {row.side.toUpperCase()}</span>
-                      )}
-                      <span className="ml-2 inline-flex items-center gap-0.5 text-muted-foreground">
-                        <StarIcon weight="fill" className="size-3" aria-hidden="true" />
-                        {row.level}
+                      <span className="inline-flex items-center gap-2">
+                        {/* The course is written beside the box, so the box reads only the level. */}
+                        <LevelBox course={row.course} level={row.level} name={null} />
+                        <span>
+                          {t(`courses.${row.course}`)}
+                          {row.side !== 'single' && (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · {row.side.toUpperCase()}
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold tabular-nums">

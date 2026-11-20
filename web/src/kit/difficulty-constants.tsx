@@ -1,8 +1,7 @@
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { StarIcon } from '@phosphor-icons/react'
 import { cn } from './lib/utils'
-import { difficultyColors } from './components/difficulty-badges'
+import { CourseLabel } from './components/difficulty-badges'
 import { blockName } from './courses'
 import type { Difficulty, DifficultyConstants as Constants } from './api/types'
 
@@ -46,18 +45,11 @@ export function DifficultyConstants({
           {t('constants.title')}
         </h2>
         {difficulty && (
-          <span
-            className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-xs font-bold whitespace-nowrap text-white',
-              difficultyColors[difficulty.course as keyof typeof difficultyColors] ?? 'bg-muted',
-            )}
-          >
-            {blockName(difficulty)}
-            <span className="inline-flex items-center gap-0.5 tabular-nums">
-              <StarIcon weight="fill" className="size-3" aria-hidden="true" />
-              {difficulty.level}
-            </span>
-          </span>
+          <CourseLabel
+            course={difficulty.course}
+            name={blockName(difficulty)}
+            level={difficulty.level}
+          />
         )}
       </div>
       {!shown ? (

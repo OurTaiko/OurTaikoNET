@@ -36,7 +36,7 @@ import {
 import { api, jsonRequest } from './api/client'
 import type { ChartBase, ScoreReplay, Vote, VoteResult } from './api/types'
 import { SiteChartCard, formatDuration } from './components/chart-card'
-import { blockName, isSupportedCourse, slotKey, supportsChart } from './courses'
+import { blockName, isSupportedCourse, sideName, slotKey, supportsChart } from './courses'
 import { defaultDifficulty, hasConstants } from './chart-difficulty'
 import { DifficultyConstants, formatConstant } from './difficulty-constants'
 import { useSession } from './session'
@@ -53,7 +53,7 @@ import { cn } from './lib/utils'
 import { coverSource } from './cover'
 import { PageHero } from './components/page-hero'
 import { SourceTag } from './components/source-tag'
-import { difficultyColors } from './components/difficulty-badges'
+import { LevelBox } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { EmptyState } from './components/empty-state'
 import { PageMeta, usePageMeta, type PageMetaProps } from './head'
@@ -515,18 +515,17 @@ export function Detail() {
                   type="button"
                   aria-pressed={slotKey(d) === course}
                   onClick={() => setChosenCourse(slotKey(d))}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-[14px] px-2 text-left text-sm transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring aria-pressed:bg-secondary aria-pressed:text-secondary-foreground"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-[14px] px-2 py-1 text-left text-sm transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring aria-pressed:bg-secondary aria-pressed:text-secondary-foreground"
                 >
-                  <span
-                    className={cn(
-                      'inline-flex h-[1.375rem] min-w-[1.625rem] shrink-0 items-center justify-center rounded-[7px] px-1.5 text-xs font-bold text-white tabular-nums',
-                      difficultyColors[d.course as keyof typeof difficultyColors] ?? 'bg-muted',
-                    )}
-                  >
-                    {d.level}
-                  </span>
+                  {/* The emblem names the course, so only a pair's side is written ("1P"); the
+                      box reads out the whole block name. */}
+                  <LevelBox course={d.course} level={d.level} name={blockName(d)} />
                   <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                    <span className="shrink-0 font-medium">{blockName(d)}</span>
+                    {d.side !== 'single' && (
+                      <span aria-hidden="true" className="shrink-0 font-medium">
+                        {sideName(d.side)}
+                      </span>
+                    )}
                     {/* Who designed this block's notes: NOTESDESIGNERn, else MAKER. */}
                     {d.maker && (
                       <span className="inline-flex min-w-0 items-center gap-1 self-center text-xs opacity-75">

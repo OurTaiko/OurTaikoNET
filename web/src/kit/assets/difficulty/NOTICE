@@ -1,0 +1,12 @@
+Third-party skin images copied without modification from OurTaikoPlay
+(OurTaiko/OurTaikoPlay, Assets/OurTaiko/Art/dan_select/yellow_box/difficulty/,
+added in commit 7d1471295533f6b047f62fdc448666f483910ab7 as the "Nijiiro
+dan_select art" of the game's skin), renamed by course:
+
+  0.png -> easy.png, 1.png -> normal.png, 2.png -> hard.png,
+  3.png -> oni.png, 4.png -> ura.png
+
+They are the course emblems the game draws when choosing a difficulty. Like
+the game's other skin images, they retain their respective owners' rights
+(the Taiko no Tatsujin artwork belongs to Bandai Namco); this attribution is
+not a new license or a claim that they are public domain.

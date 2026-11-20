@@ -50,7 +50,7 @@ import {
 import { useSession } from './session'
 import { cn } from './lib/utils'
 import { SourceTag } from './components/source-tag'
-import { difficultyColors } from './components/difficulty-badges'
+import { LevelBox } from './components/difficulty-badges'
 import { SOURCE } from './source'
 import { usePageMeta } from './head'
 import { chartQueries } from './queries/charts'
@@ -199,21 +199,14 @@ function HiddenTitle({ seed }: { seed: string }) {
   )
 }
 
-// A song's place in a course as a small square of its difficulty's colour with its stars.
+// A song's place in a course: the course and side in words, then its level box.
 function SongLevel({ song }: { song: Dan['songs'][number] }) {
   const { t } = useTranslation()
   return (
     <span className="ml-auto inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
       {t(`dans.courses.${song.chart.course}`)}
       {song.chart.side !== 'single' && ` · ${t(`dans.sides.${song.chart.side}`)}`}
-      <span
-        className={cn(
-          'inline-flex h-[1.375rem] min-w-[1.625rem] items-center justify-center rounded-[7px] px-1.5 font-bold text-white tabular-nums',
-          difficultyColors[song.chart.course as keyof typeof difficultyColors] ?? 'bg-muted',
-        )}
-      >
-        {song.level}
-      </span>
+      <LevelBox course={song.chart.course} level={song.level} name={null} />
     </span>
   )
 }
