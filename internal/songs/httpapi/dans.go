@@ -52,7 +52,10 @@ type DanSong struct {
 	Chart    DanSongChart `json:"chart"`
 	Title    string       `json:"title"`
 	Subtitle string       `json:"subtitle"`
-	Hidden   bool         `json:"hidden"`
+	// The chart's names in other languages, as a chart has them; the website picks one.
+	TitleTranslations    map[string]string `json:"titleTranslations"`
+	SubtitleTranslations map[string]string `json:"subtitleTranslations"`
+	Hidden               bool              `json:"hidden"`
 	// The block's level; Valid is false once the block's content changed or went (the
 	// chart_difficulties triggers), until the maker picks a block again. Available is Valid
 	// and the chart still published: what the game may challenge.
@@ -346,6 +349,7 @@ func (s *Server) loadDans(ctx context.Context, where string, args ...any) ([]Dan
 		ids = append(ids, c.ID)
 	}
 	rows, err = s.DB.Query(ctx, `SELECT s.course_id,s.chart_id,s.course,s.side,s.hidden,COALESCE(c.title,''),COALESCE(c.subtitle,''),
+ COALESCE(c.title_translations,'{}'::jsonb),COALESCE(c.subtitle_translations,'{}'::jsonb),
  COALESCE((SELECT b.level FROM chart_difficulties b WHERE b.chart_id=s.chart_id AND b.course=s.course AND b.side=s.side),0),
  s.valid,COALESCE(c.status='published' AND s.valid,false)
  FROM dan_course_songs s LEFT JOIN charts c ON c.id=s.chart_id
@@ -357,7 +361,7 @@ func (s *Server) loadDans(ctx context.Context, where string, args ...any) ([]Dan
 	for rows.Next() {
 		var course string
 		var song DanSong
-		if err = rows.Scan(&course, &song.Chart.ID, &song.Chart.Course, &song.Chart.Side, &song.Hidden, &song.Title, &song.Subtitle, &song.Level, &song.Valid, &song.Available); err != nil {
+		if err = rows.Scan(&course, &song.Chart.ID, &song.Chart.Course, &song.Chart.Side, &song.Hidden, &song.Title, &song.Subtitle, &song.TitleTranslations, &song.SubtitleTranslations, &song.Level, &song.Valid, &song.Available); err != nil {
 			return nil, err
 		}
 		c := &courses[index[course]]
@@ -388,6 +392,9 @@ func (s *Server) loadDans(ctx context.Context, where string, args ...any) ([]Dan
 
 func (s *Server) listDans(w http.ResponseWriter, r *http.Request) {
 	courses, err := s.loadDans(r.Context(), `true`)
+	if err == nil {
+		err = s.hideSongs(r, courses)
+	}
 	if err != nil {
 		internal(w, err)
 		return
@@ -408,6 +415,10 @@ func (s *Server) danDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(courses) == 0 {
 		problem(w, 404, "DAN_NOT_FOUND", "段位不存在")
+		return
+	}
+	if err = s.hideSongs(r, courses); err != nil {
+		internal(w, err)
 		return
 	}
 	if viewer := s.viewer(r); viewer != "" {
@@ -620,6 +631,45 @@ func (s *Server) markDanOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.Respond(w, 200, map[string]bool{"official": body.Official})
+}
+
+// hideSongs blanks which chart each hidden song is (its chart and names) on the website, for
+// everyone but the course's maker and the administrators, who edit it. The course, side and
+// level stay: the page shows them in the song's place. The game's routes read courses whole,
+// since it plays the hidden songs. The cookie alone tells the maker; whether the viewer
+// administers is asked only when a course of someone else has a hidden song.
+func (s *Server) hideSongs(r *http.Request, courses []DanCourse) error {
+	var viewer *session
+	admin, asked := false, false
+	if v, e := s.sessions().Local(r); e == nil {
+		viewer = &v
+	}
+	for i := range courses {
+		c := &courses[i]
+		if viewer != nil && viewer.User.ID == c.OwnerID {
+			continue
+		}
+		for j := range c.Songs {
+			song := &c.Songs[j]
+			if !song.Hidden {
+				continue
+			}
+			if viewer != nil && !asked {
+				// Only the account center knows who administers: the full session asks it.
+				v, e := s.current(r)
+				if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+					return e
+				}
+				admin, asked = e == nil && v.User.IsAdmin, true
+			}
+			if admin {
+				break
+			}
+			song.Chart.ID, song.Title, song.Subtitle = "", "", ""
+			song.TitleTranslations, song.SubtitleTranslations = map[string]string{}, map[string]string{}
+		}
+	}
+	return nil
 }
 
 // gameDans is GET /api/game/dans: the official courses for the game's list, which finds

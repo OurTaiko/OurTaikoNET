@@ -4,7 +4,8 @@ type Translations = Partial<Record<'origin' | 'en' | 'zh' | 'ja' | 'ko' | 'zh_tw
 
 type LocalizedChart = {
   title: string
-  subtitle: string
+  /** Absent where only the title is shown. */
+  subtitle?: string
   /** As the TJA has them: `origin` is TITLE/SUBTITLE itself, the other keys locales. */
   titleTranslations?: Translations
   subtitleTranslations?: Translations

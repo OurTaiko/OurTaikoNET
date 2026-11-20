@@ -1,0 +1,35 @@
+{
+  "charts": {
+    "stargazing": {
+      "title": "Tentai Kansoku",
+      "subtitle": "--BUMP OF CHICKEN",
+      "titleTranslations": {
+        "origin": "Tentai Kansoku",
+        "en": "Stargazing",
+        "ja": "天体観測",
+        "zh_tw": "天體觀測"
+      },
+      "subtitleTranslations": { "origin": "--BUMP OF CHICKEN", "ja": " " }
+    },
+    "plain": { "title": "A", "subtitle": "" },
+    "chinese": {
+      "title": "Senbonzakura",
+      "subtitle": "++kurousa-P",
+      "titleTranslations": { "origin": "千本桜", "zh": "千本樱" }
+    }
+  },
+  "cases": [
+    { "name": "the visitor's language", "chart": "stargazing", "language": "ja", "system": ["en-US"], "title": "天体観測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "else the system's languages in their order", "chart": "stargazing", "language": "ko", "system": ["ko-KR", "en-US", "ja"], "title": "Stargazing", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "neither has one: the original, not the English", "chart": "stargazing", "language": "zh-Hans", "system": ["zh-CN", "fr"], "title": "Tentai Kansoku", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "a traditional Chinese system", "chart": "stargazing", "language": "zh-Hans", "system": ["zh-TW"], "title": "天體觀測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "Hant and Hong Kong tags are traditional", "chart": "stargazing", "language": null, "system": ["zh-Hant-CN"], "title": "天體觀測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "no language is the site's own, Chinese", "chart": "stargazing", "language": null, "system": [], "title": "Tentai Kansoku", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "no language, a Japanese system", "chart": "stargazing", "language": null, "system": ["ja"], "title": "天体観測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "a language tag written with an underscore", "chart": "stargazing", "language": "JA_jp", "system": [], "title": "天体観測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "a language the site does not speak is Chinese", "chart": "chinese", "language": "fr", "system": ["fr"], "title": "千本樱", "subtitle": "kurousa-P" },
+    { "name": "the Chinese name before the system's", "chart": "chinese", "language": null, "system": ["ja"], "title": "千本樱", "subtitle": "kurousa-P" },
+    { "name": "a blank translation falls through", "chart": "stargazing", "language": "ja", "system": [], "title": "天体観測", "subtitle": "BUMP OF CHICKEN" },
+    { "name": "a chart without translations", "chart": "plain", "language": "en", "system": [], "title": "A", "subtitle": "" }
+  ]
+}

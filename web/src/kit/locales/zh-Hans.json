@@ -315,6 +315,7 @@
     "uploadProgressPercent": "正在上传 {{progress}}%",
     "userSquare": "玩家列表",
     "unknownMember": "未知用户",
+    "unknownSong": "未知歌曲",
     "noActivityRecord": "暂无记录",
     "publicScoreCount": "公开成绩记录",
     "lastActive": "最近活跃",

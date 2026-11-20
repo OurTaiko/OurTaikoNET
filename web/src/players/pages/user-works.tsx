@@ -10,6 +10,7 @@ import { danTitle } from '@sitekit/dan-title'
 import { Button } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import type { SourceId } from '@sitekit/source'
+import { useChartTitle } from '@sitekit/chart-name'
 import type { PlayerTotals } from '@players/api/types'
 import { formatLocale } from '@players/i18n'
 import { Notice } from '@players/notice'
@@ -237,6 +238,12 @@ export function PlaylistsTab({ id }: { id: string }) {
   )
 }
 
+/** A comment's song, named in the visitor's language once its chart is read. */
+function ChartTitle({ source, id }: { source: SourceId; id?: string }) {
+  const title = useChartTitle(source, id)
+  return title ?? <Skeleton className="inline-block h-3 w-24 align-middle" />
+}
+
 export function CommentsTab({ id }: { id: string }) {
   const { t, i18n } = useTranslation()
   return (
@@ -255,9 +262,11 @@ export function CommentsTab({ id }: { id: string }) {
               href={`/${source}${commentSubjectPath(comment)}`}
               className="max-w-full font-medium text-foreground hover:underline truncate"
             >
-              {comment.danId
-                ? danTitle(comment.danTitle ?? {}, i18n.resolvedLanguage)
-                : comment.chartTitle}
+              {comment.danId ? (
+                danTitle(comment.danTitle ?? {}, i18n.resolvedLanguage)
+              ) : (
+                <ChartTitle source={source} id={comment.chartId} />
+              )}
             </a>
             <span aria-hidden="true">·</span>
             <RelativeTime value={comment.createdAt} />

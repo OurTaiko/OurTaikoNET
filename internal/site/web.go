@@ -80,6 +80,8 @@ func servePage(w http.ResponseWriter, r *http.Request, files fs.FS, head pageHea
 	}
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// A song's name goes by the languages the browser asks for (chartText).
+	w.Header().Set("Vary", "Accept-Language")
 	// No modification time: the page changes with what it is about, not only with the file.
 	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(withHead(page, head)))
 	return true

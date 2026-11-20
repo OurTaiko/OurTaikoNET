@@ -29,7 +29,7 @@ function Row({ item, copy = false }: { item: Activity; copy?: boolean }) {
   const name = system
     ? t('home.officialUploader')
     : item.user.nickname || t('profile.unknownPlayer')
-  const title = chartText({ ...item.chart, subtitle: '' }, i18n.resolvedLanguage).title
+  const title = chartText(item.chart, i18n.resolvedLanguage).title
   const play = item.kind === 'score' ? item.play : undefined
   const crown = play ? Math.min(Math.max(play.clearStatus, 1), 3) - 1 : 0
   const who = (

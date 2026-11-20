@@ -315,6 +315,7 @@
     "uploadProgressPercent": "アップロード中 {{progress}}%",
     "userSquare": "プレイヤー一覧",
     "unknownMember": "不明なユーザー",
+    "unknownSong": "不明な曲",
     "noActivityRecord": "記録なし",
     "publicScoreCount": "公開スコア記録",
     "lastActive": "最終アクティブ",

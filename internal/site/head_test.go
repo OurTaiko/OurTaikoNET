@@ -245,6 +245,9 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 		"/api/v2/sources/official/charts/0123456789abcdef0123456789abcdef": map[string]any{
 			"id": "0123456789abcdef0123456789abcdef", "title": "夏祭り", "description": "  An official song.\n", "maker": "", "difficulties": []any{},
 		},
+		"/api/v2/sources/fanmade/charts/456": map[string]any{
+			"id": "456", "title": "Tentai Kansoku", "titleTranslations": map[string]string{"ja": "天体観測", "en": "Stargazing"}, "difficulties": []any{},
+		},
 		"/api/v2/sources/fanmade/playlists/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": map[string]any{
 			"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "name": "Night & Day", "description": "", "public": true, "coverHash": "beef",
 			"songListCoverPath": "fanmade/beef.webp", "chartCount": 12,
@@ -258,7 +261,7 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 		},
 		"/api/v2/sources/official/dans/dddddddddddddddddddddddddddddddd": map[string]any{
 			"id": "dddddddddddddddddddddddddddddddd", "title": map[string]string{"ja": "十段", "zh": "十段（中）"}, "owner": "",
-			"songs": []map[string]any{{"title": "A"}, {"title": "B"}},
+			"songs": []map[string]any{{"title": "A", "titleTranslations": map[string]string{"zh": "甲"}}, {"title": "B"}},
 		},
 		"/api/v2/sources/fanmade/dans/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": map[string]any{
 			"id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "title": map[string]string{"en": "Tenth", "ko": "십단"}, "owner": "Ka",
@@ -306,7 +309,7 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 		},
 		"/official/dans/dddddddddddddddddddddddddddddddd": {
 			"title":       "十段（中） | OurTaikoNET · 官方",
-			"description": "段位道场「十段（中）」，由 未知用户 制作：A / B。",
+			"description": "段位道场「十段（中）」，由 未知用户 制作：甲 / B。",
 			"og:type":     "website",
 		},
 		"/fanmade/dans/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": {
@@ -334,6 +337,17 @@ func TestEachPageSpeaksForItselfToLinkCards(t *testing.T) {
 		}
 		if one(t, tags, "og:title") != one(t, tags, "title") || one(t, tags, "og:url") != one(t, tags, "canonical") {
 			t.Errorf("%s: the tags disagree: %q", address, tags)
+		}
+	}
+	// A song without a Chinese name is named in the first language the browser asks for that
+	// it has, as the page names it (chartText); the page says so to caches.
+	for header, title := range map[string]string{"": "Tentai Kansoku", "fr, ja;q=0.5": "天体観測", "ko,en;q=0.9,ja;q=0.8": "Stargazing"} {
+		r := httptest.NewRequest("GET", "/fanmade/charts/456", nil)
+		r.Header.Set("Accept-Language", header)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if got := one(t, headTags(t, w.Body.String()), "title"); got != title+" | OurTaikoNET · 自制" || w.Header().Get("Vary") != "Accept-Language" {
+			t.Errorf("Accept-Language %q: %q, Vary %q", header, got, w.Header().Get("Vary"))
 		}
 	}
 	// What a visitor who is not signed in may not see, what is not found, and every other page:

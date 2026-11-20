@@ -5,6 +5,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { RelativeTime } from '@sitekit/comments'
 import { LevelBox } from '@sitekit/components/difficulty-badges'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
+import { chartText } from '@sitekit/chart-language'
 import { cn } from '@sitekit/lib/utils'
 import type { SourceId } from '@sitekit/source'
 import type { Nameplate as Plate } from '@players/api/types'
@@ -98,7 +99,7 @@ function RecentPlays({ id, onMore }: { id: string; onMore: () => void }) {
       ) : (
         <ul className="divide-y" data-testid="recent-plays">
           {plays.items.slice(0, 6).map((row) => {
-            const title = row.titleTranslations?.[language] || row.title
+            const title = chartText(row, i18n.resolvedLanguage).title
             return (
               <li key={row.source + row.id} className="flex items-center gap-3 py-2.5 min-w-0">
                 {isSource(row.source) && <SourceTag source={row.source} />}

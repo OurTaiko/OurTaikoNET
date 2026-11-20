@@ -266,7 +266,9 @@ function DanCard({ dan }: { dan: Dan }) {
                 <HiddenTitle seed={`${dan.id}/${i}`} />
               </span>
             ) : (
-              <span className="truncate font-medium">{song.title}</span>
+              <span className="truncate font-medium">
+                {chartText(song, i18n.resolvedLanguage).title}
+              </span>
             )}
             {song.hidden && (
               <Badge variant="outline" className="shrink-0">
@@ -353,7 +355,7 @@ function DanView({ id }: { id: string }) {
           // The songs by name, unless some are hidden: then only how many.
           songs: dan.songs.some((s) => s.hidden)
             ? t('playlists.songCount', { count: dan.songs.length })
-            : dan.songs.map((s) => s.title).join(' / '),
+            : dan.songs.map((s) => chartText(s, i18n.resolvedLanguage).title).join(' / '),
         })
       : undefined,
   })
@@ -401,37 +403,40 @@ function DanView({ id }: { id: string }) {
               {t('dans.songs')}
             </h2>
             <ol className="divide-y">
-              {dan.songs.map((song, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    'flex flex-wrap items-center gap-3 py-3',
-                    !song.available && 'opacity-60',
-                  )}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground tabular-nums">
-                    {i + 1}
-                  </span>
-                  {song.hidden && !isOwner ? (
-                    <HiddenTitle seed={`${dan.id}/${i}`} />
-                  ) : (
-                    <Link
-                      to={`/charts/${song.chart.id}`}
-                      className="min-w-0 font-medium hover:underline"
-                    >
-                      {song.title}
-                      {song.subtitle && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {song.subtitle.replace(/^(--|\+\+)/, '')}
-                        </span>
-                      )}
-                    </Link>
-                  )}
-                  <SongLevel song={song} />
-                  {song.hidden && <Badge variant="outline">{t('dans.hiddenTitle')}</Badge>}
-                  {!song.available && <Badge variant="destructive">{t('dans.changed')}</Badge>}
-                </li>
-              ))}
+              {dan.songs.map((song, i) => {
+                const text = chartText(song, i18n.resolvedLanguage)
+                return (
+                  <li
+                    key={i}
+                    className={cn(
+                      'flex flex-wrap items-center gap-3 py-3',
+                      !song.available && 'opacity-60',
+                    )}
+                  >
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground tabular-nums">
+                      {i + 1}
+                    </span>
+                    {song.hidden && !isOwner ? (
+                      <HiddenTitle seed={`${dan.id}/${i}`} />
+                    ) : (
+                      <Link
+                        to={`/charts/${song.chart.id}`}
+                        className="min-w-0 font-medium hover:underline"
+                      >
+                        {text.title}
+                        {text.subtitle && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {text.subtitle}
+                          </span>
+                        )}
+                      </Link>
+                    )}
+                    <SongLevel song={song} />
+                    {song.hidden && <Badge variant="outline">{t('dans.hiddenTitle')}</Badge>}
+                    {!song.available && <Badge variant="destructive">{t('dans.changed')}</Badge>}
+                  </li>
+                )
+              })}
             </ol>
           </section>
           <section className={cn(panelClassName, 'space-y-3')} aria-labelledby="dan-exams-heading">
@@ -781,7 +786,7 @@ function DanEditor({ id }: { id?: string }) {
         const chart = charts[i].data
         return {
           chartId: String(s.chart.id),
-          title: s.title,
+          title: chartText(s, i18n.resolvedLanguage).title,
           blocks: chart
             ? slotBlocks(chart)
             : [{ course: s.chart.course, side: s.chart.side, level: s.level }],

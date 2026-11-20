@@ -20,6 +20,7 @@ import type { AppNotification, NotificationPage, NotificationSetting } from './a
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Skeleton } from './components/ui/skeleton'
+import { useChartTitle } from './chart-name'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { SourceTag } from './components/source-tag'
 import { UserAvatar } from './components/user-avatar'
@@ -62,12 +63,15 @@ export const announceChange = () => void queryClient.invalidateQueries({ queryKe
 export const useGo = () => (area: SourceId | '', path: string) =>
   visit(`${area && `/${area}`}${path}`)
 
-export function useNotificationText() {
+/** What a notice says; null while the song it names is being read. */
+export function useNotificationText(n: Sourced): string | null {
   const { t, i18n } = useTranslation()
-  return (n: AppNotification) => {
+  const song = useChartTitle(n.source, n.chart?.id)
+  if (song === null) return null
+  const text = () => {
     const actor = n.actor?.nickname || t('messages.unknownMember')
     // Comment notices name the song or the course the thread is on.
-    const chart = n.chart?.title ?? (n.dan ? danTitle(n.dan.title, i18n.resolvedLanguage) : '')
+    const chart = song || (n.dan ? danTitle(n.dan.title, i18n.resolvedLanguage) : '')
     const count = n.data.upvotes ?? 0
     switch (n.kind) {
       case 'chart_collaboration':
@@ -120,6 +124,7 @@ export function useNotificationText() {
         return t('notificationCenter.text.unknown')
     }
   }
+  return text()
 }
 
 /** The page a notice is about, inside its source; null when it has none. */
@@ -166,10 +171,14 @@ export function NotificationIcon({ n }: { n: AppNotification }) {
 }
 
 export function NotificationContent({ n }: { n: Sourced }) {
-  const text = useNotificationText()
+  const text = useNotificationText(n)
   return (
     <span className="min-w-0 flex-1 space-y-1">
-      <span className={cn('block text-sm leading-snug', !n.read && 'font-medium')}>{text(n)}</span>
+      {text === null ? (
+        <Skeleton className="block h-5 w-3/4" />
+      ) : (
+        <span className={cn('block text-sm leading-snug', !n.read && 'font-medium')}>{text}</span>
+      )}
       {n.comment?.excerpt && (
         <span className="line-clamp-2 block text-sm text-muted-foreground wrap-anywhere">
           {n.comment.excerpt}
@@ -368,9 +377,8 @@ const noticeListQuery = (depth: number) =>
   })
 
 /** A notice in a line, for the list of chats. */
-export function NoticeLine({ n }: { n: AppNotification }) {
-  const text = useNotificationText()
-  return <>{text(n)}</>
+export function NoticeLine({ n }: { n: Sourced }) {
+  return <>{useNotificationText(n) ?? ''}</>
 }
 
 /**

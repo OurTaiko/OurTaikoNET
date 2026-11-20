@@ -15,6 +15,7 @@ The site has three areas, told apart by how the address starts: the two song sou
 | `src/players` | The pages about players, whichever source they play: scores on both, titles, dan badges, nameplate, and for the site's administrator the manage panel (user groups). From OurTaikoProfile's `web/src` |
 | `src/TJARenderer` | The chart renderer, another project's source kept as it came |
 | `../contracts/validation.json` | Upload rules the backend runs too: one file for both, at the repository's root |
+| `../contracts/chart-text.json` | How `chartText` picks a song's name by language; the server's link cards run the same cases |
 
 The API of a source is under `/api/v1/sources/<source>/`. Signing in is the whole site's: `/api/v1/auth/…`.
 

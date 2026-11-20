@@ -1,31 +1,20 @@
-import { expect, test } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import contract from '../../../contracts/chart-text.json'
 import { chartText } from './chart-language'
 
-const chart = {
-  title: 'Tentai Kansoku',
-  subtitle: '--BUMP OF CHICKEN',
-  titleTranslations: {
-    origin: 'Tentai Kansoku',
-    en: 'Stargazing',
-    ja: '天体観測',
-    zh_tw: '天體觀測',
-  },
-  subtitleTranslations: { origin: '--BUMP OF CHICKEN', ja: ' ' },
-}
-
-test("a chart's name is in the visitor's language, else their system's, else the original", () => {
-  expect(chartText(chart, 'ja', ['en-US']).title).toBe('天体観測')
-  // No Korean name: the system's languages in their order, the first that has one.
-  expect(chartText(chart, 'ko', ['ko-KR', 'en-US', 'ja']).title).toBe('Stargazing')
-  // Neither has one: the original, not the English.
-  expect(chartText(chart, 'zh-Hans', ['zh-CN', 'fr']).title).toBe('Tentai Kansoku')
-  expect(chartText(chart, 'zh-Hans', ['zh-TW']).title).toBe('天體觀測')
-  // No language given is Chinese, the site's own.
-  expect(chartText(chart, null, []).title).toBe('Tentai Kansoku')
-  expect(chartText(chart, null, ['ja']).title).toBe('天体観測')
+// The same cases are the server's (internal/site/chart_text_test.go): a page's link card names
+// the song as the page does.
+describe("a chart's name in the visitor's language, else their system's, else the original", () => {
+  const charts: Record<string, Parameters<typeof chartText>[0]> = contract.charts
+  for (const c of contract.cases)
+    it(c.name, () => {
+      expect(chartText(charts[c.chart], c.language, c.system)).toEqual({
+        title: c.title,
+        subtitle: c.subtitle,
+      })
+    })
 })
 
-test('an empty translation falls through, and the subtitle loses its TJA mark', () => {
-  expect(chartText(chart, 'ja', []).subtitle).toBe('BUMP OF CHICKEN')
-  expect(chartText({ title: 'A', subtitle: '' }, 'en', []).title).toBe('A')
+it('a chart without a subtitle has none', () => {
+  expect(chartText({ title: 'A' }, 'en', [])).toEqual({ title: 'A', subtitle: '' })
 })

@@ -44,9 +44,7 @@ export function ruleText(rule: TitleRule, t: TFunction, language: string): strin
   }
   if (rule.kind === 'chart_clear') {
     const chart = rule.chart
-    const title = chart
-      ? chartText({ ...chart, subtitle: '' }, language).title || chart.id
-      : (rule.chartId ?? '')
+    const title = chart ? chartText(chart, language).title || chart.id : (rule.chartId ?? '')
     return (
       t('rules.text.chart_clear', { ...words, title }) + (chart?.gone ? t('rules.chartGone') : '')
     )
