@@ -71,8 +71,10 @@ function Songs({
     <div
       ref={box}
       style={{ '--rows': rows } as CSSProperties}
+      // relative: the box clips what it scrolls. The level chips' screen-reader words are
+      // absolute, and an unpositioned box leaves them to the page, which they stretch.
       className={cn(
-        '@xl:flex-1 -mx-1 mt-1 px-1 h-[calc(var(--rows)*2.125rem)] @xl:h-auto @xl:min-h-0 overflow-y-auto overscroll-contain text-sm [scrollbar-width:none]',
+        'relative @xl:flex-1 -mx-1 mt-1 px-1 h-[calc(var(--rows)*2.125rem)] @xl:h-auto @xl:min-h-0 overflow-y-auto overscroll-contain text-sm [scrollbar-width:none]',
         loops && 'activity-fade',
       )}
     >
