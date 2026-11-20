@@ -50,7 +50,16 @@
     "activityFailed": "The activity could not be loaded.",
     "friends": "Friends",
     "thanks": "Credits",
-    "thanksPrefix": "Special thanks:"
+    "thanksPrefix": "Special thanks:",
+    "featured": "Recommended playlists",
+    "featuredBy": "Picked by the administrators",
+    "openPlaylist": "Open playlist",
+    "previousPlaylist": "Previous playlist",
+    "nextPlaylist": "Next playlist",
+    "pausePlaylists": "Pause",
+    "resumePlaylists": "Resume",
+    "playlistOf": "{{n}} of {{total}}: {{title}}",
+    "playlistSongs": "First songs of the playlist"
   },
   "profile": {
     "unknownPlayer": "Player",
@@ -231,7 +240,9 @@
     "QUERY_INVALID": "Invalid query.",
     "TITLE_LIMIT_REACHED": "You can keep at most 5 community titles.",
     "TITLE_OFFICIAL": "Only administrators can delete an official title.",
-    "TITLE_CHANGED": "An administrator just changed this title. Reload the page and try again."
+    "TITLE_CHANGED": "An administrator just changed this title. Reload the page and try again.",
+    "FEATURED_INVALID": "The list cannot be saved: too many playlists, a line too long, or a playlist that is none.",
+    "FEATURED_PLAYLIST_UNAVAILABLE": "A playlist is gone or no longer public. Remove it and save again."
   },
   "visits": {
     "heading": "Visits",
@@ -271,6 +282,27 @@
     "membersHeading": "Players in a group",
     "nobody": "Nobody is in a group yet.",
     "change": "Change"
+  },
+  "featured": {
+    "heading": "Recommended playlists on the home page",
+    "intro": "The playlists chosen are shown on the home page in this order, {{max}} at most. Only public playlists can be chosen, fanmade or official. With none chosen the home page leaves the section out.",
+    "chosenHeading": "{{n}} of {{max}} chosen",
+    "none": "No playlist is recommended yet.",
+    "note": "A line about it (optional, up to {{max}} characters)",
+    "moveUp": "Move up: {{name}}",
+    "moveDown": "Move down: {{name}}",
+    "remove": "Remove: {{name}}",
+    "save": "Save",
+    "unsaved": "There are unsaved changes.",
+    "saved": "The recommended playlists are saved.",
+    "unavailable": "This playlist is gone or no longer public",
+    "addHeading": "Add a playlist",
+    "search": "Find a playlist",
+    "searchPlaceholder": "A name, or the address of a playlist page",
+    "noMatch": "No public playlist found.",
+    "add": "Add",
+    "added": "Added",
+    "full": "All {{max}} are chosen; remove one to add another."
   },
   "don": {
     "motion": "Motion",

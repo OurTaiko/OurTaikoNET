@@ -8,7 +8,7 @@ One PostgreSQL database, `ourtaiko_net` (PostgreSQL 18), made from the databases
 |---|---|
 | `fanmade` | Everything Fanmade's database had except users and sign-in |
 | `official` | The same tables from OurTaiko Database |
-| `net` | `users` (with each player's groups, and a copy of the nickname and avatar the account center publishes), `group_changes`, `sessions`, `oidc_flows`, Profile's `titles`, `awards`, `user_titles`, `user_dans`, `nameplates`, and the parents `scores` and `dan_attempts` |
+| `net` | `users` (with each player's groups, and a copy of the nickname and avatar the account center publishes), `group_changes`, `sessions`, `oidc_flows`, Profile's `titles`, `awards`, `user_titles`, `user_dans`, `nameplates`, the parents `scores` and `dan_attempts`, and what later migrations added (`db/migrations/`), such as `featured_playlists`, the playlists the home page recommends |
 
 Rules, all checked by `check.sql`:
 

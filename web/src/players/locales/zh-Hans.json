@@ -50,7 +50,16 @@
     "activityFailed": "动态加载失败。",
     "friends": "友链",
     "thanks": "鸣谢",
-    "thanksPrefix": "Special Thanks："
+    "thanksPrefix": "Special Thanks：",
+    "featured": "推荐歌单",
+    "featuredBy": "管理员为你挑选",
+    "openPlaylist": "查看歌单",
+    "previousPlaylist": "上一个歌单",
+    "nextPlaylist": "下一个歌单",
+    "pausePlaylists": "暂停轮换",
+    "resumePlaylists": "继续轮换",
+    "playlistOf": "第 {{n}} 个，共 {{total}} 个：{{title}}",
+    "playlistSongs": "歌单里的前几首"
   },
   "profile": {
     "unknownPlayer": "玩家",
@@ -231,7 +240,9 @@
     "QUERY_INVALID": "查询参数无效。",
     "TITLE_LIMIT_REACHED": "社区称号最多 5 个。",
     "TITLE_OFFICIAL": "官方称号只有管理员可以删除。",
-    "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。"
+    "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。",
+    "FEATURED_INVALID": "推荐歌单列表无效：数量、推荐语长度或歌单有误。",
+    "FEATURED_PLAYLIST_UNAVAILABLE": "有歌单已不存在或不再公开，请移除后再保存。"
   },
   "visits": {
     "heading": "访问统计",
@@ -271,6 +282,27 @@
     "membersHeading": "已有用户组的玩家",
     "nobody": "还没有人属于任何用户组。",
     "change": "修改"
+  },
+  "featured": {
+    "heading": "首页推荐歌单",
+    "intro": "选出的歌单按下面的顺序显示在首页，最多 {{max}} 个；只能选公开歌单，自制和官方的都可以。一个都不选时，首页不显示这个分区。",
+    "chosenHeading": "已选 {{n}} / {{max}}",
+    "none": "还没有推荐歌单。",
+    "note": "推荐语（选填，{{max}} 字以内）",
+    "moveUp": "上移：{{name}}",
+    "moveDown": "下移：{{name}}",
+    "remove": "移除：{{name}}",
+    "save": "保存",
+    "unsaved": "有未保存的修改。",
+    "saved": "推荐歌单已保存。",
+    "unavailable": "歌单已不存在或不再公开",
+    "addHeading": "添加歌单",
+    "search": "查找歌单",
+    "searchPlaceholder": "歌单名，或粘贴歌单页面的地址",
+    "noMatch": "没有找到公开的歌单。",
+    "add": "添加",
+    "added": "已添加",
+    "full": "已选满 {{max}} 个，移除一个后才能再添加。"
   },
   "don": {
     "motion": "动作",

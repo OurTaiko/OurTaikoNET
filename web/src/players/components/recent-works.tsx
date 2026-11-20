@@ -1,25 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CaretLeftIcon, CaretRightIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
 import type { ChartBase } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
 import { chartOwners } from '@sitekit/chart-owners'
 import { RelativeTime } from '@sitekit/comments'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
 import { SongCover } from '@sitekit/components/song-cover'
-import { Button, buttonVariants } from '@sitekit/components/ui/button'
+import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { UserAvatar } from '@sitekit/components/user-avatar'
 import { cn } from '@sitekit/lib/utils'
 import type { SourceId } from '@sitekit/source'
 import { Notice } from '@players/notice'
+import { CarouselBar, useCarousel } from './carousel'
 import { SourceTag, coverOf, songPage } from './song-tile'
 
 export type Work = { source: SourceId; chart: ChartBase }
-
-/** Whether the visitor asked their system for less motion: nothing then moves until they start it. */
-export const prefersStill = () =>
-  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: boolean }) {
   const { t, i18n } = useTranslation()
@@ -90,10 +86,8 @@ function Slide({ work, shown, cover }: { work: Work; shown: boolean; cover: bool
 }
 
 /**
- * The newest charts of both sources, one at a time, moving on by itself. The row of notes
- * under it is the way around: a note for each chart, red (don) for an official one and
- * teal (ka) for a fanmade one, and the one shown stretches into a roll that fills until
- * the next takes over.
+ * The newest charts of both sources, one at a time (./carousel): a note for each chart under
+ * them is the way around.
  */
 export function RecentWorks({
   works,
@@ -106,16 +100,11 @@ export function RecentWorks({
   failed: boolean
 }) {
   const { t, i18n } = useTranslation()
-  const [index, setIndex] = useState(0)
-  const [paused, setPaused] = useState(prefersStill)
-  // The pointer is over it, or the keyboard is in it: it waits.
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
+  const count = works.length
+  const carousel = useCarousel(count)
+  const { current } = carousel
   // Covers are fetched for the chart shown and its neighbours, and kept once fetched.
   const [fetched, setFetched] = useState<Set<number>>(() => new Set())
-  const swipe = useRef<number | null>(null)
-  const count = works.length
-  const current = count ? index % count : 0
   useEffect(() => {
     if (!count) return
     setFetched((seen) => {
@@ -131,31 +120,21 @@ export function RecentWorks({
         <Notice>{t(failed ? 'home.loadFailed' : 'home.noCharts')}</Notice>
       </section>
     )
-  const go = (to: number) => setIndex((to + count) % count)
-  const moving = !paused && !hovered && !focused && count > 1
   return (
     <section
       aria-roledescription="carousel"
       aria-labelledby="recent-works-heading"
       data-testid="home-recent"
       className="@container flex flex-col bg-card shadow-elev-1 rounded-[28px] min-w-0 overflow-hidden"
-      onPointerEnter={(event) => event.pointerType === 'mouse' && setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setFocused(false)}
+      {...carousel.hold}
     >
       <h2 id="recent-works-heading" className="sr-only">
         {t('home.recentCharts')}
       </h2>
       <div
         className="flex-1 grid touch-pan-y"
-        aria-live={moving ? 'off' : 'polite'}
-        onTouchStart={(event) => (swipe.current = event.touches[0].clientX)}
-        onTouchEnd={(event) => {
-          const moved = event.changedTouches[0].clientX - (swipe.current ?? 0)
-          swipe.current = null
-          if (Math.abs(moved) > 48) go(current + (moved < 0 ? 1 : -1))
-        }}
+        aria-live={carousel.moving ? 'off' : 'polite'}
+        {...carousel.swipe}
       >
         {works.map((work, i) => (
           <Slide
@@ -166,60 +145,24 @@ export function RecentWorks({
           />
         ))}
       </div>
-      <div className="flex items-center gap-1 px-3 py-2 border-t">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('home.previousChart')}
-          onClick={() => go(current - 1)}
-        >
-          <CaretLeftIcon weight="bold" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('home.nextChart')}
-          onClick={() => go(current + 1)}
-        >
-          <CaretRightIcon weight="bold" />
-        </Button>
-        <ol className="flex flex-1 justify-center items-center min-w-0 note-lane">
-          {works.map((work, i) => (
-            <li key={`${work.source}/${work.chart.id}`}>
-              <button
-                type="button"
-                data-accent={work.source}
-                aria-current={i === current}
-                aria-label={t('home.chartOf', {
-                  n: i + 1,
-                  total: count,
-                  title: chartText(work.chart, i18n.resolvedLanguage).title,
-                })}
-                className="group place-items-center grid px-[3px] sm:px-1 rounded-full outline-none h-8"
-                onClick={() => go(i)}
-              >
-                <span className="note">
-                  {i === current && (
-                    <span
-                      className="note-roll"
-                      style={{ animationPlayState: moving ? 'running' : 'paused' }}
-                      onAnimationEnd={() => go(current + 1)}
-                    />
-                  )}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t(paused ? 'home.resumeCharts' : 'home.pauseCharts')}
-          onClick={() => setPaused(!paused)}
-        >
-          {paused ? <PlayIcon weight="fill" /> : <PauseIcon weight="fill" />}
-        </Button>
-      </div>
+      <CarouselBar
+        carousel={carousel}
+        notes={works.map((work, i) => ({
+          key: `${work.source}/${work.chart.id}`,
+          source: work.source,
+          label: t('home.chartOf', {
+            n: i + 1,
+            total: count,
+            title: chartText(work.chart, i18n.resolvedLanguage).title,
+          }),
+        }))}
+        labels={{
+          previous: t('home.previousChart'),
+          next: t('home.nextChart'),
+          pause: t('home.pauseCharts'),
+          resume: t('home.resumeCharts'),
+        }}
+      />
     </section>
   )
 }

@@ -20,6 +20,9 @@ export const endpoints = {
   titles: `${API_ROOT}/titles`,
   // What players have just done on either source, for the home page.
   activity: `${API_ROOT}/activity`,
+  // The playlists the home page recommends, and where its administrator sets them (PUT).
+  featuredPlaylists: `${API_ROOT}/featured-playlists`,
+  adminFeaturedPlaylists: `${API_ROOT}/admin/featured-playlists`,
   myTitles: `${API_ROOT}/me/titles`,
   myTitle: (id: string) => `${API_ROOT}/me/titles/${encodeURIComponent(id)}`,
   user: (id: string) => `${API_ROOT}/users/${id}`,

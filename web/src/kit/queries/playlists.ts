@@ -5,17 +5,23 @@ import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import type { MyPlaylists, Playlist, PlaylistPage } from '../api/types'
 import { queryClient } from '../query/client'
-import { SOURCE } from '../source'
+import { SOURCE, type SourceId } from '../source'
 
 export type PlaylistQuery = { q: string; sort: string; page: number; owner?: string }
 
+// `source` is named by the pages that belong to no source (the home page's recommended
+// playlists): what they read of a source is kept under that source's keys, so what its own
+// pages change reaches them too.
 export const playlistKeys = {
-  all: () => [SOURCE, 'playlists'] as const,
-  list: (query: PlaylistQuery) => [...playlistKeys.all(), 'list', query] as const,
+  all: (source: SourceId = SOURCE) => [source, 'playlists'] as const,
+  list: (query: PlaylistQuery, source?: SourceId) =>
+    [...playlistKeys.all(source), 'list', query] as const,
   system: () => [...playlistKeys.all(), 'system'] as const,
   /** The viewer's playlists, each saying whether it holds `chart` when one is named. */
   mine: (chart = '') => [...playlistKeys.all(), 'mine', chart] as const,
-  detail: (id: string) => [...playlistKeys.all(), 'detail', id] as const,
+  /** The public ones of the playlists named, without their songs. */
+  named: (ids: string[], source?: SourceId) => [...playlistKeys.all(source), 'named', ids] as const,
+  detail: (id: string, source?: SourceId) => [...playlistKeys.all(source), 'detail', id] as const,
 }
 
 export const playlistQueries = {

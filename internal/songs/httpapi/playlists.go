@@ -181,8 +181,30 @@ func (s *Server) playlistOwners(ctx context.Context, lists ...[]Playlist) {
 	}
 }
 
+// namedPlaylists answers GET /api/playlists?ids=a,b: the public ones of the playlists
+// named (at most a page of them), in the order they were named and without their songs. A
+// playlist that is private or gone is left out; the asker sees which by what is missing.
+func (s *Server) namedPlaylists(w http.ResponseWriter, r *http.Request, raw string) {
+	ids := strings.Split(raw, ",")
+	if len(ids) > playlistPageSize || slices.ContainsFunc(ids, func(id string) bool { return !validID(id) }) {
+		problem(w, 400, "QUERY_INVALID", "歌单 ID 无效")
+		return
+	}
+	items, e := s.source().readPlaylists(r.Context(), s.DB, playlistSelect+` WHERE p.is_public AND p.id=ANY($2::text[]) ORDER BY array_position($2::text[],p.id)`, s.viewer(r), ids)
+	if e != nil {
+		internal(w, e)
+		return
+	}
+	s.playlistOwners(r.Context(), items)
+	web.Respond(w, 200, PlaylistPage{Items: items, Total: len(items), Page: 1, PageSize: playlistPageSize})
+}
+
 func (s *Server) listPlaylists(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+	if ids := query.Get("ids"); ids != "" {
+		s.namedPlaylists(w, r, ids)
+		return
+	}
 	q, owner := strings.TrimSpace(query.Get("q")), query.Get("owner")
 	if utf8.RuneCountInString(q) > 100 || (owner != "" && !account.ValidSubject(owner)) {
 		problem(w, 400, "QUERY_INVALID", "搜索条件无效")

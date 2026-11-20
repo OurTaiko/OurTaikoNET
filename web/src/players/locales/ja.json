@@ -50,7 +50,16 @@
     "activityFailed": "読み込めませんでした。",
     "friends": "リンク",
     "thanks": "謝辞",
-    "thanksPrefix": "Special Thanks："
+    "thanksPrefix": "Special Thanks：",
+    "featured": "おすすめプレイリスト",
+    "featuredBy": "管理者が選びました",
+    "openPlaylist": "プレイリストを見る",
+    "previousPlaylist": "前のプレイリスト",
+    "nextPlaylist": "次のプレイリスト",
+    "pausePlaylists": "切り替えを止める",
+    "resumePlaylists": "切り替えを再開",
+    "playlistOf": "{{total}} 件中 {{n}} 件目：{{title}}",
+    "playlistSongs": "プレイリストの最初の曲"
   },
   "profile": {
     "unknownPlayer": "プレイヤー",
@@ -231,7 +240,9 @@
     "QUERY_INVALID": "検索条件が正しくありません。",
     "TITLE_LIMIT_REACHED": "コミュニティ称号は 5 個までです。",
     "TITLE_OFFICIAL": "公式称号を削除できるのは管理者だけです。",
-    "TITLE_CHANGED": "この称号は管理者によって変更されました。ページを再読み込みしてやり直してください。"
+    "TITLE_CHANGED": "この称号は管理者によって変更されました。ページを再読み込みしてやり直してください。",
+    "FEATURED_INVALID": "このリストは保存できません。件数、ひとことの長さ、またはプレイリストに誤りがあります。",
+    "FEATURED_PLAYLIST_UNAVAILABLE": "削除された、または非公開になったプレイリストがあります。外してからもう一度保存してください。"
   },
   "visits": {
     "heading": "アクセス統計",
@@ -271,6 +282,27 @@
     "membersHeading": "グループに所属するプレイヤー",
     "nobody": "まだ誰もグループに所属していません。",
     "change": "変更"
+  },
+  "featured": {
+    "heading": "ホームのおすすめプレイリスト",
+    "intro": "選んだプレイリストはこの順番でホームに表示されます（最大 {{max}} 件）。公開プレイリストだけを選べます。創作・公式のどちらでも構いません。1 件も選ばなければ、ホームにこの欄は表示されません。",
+    "chosenHeading": "{{max}} 件中 {{n}} 件を選択",
+    "none": "おすすめのプレイリストはまだありません。",
+    "note": "ひとこと（任意、{{max}} 文字まで）",
+    "moveUp": "上へ：{{name}}",
+    "moveDown": "下へ：{{name}}",
+    "remove": "外す：{{name}}",
+    "save": "保存",
+    "unsaved": "保存していない変更があります。",
+    "saved": "おすすめプレイリストを保存しました。",
+    "unavailable": "このプレイリストは削除されたか、非公開になりました",
+    "addHeading": "プレイリストを追加",
+    "search": "プレイリストを探す",
+    "searchPlaceholder": "名前、またはプレイリストページのアドレス",
+    "noMatch": "公開プレイリストが見つかりません。",
+    "add": "追加",
+    "added": "追加済み",
+    "full": "{{max}} 件すべて選択済みです。追加するには 1 件外してください。"
   },
   "don": {
     "motion": "モーション",

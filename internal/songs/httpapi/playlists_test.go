@@ -177,7 +177,13 @@ func TestPlaylistLifecycle(t *testing.T) {
 	list("?q=%25")
 	list("?sort=favorites&owner="+playlistOwner, p.ID, empty.ID)
 	list("?owner=" + playlistAlice)
-	for _, query := range []string{"?sort=random", "?page=0", "?owner=x"} {
+	// By id: the public ones of those named, in the order named, empty ones too; one that
+	// does not exist is left out.
+	list("?ids="+empty.ID+","+strings.Repeat("0", 32)+","+p.ID, empty.ID, p.ID)
+	if page.Items[1].Owner == nil || page.Items[1].Charts != nil || page.Items[1].ChartCount != 2 {
+		t.Fatalf("named item %+v", page.Items[1])
+	}
+	for _, query := range []string{"?sort=random", "?page=0", "?owner=x", "?ids=liked", "?ids=" + p.ID + ",", "?ids=" + strings.Repeat(p.ID+",", playlistPageSize) + p.ID} {
 		if code := c.do("", "GET", "/api/playlists"+query, "", nil); code != 400 {
 			t.Fatal("invalid query", query, code)
 		}
@@ -192,6 +198,7 @@ func TestPlaylistLifecycle(t *testing.T) {
 	if code := c.do("alice", "GET", path, "", nil); code != 404 {
 		t.Fatal("private favorite readable", code)
 	}
+	list("?ids=" + p.ID)
 	favorite("alice", "DELETE", 200, 0)
 	c.do("owner", "PATCH", path, `{"public":true}`, nil)
 	favorite("alice", "PUT", 200, 1)
