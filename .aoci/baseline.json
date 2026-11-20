@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-20T19:55:01Z",
+  "updated_at": "2026-11-20T21:42:31Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -65,15 +65,15 @@
     },
     "README.md": {
       "role": "index",
-      "sha256": "196ca3bbfaa62c9ffb5eea316dff6875710ec7edc901c13bed4f710b81c1ee43",
-      "size": 41076,
-      "normalized_sha256": "196ca3bbfaa62c9ffb5eea316dff6875710ec7edc901c13bed4f710b81c1ee43"
+      "sha256": "850b56bbef7aeb335a20ac3701b842b9e2969f552f04b9e62c821a7402efc45e",
+      "size": 41186,
+      "normalized_sha256": "850b56bbef7aeb335a20ac3701b842b9e2969f552f04b9e62c821a7402efc45e"
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "10e915dedf3123f17dd21feb854f6404a3f44829d6ccf1a2325fd52cd27d19d6",
-      "size": 177720,
-      "normalized_sha256": "10e915dedf3123f17dd21feb854f6404a3f44829d6ccf1a2325fd52cd27d19d6"
+      "sha256": "ac50dddfb5926cef3a77e8c1ab6a44b12e8a1693bb788f2edf471edae35148ed",
+      "size": 177714,
+      "normalized_sha256": "ac50dddfb5926cef3a77e8c1ab6a44b12e8a1693bb788f2edf471edae35148ed"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3866,9 +3866,9 @@
     },
     "web/src/players/components/carousel.tsx": {
       "role": "index",
-      "sha256": "4d2f9dd57588e6c166fb5cd1ab798fe10ac4a510d2c49c6cae250bf6d4687487",
-      "size": 4431,
-      "normalized_sha256": "4d2f9dd57588e6c166fb5cd1ab798fe10ac4a510d2c49c6cae250bf6d4687487"
+      "sha256": "1faa8f360a962e0779177c8f630df429095f239b93bf30610f15c208f9738cd6",
+      "size": 6684,
+      "normalized_sha256": "1faa8f360a962e0779177c8f630df429095f239b93bf30610f15c208f9738cd6"
     },
     "web/src/players/components/choice-select.tsx": {
       "role": "index",
@@ -3878,9 +3878,9 @@
     },
     "web/src/players/components/community-activity.tsx": {
       "role": "index",
-      "sha256": "dce4df4a9615a8c86cf1cfe12f792b77af8ff140a8f20388e5a68089a996bde9",
-      "size": 9491,
-      "normalized_sha256": "dce4df4a9615a8c86cf1cfe12f792b77af8ff140a8f20388e5a68089a996bde9"
+      "sha256": "74ad09ccd442db9f7a6183bb09d8305b48791e74c309075390ab28a172561f41",
+      "size": 7381,
+      "normalized_sha256": "74ad09ccd442db9f7a6183bb09d8305b48791e74c309075390ab28a172561f41"
     },
     "web/src/players/components/crown.tsx": {
       "role": "index",
@@ -3896,9 +3896,9 @@
     },
     "web/src/players/components/featured-playlists.tsx": {
       "role": "index",
-      "sha256": "aabd4627034a285efeb264e3973c80b261c7aae37be0f24f31280067a01882ce",
-      "size": 12346,
-      "normalized_sha256": "aabd4627034a285efeb264e3973c80b261c7aae37be0f24f31280067a01882ce"
+      "sha256": "44f1030219e08d06d6378e381abce8c7e7b67c72b2dd2c9617080accb2bf86a9",
+      "size": 13156,
+      "normalized_sha256": "44f1030219e08d06d6378e381abce8c7e7b67c72b2dd2c9617080accb2bf86a9"
     },
     "web/src/players/components/friends.tsx": {
       "role": "index",
@@ -3980,27 +3980,27 @@
     },
     "web/src/players/locales/en.json": {
       "role": "index",
-      "sha256": "509aa57e721a2d6fa766be191861f7713135f37a2da9af44221f06d04ec1fde0",
-      "size": 14185,
-      "normalized_sha256": "509aa57e721a2d6fa766be191861f7713135f37a2da9af44221f06d04ec1fde0"
+      "sha256": "0e7b2fe8cb1da9a6a49fcf51d7aae3c5426393bac0becd9e7d9d977e895b0cd8",
+      "size": 14179,
+      "normalized_sha256": "0e7b2fe8cb1da9a6a49fcf51d7aae3c5426393bac0becd9e7d9d977e895b0cd8"
     },
     "web/src/players/locales/ja.json": {
       "role": "index",
-      "sha256": "ac8d33f790f909103e9fc483b5338d544180457534699929cb4e060657bfad25",
-      "size": 17250,
-      "normalized_sha256": "ac8d33f790f909103e9fc483b5338d544180457534699929cb4e060657bfad25"
+      "sha256": "5e185603b887e099a53608a912eb7f6367e8846d8e476a18c4d4919f31dfe4d4",
+      "size": 17241,
+      "normalized_sha256": "5e185603b887e099a53608a912eb7f6367e8846d8e476a18c4d4919f31dfe4d4"
     },
     "web/src/players/locales/ko.json": {
       "role": "index",
-      "sha256": "ccd7d9d8d1b5b2001625d6e3042f5a74e11a9182d0f1c0c3ef1bbdad69110a82",
-      "size": 16154,
-      "normalized_sha256": "ccd7d9d8d1b5b2001625d6e3042f5a74e11a9182d0f1c0c3ef1bbdad69110a82"
+      "sha256": "aae2d97d910371f4e5b5135604df2757c1e198e48b72d07c38d606d395c8f0d8",
+      "size": 16147,
+      "normalized_sha256": "aae2d97d910371f4e5b5135604df2757c1e198e48b72d07c38d606d395c8f0d8"
     },
     "web/src/players/locales/zh-Hans.json": {
       "role": "index",
-      "sha256": "8e33443f9955a85f18ed3318392a2dad9eeea68bc3dd7ced22447fc41758484e",
-      "size": 14175,
-      "normalized_sha256": "8e33443f9955a85f18ed3318392a2dad9eeea68bc3dd7ced22447fc41758484e"
+      "sha256": "75efbd96de5fafcd41f140531c845643e1515f1713ccb8e8eefcfcf032f9f7ea",
+      "size": 14172,
+      "normalized_sha256": "75efbd96de5fafcd41f140531c845643e1515f1713ccb8e8eefcfcf032f9f7ea"
     },
     "web/src/players/newest.test.ts": {
       "role": "observe",
