@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-20T22:20:01Z",
+  "updated_at": "2026-11-20T22:29:00Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "3fb7e42d4a47d23ad184727624c69c480c4cc67693fa9c44791da666bc65e4c9",
-      "size": 178305,
-      "normalized_sha256": "3fb7e42d4a47d23ad184727624c69c480c4cc67693fa9c44791da666bc65e4c9"
+      "sha256": "4f3fcbcfa79f9d3fa6c34ee63ffe141a3d50adaa79f763b4fbddde6f63af4278",
+      "size": 178306,
+      "normalized_sha256": "4f3fcbcfa79f9d3fa6c34ee63ffe141a3d50adaa79f763b4fbddde6f63af4278"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3518,9 +3518,9 @@
     },
     "web/src/kit/pages.tsx": {
       "role": "index",
-      "sha256": "c71864a8a3f37a09494c51ba0eb2374fb2484498c04f26cb2e5bb5702da73d03",
-      "size": 43318,
-      "normalized_sha256": "c71864a8a3f37a09494c51ba0eb2374fb2484498c04f26cb2e5bb5702da73d03"
+      "sha256": "11e03618d2dc6aa31d58e21c9bd6bf58a78e990c9b4e423c414eb06b3b1634f3",
+      "size": 43547,
+      "normalized_sha256": "11e03618d2dc6aa31d58e21c9bd6bf58a78e990c9b4e423c414eb06b3b1634f3"
     },
     "web/src/kit/playlist-dialogs.tsx": {
       "role": "index",
