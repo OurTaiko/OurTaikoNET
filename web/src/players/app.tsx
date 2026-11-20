@@ -16,6 +16,7 @@ import { HomePage } from './pages/home'
 import { UserPage } from './pages/user'
 import { TitlesPage } from './pages/titles'
 import { AdminPage } from './pages/admin'
+import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
 import { VisitsPage } from './pages/visits'
 import '../styles.css'
@@ -111,6 +112,14 @@ function App() {
                   element={
                     <Private title={t('manage.heading')}>
                       <ManagePage />
+                    </Private>
+                  }
+                />
+                <Route
+                  path="featured"
+                  element={
+                    <Private title={t('featured.heading')}>
+                      <FeaturedPage />
                     </Private>
                   }
                 />

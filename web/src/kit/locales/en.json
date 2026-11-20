@@ -1014,7 +1014,8 @@
       "sourceCanonical": "Global CDN",
       "sourceRefresh": "Refresh",
       "notice": "A player community project, not affiliated with Bandai Namco Entertainment. Taiko no Tatsujin and related material belong to their owners."
-    }
+    },
+    "featured": "Home picks"
   },
   "chat": {
     "title": "Messages",

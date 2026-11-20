@@ -3,8 +3,9 @@
 // song source names that source itself, in its key and in its address.
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { api as sourceRead } from '@sitekit/api/client'
-import type { ChartBase, ChartList } from '@sitekit/api/types'
+import type { ChartBase, ChartList, Playlist, PlaylistPage } from '@sitekit/api/types'
 import { supportsChart } from '@sitekit/courses'
+import { playlistKeys } from '@sitekit/queries/playlists'
 import { queryClient } from '@sitekit/query/client'
 import type { SourceId } from '@sitekit/source'
 import { api } from '@players/api/client'
@@ -12,6 +13,7 @@ import { endpoints } from '@players/api/endpoints'
 import type {
   Activity,
   Dans,
+  FeaturedPlaylists,
   Group,
   GroupMember,
   HeldTitle,
@@ -54,6 +56,7 @@ export const playerKeys = {
   donItems: (mine: boolean) => [...playerKeys.all(), 'don-items', mine] as const,
   titles: () => [...playerKeys.all(), 'titles'] as const,
   activity: () => [...playerKeys.all(), 'activity'] as const,
+  featured: () => [...playerKeys.all(), 'featured'] as const,
   manage: () => [...playerKeys.all(), 'manage'] as const,
   groups: () => [...playerKeys.manage(), 'groups'] as const,
   members: () => [...playerKeys.manage(), 'members'] as const,
@@ -126,6 +129,42 @@ export const playerQueries = {
     queryOptions({
       queryKey: playerKeys.activity(),
       queryFn: ({ signal }) => api<{ items: Activity[] }>(endpoints.activity, { signal }),
+    }),
+  /** The playlists the home page recommends: which they are, not what is in them. */
+  featured: () =>
+    queryOptions({
+      queryKey: playerKeys.featured(),
+      queryFn: ({ signal }) => api<FeaturedPlaylists>(endpoints.featuredPlaylists, { signal }),
+    }),
+  /** The public ones of a source's playlists named, in the order named, without their songs. */
+  playlistsNamed: (source: SourceId, ids: string[]) =>
+    queryOptions({
+      queryKey: playlistKeys.named(ids, source),
+      queryFn: async ({ signal }) => {
+        const address = `${sourceApi(source)}/playlists?ids=${ids.join(',')}`
+        return (await sourceRead<PlaylistPage>(address, { signal })).items
+      },
+      staleTime: askedOnEachOpening,
+    }),
+  /** A source's public playlists whose name or description has `text`, the most kept first. */
+  playlistsFound: (source: SourceId, text: string) => {
+    const query = { q: text, sort: 'favorites', page: 1 }
+    return queryOptions({
+      queryKey: playlistKeys.list(query, source),
+      queryFn: async ({ signal }) => {
+        const address = `${sourceApi(source)}/playlists?${new URLSearchParams({ q: text, sort: query.sort })}`
+        return (await sourceRead<PlaylistPage>(address, { signal })).items
+      },
+    })
+  },
+  /** A playlist of a source with its songs, as its own page there reads it. */
+  playlist: (source: SourceId, id: string) =>
+    queryOptions({
+      queryKey: playlistKeys.detail(id, source),
+      queryFn: ({ signal }) =>
+        sourceRead<Playlist>(`${sourceApi(source)}/playlists/${encodeURIComponent(id)}`, {
+          signal,
+        }),
     }),
   groups: () =>
     queryOptions({

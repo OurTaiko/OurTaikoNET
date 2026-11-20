@@ -14,7 +14,7 @@ import { cn } from '@sitekit/lib/utils'
 import type { Activity } from '@players/api/types'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
-import { prefersStill } from './recent-works'
+import { prefersStill } from './carousel'
 import { SourceTag, songPage } from './song-tile'
 
 // The crown's colours, as on a player's scores: cleared, full combo, all good.

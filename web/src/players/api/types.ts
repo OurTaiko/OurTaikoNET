@@ -172,3 +172,9 @@ export type VisitReport = {
   hours: number[]
   pages: { page: string; views: number }[]
 }
+
+// The playlists the home page recommends, in the order shown. Each names a public playlist of a
+// song source by its id there; what the playlist is, its source says. `note` is the
+// administrator's line about it, empty for none.
+export type FeaturedPlaylist = { source: string; playlistId: string; note: string }
+export type FeaturedPlaylists = { items: FeaturedPlaylist[]; max: number }

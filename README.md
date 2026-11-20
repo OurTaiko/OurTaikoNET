@@ -65,6 +65,16 @@ How much the website is visited (`internal/visits`, migrations `0005_visits` and
 - `GET /api/v1/visits?tz=Asia/Shanghai`, public → `{"total":{"views","visitors"},"today":{…},"since":"YYYY-MM-DD"}`, kept in memory for 30 s per time zone (64 zones at most). The footer of every page shows it. A `tz` that is no time zone → 400.
 - `GET /api/v1/admin/visits?days=30&tz=Asia/Shanghai` (days 1–366), the site's administrator → the same, plus `zone`, `days` (each day of that zone, oldest first, with the days nobody came), `hours` (views in each hour of the day 0–23 over those days) and `pages` (the 50 seen most in the period). The website shows it at `/manage/visits` (`web/src/players/pages/visits.tsx`), in the menu for the administrator, in the browser's time zone.
 
+## Recommended playlists
+
+The home page recommends a few playlists the site's administrator chose (`internal/profile/httpapi/featured.go`, migration `0013_featured_playlists`): public playlists of either source, in the administrator's order, each with an optional line of the administrator's own. Only the choice is kept, in `net.featured_playlists`; what a playlist is stays its source's to answer. A playlist that is deleted or made private in its source leaves the list by trigger, so a row always names a public playlist.
+
+- `GET /api/v1/featured-playlists` (public) → `{"items": [{"source", "playlistId", "note"}, …], "max": 6}`, in the order shown.
+- `PUT /api/v1/admin/featured-playlists {"items": […]}`, the site's administrator → the same. The list sent replaces the one kept; an empty list recommends nothing. 422 `FEATURED_INVALID` (more than 6, an unknown source, an id that is no stored playlist's, one named twice, a note over 40 characters or of several lines), 422 `FEATURED_PLAYLIST_UNAVAILABLE` (a playlist that does not exist or is private).
+- `GET /api/v1/sources/<source>/playlists?ids=a,b` (public, at most 12) → the public ones of the playlists named, as the playlist list gives them (without songs), in the order named. One that is private or gone is left out.
+
+The website shows them under the newest charts (`web/src/players/components/featured-playlists.tsx`): one at a time, moving on by itself as the newest charts do (`carousel.tsx` is what both share), with the first songs of the one shown and, on a wide page, all of them beside it. It asks for the list, then each source once for its playlists, then the songs of the one shown. The administrator sets them at `/manage/featured` (`web/src/players/pages/featured.tsx`).
+
 ## Titles by rule
 
 A rule gives one item: a title, or a part of the 3D Don (see "Parts of the Don to earn"); everything below holds for both. A rule has `titleId`, or `donPart` and `donItem`; each kind of item says in `titlerules.target` how it is given, and nothing else in the package knows it. A rule for a part is made at `POST /api/v1/admin/don/items/{part}/{id}/rules` with the same body, and the part must be in the catalog.
