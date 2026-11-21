@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"fmt"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -12,7 +13,9 @@ const safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.
 
 func TestTheWebsiteCountsItsVisits(t *testing.T) {
 	now := time.Date(2026, 11, 16, 4, 0, 0, 0, time.UTC)
-	app := New(testDB(t), Config{Origin: origin, DevUserID: player, Now: func() time.Time { return now }})
+	// Every address the test asks from is in one country.
+	app := New(testDB(t), Config{Origin: origin, DevUserID: player, Now: func() time.Time { return now },
+		Country: func(netip.Addr) string { return "JP" }})
 	c := &client{t: t, handler: app.Handler()}
 	browser := map[string]string{"User-Agent": safari}
 	var summary visits.Summary
@@ -76,6 +79,7 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 		Days         []visits.DayCount
 		Hours        []int64
 		Pages        []visits.PageCount
+		Countries    []visits.CountryCount
 	}
 	c.json("GET", "/api/admin/visits?days=7&tz=Asia/Shanghai", "", 200, &report)
 	if report.Zone != "Asia/Shanghai" || len(report.Hours) != 24 || report.Hours[12] != visitsAMinute {
@@ -86,6 +90,10 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 	}
 	if fmt.Sprint(report.Pages) != fmt.Sprintf("[{/players %d} {/fanmade/charts/:id 2} {/ 1} {/titles 1}]", visitsAMinute-4) || report.Today.Views != visitsAMinute || report.Since != "2026-11-16" {
 		t.Fatalf("report %+v", report)
+	}
+	// Every view kept where it came from, and the report says the country only.
+	if fmt.Sprint(report.Countries) != fmt.Sprintf("[{JP %d 1}]", visitsAMinute) {
+		t.Fatalf("countries %+v", report.Countries)
 	}
 	c.json("GET", "/api/admin/visits", "", 200, &report)
 	if len(report.Days) != 30 || report.Zone != "UTC" || report.Days[29].Day != "2026-11-16" {

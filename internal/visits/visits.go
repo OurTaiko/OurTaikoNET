@@ -1,23 +1,24 @@
 // Package visits counts how much the website is visited: each page shown, with the moment it
 // was shown, and how many different visitors saw them (net.visit_views and visit_salts,
-// migration 0008). Whoever reads the count sees days and hours of their own time zone.
+// migration 0008; the first count's daily totals, 0005, were dropped by 0017). Whoever reads the count sees days and hours of their own time zone.
 //
 // The website says which page it shows; nothing is counted from the requests themselves, so
 // programs that read the API or fetch a page without running it are not visitors. No cookie
-// is set and no address is kept. A visitor is told from another by a hash of who they are
-// (their address and browser) with a salt that lives for two UTC days; when they are over, the
-// salt is deleted, after which nobody can tell who visited. Since a day of any time zone lies
-// within one such span, the visitors of a day are told apart by that span's hashes (the
-// migration explains how).
+// is set. A visitor is told from another by a hash of who they are (their address and browser)
+// with a salt that lives for two UTC days; when they are over, the salt is deleted. Since a day
+// of any time zone lies within one such span, the visitors of a day are told apart by that
+// span's hashes (migration 0008 explains how).
 //
-// Before 0008, views were counted by days of UTC+8 without their times (net.visit_days,
-// visit_pages); those count in the totals only.
+// Each view also keeps the address it came from and the country that address was in then
+// (migration 0016), for good: the site's administrator reads the visits by country. The views
+// made before have neither and are of an unknown country.
 package visits
 
 import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"net/netip"
 	"regexp"
 	"strings"
 	"time"
@@ -42,6 +43,8 @@ var (
 	word = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)
 	// A browser that says it is a program, not a person.
 	robot = regexp.MustCompile(`(?i)bot|crawl|spider|slurp|headless|lighthouse|preview|monitor|curl|wget|python|scrapy|http-?client`)
+	// A country as the views keep it: its two capital letters (ISO 3166-1 alpha-2).
+	countryCode = regexp.MustCompile(`^[A-Z]{2}$`)
 	// The name of a time zone as browsers give it (Asia/Shanghai, UTC, Etc/GMT+8).
 	zoneName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+\-]*(/[A-Za-z0-9_+\-]+)*$`)
 )
@@ -123,11 +126,25 @@ func dayText(n int64) string {
 	return time.Unix(n*86400, 0).UTC().Format(time.DateOnly)
 }
 
-// Record counts one view of page (as Page gives it) by who, now. who is what tells the visitor
-// from others (address and browser); it is only ever stored hashed with the salts of the two
-// spans the moment lies in.
-func (s Store) Record(ctx context.Context, page, who string) error {
+// Visitor is who a view was made by. Host is where the request came from, as web.ClientIP gives
+// it, and Browser the browser's name (User-Agent): together they tell the visitor from others.
+// Country is the country Host is in (two capital letters), empty when it is not known.
+type Visitor struct {
+	Host, Browser, Country string
+}
+
+// Record counts one view of page (as Page gives it) by v, now. What tells the visitor from
+// others is stored hashed with the salts of the two spans the moment lies in; the address is
+// kept as it is when Host is one, and the country when it is one.
+func (s Store) Record(ctx context.Context, page string, v Visitor) error {
 	now := s.now()
+	var address, country any
+	if ip, err := netip.ParseAddr(v.Host); err == nil && ip.Zone() == "" {
+		address = ip.Unmap()
+	}
+	if countryCode.MatchString(v.Country) {
+		country = v.Country
+	}
 	day := utcDay(now)
 	// The two spans that hold today: the one that began yesterday and the one beginning today.
 	even, odd := day, day-1
@@ -146,38 +163,21 @@ WITH salts AS (
     ON CONFLICT (span) DO UPDATE SET salt = s.salt
     RETURNING span, salt
 )
-INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd)
+INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd, address, country)
 SELECT $5, $6,
        sha256((SELECT salt FROM salts WHERE span = $1::date) || convert_to($7, 'UTF8')),
-       sha256((SELECT salt FROM salts WHERE span = $2::date) || convert_to($7, 'UTF8'))`,
-		dayText(even), dayText(odd), salts[:16], salts[16:], now, page, who)
+       sha256((SELECT salt FROM salts WHERE span = $2::date) || convert_to($7, 'UTF8')),
+       $8::inet, $9`,
+		dayText(even), dayText(odd), salts[:16], salts[16:], now, page, v.Host+"\n"+v.Browser, address, country)
 	return err
 }
 
-// Close deletes the salts of the spans that are over, after which the hashes they made tell
-// nobody who visited. It also finishes what was counted before views had their times: a day
-// still open there is counted and its hashes deleted. It reports how many salts it deleted.
+// Close deletes the salts of the spans that are over, after which the hashes they made can no
+// longer be made again from an address and a browser. It reports how many salts it deleted.
 func (s Store) Close(ctx context.Context) (int, error) {
-	tx, err := s.DB.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback(ctx)
 	// A span that began two days ago or earlier is over.
-	tag, err := tx.Exec(ctx, `DELETE FROM net.visit_salts WHERE span <= $1::date`, dayText(utcDay(s.now())-2))
-	if err != nil {
-		return 0, err
-	}
-	if _, err = tx.Exec(ctx, `
-UPDATE net.visit_days d SET salt = NULL,
-       visitors = (SELECT count(*) FROM net.visit_visitors v WHERE v.day = d.day)
- WHERE d.visitors IS NULL`); err != nil {
-		return 0, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM net.visit_visitors`); err != nil {
-		return 0, err
-	}
-	return int(tag.RowsAffected()), tx.Commit(ctx)
+	tag, err := s.DB.Exec(ctx, `DELETE FROM net.visit_salts WHERE span <= $1::date`, dayText(utcDay(s.now())-2))
+	return int(tag.RowsAffected()), err
 }
 
 // RunClose closes what is over now and every hour until ctx ends.
@@ -230,16 +230,12 @@ WITH days AS (
     SELECT day, count(*) AS views, count(DISTINCT visitor) AS visitors
       FROM (`+localViews+`) l
      GROUP BY day
-), before AS (
-    SELECT COALESCE(sum(views), 0) AS views, COALESCE(sum(visitors), 0) AS visitors, min(day) AS day
-      FROM net.visit_days
 )
-SELECT ((SELECT COALESCE(sum(views), 0) FROM days) + before.views)::bigint,
-       ((SELECT COALESCE(sum(visitors), 0) FROM days) + before.visitors)::bigint,
-       COALESCE((SELECT views FROM days WHERE day = $2::date), 0)::bigint,
-       COALESCE((SELECT visitors FROM days WHERE day = $2::date), 0)::bigint,
-       COALESCE(least(before.day, (SELECT min(day) FROM days))::text, '')
-  FROM before`, loc.String(), today).
+SELECT COALESCE(sum(views), 0)::bigint, COALESCE(sum(visitors), 0)::bigint,
+       COALESCE(sum(views) FILTER (WHERE day = $2::date), 0)::bigint,
+       COALESCE(sum(visitors) FILTER (WHERE day = $2::date), 0)::bigint,
+       COALESCE(min(day)::text, '')
+  FROM days`, loc.String(), today).
 		Scan(&out.Total.Views, &out.Total.Visitors, &out.Today.Views, &out.Today.Visitors, &out.Since)
 	return out, err
 }
@@ -256,18 +252,29 @@ type PageCount struct {
 	Views int64  `json:"views"`
 }
 
+// CountryCount is one country of a report: the views made from it and the different addresses
+// they came from. The country without a name ("") is the unknown one: the views that kept no
+// address (all those made before 0016) or whose address was in no country known; its Addresses
+// counts only the addresses there are.
+type CountryCount struct {
+	Country   string `json:"country"`
+	Views     int64  `json:"views"`
+	Addresses int64  `json:"addresses"`
+}
+
 // Report is the last days in full, in the reader's time zone: each day, oldest first and with
-// the days nobody came; the views made in each hour of the day (0 to 23) over those days; and
-// the pages seen most.
+// the days nobody came; the views made in each hour of the day (0 to 23) over those days; the
+// pages seen most; and every country the views came from, the one with most views first.
 type Report struct {
-	Days  []DayCount  `json:"days"`
-	Hours []int64     `json:"hours"`
-	Pages []PageCount `json:"pages"`
+	Days      []DayCount     `json:"days"`
+	Hours     []int64        `json:"hours"`
+	Pages     []PageCount    `json:"pages"`
+	Countries []CountryCount `json:"countries"`
 }
 
 // Report reads the last days days of loc, today included, and the pages most seen pages of them.
 func (s Store) Report(ctx context.Context, loc *time.Location, days, pages int) (Report, error) {
-	out := Report{Days: []DayCount{}, Hours: make([]int64, 24), Pages: []PageCount{}}
+	out := Report{Days: []DayCount{}, Hours: make([]int64, 24), Pages: []PageCount{}, Countries: []CountryCount{}}
 	now := s.now().In(loc)
 	last := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	first := last.AddDate(0, 0, 1-days)
@@ -320,9 +327,24 @@ SELECT page, count(*) AS views FROM net.visit_views
 	if err != nil {
 		return out, err
 	}
-	out.Pages, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (PageCount, error) {
+	if out.Pages, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (PageCount, error) {
 		var p PageCount
 		return p, row.Scan(&p.Page, &p.Views)
+	}); err != nil {
+		return out, err
+	}
+
+	rows, err = s.DB.Query(ctx, `
+SELECT COALESCE(country, '') AS country, count(*) AS views, count(DISTINCT address) AS addresses
+  FROM net.visit_views
+ WHERE at >= $1 AND at < $2
+ GROUP BY 1 ORDER BY views DESC, country`, start, stop)
+	if err != nil {
+		return out, err
+	}
+	out.Countries, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (CountryCount, error) {
+		var c CountryCount
+		return c, row.Scan(&c.Country, &c.Views, &c.Addresses)
 	})
 	return out, err
 }

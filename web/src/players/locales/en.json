@@ -249,7 +249,7 @@
   },
   "visits": {
     "heading": "Visits",
-    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies and without keeping IP addresses. Days and hours are those of your time zone.",
+    "about": "Each page the website shows is one view. Visitors are told apart within a day only, without cookies. Each view keeps the IP address it came from and that address's country or region; this page shows them by country or region only, never the addresses. Days and hours are those of your time zone.",
     "zone": "Time zone: {{zone}}",
     "today": "Today",
     "period": "Last {{n}} days",
@@ -268,6 +268,10 @@
     "page": "Page",
     "share": "Share",
     "noPages": "No visits in this period yet.",
+    "countriesHeading": "Where visits come from",
+    "country": "Country or region",
+    "addresses": "IP addresses",
+    "unknownCountry": "Unknown",
     "table": "Show the days as a table",
     "day": "Day"
   },

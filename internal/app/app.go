@@ -82,7 +82,10 @@ type Config struct {
 	// Where the 3D Don's catalog is read (profile/httpapi don.go); empty: the public bucket's.
 	DonCatalogURL       string
 	DonMirrorCatalogURL string
-	DonIPCountry        func(netip.Addr) string
+	// IPCountry is the country an address is in (two capital letters, "" when unknown), from
+	// the country database. It tells a mainland visitor for the mirror and is kept with each
+	// visit (package visits). Nil: no country is known.
+	IPCountry func(netip.Addr) string
 	// Multiplay is Multi-Enso, the game's online rooms (multiplay.go). Off by default.
 	Multiplay Multiplay
 }
@@ -196,9 +199,9 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	a.shared = shared
 	// Version 1 gives full addresses, a mainland visitor's on the mirror (package apiv1).
 	_, bucket := cfg.FanmadeObjects.(*objectstore.S3)
-	a.v1 = apiv1.Config{Router: distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.DonIPCountry, cfg.TrustedProxies), FilesOnDisk: !bucket, Origin: cfg.Origin}
+	a.v1 = apiv1.Config{Router: distribution.FromDonCatalog(cfg.DonMirrorCatalogURL, cfg.IPCountry, cfg.TrustedProxies), FilesOnDisk: !bucket, Origin: cfg.Origin}
 	a.Players = profile.New(shared, profile.Config{
-		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies,
+		Origin: cfg.Origin, CookieSecure: cfg.CookieSecure, SSO: cfg.SSO, DevUserID: cfg.DevUserID, TrustedProxies: cfg.TrustedProxies, Country: cfg.IPCountry,
 		SessionCookie: SessionCookie, Groups: true, DonCatalogURL: cfg.DonCatalogURL,
 		Sources: []profile.Source{
 			{ID: "fanmade", Name: "OurTaiko Fanmade", Site: fanmadeSite, Categories: songs.Fanmade.CategoryBits()},

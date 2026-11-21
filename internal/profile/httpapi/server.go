@@ -26,6 +26,9 @@ type Config struct {
 	SSO            *account.Client
 	DevUserID      string
 	TrustedProxies []netip.Prefix
+	// Country is the country an address is in (two capital letters, "" when unknown), kept with
+	// each visit (visits.go). Nil: no country is known.
+	Country func(netip.Addr) string
 	// The song sources whose plays are shown, in display order.
 	Sources []Source
 	// Groups turns user groups on (package groups): the title catalog and grants are then for

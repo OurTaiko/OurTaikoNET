@@ -1,7 +1,8 @@
 // How much the site is visited. The frame (./shell) tells the server each page it shows, and
 // the footer shows the totals. Nothing is kept in the browser: no cookie, no id. The server
-// keeps each view with its time and tells one day's visitors apart without keeping who they
-// were (the backend's internal/visits); its days are those of the time zone it is asked in.
+// keeps each view with its time, the address it came from and that address's country, and
+// tells one day's visitors apart by salted hashes (the backend's internal/visits); its days
+// are those of the time zone it is asked in.
 import { useEffect, useState } from 'react'
 
 const address = '/api/v2/visits'
