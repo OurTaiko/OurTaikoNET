@@ -165,6 +165,17 @@ nameplate catalogs' `mirrorBaseUrl`. A moved song file carries `fallbackUrl`, an
 keeps the canonical address. No API route reads a cover (`PUT`/`DELETE` remain). See [regional deployment](deploy/README.md#regional-resource-mirror-rollout)
 and [OSS/ESA policy](deploy/aliyun-mirror.md) for configuration, lazy back-to-origin and rollout.
 
+## The chart editor at /edit/
+
+`/edit/` is OurTaikoEdit's web version (the chart editor, its own repository; package `internal/edit`).
+That repository publishes each build to the public bucket as a never-changed `edit/<build id>/`
+and names the current one in `edit-nightly.json`. The site reads that manifest (again after a
+minute; the last build read is kept when a read fails), takes the build's `index.html` and adds a
+`<base>` pointing at the build's folder on the visitor's root (the mirror for mainland visitors,
+as in Regional resource distribution). The editor's files come from there with CORS; only the page
+is this site's, so the editor's projects (the browser's IndexedDB) belong to this origin. `/edit`
+redirects to `/edit/`; any other `/edit/…` is 404.
+
 ## Local development
 
 The backend and the website run side by side on this machine:
