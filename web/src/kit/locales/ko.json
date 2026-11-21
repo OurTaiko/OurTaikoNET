@@ -948,7 +948,7 @@
     "manageGroup": "관리",
     "visits": "방문 통계",
     "titleAdmin": "칭호 관리",
-    "player": "OurTaiko Player",
+    "player": "OurTaikoPlay",
     "signIn": "로그인",
     "signOut": "로그아웃",
     "closeMenu": "메뉴 닫기",
@@ -1003,7 +1003,7 @@
       "notice": "이 사이트는 플레이어 커뮤니티 프로젝트이며 반다이남코 엔터테인먼트와 관련이 없습니다. 「태고의 달인」 및 관련 자료의 권리는 해당 권리자에게 있습니다."
     },
     "featured": "홈 추천",
-    "editor": "채보 에디터"
+    "editor": "OurTaikoEdit"
   },
   "chat": {
     "title": "메시지",
