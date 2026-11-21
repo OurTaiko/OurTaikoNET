@@ -1,14 +1,29 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { CommentBody } from '@sitekit/comments'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { formatLocale } from '@sitekit/i18n'
 import { AnnouncementPager, Pinned } from '@players/components/announcements'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
+
+const Markdown = lazy(() => import('@sitekit/markdown'))
+
+/**
+ * An announcement's text, which the administrator writes in Markdown. Until the parser has
+ * arrived it is shown as written, in as many lines.
+ */
+export function AnnouncementBody({ text }: { text: string }) {
+  return (
+    <Suspense
+      fallback={<p className="text-sm leading-6 whitespace-pre-wrap wrap-anywhere">{text}</p>}
+    >
+      <Markdown text={text} className="max-w-[70ch]" />
+    </Suspense>
+  )
+}
 
 /** As many as the server gives at a time when it is not asked for fewer. */
 export const announcementPageSize = 20
@@ -72,7 +87,7 @@ export function AnnouncementsPage() {
               </time>
             </p>
           </header>
-          {item.body && <CommentBody text={item.body} />}
+          {item.body && <AnnouncementBody text={item.body} />}
         </article>
       ))}
       {list && <AnnouncementPager list={list} onTurn={turn} />}

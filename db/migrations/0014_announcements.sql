@@ -1,7 +1,7 @@
 -- The site's announcements (internal/profile/httpapi/announcements.go): what its administrator
 -- has to tell every visitor, shown on the home page and listed at /announcements. A title and
--- a text of plain lines, in whatever language the administrator writes; nothing here is read as
--- HTML or Markdown.
+-- a text in Markdown, in whatever language the administrator writes. The website shows the text
+-- as Markdown and never runs HTML in it; here it is only text.
 CREATE TABLE IF NOT EXISTS net.announcements (
     id text PRIMARY KEY CHECK (id ~ '^[0-9a-f]{32}$'),
     title text NOT NULL CHECK (char_length(title) BETWEEN 1 AND 80 AND title = btrim(title)),

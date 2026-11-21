@@ -15,7 +15,8 @@ import (
 
 // The site's announcements: what its administrator has to tell every visitor. The home page
 // shows the first few and /announcements all of them, pinned ones first and then the newest
-// (net.announcements). A title and a text of plain lines; neither is HTML or Markdown.
+// (net.announcements). A title of one line and a text the website reads as Markdown; here both
+// are only text, kept as written, and HTML in them is never run.
 
 // Announcement is one of them.
 type Announcement struct {

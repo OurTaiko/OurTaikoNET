@@ -17,7 +17,7 @@ import { AnnouncementPager, Pinned, announcementAddress } from '@players/compone
 import { Notice } from '@players/notice'
 import { playerKeys, playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
-import { announcementPageSize, usePageParam } from './announcements'
+import { AnnouncementBody, announcementPageSize, usePageParam } from './announcements'
 
 // As the server counts them: in characters.
 const maxTitle = 80
@@ -152,6 +152,15 @@ export function AnnouncementsAdminPage() {
                 disabled={busy}
                 onChange={(event) => write({ body: event.target.value })}
               />
+              {draft.body.trim() && (
+                <div
+                  className="space-y-1.5 p-4 border rounded-2xl"
+                  data-testid="announcement-preview"
+                >
+                  <p className="text-muted-foreground text-xs">{t('announcements.preview')}</p>
+                  <AnnouncementBody text={draft.body} />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <Checkbox

@@ -323,6 +323,107 @@
   }
 }
 
+/* Text written in Markdown (kit/markdown.tsx): the site's type and role colours on what the
+   parser makes of it. */
+.markdown {
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  overflow-wrap: anywhere;
+}
+.markdown > * + * {
+  margin-top: 0.75rem;
+}
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  line-height: 1.4;
+}
+.markdown > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+  margin-top: 1.25rem;
+}
+.markdown h1 {
+  font-size: 1.25rem;
+}
+.markdown h2 {
+  font-size: 1.125rem;
+}
+.markdown h3 {
+  font-size: 1rem;
+}
+.markdown a {
+  color: var(--color-link);
+}
+.markdown a:hover {
+  text-decoration: underline;
+}
+.markdown :is(ul, ol) {
+  padding-left: 1.5rem;
+}
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown li + li,
+.markdown li > :is(ul, ol) {
+  margin-top: 0.25rem;
+}
+.markdown .contains-task-list {
+  padding-left: 0.25rem;
+  list-style: none;
+}
+.markdown .task-list-item input {
+  margin-right: 0.5rem;
+}
+.markdown blockquote {
+  padding-left: 0.875rem;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-muted-foreground);
+}
+.markdown :is(code, pre) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+}
+.markdown code {
+  padding: 0.125rem 0.375rem;
+  border-radius: 6px;
+  background: var(--color-muted);
+}
+.markdown pre {
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: var(--color-muted);
+  overflow-x: auto;
+  overflow-wrap: normal;
+}
+.markdown pre code {
+  padding: 0;
+  background: none;
+}
+.markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+.markdown hr {
+  border-color: var(--color-border);
+}
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.markdown :is(th, td) {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+.markdown th {
+  font-weight: 700;
+  background: var(--color-muted);
+}
+
 /* The marker under the word of a page heading that says what the page is. */
 /* The don/ka stripe: the drum's two hits, used sparingly as a divider. */
 .drum-stripe {
