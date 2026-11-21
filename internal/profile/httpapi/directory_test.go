@@ -232,19 +232,28 @@ func TestThePlayersDirectoryByKarma(t *testing.T) {
 
 func TestThePlayersDirectoryPages(t *testing.T) {
 	c, exec := directorySite(t)
-	for i := range 13 {
+	for i := range defaultDirectoryPageSize + 1 {
 		exec(`INSERT INTO net.users(id,nickname,profile_checked_at) VALUES ($1,$2,now())`, fmt.Sprintf("%032x", i+1), fmt.Sprintf("P%d", i))
 	}
 	var list UserDirectory
 	c.json("GET", "/api/users", "", 200, &list)
-	if list.Total != 13 || len(list.Items) != 12 || list.PageSize != 12 || list.Page != 1 {
+	if list.Total != defaultDirectoryPageSize+1 || len(list.Items) != defaultDirectoryPageSize || list.PageSize != defaultDirectoryPageSize || list.Page != 1 {
 		t.Fatalf("%+v", list)
 	}
 	c.json("GET", "/api/users?page=2", "", 200, &list)
-	if list.Total != 13 || len(list.Items) != 1 || list.Page != 2 {
+	if list.Total != defaultDirectoryPageSize+1 || len(list.Items) != 1 || list.Page != 2 {
 		t.Fatalf("%+v", list)
 	}
-	for _, query := range []string{"page=0", "page=bad", "page=1.5", "page=10001", "sort=invalid", "q=" + strings.Repeat("x", 201)} {
+	// The client may say how many a page has.
+	c.json("GET", "/api/users?pageSize=5&page=2", "", 200, &list)
+	if list.Total != defaultDirectoryPageSize+1 || len(list.Items) != 5 || list.PageSize != 5 || list.Page != 2 {
+		t.Fatalf("%+v", list)
+	}
+	c.json("GET", fmt.Sprintf("/api/users?pageSize=%d", maxDirectoryPageSize), "", 200, &list)
+	if len(list.Items) != defaultDirectoryPageSize+1 || list.PageSize != maxDirectoryPageSize {
+		t.Fatalf("%+v", list)
+	}
+	for _, query := range []string{"page=0", "page=bad", "page=1.5", "page=10001", "sort=invalid", "q=" + strings.Repeat("x", 201), "pageSize=0", "pageSize=bad", "pageSize=101"} {
 		c.json("GET", "/api/users?"+query, "", 400, nil)
 	}
 	// Only what is public leaves the server.

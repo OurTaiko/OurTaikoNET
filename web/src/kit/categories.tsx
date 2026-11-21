@@ -9,6 +9,8 @@ import { useQuery, type QueryFunctionContext } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { api } from './api/client'
 import { categoryColor } from './category-colors'
+import { coverChip } from './components/song-cover'
+import { cn } from './lib/utils'
 import type { Category, CategoryList } from './api/types'
 import { i18n } from './i18n'
 import { SOURCE } from './source'
@@ -64,6 +66,41 @@ export function CategoryLabels({ ids = [], children }: { ids?: string[]; childre
           </Badge>
         </li>
       ))}
+    </ul>
+  )
+}
+/**
+ * A chart's categories as labels over its cover (SongCover's children), one under the other:
+ * four at most, the last of them saying how many more there are.
+ */
+export function CoverCategories({ ids = [] }: { ids?: string[] }) {
+  const { t } = useTranslation()
+  const { items } = useCategories()
+  const uniqueIds = [...new Set(ids)]
+  if (uniqueIds.length === 0) return null
+  const shown = uniqueIds.length > 4 ? uniqueIds.slice(0, 3) : uniqueIds
+  return (
+    <ul
+      aria-label={t('messages.categories')}
+      className="flex max-w-full flex-col items-start gap-1"
+    >
+      {shown.map((id) => (
+        <li key={id} className={cn(coverChip, 'max-w-full gap-1')}>
+          {categoryColor(id) && (
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: categoryColor(id) }}
+            />
+          )}
+          <span className="truncate">
+            {categoryName(items?.find((category) => category.id === id) ?? { id, title: id })}
+          </span>
+        </li>
+      ))}
+      {shown.length < uniqueIds.length && (
+        <li className={coverChip}>+{uniqueIds.length - shown.length}</li>
+      )}
     </ul>
   )
 }

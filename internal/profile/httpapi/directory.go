@@ -15,7 +15,12 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-const directoryPageSize = 12
+// How many players a page of the directory has when the client does not say, and the most a
+// client can ask for: as the chart list.
+const (
+	defaultDirectoryPageSize = 24
+	maxDirectoryPageSize     = 100
+)
 
 // PlayerTotals is what a player did on the whole site: every source added together. Never add
 // login names, email, roles or credentials here: this is public.
@@ -114,7 +119,8 @@ func queryPage(w http.ResponseWriter, r *http.Request) (int, bool) {
 	return page, true
 }
 
-// listUsers is GET /api/users: the site's players with what they did on all sources together.
+// listUsers is GET /api/users: the site's players with what they did on all sources together,
+// pageSize of them at a time.
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))
@@ -125,6 +131,14 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	if len(q) > 200 {
 		problem(w, 400, "QUERY_INVALID", "搜索内容过长")
 		return
+	}
+	pageSize := defaultDirectoryPageSize
+	if raw := query.Get("pageSize"); raw != "" {
+		var err error
+		if pageSize, err = strconv.Atoi(raw); err != nil || pageSize < 1 || pageSize > maxDirectoryPageSize {
+			problem(w, 400, "QUERY_INVALID", "每页数量必须在 1 到 100 之间")
+			return
+		}
 	}
 	// sort_value is what the players are ranked by before their last visit, when it is not that.
 	order, sortValue := "u.last_active_at DESC NULLS LAST,u.id", `0::bigint`
@@ -157,7 +171,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	result := UserDirectory{Items: []DirectoryUser{}, Page: page, PageSize: directoryPageSize, ProfilesAvailable: s.Config.SSO != nil}
+	result := UserDirectory{Items: []DirectoryUser{}, Page: page, PageSize: pageSize, ProfilesAvailable: s.Config.SSO != nil}
 	const filter = ` WHERE u.id<>'` + account.SystemUserID + `' AND ($1='' OR u.id=ANY($2::text[]))`
 	if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM net.users u`+filter, q, matching).Scan(&result.Total); err != nil {
 		internal(w, err)
@@ -166,7 +180,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := tx.Query(r.Context(), `WITH selected AS (
  SELECT u.id,u.first_login_at,u.last_active_at,`+sortValue+` AS sort_value FROM net.users u`+filter+`
  ORDER BY `+order+` LIMIT $3 OFFSET $4)
- SELECT u.id,`+totalsColumns+` FROM selected u ORDER BY `+order, q, matching, directoryPageSize, (page-1)*directoryPageSize)
+ SELECT u.id,`+totalsColumns+` FROM selected u ORDER BY `+order, q, matching, pageSize, (page-1)*pageSize)
 	if err != nil {
 		internal(w, err)
 		return

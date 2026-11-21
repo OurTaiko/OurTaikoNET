@@ -8,10 +8,23 @@ import type { UserDirectory } from '../api/types'
 
 export const directorySorts = ['active', 'newest', 'karma'] as const
 export type DirectorySort = (typeof directorySorts)[number]
-export type DirectoryQuery = { q: string; sort: DirectorySort; page: number }
+export type DirectoryQuery = {
+  q: string
+  sort: DirectorySort
+  page: number
+  /** Players in a page, 1 to 100; left out, 24. */
+  pageSize?: number
+}
 
 export const directoryAddress = (query: DirectoryQuery) =>
-  withQuery(`${SITE_API_ROOT}/users`, query)
+  withQuery(
+    `${SITE_API_ROOT}/users`,
+    Object.fromEntries(
+      Object.entries(query).filter(
+        (entry): entry is [string, string | number] => entry[1] !== undefined,
+      ),
+    ),
+  )
 
 export const directoryQuery = (query: DirectoryQuery) =>
   queryOptions({

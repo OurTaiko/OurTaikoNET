@@ -126,17 +126,30 @@ export function LevelBoxes({ difficulties }: { difficulties: Difficulty[] }) {
   )
 }
 
-/** A chart's courses as small squares with their star levels: the form a song tile shows. */
-export function LevelChips({ difficulties }: { difficulties: Difficulty[] }) {
+/**
+ * A chart's courses as small squares with their star levels: the form a song tile shows.
+ * With `oneRow` they never wrap, and narrow instead where five do not fit.
+ */
+export function LevelChips({
+  difficulties,
+  oneRow = false,
+}: {
+  difficulties: Difficulty[]
+  oneRow?: boolean
+}) {
   const { t } = useTranslation()
   return (
-    <ul aria-label={t('messages.chartDifficulty')} className="flex flex-wrap gap-1">
+    <ul
+      aria-label={t('messages.chartDifficulty')}
+      className={cn('flex gap-1', oneRow ? 'min-w-0' : 'flex-wrap')}
+    >
       {groupCourses(difficulties).map((group) => (
         <li
           key={group.base}
           title={groupName(group)}
           className={cn(
-            'inline-flex justify-center items-center px-1.5 rounded-[7px] min-w-[1.625rem] h-[1.375rem] font-bold text-white text-xs tabular-nums',
+            'inline-flex justify-center items-center rounded-[7px] h-[1.375rem] font-bold text-white text-xs tabular-nums',
+            oneRow ? 'w-[1.625rem] min-w-0 shrink' : 'px-1.5 min-w-[1.625rem]',
             difficultyColors[group.base],
           )}
         >

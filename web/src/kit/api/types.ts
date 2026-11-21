@@ -103,6 +103,8 @@ export type ChartBase = {
   upvotes: number
   downvotes: number
   commentCount: number
+  /** Scores of all the chart's blocks, those of replaced files too. */
+  playCount: number
   /** Only filled on the signed-in detail view. */
   myVote: Vote
 }

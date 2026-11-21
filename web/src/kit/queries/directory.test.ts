@@ -11,3 +11,10 @@ it('asks the same list from every area', () => {
     expect(directoryQuery(query).queryKey).toEqual(['players', 'directory', query])
   }
 })
+
+it('says how many players a page has only when asked to', () => {
+  setArea('')
+  expect(directoryAddress({ ...query, pageSize: 12 })).toBe(
+    '/api/v2/users?q=%E9%BC%93%E6%89%8B&sort=active&page=2&pageSize=12',
+  )
+})

@@ -1,9 +1,8 @@
 import type { Chart } from '@fanmade/api/types'
 import {
-  BranchingBadge,
   ChartCard as SharedChartCard,
   CommentCountBadge,
-  DoubleBadge,
+  PlayCountBadge,
   MakerBadge,
   ScoreBadge,
 } from '@sitekit/components/chart-card'
@@ -12,16 +11,11 @@ export function ChartCard({ chart }: { chart: Chart }) {
   return (
     <SharedChartCard
       chart={chart}
-      facts={
-        <>
-          <MakerBadge name={chart.maker || chart.author} />
-        </>
-      }
+      facts={<MakerBadge name={chart.maker || chart.author} />}
       footer={
         <>
-          <DoubleBadge difficulties={chart.difficulties} />
-          <BranchingBadge difficulties={chart.difficulties} />
           <ScoreBadge score={chart.score} />
+          <PlayCountBadge count={chart.playCount} />
           <CommentCountBadge count={chart.commentCount} />
         </>
       }
