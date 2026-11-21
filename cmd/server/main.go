@@ -114,12 +114,16 @@ func main() {
 		if _, err := distribution.ParseMirrorCatalogURL(cfg.DonMirrorCatalogURL); err != nil {
 			log.Fatal(err)
 		}
-		db, err := maxminddb.Open(os.Getenv("DON_GEOIP_DB"))
+	}
+	// The IP country database: the mirror cannot do without it, and with it each visit is kept
+	// with its country (package visits), mirror or not.
+	if path := os.Getenv("DON_GEOIP_DB"); path != "" || cfg.DonMirrorCatalogURL != "" {
+		db, err := maxminddb.Open(path)
 		if err != nil {
 			log.Fatalf("DON_GEOIP_DB: %v", err)
 		}
 		defer db.Close()
-		cfg.DonIPCountry = func(ip netip.Addr) string {
+		cfg.IPCountry = func(ip netip.Addr) string {
 			var country string
 			if err := db.Lookup(ip).DecodePath(&country, "country", "iso_code"); err != nil {
 				return ""

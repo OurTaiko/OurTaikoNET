@@ -74,7 +74,7 @@ func TestViewsAndVisitorsInEveryTimeZone(t *testing.T) {
 	pool := netdbtest.NewShared(t)
 	var now time.Time
 	store := Store{DB: pool, Now: func() time.Time { return now }}
-	at := func(when, page, who string) {
+	at := func(when, page string, who Visitor) {
 		t.Helper()
 		var err error
 		if now, err = time.Parse(time.RFC3339, when); err != nil {
@@ -104,7 +104,7 @@ func TestViewsAndVisitorsInEveryTimeZone(t *testing.T) {
 	if s := summary(shanghai); s != (Summary{}) {
 		t.Fatalf("before anyone came %+v", s)
 	}
-	x, y := "1.1.1.1\nSafari", "2.2.2.2\nSafari"
+	x, y := Visitor{Host: "1.1.1.1", Browser: "Safari", Country: "AU"}, Visitor{Host: "2.2.2.2", Browser: "Safari", Country: "FR"}
 	//                          Shanghai     Los Angeles
 	at("2026-11-15T15:00:00Z", "/", x)        // 15th 23:00  15th 07:00
 	at("2026-11-15T17:00:00Z", "/players", x) // 16th 01:00  15th 09:00
@@ -152,7 +152,7 @@ func TestViewsAndVisitorsInEveryTimeZone(t *testing.T) {
 		t.Errorf("today in Los Angeles %+v", r)
 	}
 
-	// Nothing that is kept says who came: only hashes, which the salts made.
+	// What tells one day's visitors apart is hashes, which the salts made, not the address.
 	var plain int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.visit_views WHERE position('1.1.1.1' in encode(visitor_even || visitor_odd, 'escape')) > 0`).Scan(&plain); err != nil || plain != 0 {
 		t.Fatal("visitors are not kept as hashes", plain, err)
@@ -181,35 +181,44 @@ func TestViewsAndVisitorsInEveryTimeZone(t *testing.T) {
 	}
 }
 
-// What was counted by days of UTC+8, before views had their times, is in the totals.
-func TestWhatWasCountedBeforeIsInTheTotals(t *testing.T) {
+// Each view keeps the address it came from and its country; the countries of a period are
+// counted with their views and their different addresses, and what has no country is unknown.
+func TestViewsAreCountedByCountry(t *testing.T) {
 	ctx := context.Background()
 	pool := netdbtest.NewShared(t)
-	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
 	store := Store{DB: pool, Now: func() time.Time { return now }}
-	if _, err := pool.Exec(ctx, `
-INSERT INTO net.visit_days (day, views, visitors, salt) VALUES ('2026-11-16', 10, 4, NULL), ('2026-11-17', 5, NULL, '\x00');
-INSERT INTO net.visit_visitors (day, visitor) VALUES ('2026-11-17', '\x01'), ('2026-11-17', '\x02');
-INSERT INTO net.visit_pages (day, page, views) VALUES ('2026-11-16', '/', 10)`); err != nil {
+	// A view made before addresses were kept.
+	if _, err := pool.Exec(ctx, `INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd) VALUES ($1, '/', sha256('a'), sha256('b'))`, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Close(ctx); err != nil {
-		t.Fatal(err)
+	for _, v := range []Visitor{
+		{Host: "1.1.1.1", Browser: "Safari", Country: "AU"},
+		{Host: "1.1.1.1", Browser: "Firefox", Country: "AU"},
+		{Host: "1.1.1.2", Browser: "Safari", Country: "AU"},
+		{Host: "::ffff:2.2.2.2", Browser: "Safari", Country: "FR"},
+		{Host: "2001:db8::1", Browser: "Safari", Country: "JP"},
+		{Host: "2001:db8::1", Browser: "Safari", Country: "JP"},
+		// No country known, a country that is none, an address that is none.
+		{Host: "3.3.3.3", Browser: "Safari"},
+		{Host: "3.3.3.4", Browser: "Safari", Country: "jp"},
+		{Host: "somewhere", Browser: "Safari", Country: "Japan"},
+	} {
+		if err := store.Record(ctx, "/", v); err != nil {
+			t.Fatal(v, err)
+		}
 	}
-	var open, hashes int
-	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM net.visit_days WHERE salt IS NOT NULL OR visitors IS NULL), (SELECT count(*) FROM net.visit_visitors)`).Scan(&open, &hashes); err != nil || open != 0 || hashes != 0 {
-		t.Fatal("the old count is left open", open, hashes, err)
+	r, err := store.Report(ctx, time.UTC, 1, 10)
+	if err != nil || fmt.Sprint(r.Countries) != "[{ 4 2} {AU 3 2} {JP 2 1} {FR 1 1}]" {
+		t.Fatalf("countries %v %v", r.Countries, err)
 	}
-	if err := store.Record(ctx, "/", "1.1.1.1\nSafari"); err != nil {
-		t.Fatal(err)
+	var kept string
+	if err := pool.QueryRow(ctx, `SELECT string_agg(DISTINCT host(address), ' ' ORDER BY host(address)) FROM net.visit_views`).Scan(&kept); err != nil || kept != "1.1.1.1 1.1.1.2 2.2.2.2 2001:db8::1 3.3.3.3 3.3.3.4" {
+		t.Fatalf("addresses kept %q %v", kept, err)
 	}
-	s, err := store.Summary(ctx, time.UTC)
-	if err != nil || s != (Summary{Total: Count{16, 7}, Today: Count{1, 1}, Since: "2026-11-16"}) {
-		t.Fatalf("%+v %v", s, err)
-	}
-	// The days and pages are only of views with their times.
-	r, err := store.Report(ctx, time.UTC, 3, 10)
-	if err != nil || fmt.Sprint(r.Days) != "[{2026-11-16 {0 0}} {2026-11-17 {0 0}} {2026-11-18 {1 1}}]" || fmt.Sprint(r.Pages) != "[{/ 1}]" {
-		t.Fatalf("%+v %v", r, err)
+	// The views of another period are not of this one's countries.
+	now = now.Add(48 * time.Hour)
+	if r, err = store.Report(ctx, time.UTC, 1, 10); err != nil || len(r.Countries) != 0 {
+		t.Fatalf("two days later %v %v", r.Countries, err)
 	}
 }

@@ -113,8 +113,8 @@ function Bars({ bars, format }: { bars: Bar[]; format: (n: number) => string }) 
   )
 }
 
-// How much the site is visited: today, the chosen period day by day and hour by hour, and the
-// pages seen most, all in the reader's time zone. Only the site's administrator sees it;
+// How much the site is visited: today, the chosen period day by day and hour by hour, the
+// pages seen most and the countries the views came from, all in the reader's time zone. Only the site's administrator sees it;
 // everyone sees the totals at the foot of every page.
 export function VisitsPage() {
   const { t, i18n } = useTranslation()
@@ -144,6 +144,18 @@ export function VisitsPage() {
   const visitors = days.reduce((sum, day) => sum + day.visitors, 0)
   const pages = report?.pages ?? []
   const mostSeen = Math.max(1, ...pages.map((page) => page.views))
+  const countries = report?.countries ?? []
+  const mostFrom = Math.max(1, ...countries.map((country) => country.views))
+  // A country by its name in the reader's language; one the browser cannot name by its letters.
+  const regions = new Intl.DisplayNames(i18n.language, { type: 'region', fallback: 'code' })
+  const countryName = (code: string) => {
+    if (!code) return t('visits.unknownCountry')
+    try {
+      return regions.of(code) ?? code
+    } catch {
+      return code
+    }
+  }
   const dayBars = (pick: (day: (typeof days)[number]) => number): Bar[] =>
     days.map((day) => ({ key: day.day, label: day.day, mark: day.day.slice(5), value: pick(day) }))
   const hourBars: Bar[] = (report?.hours ?? []).map((value, h) => ({
@@ -286,6 +298,56 @@ export function VisitsPage() {
                             </div>
                             <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
                               {percent.format(views ? page.views / views : 0)}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl">
+            <CardHeader>
+              <CardTitle>{t('visits.countriesHeading')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {countries.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('visits.noPages')}</p>
+              ) : (
+                <Table data-testid="visits-countries">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('visits.country')}</TableHead>
+                      <TableHead className="text-right">{t('visits.views')}</TableHead>
+                      <TableHead className="text-right">{t('visits.addresses')}</TableHead>
+                      <TableHead className="w-1/3 text-right">{t('visits.share')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {countries.map((country) => (
+                      <TableRow key={country.country}>
+                        <TableCell className={cn(!country.country && 'text-muted-foreground')}>
+                          {countryName(country.country)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {format(country.views)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {format(country.addresses)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end items-center gap-2">
+                            <div className="flex-1 max-sm:hidden">
+                              <div
+                                className="bg-primary rounded-full h-1.5"
+                                style={{ width: `${(country.views / mostFrom) * 100}%` }}
+                              />
+                            </div>
+                            <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
+                              {percent.format(views ? country.views / views : 0)}
                             </span>
                           </div>
                         </TableCell>

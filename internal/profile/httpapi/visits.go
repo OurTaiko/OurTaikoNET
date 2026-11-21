@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"time"
 
@@ -15,7 +16,8 @@ import (
 
 // How much the website is visited (package visits). The website tells the page it shows;
 // everyone may read the totals, which the foot of every page shows, and the site's
-// administrator the days, hours and pages behind them. Whoever reads names their time zone
+// administrator the days, hours, pages and countries behind them. The address a view came from
+// is kept with it, and no answer gives it out. Whoever reads names their time zone
 // (?tz=Asia/Shanghai, as their browser gives it; UTC without one), and its days are the days
 // they are given.
 
@@ -62,6 +64,19 @@ func (s *Server) visitAllowed(host string) bool {
 	return limit.count <= visitsAMinute
 }
 
+// visitCountry is the country the address host is in, empty when it is not known: no country
+// database (Config.Country), or an address that is nobody's on the internet.
+func (s *Server) visitCountry(host string) string {
+	if s.Config.Country == nil {
+		return ""
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !ip.IsGlobalUnicast() || ip.IsPrivate() {
+		return ""
+	}
+	return s.Config.Country(ip)
+}
+
 // countVisit is POST /api/visits with {"path": "/fanmade/charts/…"}: the website shows that
 // page. No session is needed and nothing is answered (204), also when the view is not counted:
 // a program's, one too many, or an address that is none of the site's.
@@ -79,7 +94,8 @@ func (s *Server) countVisit(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 		// A count that could not be written is the site's trouble, not the visitor's.
-		if err := s.visitStore().Record(ctx, page, host+"\n"+agent); err != nil {
+		visitor := visits.Visitor{Host: host, Browser: agent, Country: s.visitCountry(host)}
+		if err := s.visitStore().Record(ctx, page, visitor); err != nil {
 			log.Printf("request=%s counting a visit: %v", w.Header().Get("X-Request-ID"), err)
 		}
 	}
@@ -136,7 +152,9 @@ func (s *Server) visitSummary(w http.ResponseWriter, r *http.Request) {
 
 // visitReport is GET /api/admin/visits?days=30&tz=Asia/Shanghai (days 1 to visits.MaxDays),
 // for the site's administrator: the summary, each of the last days of that time zone (oldest
-// first, today last), the views in each of its hours over them, and the pages seen most.
+// first, today last), the views in each of its hours over them, the pages seen most, and the
+// countries the views came from ("countries": [{"country": "JP", "views", "addresses"}], most
+// views first, "" being the unknown country). No address is given out.
 func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
 		return
@@ -159,7 +177,7 @@ func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		var report visits.Report
 		if report, err = store.Report(r.Context(), loc, days, visitReportPages); err == nil {
-			web.Respond(w, 200, map[string]any{"zone": loc.String(), "total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "hours": report.Hours, "pages": report.Pages})
+			web.Respond(w, 200, map[string]any{"zone": loc.String(), "total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "hours": report.Hours, "pages": report.Pages, "countries": report.Countries})
 			return
 		}
 	}

@@ -171,6 +171,12 @@ export type VisitReport = {
   /** The views made in each hour of the day (0 to 23) over those days. */
   hours: number[]
   pages: { page: string; views: number }[]
+  /**
+   * The countries the views of those days came from, most views first: the country's two
+   * letters (ISO 3166-1), its views and the different addresses they came from. The country
+   * "" is the unknown one, which also holds the views made before addresses were kept.
+   */
+  countries: { country: string; views: number; addresses: number }[]
 }
 
 // The playlists the home page recommends, in the order shown. Each names a public playlist of a
