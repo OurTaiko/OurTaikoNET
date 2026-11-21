@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-21T10:14:40Z",
+  "updated_at": "2026-11-21T10:36:48Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "0d9ec4621a6e9b75165464865bb2315b53285326fe03d6aed5dce266fde1e855",
-      "size": 181868,
-      "normalized_sha256": "0d9ec4621a6e9b75165464865bb2315b53285326fe03d6aed5dce266fde1e855"
+      "sha256": "7a8b6f0cc8b858769ae723544e9742441c23b2518fb11e3ccd45452c66005509",
+      "size": 181874,
+      "normalized_sha256": "7a8b6f0cc8b858769ae723544e9742441c23b2518fb11e3ccd45452c66005509"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -2872,9 +2872,9 @@
     },
     "web/src/kit/chart-editor.tsx": {
       "role": "index",
-      "sha256": "8a76fd5833dfb294f3404e9cf22dd2b68e077658432b79dbe89013c6569cb6fc",
-      "size": 14482,
-      "normalized_sha256": "8a76fd5833dfb294f3404e9cf22dd2b68e077658432b79dbe89013c6569cb6fc"
+      "sha256": "c61a9b7044b1507398a926fc70da5e3a5f3cf098bd86267f1bfa02ab754db2c1",
+      "size": 14803,
+      "normalized_sha256": "c61a9b7044b1507398a926fc70da5e3a5f3cf098bd86267f1bfa02ab754db2c1"
     },
     "web/src/kit/chart-file.test.ts": {
       "role": "observe",
