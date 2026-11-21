@@ -310,6 +310,7 @@
   "announcements": {
     "heading": "お知らせ",
     "pinned": "固定",
+    "comments": "コメント数",
     "none": "お知らせはまだありません。",
     "pages": "お知らせのページ送り",
     "manage": "お知らせを管理",

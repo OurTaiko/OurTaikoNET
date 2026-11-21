@@ -11,8 +11,17 @@ import { playerQueries, type Page } from '@players/queries'
 // How many the home page shows; the rest are a link away.
 const homeShown = 3
 
-/** Where an announcement is on the page of them all. */
-export const announcementAddress = (id: string) => `/announcements#${id}`
+// Which announcement is open, and which of its comments is singled out, is in the address:
+// ?announcement=<id>&comment=<id>. So the way back closes it and its link can be passed on.
+export const open = 'announcement'
+export const focus = 'comment'
+
+/** The address that opens an announcement, on the page of them all. */
+export const announcementAddress = (id: string, commentId?: string) =>
+  `/announcements?${open}=${encodeURIComponent(id)}${commentId ? `&${focus}=${encodeURIComponent(commentId)}` : ''}`
+
+/** What to add to the address of a page that shows AnnouncementDialog, to open one over it. */
+export const announcementOver = (id: string) => `?${open}=${encodeURIComponent(id)}`
 
 /** The mark of one that is kept before the others. */
 export function Pinned() {
@@ -59,8 +68,9 @@ export function AnnouncementPager({
 
 /**
  * The home page's corner for what the site's administrator announces: the first few titles,
- * pinned ones before the newest, each leading to its text on the page of them all. Nothing is
- * shown while there is none or they cannot be read: the home page is whole without it.
+ * pinned ones before the newest, each opening its announcement over the page (which shows
+ * AnnouncementDialog). Nothing is shown while there is none or they cannot be read: the home
+ * page is whole without it.
  */
 export function Announcements({ className }: { className?: string }) {
   const { t } = useTranslation()
@@ -91,7 +101,7 @@ export function Announcements({ className }: { className?: string }) {
         {items.map((item) => (
           <li key={item.id}>
             <Link
-              to={announcementAddress(item.id)}
+              to={announcementOver(item.id)}
               className="flex items-center gap-2 hover:bg-muted px-3 py-2 rounded-[16px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
             >
               {item.pinned && <Pinned />}

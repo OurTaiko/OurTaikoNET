@@ -25,6 +25,8 @@ type Announcement struct {
 	Body        string    `json:"body"`
 	Pinned      bool      `json:"pinned"`
 	PublishedAt time.Time `json:"publishedAt"`
+	// How many comments are under it, replies among them.
+	CommentCount int `json:"commentCount"`
 }
 
 // AnnouncementPage is one page of them, in the order they are shown.
@@ -43,13 +45,13 @@ const (
 	defaultAnnouncementPageSize = 20
 	maxAnnouncementPageSize     = 50
 
-	announcementColumns = `id,title,body,pinned,published_at`
+	announcementColumns = `id,title,body,pinned,published_at,comment_count`
 )
 
 // announcements is GET /api/announcements, public: pinned ones first, then the newest,
 // ?pageSize= (1 to 50, 20 when there is none) of them at a time from ?page=.
 func (s *Server) announcements(w http.ResponseWriter, r *http.Request) {
-	page, ok := queryPage(w, r)
+	page, ok := answers.Page(w, r)
 	if !ok {
 		return
 	}
@@ -79,13 +81,14 @@ func (s *Server) announcements(w http.ResponseWriter, r *http.Request) {
 			id, title, body *string
 			pinned          *bool
 			publishedAt     *time.Time
+			commentCount    *int
 		)
-		if err = rows.Scan(&answer.Total, &id, &title, &body, &pinned, &publishedAt); err != nil {
+		if err = rows.Scan(&answer.Total, &id, &title, &body, &pinned, &publishedAt, &commentCount); err != nil {
 			internal(w, err)
 			return
 		}
 		if id != nil {
-			answer.Items = append(answer.Items, Announcement{ID: *id, Title: *title, Body: *body, Pinned: *pinned, PublishedAt: *publishedAt})
+			answer.Items = append(answer.Items, Announcement{ID: *id, Title: *title, Body: *body, Pinned: *pinned, PublishedAt: *publishedAt, CommentCount: *commentCount})
 		}
 	}
 	if err = rows.Err(); err != nil {
@@ -93,6 +96,21 @@ func (s *Server) announcements(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.Respond(w, 200, answer)
+}
+
+// announcement is GET /api/announcements/{id}, public: that one.
+func (s *Server) announcement(w http.ResponseWriter, r *http.Request) {
+	rows, _ := s.DB.Query(r.Context(), `SELECT `+announcementColumns+` FROM net.announcements WHERE id=$1`, r.PathValue("id"))
+	found, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[Announcement])
+	if errors.Is(err, pgx.ErrNoRows) {
+		problem(w, 404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
+		return
+	}
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	web.Respond(w, 200, found)
 }
 
 // announcementInput is what the administrator writes of an announcement.

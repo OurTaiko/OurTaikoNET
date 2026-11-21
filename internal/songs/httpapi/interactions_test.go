@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/comments"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -247,7 +248,7 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 func TestCommentBurstLimit(t *testing.T) { bothSources(t, testCommentBurstLimit) }
 
 func testCommentBurstLimit(t *testing.T, w interactionWorld) {
-	for i := 0; i < commentBurst; i++ {
+	for i := 0; i < comments.Burst; i++ {
 		if code := w.c.do("alice", "POST", w.chart(w.song)+"/comments", `{"body":"spam"}`, nil); code != 201 {
 			t.Fatal("comment", i, code)
 		}

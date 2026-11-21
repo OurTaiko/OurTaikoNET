@@ -310,6 +310,7 @@
   "announcements": {
     "heading": "공지",
     "pinned": "고정",
+    "comments": "댓글 수",
     "none": "아직 공지가 없습니다.",
     "pages": "공지 페이지 넘기기",
     "manage": "공지 관리",

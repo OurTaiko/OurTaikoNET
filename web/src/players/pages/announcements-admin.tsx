@@ -13,11 +13,12 @@ import { queryClient } from '@sitekit/query/client'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type { Announcement, AnnouncementDraft } from '@players/api/types'
+import { AnnouncementBody } from '@players/components/announcement-dialog'
 import { AnnouncementPager, Pinned, announcementAddress } from '@players/components/announcements'
 import { Notice } from '@players/notice'
 import { playerKeys, playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
-import { AnnouncementBody, announcementPageSize, usePageParam } from './announcements'
+import { announcementPageSize, usePageParam } from './announcements'
 
 // As the server counts them: in characters.
 const maxTitle = 80

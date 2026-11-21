@@ -498,6 +498,7 @@
     "viewParent": "親コメントを見る",
     "commentPlaceholder": "この譜面の感想をどうぞ…",
     "danCommentPlaceholder": "この段位の感想をどうぞ…",
+    "announcementCommentPlaceholder": "このお知らせへのコメントをどうぞ…",
     "comment": "コメントする",
     "signInToComment": "ログインするとコメントと投票ができます。",
     "loadingComments": "コメントを読み込み中…",

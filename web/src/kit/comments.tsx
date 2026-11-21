@@ -33,6 +33,7 @@ import { VoteControl, loginPath } from './components/vote-control'
 import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { useSession } from './session'
+import { SOURCE } from './source'
 import {
   commentQueries,
   invalidateSubjectComments,
@@ -62,24 +63,43 @@ export const commentPath = (chartId: string, commentId: string) =>
 export const danCommentPath = (danId: string, commentId: string) =>
   `/dans/${encodeURIComponent(danId)}/comments/${encodeURIComponent(commentId)}`
 
-// What a thread hangs on: a chart or a 段位 course. The pages and endpoints
-// differ; the comments themselves do not.
+// What a thread hangs on: a chart or a 段位 course of a song source, or an announcement of
+// the site. The pages and endpoints differ; the comments themselves do not.
 export type CommentSubject = {
+  /** Whose comments these are: a song source, or 'site'. It keeps their caches apart. */
+  host: string
   /** The page the thread lives on, e.g. /charts/12 or /dans/3. */
   path: string
   commentCount: number
   comments: (query: { sort: string; page: number }) => string
   newComment: string
+  /** One comment's own address (PATCH, DELETE), its vote's, and its thread's in an order. */
+  comment: (commentId: string) => string
+  commentVote: (commentId: string) => string
+  commentThread: (commentId: string, sort: string) => string
   commentPath: (commentId: string) => string
   isOwner: (userId: string) => boolean
+  /** Whether the viewer may remove others' comments here, when it is not their isAdmin. */
+  moderator?: boolean
   /** The new-comment box's prompt names what the thread is about. */
-  placeholder: 'interactions.commentPlaceholder' | 'interactions.danCommentPlaceholder'
+  placeholder:
+    | 'interactions.commentPlaceholder'
+    | 'interactions.danCommentPlaceholder'
+    | 'interactions.announcementCommentPlaceholder'
+}
+
+// A song source's addresses for single comments, taken now: a later request may be made after
+// the visitor has moved to another area.
+function sourceComments() {
+  const { comment, commentVote, commentThread } = endpoints
+  return { host: SOURCE, comment, commentVote, commentThread }
 }
 
 export function chartSubject(chart: ChartBase): CommentSubject {
   // Taken now: a later page may be asked for after the visitor has moved to another area.
   const address = endpoints.newComment(chart.id)
   return {
+    ...sourceComments(),
     path: `/charts/${encodeURIComponent(chart.id)}`,
     commentCount: chart.commentCount,
     comments: (query) => withQuery(address, query),
@@ -94,6 +114,7 @@ export function danSubject(dan: Dan): CommentSubject {
   // Taken now: a later page may be asked for after the visitor has moved to another area.
   const address = `${endpoints.dan(dan.id)}/comments`
   return {
+    ...sourceComments(),
     path: `/dans/${encodeURIComponent(dan.id)}`,
     commentCount: dan.commentCount,
     comments: (query) => withQuery(address, query),
@@ -329,7 +350,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
   const [busy, setBusy] = useState(false)
   const gone = comment.deleted || comment.removed
   const own = !!user && user.id === comment.authorId
-  const canModerate = !!user?.isAdmin && !own
+  const canModerate = !!user && (tree.subject.moderator ?? user.isAdmin) && !own
   const focused = tree.focusId === comment.id
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -364,7 +385,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
     setBusy(true)
     try {
       const result = await api<{ purged: boolean }>(
-        endpoints.comment(comment.id),
+        tree.subject.comment(comment.id),
         jsonRequest('DELETE', {}, csrfToken),
       )
       setConfirm(false)
@@ -475,7 +496,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
                   onCancel={() => setEditing(false)}
                   onSubmit={async (body) => {
                     const updated = await api<Comment>(
-                      endpoints.comment(comment.id),
+                      tree.subject.comment(comment.id),
                       jsonRequest('PATCH', { body }, csrfToken),
                     )
                     tree.update(comment.id, (c) => ({
@@ -502,7 +523,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
                   disabled={gone && comment.myVote === 0}
                   onVote={(value: Vote) =>
                     api<VoteResult>(
-                      endpoints.commentVote(comment.id),
+                      tree.subject.commentVote(comment.id),
                       jsonRequest('PUT', { value }, csrfToken),
                     )
                   }
@@ -654,10 +675,13 @@ export function CommentSection({
   subject,
   focusId,
   onCountChange,
+  className,
 }: {
   subject: CommentSubject
   focusId?: string
   onCountChange: (delta: number) => void
+  /** Over the card it is on a page: where it is a part of something else, such as a dialog. */
+  className?: string
 }) {
   const { t } = useTranslation()
   const { user, csrfToken } = useSession()
@@ -689,7 +713,7 @@ export function CommentSection({
       read.queryKey,
       (data) => data && { ...data, pages: data.pages.map(change) },
     )
-    void invalidateSubjectComments(subject.path)
+    void invalidateSubjectComments(subject)
   }
   const tree: Tree = {
     subject,
@@ -744,7 +768,10 @@ export function CommentSection({
       ref={section}
       id="comments"
       aria-labelledby="comments-heading"
-      className="scroll-mt-24 space-y-6 rounded-[20px] border border-border bg-card p-6 shadow-drop sm:p-8"
+      className={cn(
+        'scroll-mt-24 space-y-6 rounded-[20px] border border-border bg-card p-6 shadow-drop sm:p-8',
+        className,
+      )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2

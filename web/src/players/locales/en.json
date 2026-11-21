@@ -310,6 +310,7 @@
   "announcements": {
     "heading": "Announcements",
     "pinned": "Pinned",
+    "comments": "Comments",
     "none": "Nothing has been announced yet.",
     "pages": "Pages of announcements",
     "manage": "Manage announcements",

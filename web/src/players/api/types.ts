@@ -187,6 +187,8 @@ export type Announcement = {
   body: string
   pinned: boolean
   publishedAt: string
+  /** How many comments are under it, replies among them. */
+  commentCount: number
 }
 /** What the administrator writes of one. */
 export type AnnouncementDraft = Pick<Announcement, 'title' | 'body' | 'pinned'>

@@ -61,6 +61,7 @@ export const playerKeys = {
   announcements: () => [...playerKeys.all(), 'announcements'] as const,
   announcementPage: (page: number, pageSize: number) =>
     [...playerKeys.announcements(), page, pageSize] as const,
+  announcement: (id: string) => [...playerKeys.announcements(), 'one', id] as const,
   manage: () => [...playerKeys.all(), 'manage'] as const,
   groups: () => [...playerKeys.manage(), 'groups'] as const,
   members: () => [...playerKeys.manage(), 'members'] as const,
@@ -146,6 +147,12 @@ export const playerQueries = {
       queryKey: playerKeys.announcementPage(page, pageSize),
       queryFn: ({ signal }) =>
         api<Page<Announcement>>(endpoints.announcements(page, pageSize), { signal }),
+    }),
+  /** One announcement, whole. */
+  announcement: (id: string) =>
+    queryOptions({
+      queryKey: playerKeys.announcement(id),
+      queryFn: ({ signal }) => api<Announcement>(endpoints.announcement(id), { signal }),
     }),
   /** The public ones of a source's playlists named, in the order named, without their songs. */
   playlistsNamed: (source: SourceId, ids: string[]) =>

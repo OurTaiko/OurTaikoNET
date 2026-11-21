@@ -1,29 +1,14 @@
-import { Suspense, lazy, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ChatCircleIcon } from '@phosphor-icons/react'
+import { RelativeTime } from '@sitekit/comments'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
-import { formatLocale } from '@sitekit/i18n'
-import { AnnouncementPager, Pinned } from '@players/components/announcements'
+import { AnnouncementDialog } from '@players/components/announcement-dialog'
+import { AnnouncementPager, Pinned, announcementOver } from '@players/components/announcements'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
-
-const Markdown = lazy(() => import('@sitekit/markdown'))
-
-/**
- * An announcement's text, which the administrator writes in Markdown. Until the parser has
- * arrived it is shown as written, in as many lines.
- */
-export function AnnouncementBody({ text }: { text: string }) {
-  return (
-    <Suspense
-      fallback={<p className="text-sm leading-6 whitespace-pre-wrap wrap-anywhere">{text}</p>}
-    >
-      <Markdown text={text} className="max-w-[70ch]" />
-    </Suspense>
-  )
-}
 
 /** As many as the server gives at a time when it is not asked for fewer. */
 export const announcementPageSize = 20
@@ -36,10 +21,10 @@ export function usePageParam() {
   return [page, (next: number) => setParams({ page: String(next) })] as const
 }
 
-// Everything the site's administrator has announced, whole: pinned ones first, then the
-// newest. The home page's titles lead here, each to its own (#<id>).
+// Everything the site's administrator has announced: pinned ones first, then the newest. Each
+// opens over the page with its text and its comments (AnnouncementDialog).
 export function AnnouncementsPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const session = useSession()
   const [page, turn] = usePageParam()
   const read = useQuery({
@@ -47,13 +32,6 @@ export function AnnouncementsPage() {
     placeholderData: keepPreviousData,
   })
   const list = read.data
-  // The one the address names is brought into view once it is on the page.
-  const named = useLocation().hash.slice(1)
-  const present = !!list?.items.some((item) => item.id === named)
-  useEffect(() => {
-    if (present) document.getElementById(named)?.scrollIntoView({ block: 'start' })
-  }, [present, named])
-  const locale = formatLocale(i18n.resolvedLanguage)
   return (
     <div className="space-y-6 mx-auto max-w-3xl" data-testid="announcements">
       <div className="flex flex-wrap justify-between items-baseline gap-3">
@@ -69,28 +47,31 @@ export function AnnouncementsPage() {
       {list && !list.items.length && (
         <p className="text-muted-foreground text-sm">{t('announcements.none')}</p>
       )}
-      {list?.items.map((item) => (
-        <article
-          key={item.id}
-          id={item.id}
-          className="space-y-3 bg-card shadow-elev-1 p-6 rounded-[28px] scroll-mt-24"
-        >
-          <header className="space-y-1">
-            <h2 className="font-bold text-lg wrap-anywhere">{item.title}</h2>
-            <p className="flex items-center gap-2 text-muted-foreground text-xs">
-              {item.pinned && <Pinned />}
-              <time dateTime={item.publishedAt}>
-                {new Date(item.publishedAt).toLocaleString(locale, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
-              </time>
-            </p>
-          </header>
-          {item.body && <AnnouncementBody text={item.body} />}
-        </article>
-      ))}
+      {!!list?.items.length && (
+        <ul className="bg-card shadow-elev-1 p-3 rounded-[28px]">
+          {list.items.map((item) => (
+            <li key={item.id}>
+              <Link
+                to={`${announcementOver(item.id)}${page > 1 ? `&page=${page}` : ''}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 hover:bg-muted px-4 py-3 rounded-[18px] outline-none focus-visible:ring-3 focus-visible:ring-ring transition-colors"
+              >
+                {item.pinned && <Pinned />}
+                <span className="flex-[1_1_12rem] font-bold wrap-anywhere">{item.title}</span>
+                <span className="flex items-center gap-3 text-muted-foreground text-xs shrink-0">
+                  <span className="flex items-center gap-1">
+                    <ChatCircleIcon aria-hidden="true" className="size-3.5" />
+                    <span className="sr-only">{t('announcements.comments')}</span>
+                    {item.commentCount}
+                  </span>
+                  <RelativeTime value={item.publishedAt} />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       {list && <AnnouncementPager list={list} onTurn={turn} />}
+      <AnnouncementDialog />
     </div>
   )
 }

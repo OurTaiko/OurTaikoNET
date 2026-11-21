@@ -105,26 +105,12 @@ func (s *Server) playerTotals(ctx context.Context, id string) (PlayerTotals, err
 	return totals, err
 }
 
-// queryPage reads ?page=, 1 when there is none. It reports false after answering.
-func queryPage(w http.ResponseWriter, r *http.Request) (int, bool) {
-	raw := r.URL.Query().Get("page")
-	if raw == "" {
-		return 1, true
-	}
-	page, err := strconv.Atoi(raw)
-	if err != nil || page < 1 || page > 10000 {
-		problem(w, 400, "QUERY_INVALID", "页码需要为 1–10000 的整数")
-		return 0, false
-	}
-	return page, true
-}
-
 // listUsers is GET /api/users: the site's players with what they did on all sources together,
 // pageSize of them at a time.
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	q := strings.TrimSpace(query.Get("q"))
-	page, ok := queryPage(w, r)
+	page, ok := answers.Page(w, r)
 	if !ok {
 		return
 	}
