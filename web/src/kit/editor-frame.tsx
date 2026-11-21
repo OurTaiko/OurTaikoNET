@@ -7,7 +7,7 @@
 //   from the editor  ready; opened | open-failed { message }; save { request, tja };
 //                    dirty { dirty }; leave
 //   to the editor    open { chart }; save-result { request, saved, message?, line? }
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from './lib/utils'
@@ -57,7 +57,14 @@ export function EditorFrame({
   frameRef?: RefObject<HTMLIFrameElement | null>
   className?: string
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // The editor's words follow the site's language as it is when the editor opens (its own
+  // setting, when chosen, wins); changing it later would load the editor anew.
+  const [address] = useState(() => {
+    const query = new URLSearchParams({ lang: i18n.resolvedLanguage ?? i18n.language })
+    if (embed) query.set('embed', '1')
+    return `${EDITOR_ADDRESS}?${query}`
+  })
   const own = useRef<HTMLIFrameElement>(null)
   const frame = frameRef ?? own
   const listener = useRef(onMessage)
@@ -78,7 +85,7 @@ export function EditorFrame({
   return (
     <iframe
       ref={frame}
-      src={embed ? `${EDITOR_ADDRESS}?embed=1` : EDITOR_ADDRESS}
+      src={address}
       title={t('editor.frameTitle')}
       // The editor takes the keyboard (its shortcuts) and the clipboard (copying notes).
       allow="clipboard-read; clipboard-write; fullscreen"
