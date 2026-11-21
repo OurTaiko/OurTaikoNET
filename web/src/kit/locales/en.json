@@ -999,6 +999,7 @@
     "about": "About",
     "license": "OurTaikoNET is free software under the GNU Affero General Public License, version 3 or later: anyone may get, change and share its source.",
     "sourceCode": "Source code",
+    "revision": "Website version",
     "layoutCredit": "Layout after",
     "signedOut": "Not signed in",
     "signInHint": "Sign in to keep your scores and playlists",

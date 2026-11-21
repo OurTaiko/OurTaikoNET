@@ -1,6 +1,7 @@
 // The settings sheet the top bar's gear opens: a pane floating at the right on wide screens, a
 // sheet from the bottom on narrow ones. The light or dark theme and the accent are kept in this
-// browser, and so is the font, one of the built-in ones fetched when chosen; About says where the site's source is, as its license (the AGPL) asks.
+// browser, and so is the font, one of the built-in ones fetched when chosen; About says where the site's source is, as its license (the AGPL) asks,
+// and which commit of it the website on show was built from.
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
@@ -16,6 +17,7 @@ import {
 import { cn } from '../lib/utils'
 import { chooseTone, useChosenTone, type Tone } from '../accent'
 import { builtInFonts, chooseFont, useFontState, type FontId } from '../font'
+import { commitAddress, revision } from '../revision'
 import { useTheme, type Theme } from '../theme-context'
 import type { SourceId } from '../source'
 import { Button } from '../components/ui/button'
@@ -221,6 +223,14 @@ export function SettingsSheet({
                 <div className="flex flex-col gap-2">
                   <AboutLink href={sourceCodeAddress} label={t('shell.sourceCode')} />
                   <AboutLink href={licenseAddress} label="GNU AGPL-3.0" />
+                  {revision && (
+                    <AboutLink
+                      href={commitAddress(sourceCodeAddress, revision)}
+                      label={t('shell.revision')}
+                      value={revision.short}
+                      testId="revision"
+                    />
+                  )}
                 </div>
                 <p className="text-muted-foreground text-xs leading-relaxed">
                   {t('shell.layoutCredit')}{' '}
@@ -242,15 +252,30 @@ export function SettingsSheet({
   )
 }
 
-function AboutLink({ href, label }: { href: string; label: string }) {
+function AboutLink({
+  href,
+  label,
+  value,
+  testId,
+}: {
+  href: string
+  label: string
+  /** What the link leads to in a word (a commit's short hash), shown before the arrow. */
+  value?: string
+  testId?: string
+}) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex justify-between items-center bg-card hover:bg-accent px-4 rounded-full outline-none h-10 font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
+      data-testid={testId}
+      className="flex items-center gap-2 bg-card hover:bg-accent px-4 rounded-full outline-none h-10 font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/40"
     >
-      {label}
+      <span className="flex-1">{label}</span>
+      {value && (
+        <span className="font-mono font-normal text-muted-foreground text-xs">{value}</span>
+      )}
       <ArrowSquareOutIcon className="size-4 text-muted-foreground" aria-hidden="true" />
     </a>
   )

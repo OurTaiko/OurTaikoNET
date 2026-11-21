@@ -988,6 +988,7 @@
     "about": "このサイトについて",
     "license": "OurTaikoNET は GNU Affero 一般公衆利用許諾書 第 3 版（またはそれ以降）のもとで公開されているフリーソフトウェアです。誰でもソースコードを入手・改変・共有できます。",
     "sourceCode": "ソースコード",
+    "revision": "サイトのバージョン",
     "layoutCredit": "レイアウトの参考：",
     "signedOut": "未ログイン",
     "signInHint": "ログインしてスコアとプレイリストを同期",
