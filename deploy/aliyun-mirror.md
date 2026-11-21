@@ -55,7 +55,7 @@ again: OSS has no pass-through option and does not follow origin updates
 ([back-to-origin overview](https://www.alibabacloud.com/help/zh/oss/back-to-origin-rules-overview)).
 Files other than JSON are never replaced in place, so that is right for them. JSON is not, so
 the synchronization worker below rewrites every JSON file of the bucket on the mirror every 15
-minutes: `player-build.json`, `3dchara/catalog.json` and `nameplate/catalog.json` with the files
+minutes: `player-build.json`, `edit-nightly.json`, `3dchara/catalog.json` and `nameplate/catalog.json` with the files
 they list (which include `3dchara/base/face_animations.json`), and the JSON no catalog lists,
 named in `oss.mirrorJson` of `aliyun-mirror.json` (`3dchara/names.json`). A JSON file added to
 the bucket outside a catalog must be added there, or the mirror keeps its first copy (delete
@@ -100,10 +100,12 @@ After a canonical publication succeeds:
    replaced in place would stay old there.
 
 `tools/sync-distribution-mirror.py` now refreshes 3D art (including `.otanim` and icons),
-nameplate art, and the entire web-player file inventory. It validates source SHA-256 and
+nameplate art, the entire web-player file inventory, and OurTaikoEdit's web version (its
+`edit-nightly.json` names one never-changed `edit/<build id>/` folder, published by that
+repository's `build/publish-web.py` the way the web player is). It validates source SHA-256 and
 uploaded bytes, rechecks that the canonical catalog has not changed, then publishes the
-mirror catalog last. A failed transfer leaves the previous catalog in place. Old player
-versions and other business data are never deleted.
+mirror catalog last. A failed transfer leaves the previous catalog in place. Old player and
+OurTaikoEdit versions and other business data are never deleted.
 
 On the mirror host, Python 3.11+, `requests`, `oss2`, and the existing private ossutil
 credential file are required. Run `tools/install-mirror-sync.sh` as root after committing

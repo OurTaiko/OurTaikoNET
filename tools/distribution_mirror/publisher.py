@@ -12,7 +12,7 @@ import time
 import oss2
 import requests
 
-from .catalogs import objects, player_objects
+from .catalogs import BUILDS, build_objects, objects
 
 
 class Publisher:
@@ -119,9 +119,10 @@ class Publisher:
                 raise ValueError('OSS upload verification failed')
 
     def publish(self, collection):
-        manifest = 'player-build.json' if collection == 'player' else collection + '/catalog.json'
+        build = BUILDS.get(collection)
+        manifest = build[0] if build else collection + '/catalog.json'
         raw, catalog = self.catalog(manifest)
-        files = player_objects(catalog) if collection == 'player' else {
+        files = build_objects(catalog, build[1]) if build else {
             collection + '/' + name: ref for name, ref in objects(collection, catalog).items()
         }
         # executor.map keeps only a fixed small set of active transfers.

@@ -36,16 +36,26 @@ def objects(collection, catalog):
     return result
 
 
-def player_objects(manifest):
+# Web builds published as a never-changed folder named by a manifest: the web player
+# (OurTaikoView_Web, player-build.json) and OurTaikoEdit's web version (edit-nightly.json),
+# both {"path": "/<root>/<16 hex>/index.html", "files": {name: sha256}}.
+BUILDS = {'player': ('player-build.json', 'player'), 'edit': ('edit-nightly.json', 'edit')}
+
+
+def build_objects(manifest, root):
     path = manifest.get('path')
     files = manifest.get('files')
-    if (not isinstance(path, str) or not re.fullmatch(r'/player/[a-f0-9]{16}/index\.html', path)
+    if (not isinstance(path, str) or not re.fullmatch(rf'/{root}/[a-f0-9]{{16}}/index\.html', path)
             or not isinstance(files, dict) or not 0 < len(files) <= 4096 or 'index.html' not in files):
-        raise ValueError('invalid player manifest')
+        raise ValueError(f'invalid {root} manifest')
     base = path.removesuffix('index.html').lstrip('/')
     result = {}
     for name, digest in files.items():
         if not valid_path(name) or not isinstance(digest, str) or not DIGEST.fullmatch(digest):
-            raise ValueError('invalid player file')
+            raise ValueError(f'invalid {root} file')
         result[base + name] = (None, digest)
     return result
+
+
+def player_objects(manifest):
+    return build_objects(manifest, 'player')

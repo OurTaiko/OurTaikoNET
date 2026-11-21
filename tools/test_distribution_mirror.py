@@ -9,7 +9,7 @@ import threading
 import time
 import unittest
 
-from distribution_mirror.catalogs import objects, player_objects
+from distribution_mirror.catalogs import build_objects, objects, player_objects
 from distribution_mirror.publisher import Publisher
 
 
@@ -28,8 +28,18 @@ class CatalogTests(unittest.TestCase):
                 player_objects({**manifest, 'files': {**manifest['files'], bad: 'a' * 64}})
 
 
+    def test_edit_build_lives_under_its_own_root(self):
+        manifest = {'path': '/edit/0123456789abcdef/index.html', 'version': '0.1.0-49', 'commit': 'c' * 40,
+                    'files': {'index.html': 'a' * 64, '_framework/dotnet.native.abcdefghij.wasm': 'b' * 64}}
+        self.assertEqual(set(build_objects(manifest, 'edit')), {
+            'edit/0123456789abcdef/index.html', 'edit/0123456789abcdef/_framework/dotnet.native.abcdefghij.wasm'})
+        with self.assertRaises(ValueError):
+            build_objects(manifest, 'player')
+        with self.assertRaises(ValueError):
+            build_objects({**manifest, 'path': '/player/0123456789abcdef/index.html'}, 'edit')
+
 class PublicationTests(unittest.TestCase):
-    def publisher(self, fail=False, changed=False):
+    def publisher(self, fail=False, changed=False, root='player'):
         class Fake(Publisher):
             def __init__(self):
                 self.events = []
@@ -39,7 +49,7 @@ class PublicationTests(unittest.TestCase):
                 self.downloaded = 0
             def catalog(self, path):
                 self.reads += 1
-                manifest = {'path': '/player/0123456789abcdef/index.html', 'files': {'index.html': 'a' * 64, 'Build/Web.wasm.unityweb': 'b' * 64}}
+                manifest = {'path': f'/{root}/0123456789abcdef/index.html', 'files': {'index.html': 'a' * 64, 'Build/Web.wasm.unityweb': 'b' * 64}}
                 body = json.dumps(manifest).encode()
                 return (body + b' ' if changed and self.reads == 2 else body), manifest
             def ensure(self, path, size, digest):
@@ -54,6 +64,13 @@ class PublicationTests(unittest.TestCase):
         publisher.publish('player')
         self.assertEqual(publisher.events[-1], ('published', 'ourtaiko/player-build.json'))
         self.assertEqual(sum(event[0] == 'verified' for event in publisher.events), 2)
+
+    def test_edit_manifest_is_published_after_its_files(self):
+        publisher = self.publisher(root='edit')
+        publisher.publish('edit')
+        self.assertEqual(publisher.events[-1], ('published', 'ourtaiko/edit-nightly.json'))
+        self.assertEqual(publisher.events[:-1], [('verified', 'edit/0123456789abcdef/index.html'),
+                                                 ('verified', 'edit/0123456789abcdef/Build/Web.wasm.unityweb')])
 
     def test_json_outside_catalogs_is_copied_as_it_is(self):
         publisher = self.publisher()
