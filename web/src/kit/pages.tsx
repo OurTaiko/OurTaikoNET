@@ -249,11 +249,6 @@ export function Auth({ register = false }: { register?: boolean }) {
             : t('messages.signInWithOurtaiko')}
         </h2>
         <p>{t('messages.signInNicknameAndPasswordAreManagedInTheAccountCenterYou')}</p>
-        {params.has('error') && (
-          <Notice>
-            {t('messages.signInWasIncompleteOrAuthorizationExpiredPleaseSignInAgain')}
-          </Notice>
-        )}
         {session.error && <Notice>{session.error}</Notice>}
         <a
           className={buttonVariants({ variant: 'default', size: 'default', className: 'w-full' })}
