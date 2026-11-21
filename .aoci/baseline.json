@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-21T10:36:48Z",
+  "updated_at": "2026-11-21T10:44:24Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "7a8b6f0cc8b858769ae723544e9742441c23b2518fb11e3ccd45452c66005509",
-      "size": 181874,
-      "normalized_sha256": "7a8b6f0cc8b858769ae723544e9742441c23b2518fb11e3ccd45452c66005509"
+      "sha256": "f7e0faee3310cdb83eaf4fd541fddaeb63aa86eb55e752127a1b6c9d8181b484",
+      "size": 181899,
+      "normalized_sha256": "f7e0faee3310cdb83eaf4fd541fddaeb63aa86eb55e752127a1b6c9d8181b484"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3406,9 +3406,9 @@
     },
     "web/src/kit/editor-frame.tsx": {
       "role": "index",
-      "sha256": "26a9522a9d7fcf5e3313c365593e7a455642879166fee12184ddb8addfdb8d78",
-      "size": 3343,
-      "normalized_sha256": "26a9522a9d7fcf5e3313c365593e7a455642879166fee12184ddb8addfdb8d78"
+      "sha256": "337e823a858009513773bda2d1a032f3296359cf53b5c6f66e30a66ff9877388",
+      "size": 3694,
+      "normalized_sha256": "337e823a858009513773bda2d1a032f3296359cf53b5c6f66e30a66ff9877388"
     },
     "web/src/kit/embedded-player-audio.test.ts": {
       "role": "observe",
