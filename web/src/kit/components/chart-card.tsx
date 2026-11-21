@@ -133,18 +133,19 @@ export function MakerBadge({ name }: { name: string }) {
   )
 }
 
-export function ScoreBadge({ score }: { score: number }) {
+/** Upvotes alone: the row has no room for the 何意味 count too, which the chart's page shows. */
+export function UpvoteCountBadge({ count }: { count: number }) {
   const { t, i18n } = useTranslation()
   return (
     <li>
       <Badge
         variant="outline"
         className="tabular-nums"
-        title={t('interactions.scoreExact', { score })}
+        title={t('interactions.upvotesExact', { count })}
       >
         <ArrowFatUpIcon className="size-3" aria-hidden="true" />
-        <span className="sr-only">{t('interactions.score')}</span>
-        {compactNumber(score, i18n.resolvedLanguage ?? '')}
+        <span className="sr-only">{t('interactions.upvote')}</span>
+        {compactNumber(count, i18n.resolvedLanguage ?? '')}
       </Badge>
     </li>
   )

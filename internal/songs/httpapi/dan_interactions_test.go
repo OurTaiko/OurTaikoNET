@@ -32,11 +32,11 @@ func testDanInteractions(t *testing.T, w interactionWorld) {
 	c.do("alice", "PUT", path+"/vote", `{"value":1}`, &v)
 	c.do("alice", "PUT", path+"/vote", `{"value":1}`, &v)
 	c.do("bob", "PUT", path+"/vote", `{"value":-1}`, &v)
-	if v.Score != 0 || *v.Upvotes != 1 || *v.Downvotes != 1 || v.MyVote != -1 {
+	if v.Score != 0 || v.Upvotes != 1 || v.Downvotes != 1 || v.MyVote != -1 {
 		t.Fatalf("tally: %+v", v)
 	}
 	c.do("bob", "PUT", path+"/vote", `{"value":0}`, &v)
-	if v.Score != 1 || *v.Downvotes != 0 || v.MyVote != 0 {
+	if v.Score != 1 || v.Downvotes != 0 || v.MyVote != 0 {
 		t.Fatalf("withdrawn: %+v", v)
 	}
 	var course DanCourse

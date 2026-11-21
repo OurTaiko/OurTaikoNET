@@ -16,6 +16,8 @@ function comment(id: string, replies: Comment[] = [], extra: Partial<Comment> = 
     deleted: false,
     removed: false,
     score: 1,
+    upvotes: 1,
+    downvotes: 0,
     myVote: 0,
     replyCount: replies.length,
     replies,

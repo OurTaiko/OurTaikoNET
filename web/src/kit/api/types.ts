@@ -115,8 +115,9 @@ export type ChartList<C extends ChartBase = ChartBase> = {
   pageSize: number
 }
 
+/** 1 is an upvote; -1 is a 何意味 ("what?"), which the API still counts as `downvotes`. */
 export type Vote = -1 | 0 | 1
-export type VoteResult = { score: number; upvotes?: number; downvotes?: number; myVote: Vote }
+export type VoteResult = { score: number; upvotes: number; downvotes: number; myVote: Vote }
 export type CommentSort = 'best' | 'top' | 'new' | 'old' | 'controversial'
 export type Comment = {
   id: string
@@ -135,6 +136,8 @@ export type Comment = {
   deleted: boolean
   removed: boolean
   score: number
+  upvotes: number
+  downvotes: number
   myVote: Vote
   replyCount: number
   replies: Comment[]

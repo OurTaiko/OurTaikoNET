@@ -480,9 +480,9 @@
   },
   "interactions": {
     "upvote": "高評価",
-    "downvote": "低評価",
-    "score": "スコア",
-    "scoreExact": "スコア {{score}}",
+    "what": "何の意味",
+    "upvotesExact": "高評価 {{count}}",
+    "whatsExact": "何の意味 {{count}}",
     "voteOnChart": "この譜面に投票",
     "voteOnDan": "この段位に投票",
     "voteOnComment": "このコメントに投票",
@@ -536,7 +536,7 @@
     "orderComments": "コメントが多い順",
     "publicCommentCount": "コメント",
     "karma": "カルマ",
-    "karmaExplanation": "ほかのユーザーから譜面とコメントに付いた高評価から低評価を引いた数",
+    "karmaExplanation": "ほかのユーザーから譜面とコメントに付いた高評価から「何の意味」を引いた数",
     "userSpaceSections": "ユーザースペースの内容",
     "noUserComments": "このユーザーはまだコメントしていません。",
     "commentCount_other": "コメント {{count}} 件",
@@ -544,7 +544,6 @@
     "commentsHeading_other": "コメント · {{count}}",
     "replyCount_other": "返信 {{count}} 件",
     "moreReplies_other": "ほかの返信 {{count}} 件を見る",
-    "points_other": "{{count}} ポイント",
     "approval": "高評価"
   },
   "notificationCenter": {

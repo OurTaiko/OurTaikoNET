@@ -9,18 +9,18 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Up and down votes on charts, 段位 courses and comments, as on Fanmade.
+// Votes on charts, 段位 courses and comments: an upvote (1) or a 何意味 "what?" (-1), which the
+// API and the tables still call a downvote. The website shows the two counts side by side.
 type voteRequest struct {
 	Value *int `json:"value"`
 }
 
 // VoteResult is the target's tally after the viewer's vote was applied.
 type VoteResult struct {
-	Score int `json:"score"`
-	// Only songs publish their separate counts; comments show the score alone.
-	Upvotes   *int `json:"upvotes,omitempty"`
-	Downvotes *int `json:"downvotes,omitempty"`
-	MyVote    int  `json:"myVote"`
+	Score     int `json:"score"`
+	Upvotes   int `json:"upvotes"`
+	Downvotes int `json:"downvotes"`
+	MyVote    int `json:"myVote"`
 }
 
 func readVote(w http.ResponseWriter, r *http.Request) (int, bool) {
@@ -106,15 +106,15 @@ func (s *Server) voteSubject(w http.ResponseWriter, r *http.Request, load subjec
 		internal(w, e)
 		return
 	}
-	result := VoteResult{MyVote: value, Upvotes: new(int), Downvotes: new(int)}
-	e = tx.QueryRow(ctx, tally, subject.id()).Scan(result.Upvotes, result.Downvotes)
+	result := VoteResult{MyVote: value}
+	e = tx.QueryRow(ctx, tally, subject.id()).Scan(&result.Upvotes, &result.Downvotes)
 	// A milestone names no voter; the owner's own vote never notifies them.
 	if e == nil && value == 1 {
 		for _, owner := range subject.owners {
 			if owner == u.User.ID {
 				continue
 			}
-			if e = notifyUpvoteMilestone(ctx, tx, kind, owner, Notice{ChartID: subject.chartID, DanID: subject.danID}, *result.Upvotes); e != nil {
+			if e = notifyUpvoteMilestone(ctx, tx, kind, owner, Notice{ChartID: subject.chartID, DanID: subject.danID}, result.Upvotes); e != nil {
 				break
 			}
 		}
@@ -126,7 +126,7 @@ func (s *Server) voteSubject(w http.ResponseWriter, r *http.Request, load subjec
 		internal(w, e)
 		return
 	}
-	result.Score = *result.Upvotes - *result.Downvotes
+	result.Score = result.Upvotes - result.Downvotes
 	web.Respond(w, 200, result)
 }
 
@@ -160,10 +160,9 @@ func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := VoteResult{MyVote: value}
-	var upvotes int
-	e = tx.QueryRow(ctx, `SELECT upvotes-downvotes,upvotes FROM comments WHERE id=$1`, c.id).Scan(&result.Score, &upvotes)
+	e = tx.QueryRow(ctx, `SELECT upvotes,downvotes FROM comments WHERE id=$1`, c.id).Scan(&result.Upvotes, &result.Downvotes)
 	if e == nil && value == 1 && c.authorID != u.User.ID {
-		e = notifyUpvoteMilestone(ctx, tx, "comment_upvotes", c.authorID, Notice{ChartID: c.chartID, DanID: c.danID, CommentID: c.id}, upvotes)
+		e = notifyUpvoteMilestone(ctx, tx, "comment_upvotes", c.authorID, Notice{ChartID: c.chartID, DanID: c.danID, CommentID: c.id}, result.Upvotes)
 	}
 	if e == nil {
 		e = tx.Commit(ctx)
@@ -172,6 +171,7 @@ func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
+	result.Score = result.Upvotes - result.Downvotes
 	web.Respond(w, 200, result)
 }
 

@@ -6,7 +6,7 @@ import {
   ChartCard as SharedChartCard,
   CommentCountBadge,
   PlayCountBadge,
-  ScoreBadge,
+  UpvoteCountBadge,
 } from '@sitekit/components/chart-card'
 import { coverChip } from '@sitekit/components/song-cover'
 import { cn } from '@sitekit/lib/utils'
@@ -47,7 +47,7 @@ export function ChartCard({ chart }: { chart: Chart }) {
       }
       footer={
         <>
-          <ScoreBadge score={chart.score} />
+          <UpvoteCountBadge count={chart.upvotes} />
           <PlayCountBadge count={chart.playCount} />
           <CommentCountBadge count={chart.commentCount} />
         </>

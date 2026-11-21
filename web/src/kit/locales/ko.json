@@ -480,9 +480,9 @@
   },
   "interactions": {
     "upvote": "추천",
-    "downvote": "비추천",
-    "score": "점수",
-    "scoreExact": "점수 {{score}}",
+    "what": "무슨 의미",
+    "upvotesExact": "추천 {{count}}",
+    "whatsExact": "무슨 의미 {{count}}",
     "voteOnChart": "이 채보에 투표",
     "voteOnDan": "이 단위에 투표",
     "voteOnComment": "이 댓글에 투표",
@@ -536,7 +536,7 @@
     "orderComments": "댓글 많은 순",
     "publicCommentCount": "댓글",
     "karma": "카르마",
-    "karmaExplanation": "다른 사용자가 채보와 댓글에 준 추천 수에서 비추천 수를 뺀 값",
+    "karmaExplanation": "다른 사용자가 채보와 댓글에 준 추천 수에서 \"무슨 의미\" 수를 뺀 값",
     "userSpaceSections": "사용자 공간 섹션",
     "noUserComments": "이 사용자는 아직 댓글을 달지 않았습니다.",
     "commentCount_other": "댓글 {{count}}개",
@@ -544,7 +544,6 @@
     "commentsHeading_other": "댓글 · {{count}}",
     "replyCount_other": "답글 {{count}}개",
     "moreReplies_other": "답글 {{count}}개 더 보기",
-    "points_other": "{{count}}점",
     "approval": "추천"
   },
   "notificationCenter": {

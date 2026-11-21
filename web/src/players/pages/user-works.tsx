@@ -8,6 +8,7 @@ import { CommentBody, RelativeTime, commentPermalink, commentSubjectPath } from 
 import { supportsChart } from '@sitekit/courses'
 import { danTitle } from '@sitekit/dan-title'
 import { Button } from '@sitekit/components/ui/button'
+import { VoteCounts } from '@sitekit/components/vote-control'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import type { SourceId } from '@sitekit/source'
 import { useChartTitle } from '@sitekit/chart-name'
@@ -273,8 +274,8 @@ export function CommentsTab({ id }: { id: string }) {
           </header>
           <CommentBody text={comment.body} />
           <footer className="flex flex-wrap items-center gap-3 text-muted-foreground text-xs">
-            <span className="tabular-nums">
-              {t('interactions.points', { count: comment.score })}
+            <span className="inline-flex gap-2 tabular-nums">
+              <VoteCounts upvotes={comment.upvotes} downvotes={comment.downvotes} />
             </span>
             <a
               href={`/${source}${commentPermalink(comment)}`}

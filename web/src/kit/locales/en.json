@@ -482,9 +482,9 @@
   },
   "interactions": {
     "upvote": "Upvote",
-    "downvote": "Downvote",
-    "score": "Score",
-    "scoreExact": "Score {{score}}",
+    "what": "WHAT?",
+    "upvotesExact": "{{count}} upvoted",
+    "whatsExact": "{{count}} said WHAT?",
     "voteOnChart": "Vote on this chart",
     "voteOnDan": "Vote on this dan course",
     "voteOnComment": "Vote on this comment",
@@ -538,7 +538,7 @@
     "orderComments": "Most discussed",
     "publicCommentCount": "Comments",
     "karma": "Karma",
-    "karmaExplanation": "Upvotes minus downvotes from others on their charts and comments",
+    "karmaExplanation": "Upvotes minus WHAT?s from others on their charts and comments",
     "userSpaceSections": "User space sections",
     "noUserComments": "This user has not commented yet.",
     "commentCount_one": "{{count}} comment",
@@ -551,8 +551,6 @@
     "replyCount_other": "{{count}} replies",
     "moreReplies_one": "{{count}} more reply",
     "moreReplies_other": "{{count}} more replies",
-    "points_one": "{{count}} point",
-    "points_other": "{{count}} points",
     "approval": "Upvoted"
   },
   "notificationCenter": {

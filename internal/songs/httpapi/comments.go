@@ -47,6 +47,8 @@ type Comment struct {
 	Deleted          bool              `json:"deleted"`
 	Removed          bool              `json:"removed"`
 	Score            int               `json:"score"`
+	Upvotes          int               `json:"upvotes"`
+	Downvotes        int               `json:"downvotes"`
 	MyVote           int               `json:"myVote"`
 	ReplyCount       int               `json:"replyCount"`
 	Replies          []*Comment        `json:"replies"`
@@ -54,7 +56,7 @@ type Comment struct {
 
 // The viewer is always $1 so every query can report the viewer's own vote.
 const commentColumns = `m.id,m.chart_id,m.dan_id,m.parent_id,m.depth,m.author_id,m.body,m.created_at,m.edited_at,
- m.deleted_at IS NOT NULL,m.removed_at IS NOT NULL,m.upvotes-m.downvotes,m.reply_count,
+ m.deleted_at IS NOT NULL,m.removed_at IS NOT NULL,m.upvotes,m.downvotes,m.reply_count,
  COALESCE((SELECT value FROM comment_votes v WHERE v.comment_id=m.id AND v.user_id=$1),0)`
 
 // commentTitles follows commentColumns when the thread's subject is wanted: the course's
@@ -181,13 +183,14 @@ func readComments(ctx context.Context, db rowQuerier, withTitle bool, sql string
 		c := &Comment{Replies: []*Comment{}}
 		var chartID, danID *string
 		var danTitle []byte
-		dest := []any{&c.ID, &chartID, &danID, &c.ParentID, &c.Depth, &c.AuthorID, &c.Body, &c.CreatedAt, &c.EditedAt, &c.Deleted, &c.Removed, &c.Score, &c.ReplyCount, &c.MyVote}
+		dest := []any{&c.ID, &chartID, &danID, &c.ParentID, &c.Depth, &c.AuthorID, &c.Body, &c.CreatedAt, &c.EditedAt, &c.Deleted, &c.Removed, &c.Upvotes, &c.Downvotes, &c.ReplyCount, &c.MyVote}
 		if withTitle {
 			dest = append(dest, &danTitle)
 		}
 		if e = rows.Scan(dest...); e != nil {
 			return nil, e
 		}
+		c.Score = c.Upvotes - c.Downvotes
 		c.setSubject(chartID, danID, danTitle)
 		if c.Deleted || c.Removed {
 			c.AuthorID, c.Body = "", ""
