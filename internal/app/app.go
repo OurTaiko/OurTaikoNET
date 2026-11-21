@@ -23,6 +23,8 @@ import (
 	apiv1 "ourtaiko.dev/net/internal/api/v1"
 	apiv2 "ourtaiko.dev/net/internal/api/v2"
 	"ourtaiko.dev/net/internal/awards"
+	"ourtaiko.dev/net/internal/edit"
+	"ourtaiko.dev/net/internal/files"
 	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/inproc"
 	"ourtaiko.dev/net/internal/kit/distribution"
@@ -300,7 +302,9 @@ func (a *App) Handler() http.Handler {
 	v1 := apiv1.Handler(api, a.v1)
 	routes.Handle("/", mount.Serve(map[string]http.Handler{apiv1.Version: v1, apiv2.Version: apiv2.Handler(api, a.v2)}, api))
 	// Every answer, the old domains' too, says how many rewards its player has not seen.
-	return a.rewards.Announce(legacy.Handler(a.legacy, site.Web(a.webDir, a.origin, routes)))
+	// The chart editor (OurTaikoEdit's web version) at /edit/, its build from the public bucket.
+	page := edit.Handler(edit.Config{Root: files.Root, Manifest: "edit-nightly.json", Router: a.v1.Router}, site.Web(a.webDir, a.origin, routes))
+	return a.rewards.Announce(legacy.Handler(a.legacy, page))
 }
 
 // versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
