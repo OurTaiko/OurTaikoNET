@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
+  ArrowFatUpIcon,
   ChatCircleIcon,
   GameControllerIcon,
   GitBranchIcon,
@@ -17,7 +18,7 @@ import { supportsChart } from '../courses'
 import { Badge } from './ui/badge'
 import { LevelChips } from './difficulty-badges'
 import { useSite } from '../site'
-import { VoteCounts, compactNumber } from './vote-control'
+import { compactNumber } from './vote-control'
 import { SongCover, coverChip } from './song-cover'
 import { ScrollingText } from './scrolling-text'
 
@@ -132,11 +133,19 @@ export function MakerBadge({ name }: { name: string }) {
   )
 }
 
-export function VoteCountBadge({ upvotes, downvotes }: { upvotes: number; downvotes: number }) {
+/** Upvotes alone: the row has no room for the 何意味 count too, which the chart's page shows. */
+export function UpvoteCountBadge({ count }: { count: number }) {
+  const { t, i18n } = useTranslation()
   return (
     <li>
-      <Badge variant="outline" className="gap-2 tabular-nums">
-        <VoteCounts upvotes={upvotes} downvotes={downvotes} />
+      <Badge
+        variant="outline"
+        className="tabular-nums"
+        title={t('interactions.upvotesExact', { count })}
+      >
+        <ArrowFatUpIcon className="size-3" aria-hidden="true" />
+        <span className="sr-only">{t('interactions.upvote')}</span>
+        {compactNumber(count, i18n.resolvedLanguage ?? '')}
       </Badge>
     </li>
   )
