@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { FrameBell, useTellFrame } from '@sitekit/shell/frame'
 import { ChatBell } from '@sitekit/chat-center'
+import { useSignInFailure } from '@sitekit/sign-in-failure'
 import { useSession } from '@players/session'
 import { Notice } from '@players/notice'
 
@@ -10,6 +11,7 @@ export function Layout() {
   const session = useSession()
   const { pathname } = useLocation()
   const [error, setError] = useState('')
+  useSignInFailure()
   useTellFrame({
     area: '',
     path: pathname,

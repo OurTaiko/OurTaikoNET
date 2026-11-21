@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Notice } from '../notifications'
 import { ChatBell } from '../chat-center'
 import { useSession } from '../session'
+import { useSignInFailure } from '../sign-in-failure'
 import { FrameBell, useTellFrame } from '../shell/frame'
 import { useSite } from '../site'
 import { SOURCE } from '../source'
@@ -13,6 +14,7 @@ export function Layout() {
   const site = useSite()
   const { pathname } = useLocation()
   const [error, setError] = useState('')
+  useSignInFailure()
   useTellFrame({
     area: SOURCE,
     path: pathname,
