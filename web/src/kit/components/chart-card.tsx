@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
-  ArrowFatUpIcon,
   ChatCircleIcon,
   GameControllerIcon,
   GitBranchIcon,
@@ -18,7 +17,7 @@ import { supportsChart } from '../courses'
 import { Badge } from './ui/badge'
 import { LevelChips } from './difficulty-badges'
 import { useSite } from '../site'
-import { compactNumber } from './vote-control'
+import { VoteCounts, compactNumber } from './vote-control'
 import { SongCover, coverChip } from './song-cover'
 import { ScrollingText } from './scrolling-text'
 
@@ -133,18 +132,11 @@ export function MakerBadge({ name }: { name: string }) {
   )
 }
 
-export function ScoreBadge({ score }: { score: number }) {
-  const { t, i18n } = useTranslation()
+export function VoteCountBadge({ upvotes, downvotes }: { upvotes: number; downvotes: number }) {
   return (
     <li>
-      <Badge
-        variant="outline"
-        className="tabular-nums"
-        title={t('interactions.scoreExact', { score })}
-      >
-        <ArrowFatUpIcon className="size-3" aria-hidden="true" />
-        <span className="sr-only">{t('interactions.score')}</span>
-        {compactNumber(score, i18n.resolvedLanguage ?? '')}
+      <Badge variant="outline" className="gap-2 tabular-nums">
+        <VoteCounts upvotes={upvotes} downvotes={downvotes} />
       </Badge>
     </li>
   )

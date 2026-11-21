@@ -34,15 +34,15 @@ func testChartVotes(t *testing.T, w interactionWorld) {
 	c.do("alice", "PUT", song+"/vote", `{"value":1}`, &v)
 	c.do("alice", "PUT", song+"/vote", `{"value":1}`, &v)
 	c.do("bob", "PUT", song+"/vote", `{"value":1}`, &v)
-	if v.Score != 2 || *v.Upvotes != 2 || v.MyVote != 1 {
+	if v.Score != 2 || v.Upvotes != 2 || v.MyVote != 1 {
 		t.Fatalf("repeated vote counted twice: %+v", v)
 	}
 	c.do("bob", "PUT", song+"/vote", `{"value":-1}`, &v)
-	if v.Score != 0 || *v.Upvotes != 1 || *v.Downvotes != 1 || v.MyVote != -1 {
+	if v.Score != 0 || v.Upvotes != 1 || v.Downvotes != 1 || v.MyVote != -1 {
 		t.Fatalf("changed vote: %+v", v)
 	}
 	c.do("bob", "PUT", song+"/vote", `{"value":0}`, &v)
-	if v.Score != 1 || *v.Downvotes != 0 || v.MyVote != 0 {
+	if v.Score != 1 || v.Downvotes != 0 || v.MyVote != 0 {
 		t.Fatalf("withdrawn vote: %+v", v)
 	}
 	var chart Chart
@@ -108,8 +108,8 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	// Bob downvotes the long comment so "best" ranks the first comment ahead.
 	var v VoteResult
 	c.do("bob", "PUT", "/api/comments/"+long.ID+"/vote", `{"value":-1}`, &v)
-	if v.Upvotes != nil {
-		t.Fatal("comment vote published separate counts")
+	if v.Score != 0 || v.Upvotes != 1 || v.Downvotes != 1 {
+		t.Fatalf("comment vote without separate counts: %+v", v)
 	}
 	c.do("owner", "PUT", "/api/comments/"+top.ID+"/vote", `{"value":1}`, &v)
 	if v.Score != 2 || v.MyVote != 1 {
@@ -123,8 +123,8 @@ func testCommentThreads(t *testing.T, w interactionWorld) {
 	if got := page.Items[0]; len(got.Replies) != 1 || got.Replies[0].ID != reply.ID || len(got.Replies[0].Replies) != 1 || got.Replies[0].Replies[0].Author != "owner" || got.Replies[0].MyVote != 1 {
 		t.Fatalf("tree: %+v", got.Replies)
 	}
-	if page.Items[1].MyVote != -1 {
-		t.Fatal("viewer's downvote not reported")
+	if got := page.Items[1]; got.MyVote != -1 || got.Upvotes != 1 || got.Downvotes != 1 || got.Score != 0 {
+		t.Fatalf("viewer's downvote not reported: %+v", got)
 	}
 	for sort, first := range map[string]string{"new": top.ID, "old": long.ID, "top": top.ID, "controversial": long.ID} {
 		c.do("", "GET", song+"/comments?sort="+sort, "", &page)
@@ -636,7 +636,7 @@ func testGameChartVote(t *testing.T, w interactionWorld) {
 		t.Fatal("no vote yet", code, mine.MyVote)
 	}
 	var v VoteResult
-	if code := call(token, "PUT", path, `{"value":-1}`, &v); code != 200 || v.MyVote != -1 || *v.Downvotes != 1 {
+	if code := call(token, "PUT", path, `{"value":-1}`, &v); code != 200 || v.MyVote != -1 || v.Downvotes != 1 {
 		t.Fatalf("game vote: %d %+v", code, v)
 	}
 	if code := call(token, "GET", path, "", &mine); code != 200 || *mine.MyVote != -1 {

@@ -635,7 +635,8 @@ export function Detail() {
             )}
             <VoteControl
               className="rounded-full bg-muted px-1 py-0.5"
-              score={chart.score}
+              upvotes={chart.upvotes}
+              downvotes={chart.downvotes}
               myVote={chart.myVote}
               label={t('interactions.voteOnChart')}
               onVote={(value: Vote) =>

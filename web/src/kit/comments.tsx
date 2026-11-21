@@ -495,7 +495,8 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
               )}
               <div className="-ml-1.5 flex flex-wrap items-center gap-1 text-xs">
                 <VoteControl
-                  score={comment.score}
+                  upvotes={comment.upvotes}
+                  downvotes={comment.downvotes}
                   myVote={comment.myVote}
                   label={t('interactions.voteOnComment')}
                   disabled={gone && comment.myVote === 0}
@@ -505,9 +506,7 @@ function CommentNode({ comment, level }: { comment: Comment; level: number }) {
                       jsonRequest('PUT', { value }, csrfToken),
                     )
                   }
-                  onResult={(r) =>
-                    tree.update(comment.id, (c) => ({ ...c, score: r.score, myVote: r.myVote }))
-                  }
+                  onResult={(r) => tree.update(comment.id, (c) => ({ ...c, ...r }))}
                 />
                 {!gone &&
                   (user ? (

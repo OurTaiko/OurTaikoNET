@@ -480,9 +480,9 @@
   },
   "interactions": {
     "upvote": "赞",
-    "downvote": "踩",
-    "score": "得分",
-    "scoreExact": "得分 {{score}}",
+    "what": "何意味",
+    "upvotesExact": "赞 {{count}}",
+    "whatsExact": "何意味 {{count}}",
     "voteOnChart": "为这首谱面投票",
     "voteOnDan": "为这个段位投票",
     "voteOnComment": "为这条评论投票",
@@ -536,7 +536,7 @@
     "orderComments": "讨论最多",
     "publicCommentCount": "评论",
     "karma": "声望",
-    "karmaExplanation": "其他用户对其谱面和评论的赞数减去踩数",
+    "karmaExplanation": "其他用户对其谱面和评论的赞数减去「何意味」数",
     "userSpaceSections": "用户空间内容",
     "noUserComments": "这位用户还没有发表评论。",
     "commentCount_other": "{{count}} 条评论",
@@ -544,7 +544,6 @@
     "commentsHeading_other": "评论 · {{count}}",
     "replyCount_other": "{{count}} 条回复",
     "moreReplies_other": "查看另外 {{count}} 条回复",
-    "points_other": "{{count}} 分",
     "approval": "好评"
   },
   "notificationCenter": {

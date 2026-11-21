@@ -7,7 +7,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { CommentSection, danSubject } from './comments'
 import { danTitle } from './dan-title'
 export { danTitle }
-import { VoteControl } from './components/vote-control'
+import { VoteControl, VoteCounts } from './components/vote-control'
 import {
   ChatCircleIcon,
   ArrowClockwiseIcon,
@@ -237,7 +237,9 @@ function DanCard({ dan }: { dan: Dan }) {
           <p className="truncate text-xs text-muted-foreground">
             {dan.owner || t('dans.unknownOwner')}
             <span aria-hidden="true"> · </span>
-            {t('interactions.points', { count: dan.score })}
+            <span className="inline-flex gap-2 align-middle tabular-nums">
+              <VoteCounts upvotes={dan.upvotes} downvotes={dan.downvotes} />
+            </span>
             <span aria-hidden="true"> · </span>
             {t('interactions.commentCount', { count: dan.commentCount })}
           </p>
@@ -460,7 +462,8 @@ function DanView({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <VoteControl
                 className="rounded-full bg-muted px-1 py-0.5"
-                score={dan.score}
+                upvotes={dan.upvotes}
+                downvotes={dan.downvotes}
                 myVote={dan.myVote}
                 label={t('interactions.voteOnDan')}
                 onVote={(value: Vote) =>

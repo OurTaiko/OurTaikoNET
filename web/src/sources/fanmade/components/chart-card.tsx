@@ -4,7 +4,7 @@ import {
   CommentCountBadge,
   PlayCountBadge,
   MakerBadge,
-  ScoreBadge,
+  VoteCountBadge,
 } from '@sitekit/components/chart-card'
 
 export function ChartCard({ chart }: { chart: Chart }) {
@@ -14,7 +14,7 @@ export function ChartCard({ chart }: { chart: Chart }) {
       facts={<MakerBadge name={chart.maker || chart.author} />}
       footer={
         <>
-          <ScoreBadge score={chart.score} />
+          <VoteCountBadge upvotes={chart.upvotes} downvotes={chart.downvotes} />
           <PlayCountBadge count={chart.playCount} />
           <CommentCountBadge count={chart.commentCount} />
         </>
