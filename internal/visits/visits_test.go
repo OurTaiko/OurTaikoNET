@@ -212,8 +212,10 @@ func TestViewsAreCountedByCountry(t *testing.T) {
 	if err != nil || fmt.Sprint(r.Countries) != "[{ 4 2} {AU 3 2} {JP 2 1} {FR 1 1}]" {
 		t.Fatalf("countries %v %v", r.Countries, err)
 	}
+	// In the order of addresses, which is the same in every database (that of their text is the
+	// database's collation's).
 	var kept string
-	if err := pool.QueryRow(ctx, `SELECT string_agg(DISTINCT host(address), ' ' ORDER BY host(address)) FROM net.visit_views`).Scan(&kept); err != nil || kept != "1.1.1.1 1.1.1.2 2.2.2.2 2001:db8::1 3.3.3.3 3.3.3.4" {
+	if err := pool.QueryRow(ctx, `SELECT string_agg(host(address), ' ' ORDER BY address) FROM (SELECT DISTINCT address FROM net.visit_views WHERE address IS NOT NULL) a`).Scan(&kept); err != nil || kept != "1.1.1.1 1.1.1.2 2.2.2.2 3.3.3.3 3.3.3.4 2001:db8::1" {
 		t.Fatalf("addresses kept %q %v", kept, err)
 	}
 	// The views of another period are not of this one's countries.
