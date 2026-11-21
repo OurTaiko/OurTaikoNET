@@ -1,10 +1,12 @@
-// Package edit serves OurTaikoEdit's web version (the chart editor, a separate repository) at
-// /edit/ of the site.
+// Package edit serves OurTaikoEdit's web version (the chart editor, a separate repository) as a
+// bare page at /edit/app/, which the website shows inside its own frame: at /edit (the editor with
+// the person's projects in the browser) and on a chart's edit page, where the page hands the chart
+// to the editor and stores what it saves (web/src/kit/editor-frame.tsx).
 //
 // OurTaikoEdit publishes each build of its web version to the public bucket as a folder that
 // never changes, edit/<build id>/, and names the current one in edit-nightly.json (its
-// build/publish-web.py). /edit/ answers with that build's index.html and a <base> pointing at the
-// build's folder on the visitor's root: the mirror for a mainland visitor, the canonical CDN for
+// build/publish-web.py). /edit/app/ answers with that build's index.html and a <base> pointing at
+// the build's folder on the visitor's root: the mirror for a mainland visitor, the canonical CDN for
 // everyone else (package distribution). The page's scripts, styles and WebAssembly then come from
 // there, with CORS, and only the page itself from this site; the editor's projects are kept in
 // the browser's storage for this site's origin.
@@ -26,8 +28,8 @@ import (
 )
 
 const (
-	// Prefix is where the editor is on the site.
-	Prefix = "/edit/"
+	// Prefix is where the bare editor is on the site.
+	Prefix = "/edit/app/"
 	// manifestTTL is how long a manifest read is used before it is read again.
 	manifestTTL = time.Minute
 	maxManifest = 1 << 20
@@ -59,7 +61,8 @@ type server struct {
 	reading *sync.Mutex
 }
 
-// Handler serves /edit/ (and sends /edit there); every other address goes to next.
+// Handler serves /edit/app/ (and sends /edit/app there); every other address, /edit itself
+// included, goes to next.
 func Handler(cfg Config, next http.Handler) http.Handler {
 	if cfg.Client == nil {
 		cfg.Client = &http.Client{Timeout: 10 * time.Second}

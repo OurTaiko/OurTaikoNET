@@ -718,17 +718,10 @@
     "open": "在线编辑谱面",
     "title": "在线编辑谱面",
     "loading": "正在读取谱面文件…",
-    "loadingEditor": "正在加载编辑器…",
-    "editorLabel": "TJA 文本",
-    "previewHeading": "实时预览",
-    "block": "谱面块",
-    "noBlocks": "没有可以预览的谱面块",
-    "lines_one": "{{count}} 行",
-    "lines_other": "{{count}} 行",
-    "discard": "放弃修改",
-    "save": "保存并替换",
     "saved": "谱面已保存",
-    "onlyManagers": "只有作者或管理员可以编辑这首谱面"
+    "onlyManagers": "只有作者或管理员可以编辑这首谱面",
+    "frameTitle": "谱面编辑器",
+    "openFailed": "编辑器无法打开这张谱面：{{message}}"
   },
   "dans": {
     "nav": "段位道场",
@@ -1009,7 +1002,8 @@
       "sourceRefresh": "刷新",
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     },
-    "featured": "首页推荐"
+    "featured": "首页推荐",
+    "editor": "谱面编辑器"
   },
   "chat": {
     "title": "消息",
@@ -1051,7 +1045,8 @@
     "titles": "OurTaikoNET 的称号目录：可以获得的称号与获得方式。",
     "playlists": "玩家整理的太鼓谱面歌单，以及系统歌单。",
     "dans": "官方与社区制作的段位道场，可以在游戏中挑战。",
-    "register": "注册"
+    "register": "注册",
+    "editor": "在浏览器里使用谱面编辑器 OurTaikoEdit：项目保存在这个浏览器里。"
   },
   "rewards": {
     "heading": "获得了新奖励",

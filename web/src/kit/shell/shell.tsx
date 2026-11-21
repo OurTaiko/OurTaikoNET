@@ -25,6 +25,7 @@ import {
   ListIcon,
   MagnifyingGlassIcon,
   MedalIcon,
+  PencilRulerIcon,
   PlaylistIcon,
   ShieldStarIcon,
   StarIcon,
@@ -190,6 +191,7 @@ export function Frame({ children }: { children: ReactNode }) {
       icon: PlaylistIcon,
     },
     { key: 'dans', href: `/${source}/dans`, label: t('shell.dans'), icon: MedalIcon },
+    { key: 'editor', href: '/edit', label: t('shell.editor'), icon: PencilRulerIcon },
   ]
   const players: Item[] = [
     {

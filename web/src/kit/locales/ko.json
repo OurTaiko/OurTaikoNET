@@ -718,17 +718,10 @@
     "open": "온라인으로 채보 편집",
     "title": "온라인으로 채보 편집",
     "loading": "채보 파일을 불러오는 중…",
-    "loadingEditor": "편집기를 불러오는 중…",
-    "editorLabel": "TJA 텍스트",
-    "previewHeading": "실시간 미리보기",
-    "block": "채보 블록",
-    "noBlocks": "미리볼 수 있는 채보 블록이 없습니다",
-    "lines_one": "{{count}}줄",
-    "lines_other": "{{count}}줄",
-    "discard": "변경 취소",
-    "save": "저장하고 교체",
     "saved": "채보를 저장했습니다",
-    "onlyManagers": "작성자 또는 관리자만 이 채보를 편집할 수 있습니다"
+    "onlyManagers": "작성자 또는 관리자만 이 채보를 편집할 수 있습니다",
+    "frameTitle": "채보 에디터",
+    "openFailed": "에디터에서 이 채보를 열 수 없습니다: {{message}}"
   },
   "dans": {
     "nav": "단위 도장",
@@ -1009,7 +1002,8 @@
       "sourceRefresh": "새로 고침",
       "notice": "이 사이트는 플레이어 커뮤니티 프로젝트이며 반다이남코 엔터테인먼트와 관련이 없습니다. 「태고의 달인」 및 관련 자료의 권리는 해당 권리자에게 있습니다."
     },
-    "featured": "홈 추천"
+    "featured": "홈 추천",
+    "editor": "채보 에디터"
   },
   "chat": {
     "title": "메시지",
@@ -1051,7 +1045,8 @@
     "titles": "OurTaikoNET 칭호 목록: 얻을 수 있는 칭호와 조건.",
     "playlists": "플레이어가 만든 태고 채보 플레이리스트와 사이트 플레이리스트.",
     "dans": "공식과 커뮤니티의 단위 도장. 게임에서 도전할 수 있습니다.",
-    "register": "회원가입"
+    "register": "회원가입",
+    "editor": "브라우저에서 채보 에디터 OurTaikoEdit을 사용합니다. 프로젝트는 이 브라우저에 저장됩니다."
   },
   "rewards": {
     "heading": "새 보상을 받았습니다",

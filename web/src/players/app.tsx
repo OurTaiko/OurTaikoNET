@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { DocumentLanguage, LanguageProvider } from '@sitekit/language'
 import { PageMeta } from '@sitekit/head'
 import { ChatsPage } from '@sitekit/chat-center'
+import { EditorPage } from '@sitekit/editor-frame'
 import { NotificationProvider } from '@sitekit/notifications'
 import { RouterBridge } from '@sitekit/navigation'
 import { UsersPage } from '@sitekit/users'
@@ -65,6 +66,15 @@ function App() {
                   <>
                     <PageMeta title={t('shell.directory')} description={t('meta.players')} />
                     <UsersPage />
+                  </>
+                }
+              />
+              <Route
+                path="edit"
+                element={
+                  <>
+                    <PageMeta title={t('shell.editor')} description={t('meta.editor')} />
+                    <EditorPage />
                   </>
                 }
               />

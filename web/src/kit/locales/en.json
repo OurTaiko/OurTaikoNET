@@ -730,17 +730,10 @@
     "open": "Edit chart online",
     "title": "Edit chart online",
     "loading": "Loading the chart file…",
-    "loadingEditor": "Loading the editor…",
-    "editorLabel": "TJA text",
-    "previewHeading": "Live preview",
-    "block": "Chart block",
-    "noBlocks": "No chart block to preview",
-    "lines_one": "{{count}} line",
-    "lines_other": "{{count}} lines",
-    "discard": "Discard changes",
-    "save": "Save and replace",
     "saved": "Chart saved",
-    "onlyManagers": "Only an owner or an administrator can edit this chart"
+    "onlyManagers": "Only an owner or an administrator can edit this chart",
+    "frameTitle": "Chart editor",
+    "openFailed": "The editor could not open this chart: {{message}}"
   },
   "dans": {
     "nav": "Dan Dojo",
@@ -1021,7 +1014,8 @@
       "sourceRefresh": "Refresh",
       "notice": "A player community project, not affiliated with Bandai Namco Entertainment. Taiko no Tatsujin and related material belong to their owners."
     },
-    "featured": "Home picks"
+    "featured": "Home picks",
+    "editor": "Chart editor"
   },
   "chat": {
     "title": "Messages",
@@ -1064,7 +1058,8 @@
     "titles": "The titles of OurTaikoNET: every title there is to earn, and how.",
     "playlists": "Taiko playlists put together by players, and the site’s own.",
     "dans": "Dan courses by the site and the community, to take on in the game.",
-    "register": "Create an account"
+    "register": "Create an account",
+    "editor": "OurTaikoEdit, the chart editor, in the browser: your projects stay in this browser."
   },
   "rewards": {
     "heading": "You got something new",

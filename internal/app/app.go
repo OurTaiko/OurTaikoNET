@@ -302,7 +302,8 @@ func (a *App) Handler() http.Handler {
 	v1 := apiv1.Handler(api, a.v1)
 	routes.Handle("/", mount.Serve(map[string]http.Handler{apiv1.Version: v1, apiv2.Version: apiv2.Handler(api, a.v2)}, api))
 	// Every answer, the old domains' too, says how many rewards its player has not seen.
-	// The chart editor (OurTaikoEdit's web version) at /edit/, its build from the public bucket.
+	// The chart editor (OurTaikoEdit's web version) as a bare page at /edit/app/, its build from the
+	// public bucket; the website shows it in its frame.
 	page := edit.Handler(edit.Config{Root: files.Root, Manifest: "edit-nightly.json", Router: a.v1.Router}, site.Web(a.webDir, a.origin, routes))
 	return a.rewards.Announce(legacy.Handler(a.legacy, page))
 }

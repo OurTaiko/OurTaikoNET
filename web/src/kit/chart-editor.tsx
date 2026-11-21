@@ -3,27 +3,18 @@ import { chartText } from './chart-language'
 import { i18n } from './i18n'
 import { useTranslation } from 'react-i18next'
 import { endpoints } from './api/endpoints'
-import { Button } from './components/ui/button'
-import { Card } from './components/ui/card'
 import { Progress } from './components/ui/progress'
-import { ChoiceSelect } from './components/choice-select'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { queryOptions, skipToken, useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
-import {
-  ArrowCounterClockwiseIcon,
-  CaretLeftIcon,
-  FloppyDiskIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { CaretLeftIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { previewReplacement, uploadChart } from './api/client'
-import type { ChartBase, Side } from './api/types'
-import { baseCourse, blockName, slotKey } from './courses'
+import type { ChartBase } from './api/types'
 import { isChartOwner } from './chart-owners'
+import { EditorFrame, tellEditor, type FromEditor } from './editor-frame'
 import { useSession } from './session'
 import { Notice } from './notifications'
 import { useNotification } from './notification-context'
-import { parsePreviewTja } from './preview-tja'
 import { chartWritten, useChartSeed, useFirst } from './queries/chart-writes'
 import { chartKeys } from './queries/charts'
 import { maxTja } from './tja-limits'
@@ -31,9 +22,6 @@ import { withChartTitles } from './tja-titles'
 import { replacementFields, reviewReplacement } from './replacement-diff'
 import type { Proposal, ReplacementPreview, Review } from './replacement-diff'
 import { ReplacementReview } from './replacement-review'
-
-const ChartPreview = lazy(() => import('./chart-preview'))
-const TjaEditor = lazy(() => import('@sitekit/components/tja-editor'))
 
 function createRequestKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(16))
@@ -83,41 +71,81 @@ function chartSource(chart: ChartBase | null) {
   })
 }
 
-/** Reads the chart and its text once; the editor below keeps them from then on. */
+// The chart's audio, handed to the editor with the text (null: the chart has none).
+function chartAudio(chart: ChartBase | null) {
+  const address = chart ? endpoints.resources(chart.id) : ''
+  return queryOptions({
+    queryKey: [...chartKeys.all(), 'audio-bytes', chart?.id ?? '', chart?.audioHash ?? ''],
+    queryFn: chart
+      ? async ({ signal }) => {
+          const response = await fetchChartFile(
+            chart.id,
+            'audio',
+            { signal, credentials: 'omit' },
+            address,
+          )
+          if (response.status === 404) return null
+          if (!response.ok)
+            throw new Error(i18n.t('messages.chartHttpError', { status: response.status }))
+          return response.arrayBuffer()
+        }
+      : skipToken,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+}
+
+/** Reads the chart, its text and its audio once; the editor below keeps them from then on. */
 export function ChartEditorPage() {
   const { t } = useTranslation()
   const { id } = useParams()
   const session = useSession()
   const { chart, error } = useChartSeed<ChartBase>(id)
   const read = useQuery(chartSource(chart))
+  const sound = useQuery(chartAudio(chart))
   const source = useFirst(chart?.id, read.data)
+  const audio = useFirst(chart?.id, sound.data)
   if (!id) return <Notice>{t('messages.missingSongId')}</Notice>
-  if (chart && source !== undefined) return <ChartEditor key={id} loaded={chart} source={source} />
+  if (chart && source !== undefined && audio !== undefined)
+    return <ChartEditor key={id} loaded={chart} source={source} audio={audio} />
   if (session.loading) return <p role="status">{t('messages.loadingAccount')}</p>
   if (error) return <Notice>{error}</Notice>
   if (read.error) return <Notice>{read.error.message || t('messages.failedToLoadChart')}</Notice>
+  if (sound.error) return <Notice>{sound.error.message || t('messages.failedToLoadChart')}</Notice>
   return <p className="text-sm text-muted-foreground">{t('editor.loading')}</p>
 }
 
 /**
- * Edits a chart's TJA in the browser with a live rendering. Saving sends the
- * text as the new TJA through the same replacement as the update page, with
- * the audio and movie kept, after the same review of what it changes: blocks
- * the new text no longer has go with their scores, and older scores leave the
- * leaderboard.
+ * Edits a chart in OurTaikoEdit, the chart editor (./editor-frame), with its text and audio.
+ * Saving in the editor sends the text here, and it becomes the chart's new TJA through the same
+ * replacement as the update page, with the audio and movie kept, after the same review of what it
+ * changes: blocks the new text no longer has go with their scores, and older scores leave the
+ * leaderboard. The editor is told whether it was stored.
  */
-function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) {
+function ChartEditor({
+  loaded,
+  source,
+  audio,
+}: {
+  loaded: ChartBase
+  source: string
+  audio: ArrayBuffer | null
+}) {
   const { t } = useTranslation()
   const { notify } = useNotification()
+  const navigate = useNavigate()
   const session = useSession()
   const [chart, setChart] = useState(loaded)
-  const [original, setOriginal] = useState(source)
-  const [text, setText] = useState(source)
-  const [preview, setPreview] = useState(source)
-  const [course, setCourse] = useState('')
+  const [opened, setOpened] = useState(false)
+  const [openError, setOpenError] = useState('')
+  const [dirty, setDirty] = useState(false)
   // Open while the server reads the text (review null) and until the update is confirmed.
   const [reviewing, setReviewing] = useState<{
     file: File
+    text: string
     /** The text drops the movie the chart has. */
     dropsMovie: boolean
     preview: ReplacementPreview | null
@@ -127,17 +155,11 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(0)
   const [saveError, setSaveError] = useState('')
-  const [jump, setJump] = useState<{ line: number; at: number } | null>(null)
   const requestKey = useRef(createRequestKey())
   const controller = useRef<AbortController | null>(null)
-  const dirty = text !== original
-
-  // The rendering follows the text after a short pause in typing.
-  useEffect(() => {
-    if (text === preview) return
-    const timer = setTimeout(() => setPreview(text), 300)
-    return () => clearTimeout(timer)
-  }, [text, preview])
+  const frame = useRef<HTMLIFrameElement>(null)
+  // The editor's save being answered.
+  const asking = useRef<number | null>(null)
 
   useEffect(() => {
     if (!dirty) return
@@ -147,31 +169,13 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
   }, [dirty])
   useEffect(() => () => controller.current?.abort(), [])
 
-  const blocks = useMemo(() => {
-    if (!preview) return { keys: [] as string[], error: '' }
-    try {
-      return { keys: Object.keys(parsePreviewTja(preview)), error: '' }
-    } catch (e) {
-      return { keys: [], error: e instanceof Error ? e.message : t('messages.failedToParseTja') }
-    }
-  }, [preview, t])
-  // Keep the chosen block while it exists; otherwise show the first one.
-  const shownCourse = blocks.keys.includes(course) ? course : (blocks.keys[0] ?? '')
-  const previewChart = useMemo(
-    () => ({
-      ...chart,
-      difficulties: blocks.keys.map(
-        (key) =>
-          chart.difficulties.find((d) => slotKey(d) === key) ?? {
-            course: baseCourse(key),
-            side: (key.endsWith('_1p') ? 'p1' : key.endsWith('_2p') ? 'p2' : 'single') as Side,
-            level: 0,
-            maker: '',
-          },
-      ),
-    }),
-    [chart, blocks.keys],
-  )
+  /** Tells the editor how its save went: stored, called off (no message) or refused. */
+  const answer = (saved: boolean, message?: string, line?: number) => {
+    const request = asking.current
+    if (request === null) return
+    asking.current = null
+    tellEditor(frame.current, { type: 'save-result', request, saved, message, line })
+  }
 
   // The site fields go back as the chart has them unless the review lets the new text change them.
   const proposal = (current: ChartBase): Proposal => ({
@@ -183,12 +187,12 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
     typedDemo: false,
   })
   const fail = (e: unknown) => {
-    setSaveError(e instanceof Error ? e.message : t('messages.requestFailed'))
-    const line = errorLine(e)
-    if (line) setJump({ line, at: Date.now() })
+    const message = e instanceof Error ? e.message : t('messages.requestFailed')
+    setSaveError(message)
+    answer(false, message, errorLine(e))
   }
-  const startReview = async () => {
-    if (!dirty || busy) return
+  const startReview = async (text: string) => {
+    if (busy) return
     setSaveError('')
     const abort = new AbortController()
     controller.current = abort
@@ -196,7 +200,7 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
     const file = new File([text], chart.tjaName, { type: 'text/plain;charset=utf-8' })
     // A stored movie stays while the text still declares BGMOVIE before its first #START.
     const dropsMovie = !!chart.movieHash && !/^\s*BGMOVIE\s*:\s*\S/m.test(text.split(/#START/i)[0])
-    setReviewing({ file, dropsMovie, preview: null, review: null })
+    setReviewing({ file, text, dropsMovie, preview: null, review: null })
     try {
       const preview = await previewReplacement(
         chart.id,
@@ -208,6 +212,7 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
       if (abort.signal.aborted) return
       setReviewing({
         file,
+        text,
         dropsMovie,
         preview,
         review: reviewReplacement(chart, preview, proposal(chart), false, {
@@ -218,11 +223,12 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
     } catch (e) {
       setReviewing(null)
       if (!abort.signal.aborted) fail(e)
+      else answer(false)
     }
   }
   const save = async (kept: Set<string>) => {
     if (!reviewing?.preview || busy) return
-    const { file, preview } = reviewing
+    const { file, text, preview } = reviewing
     setReviewing(null)
     setBusy(true)
     setProgress(0)
@@ -258,8 +264,8 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
       requestKey.current = createRequestKey()
       attempted.current = ''
       setChart(updated)
-      setOriginal(text)
       void chartWritten(updated.id, updated)
+      answer(true)
       notify(t('editor.saved'), 'success')
     } catch (e) {
       fail(e)
@@ -268,118 +274,87 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
     }
   }
 
+  const hear = (message: FromEditor) => {
+    switch (message.type) {
+      case 'ready':
+        // Again if the editor was loaded anew: the audio is copied, since sending moves it.
+        tellEditor(frame.current, {
+          type: 'open',
+          chart: {
+            id: chart.id,
+            name: chartText(chart, i18n.resolvedLanguage).title,
+            tjaName: chart.tjaName,
+            tja: source,
+            audioName: chart.audioName,
+            audio: audio ? audio.slice(0) : null,
+          },
+        })
+        break
+      case 'opened':
+        setOpened(true)
+        setOpenError('')
+        break
+      case 'open-failed':
+        setOpenError(message.message)
+        break
+      case 'save':
+        // One save at a time: a second while one is under way is turned away.
+        if (asking.current !== null || busy || reviewing) {
+          tellEditor(frame.current, { type: 'save-result', request: message.request, saved: false })
+          break
+        }
+        asking.current = message.request
+        void startReview(message.tja)
+        break
+      case 'dirty':
+        setDirty(message.dirty)
+        break
+      case 'leave':
+        navigate(`/charts/${chart.id}`)
+        break
+    }
+  }
+
   if (session.loading) return <p role="status">{t('messages.loadingAccount')}</p>
   const canManage = isChartOwner(chart, session.user?.id) || !!session.user?.isAdmin
   if (!canManage) return <Notice>{t('editor.onlyManagers')}</Notice>
   const title = chartText(chart, i18n.resolvedLanguage).title
-  const lines = text.length ? text.split('\n').length : 0
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 [&_p]:mt-2 [&_p]:text-sm [&_p]:text-muted-foreground">
-          <Link
-            to={`/charts/${chart.id}`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <CaretLeftIcon size={14} aria-hidden="true" />
-            {title}
-          </Link>
-          <h1 className="text-2xl font-extrabold sm:text-3xl">{t('editor.title')}</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground tabular-nums" role="status">
-            {dirty ? t('messages.unsavedChanges') : t('editor.lines', { count: lines })}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Link
+          to={`/charts/${chart.id}`}
+          className="inline-flex min-w-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <CaretLeftIcon size={14} aria-hidden="true" />
+          <span className="truncate">{title}</span>
+        </Link>
+        <h1 className="text-sm font-extrabold">{t('editor.title')}</h1>
+        {dirty && (
+          <span className="text-sm text-muted-foreground" role="status">
+            {t('messages.unsavedChanges')}
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            disabled={!dirty || busy}
-            onClick={() => setText(original)}
-          >
-            <ArrowCounterClockwiseIcon size={16} />
-            {t('editor.discard')}
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="default"
-            disabled={!dirty || busy || !!blocks.error}
-            onClick={() => void startReview()}
-          >
-            <FloppyDiskIcon size={16} />
-            {busy ? t('messages.saving') : t('editor.save')}
-          </Button>
-        </div>
+        )}
       </div>
       {busy && <Progress value={progress} aria-label={t('messages.saving')} />}
-      {saveError && (
+      {(saveError || openError) && (
         <Notice>
           <span className="inline-flex items-center gap-2">
             <WarningCircleIcon size={16} className="shrink-0" aria-hidden="true" />
-            {saveError}
+            {openError ? t('editor.openFailed', { message: openError }) : saveError}
           </span>
         </Notice>
       )}
-      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
-        <Card className="rounded-[28px] min-w-0 gap-3 overflow-hidden p-0">
-          <h2 className="px-5 pt-5 text-base font-extrabold sm:px-6">{t('editor.editorLabel')}</h2>
-          <Suspense
-            fallback={
-              <p className="px-5 pb-5 text-sm text-muted-foreground sm:px-6">
-                {t('editor.loadingEditor')}
-              </p>
-            }
+      <div className="relative">
+        <EditorFrame embed frameRef={frame} onMessage={hear} className="h-[calc(100svh-9rem)]" />
+        {!opened && !openError && (
+          <p
+            role="status"
+            className="absolute inset-0 flex items-center justify-center rounded-[28px] bg-card text-sm text-muted-foreground"
           >
-            <TjaEditor
-              value={text}
-              onChange={setText}
-              disabled={busy}
-              jumpToLine={jump}
-              onSave={() => {
-                if (dirty && !busy && !blocks.error && !reviewing) void startReview()
-              }}
-              ariaLabel={t('editor.editorLabel')}
-              className="h-[70svh] min-h-80 border-t text-sm"
-            />
-          </Suspense>
-        </Card>
-        <Card className="rounded-[28px] min-w-0 gap-4 p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base font-extrabold">{t('editor.previewHeading')}</h2>
-            {blocks.keys.length > 0 && (
-              <ChoiceSelect
-                label={t('editor.block')}
-                value={shownCourse}
-                onValueChange={setCourse}
-                items={blocks.keys.map((key) => ({
-                  value: key,
-                  label: blockName(key),
-                }))}
-              />
-            )}
-          </div>
-          {blocks.error ? (
-            <Notice>{blocks.error}</Notice>
-          ) : !shownCourse ? (
-            <p className="text-sm text-muted-foreground">{t('editor.noBlocks')}</p>
-          ) : (
-            <Suspense
-              fallback={
-                <p role="status" className="text-sm text-muted-foreground">
-                  {t('messages.loadingChartPreview')}
-                </p>
-              }
-            >
-              <ChartPreview
-                key={shownCourse}
-                chart={previewChart}
-                source={preview}
-                course={shownCourse}
-              />
-            </Suspense>
-          )}
-        </Card>
+            {t('editor.loading')}
+          </p>
+        )}
       </div>
       {reviewing && (
         <ReplacementReview
@@ -394,6 +369,7 @@ function ChartEditor({ loaded, source }: { loaded: ChartBase; source: string }) 
           onCancel={() => {
             controller.current?.abort()
             setReviewing(null)
+            answer(false)
           }}
           onConfirm={(kept) => void save(kept)}
         />
