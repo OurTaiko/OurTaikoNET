@@ -117,7 +117,7 @@ export function CommunityActivity() {
     <section
       aria-labelledby="activity-heading"
       data-testid="home-activity"
-      className="flex flex-col bg-card shadow-elev-1 rounded-[28px] min-w-0 h-[26rem] xl:h-auto xl:min-h-[23.5rem]"
+      className="flex flex-col bg-card shadow-elev-1 rounded-[28px] min-w-0 h-[26rem] xl:h-auto xl:min-h-[14rem] xl:flex-1"
     >
       <div className="flex justify-between items-center gap-3 pt-4 pr-3 pb-1 pl-6">
         <h2 id="activity-heading" className="font-extrabold text-xl tracking-tight">

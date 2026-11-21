@@ -75,6 +75,17 @@ The home page recommends a few playlists the site's administrator chose (`intern
 
 The website shows them under the newest charts (`web/src/players/components/featured-playlists.tsx`): one at a time, moving on by itself as the newest charts do (`carousel.tsx` is what both share), with every song of the one shown in a list that scrolls by itself, as the community's activity does, and, on a wide page, all the playlists beside it. It asks for the list, then each source once for its playlists, then the songs of the one shown (not of the others until they are shown). The administrator sets them at `/manage/featured` (`web/src/players/pages/featured.tsx`).
 
+## Announcements
+
+What the site's administrator has to tell every visitor (`internal/profile/httpapi/announcements.go`, migration `0014_announcements`, table `net.announcements`): a title of one line (1–80 characters) and a text written in Markdown (up to 4000 characters, empty when the title says it all), in whatever language the administrator writes. The server keeps the text as written; the website shows it as Markdown (`web/src/kit/markdown.tsx`: react-markdown with GitHub's tables, task lists and bare addresses as links, line ends kept, links opening in a tab of their own) and never runs HTML written in it. The title is plain text. Pinned ones are shown first, then the newest; editing one does not change when it was announced.
+
+- `GET /api/v1/announcements?page=1&pageSize=20` (public; `pageSize` 1–50) → `{"items": [{"id", "title", "body", "pinned", "publishedAt"}, …], "total", "page", "pageSize"}`, in the order shown. A page past the end has no items and the same `total`.
+- `POST /api/v1/admin/announcements {"title", "body", "pinned"}`, the site's administrator → 201 and the announcement, announced as of now.
+- `PUT /api/v1/admin/announcements/<id>` with the same body → the announcement as it now reads. `DELETE` of the same address → 204.
+- 422 `ANNOUNCEMENT_INVALID` (no title, one too long or of several lines, a text too long or with control characters other than line ends), 404 `ANNOUNCEMENT_NOT_FOUND`.
+
+The home page shows the first three titles beside the newest charts, over the community's activity (`web/src/players/components/announcements.tsx`); on a narrow page they come first. With none, or when they cannot be read, the corner is not there. Each title leads to its text on `/announcements` (`web/src/players/pages/announcements.tsx`), which lists them all; the Markdown parser is a part of its own that only these pages load. The administrator writes them at `/manage/announcements` (`web/src/players/pages/announcements-admin.tsx`), with the text as it will read shown under what is typed.
+
 ## Titles by rule
 
 A rule gives one item: a title, or a part of the 3D Don (see "Parts of the Don to earn"); everything below holds for both. A rule has `titleId`, or `donPart` and `donItem`; each kind of item says in `titlerules.target` how it is given, and nothing else in the package knows it. A rule for a part is made at `POST /api/v1/admin/don/items/{part}/{id}/rules` with the same body, and the part must be in the catalog.

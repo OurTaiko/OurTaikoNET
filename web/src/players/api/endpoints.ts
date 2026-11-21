@@ -23,6 +23,12 @@ export const endpoints = {
   // The playlists the home page recommends, and where its administrator sets them (PUT).
   featuredPlaylists: `${API_ROOT}/featured-playlists`,
   adminFeaturedPlaylists: `${API_ROOT}/admin/featured-playlists`,
+  // The site's announcements, a page at a time, and where its administrator writes them (POST
+  // a new one; PUT or DELETE one by its id).
+  announcements: (page: number, pageSize: number) =>
+    `${API_ROOT}/announcements?page=${page}&pageSize=${pageSize}`,
+  adminAnnouncements: `${API_ROOT}/admin/announcements`,
+  adminAnnouncement: (id: string) => `${API_ROOT}/admin/announcements/${encodeURIComponent(id)}`,
   myTitles: `${API_ROOT}/me/titles`,
   myTitle: (id: string) => `${API_ROOT}/me/titles/${encodeURIComponent(id)}`,
   user: (id: string) => `${API_ROOT}/users/${id}`,

@@ -25,6 +25,7 @@ import {
   ListIcon,
   MagnifyingGlassIcon,
   MedalIcon,
+  MegaphoneIcon,
   PencilRulerIcon,
   PlaylistIcon,
   ShieldStarIcon,
@@ -237,8 +238,8 @@ export function Frame({ children }: { children: ReactNode }) {
       ]
     : []
   // What only those who manage the site see, under /manage/: the title catalog for its
-  // managers; players' user groups, the playlists the home page recommends and the visit count
-  // for the site's administrator.
+  // managers; players' user groups, the playlists the home page recommends, the announcements
+  // and the visit count for the site's administrator.
   const manage: Item[] = user
     ? [
         ...(roles.titleManager
@@ -264,6 +265,12 @@ export function Frame({ children }: { children: ReactNode }) {
                 href: '/manage/featured',
                 label: t('shell.featured'),
                 icon: StarIcon,
+              },
+              {
+                key: 'announcements',
+                href: '/manage/announcements',
+                label: t('shell.announcements'),
+                icon: MegaphoneIcon,
               },
               {
                 key: 'visits',

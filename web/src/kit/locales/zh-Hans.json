@@ -1008,6 +1008,7 @@
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     },
     "featured": "首页推荐",
+    "announcements": "公告管理",
     "editor": "OurTaikoEdit"
   },
   "chat": {
@@ -1051,7 +1052,8 @@
     "playlists": "玩家整理的太鼓谱面歌单，以及系统歌单。",
     "dans": "官方与社区制作的段位道场，可以在游戏中挑战。",
     "register": "注册",
-    "editor": "在浏览器里使用谱面编辑器 OurTaikoEdit：项目保存在这个浏览器里。"
+    "editor": "在浏览器里使用谱面编辑器 OurTaikoEdit：项目保存在这个浏览器里。",
+    "announcements": "OurTaikoNET 的站点公告：维护通知、活动与更新。"
   },
   "rewards": {
     "heading": "获得了新奖励",

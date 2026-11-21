@@ -52,14 +52,15 @@
     "thanks": "謝辞",
     "thanksPrefix": "Special Thanks：",
     "featured": "おすすめプレイリスト",
-    "featuredBy": "管理者が選びました",
     "openPlaylist": "プレイリストを見る",
     "previousPlaylist": "前のプレイリスト",
     "nextPlaylist": "次のプレイリスト",
     "pausePlaylists": "切り替えを止める",
     "resumePlaylists": "切り替えを再開",
     "playlistOf": "{{total}} 件中 {{n}} 件目：{{title}}",
-    "playlistSongs": "プレイリストの曲"
+    "playlistSongs": "プレイリストの曲",
+    "announcements": "お知らせ",
+    "allAnnouncements": "すべて"
   },
   "profile": {
     "unknownPlayer": "プレイヤー",
@@ -242,7 +243,9 @@
     "TITLE_OFFICIAL": "公式称号を削除できるのは管理者だけです。",
     "TITLE_CHANGED": "この称号は管理者によって変更されました。ページを再読み込みしてやり直してください。",
     "FEATURED_INVALID": "このリストは保存できません。件数、ひとことの長さ、またはプレイリストに誤りがあります。",
-    "FEATURED_PLAYLIST_UNAVAILABLE": "削除された、または非公開になったプレイリストがあります。外してからもう一度保存してください。"
+    "FEATURED_PLAYLIST_UNAVAILABLE": "削除された、または非公開になったプレイリストがあります。外してからもう一度保存してください。",
+    "ANNOUNCEMENT_INVALID": "お知らせを保存できません：タイトルは 1〜80 文字で改行なし、本文は 4000 文字までです。",
+    "ANNOUNCEMENT_NOT_FOUND": "このお知らせはもうありません。"
   },
   "visits": {
     "heading": "アクセス統計",
@@ -303,6 +306,31 @@
     "add": "追加",
     "added": "追加済み",
     "full": "{{max}} 件すべて選択済みです。追加するには 1 件外してください。"
+  },
+  "announcements": {
+    "heading": "お知らせ",
+    "pinned": "固定",
+    "none": "お知らせはまだありません。",
+    "pages": "お知らせのページ送り",
+    "manage": "お知らせを管理",
+    "adminHeading": "お知らせ管理",
+    "adminIntro": "お知らせはホームの右上（最新 3 件）とお知らせページに表示されます。固定したものが先頭、ほかは新しい順です。本文は Markdown で書けます：見出し、リスト、リンク、画像、表、コードが使え、URL は自動でリンクになります。",
+    "newHeading": "お知らせを掲載",
+    "editHeading": "お知らせを編集",
+    "title": "タイトル（{{max}} 文字まで）",
+    "body": "本文（任意、Markdown 対応、{{max}} 文字まで）",
+    "preview": "プレビュー",
+    "pin": "先頭に固定",
+    "publish": "掲載",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "edit": "編集",
+    "delete": "削除",
+    "listHeading": "掲載中 {{n}} 件",
+    "published": "お知らせを掲載しました。",
+    "saved": "お知らせを保存しました。",
+    "deleted": "お知らせを削除しました。",
+    "confirmDelete": "お知らせ「{{title}}」を削除しますか？"
   },
   "don": {
     "motion": "モーション",

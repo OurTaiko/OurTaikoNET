@@ -272,12 +272,9 @@ export function FeaturedPlaylists() {
   if (!items.length || (!count && !named.loading)) return null
   return (
     <section aria-labelledby="featured-heading" data-testid="home-featured" className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id="featured-heading" className="font-extrabold text-xl tracking-tight">
-          {t('home.featured')}
-        </h2>
-        <p className="text-muted-foreground text-sm">{t('home.featuredBy')}</p>
-      </div>
+      <h2 id="featured-heading" className="font-extrabold text-xl tracking-tight">
+        {t('home.featured')}
+      </h2>
       {count === 0 ? (
         <Skeleton className="rounded-[28px] w-full h-[14rem] sm:h-[23.25rem]" />
       ) : (

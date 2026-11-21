@@ -178,3 +178,15 @@ export type VisitReport = {
 // administrator's line about it, empty for none.
 export type FeaturedPlaylist = { source: string; playlistId: string; note: string }
 export type FeaturedPlaylists = { items: FeaturedPlaylist[]; max: number }
+
+// What the site's administrator has to tell every visitor: a title and a text of plain lines
+// (empty when the title says it all). Pinned ones are shown first, then the newest.
+export type Announcement = {
+  id: string
+  title: string
+  body: string
+  pinned: boolean
+  publishedAt: string
+}
+/** What the administrator writes of one. */
+export type AnnouncementDraft = Pick<Announcement, 'title' | 'body' | 'pinned'>
