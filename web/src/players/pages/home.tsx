@@ -5,6 +5,7 @@ import type { ChartBase } from '@sitekit/api/types'
 import type { SourceId } from '@sitekit/source'
 import { newestOf } from '@players/newest'
 import { Notice } from '@players/notice'
+import { Announcements } from '@players/components/announcements'
 import { CommunityActivity } from '@players/components/community-activity'
 import { FeaturedPlaylists } from '@players/components/featured-playlists'
 import { Friends } from '@players/components/friends'
@@ -48,7 +49,12 @@ export function HomePage() {
           loading={loading}
           failed={sources.every((source) => libraries[source] === 'failed')}
         />
-        <CommunityActivity />
+        {/* Beside the newest charts on a wide page, the announcements over the activity; on a
+            narrow one each is a row of its own and the announcements come first. */}
+        <div className="xl:flex xl:flex-col xl:gap-4 contents min-w-0 xl:min-h-[23.5rem]">
+          <Announcements className="order-first xl:order-none" />
+          <CommunityActivity />
+        </div>
       </div>
       <FeaturedPlaylists />
       <Friends />

@@ -1019,6 +1019,7 @@
       "notice": "A player community project, not affiliated with Bandai Namco Entertainment. Taiko no Tatsujin and related material belong to their owners."
     },
     "featured": "Home picks",
+    "announcements": "Announcements",
     "editor": "OurTaikoEdit"
   },
   "chat": {
@@ -1063,7 +1064,8 @@
     "playlists": "Taiko playlists put together by players, and the site’s own.",
     "dans": "Dan courses by the site and the community, to take on in the game.",
     "register": "Create an account",
-    "editor": "OurTaikoEdit, the chart editor, in the browser: your projects stay in this browser."
+    "editor": "OurTaikoEdit, the chart editor, in the browser: your projects stay in this browser.",
+    "announcements": "Announcements of OurTaikoNET: maintenance, events and updates."
   },
   "rewards": {
     "heading": "You got something new",

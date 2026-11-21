@@ -12,6 +12,7 @@ import { api } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
 import type {
   Activity,
+  Announcement,
   Dans,
   FeaturedPlaylists,
   Group,
@@ -57,6 +58,9 @@ export const playerKeys = {
   titles: () => [...playerKeys.all(), 'titles'] as const,
   activity: () => [...playerKeys.all(), 'activity'] as const,
   featured: () => [...playerKeys.all(), 'featured'] as const,
+  announcements: () => [...playerKeys.all(), 'announcements'] as const,
+  announcementPage: (page: number, pageSize: number) =>
+    [...playerKeys.announcements(), page, pageSize] as const,
   manage: () => [...playerKeys.all(), 'manage'] as const,
   groups: () => [...playerKeys.manage(), 'groups'] as const,
   members: () => [...playerKeys.manage(), 'members'] as const,
@@ -135,6 +139,13 @@ export const playerQueries = {
     queryOptions({
       queryKey: playerKeys.featured(),
       queryFn: ({ signal }) => api<FeaturedPlaylists>(endpoints.featuredPlaylists, { signal }),
+    }),
+  /** The site's announcements, pinned ones first and then the newest, a page at a time. */
+  announcements: (page: number, pageSize: number) =>
+    queryOptions({
+      queryKey: playerKeys.announcementPage(page, pageSize),
+      queryFn: ({ signal }) =>
+        api<Page<Announcement>>(endpoints.announcements(page, pageSize), { signal }),
     }),
   /** The public ones of a source's playlists named, in the order named, without their songs. */
   playlistsNamed: (source: SourceId, ids: string[]) =>

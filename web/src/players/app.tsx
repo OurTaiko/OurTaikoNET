@@ -1,5 +1,5 @@
 // The pages that belong to no song source: home, players (their scores on both sources, titles,
-// 段位 badges and nameplate), the title catalog, messages (chats with other players and the
+// 段位 badges and nameplate), the title catalog, the site's announcements, messages (chats with other players and the
 // site's notices), and for the site's administrator the manage panel.
 import type { ReactNode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
@@ -17,6 +17,8 @@ import { HomePage } from './pages/home'
 import { UserPage } from './pages/user'
 import { TitlesPage } from './pages/titles'
 import { AdminPage } from './pages/admin'
+import { AnnouncementsPage } from './pages/announcements'
+import { AnnouncementsAdminPage } from './pages/announcements-admin'
 import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
 import { VisitsPage } from './pages/visits'
@@ -90,6 +92,18 @@ function App() {
                 }
               />
               <Route
+                path="announcements"
+                element={
+                  <>
+                    <PageMeta
+                      title={t('announcements.heading')}
+                      description={t('meta.announcements')}
+                    />
+                    <AnnouncementsPage />
+                  </>
+                }
+              />
+              <Route
                 path="chats"
                 element={
                   <Private title={t('chat.title')}>
@@ -130,6 +144,14 @@ function App() {
                   element={
                     <Private title={t('featured.heading')}>
                       <FeaturedPage />
+                    </Private>
+                  }
+                />
+                <Route
+                  path="announcements"
+                  element={
+                    <Private title={t('announcements.adminHeading')}>
+                      <AnnouncementsAdminPage />
                     </Private>
                   }
                 />

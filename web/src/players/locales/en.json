@@ -52,14 +52,15 @@
     "thanks": "Credits",
     "thanksPrefix": "Special thanks:",
     "featured": "Recommended playlists",
-    "featuredBy": "Picked by the administrators",
     "openPlaylist": "Open playlist",
     "previousPlaylist": "Previous playlist",
     "nextPlaylist": "Next playlist",
     "pausePlaylists": "Pause",
     "resumePlaylists": "Resume",
     "playlistOf": "{{n}} of {{total}}: {{title}}",
-    "playlistSongs": "Songs of the playlist"
+    "playlistSongs": "Songs of the playlist",
+    "announcements": "Announcements",
+    "allAnnouncements": "All"
   },
   "profile": {
     "unknownPlayer": "Player",
@@ -242,7 +243,9 @@
     "TITLE_OFFICIAL": "Only administrators can delete an official title.",
     "TITLE_CHANGED": "An administrator just changed this title. Reload the page and try again.",
     "FEATURED_INVALID": "The list cannot be saved: too many playlists, a line too long, or a playlist that is none.",
-    "FEATURED_PLAYLIST_UNAVAILABLE": "A playlist is gone or no longer public. Remove it and save again."
+    "FEATURED_PLAYLIST_UNAVAILABLE": "A playlist is gone or no longer public. Remove it and save again.",
+    "ANNOUNCEMENT_INVALID": "The announcement cannot be kept: a title of 1 to 80 characters on one line, and a text of at most 4000 characters.",
+    "ANNOUNCEMENT_NOT_FOUND": "That announcement no longer exists."
   },
   "visits": {
     "heading": "Visits",
@@ -303,6 +306,30 @@
     "add": "Add",
     "added": "Added",
     "full": "All {{max}} are chosen; remove one to add another."
+  },
+  "announcements": {
+    "heading": "Announcements",
+    "pinned": "Pinned",
+    "none": "Nothing has been announced yet.",
+    "pages": "Pages of announcements",
+    "manage": "Manage announcements",
+    "adminHeading": "Announcements",
+    "adminIntro": "Announcements are shown at the top right of the home page (the first 3) and on the announcements page: pinned ones first, then the newest. The text is plain text; web addresses become links.",
+    "newHeading": "New announcement",
+    "editHeading": "Edit announcement",
+    "title": "Title (up to {{max}} characters)",
+    "body": "Text (optional, up to {{max}} characters)",
+    "pin": "Pin to the top",
+    "publish": "Publish",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "listHeading": "{{n}} published",
+    "published": "Announcement published.",
+    "saved": "Announcement saved.",
+    "deleted": "Announcement deleted.",
+    "confirmDelete": "Delete the announcement \"{{title}}\"?"
   },
   "don": {
     "motion": "Motion",

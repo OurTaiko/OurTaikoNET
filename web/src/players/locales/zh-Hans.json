@@ -52,14 +52,15 @@
     "thanks": "鸣谢",
     "thanksPrefix": "Special Thanks：",
     "featured": "推荐歌单",
-    "featuredBy": "管理员为你挑选",
     "openPlaylist": "查看歌单",
     "previousPlaylist": "上一个歌单",
     "nextPlaylist": "下一个歌单",
     "pausePlaylists": "暂停轮换",
     "resumePlaylists": "继续轮换",
     "playlistOf": "第 {{n}} 个，共 {{total}} 个：{{title}}",
-    "playlistSongs": "歌单里的歌曲"
+    "playlistSongs": "歌单里的歌曲",
+    "announcements": "公告",
+    "allAnnouncements": "全部"
   },
   "profile": {
     "unknownPlayer": "玩家",
@@ -242,7 +243,9 @@
     "TITLE_OFFICIAL": "官方称号只有管理员可以删除。",
     "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。",
     "FEATURED_INVALID": "推荐歌单列表无效：数量、推荐语长度或歌单有误。",
-    "FEATURED_PLAYLIST_UNAVAILABLE": "有歌单已不存在或不再公开，请移除后再保存。"
+    "FEATURED_PLAYLIST_UNAVAILABLE": "有歌单已不存在或不再公开，请移除后再保存。",
+    "ANNOUNCEMENT_INVALID": "公告无效：标题需要 1–80 个字符且不能换行，正文不能超过 4000 个字符。",
+    "ANNOUNCEMENT_NOT_FOUND": "公告已不存在。"
   },
   "visits": {
     "heading": "访问统计",
@@ -303,6 +306,30 @@
     "add": "添加",
     "added": "已添加",
     "full": "已选满 {{max}} 个，移除一个后才能再添加。"
+  },
+  "announcements": {
+    "heading": "公告",
+    "pinned": "置顶",
+    "none": "还没有公告。",
+    "pages": "公告翻页",
+    "manage": "管理公告",
+    "adminHeading": "公告管理",
+    "adminIntro": "公告显示在首页右上角（最新 3 条）和公告页；置顶的排在最前，其余按发布时间从新到旧。正文是纯文本，网址会自动变成链接。",
+    "newHeading": "发布公告",
+    "editHeading": "修改公告",
+    "title": "标题（{{max}} 字以内）",
+    "body": "正文（选填，{{max}} 字以内）",
+    "pin": "置顶",
+    "publish": "发布",
+    "save": "保存",
+    "cancel": "取消",
+    "edit": "修改",
+    "delete": "删除",
+    "listHeading": "已发布 {{n}} 条",
+    "published": "公告已发布。",
+    "saved": "公告已保存。",
+    "deleted": "公告已删除。",
+    "confirmDelete": "删除公告「{{title}}」？"
   },
   "don": {
     "motion": "动作",
