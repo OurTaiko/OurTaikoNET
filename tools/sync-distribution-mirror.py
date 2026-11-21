@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify and publish current art and web-player builds; never delete old objects."""
+"""Verify and publish current art, web-player and OurTaikoEdit web builds; never delete old objects."""
 import argparse
 from datetime import datetime, timezone
 import fcntl
@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--credentials', default='/root/.ossutilconfig')
     parser.add_argument('--scratch', type=Path, required=True)
     parser.add_argument('--state', type=Path)
-    parser.add_argument('--collections', nargs='+', choices=['3dchara', 'nameplate', 'player'], default=['3dchara', 'nameplate', 'player'])
+    parser.add_argument('--collections', nargs='+', choices=['3dchara', 'nameplate', 'player', 'edit'], default=['3dchara', 'nameplate', 'player', 'edit'])
     args = parser.parse_args()
     args.scratch.mkdir(parents=True, exist_ok=True)
     with (args.scratch / 'sync.lock').open('w') as lock:

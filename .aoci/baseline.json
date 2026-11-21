@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-20T23:58:04Z",
+  "updated_at": "2026-11-21T07:59:38Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "e7bde84a7a33d25c59a8d40ee457ca531934fdd7c92211041058e9514b24f2ff",
-      "size": 180838,
-      "normalized_sha256": "e7bde84a7a33d25c59a8d40ee457ca531934fdd7c92211041058e9514b24f2ff"
+      "sha256": "a2e7d62fc4f09cea15add1d6d6d7f531dbb179f7e563c8f3d4fcbfc1361107f5",
+      "size": 181060,
+      "normalized_sha256": "a2e7d62fc4f09cea15add1d6d6d7f531dbb179f7e563c8f3d4fcbfc1361107f5"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -315,9 +315,9 @@
     },
     "deploy/aliyun-mirror.md": {
       "role": "index",
-      "sha256": "3753141d671683a74ab12da6fdf8043c19d03b9893302effd8f150766910d9b7",
-      "size": 10883,
-      "normalized_sha256": "3753141d671683a74ab12da6fdf8043c19d03b9893302effd8f150766910d9b7"
+      "sha256": "2a618ebb1c6398c4ac35a073a88b11eeecc70d9729121f67974f8f17c363d858",
+      "size": 11106,
+      "normalized_sha256": "2a618ebb1c6398c4ac35a073a88b11eeecc70d9729121f67974f8f17c363d858"
     },
     "deploy/api.env.example": {
       "role": "index",
@@ -2469,15 +2469,15 @@
     },
     "tools/distribution_mirror/catalogs.py": {
       "role": "index",
-      "sha256": "95f0b69f31981abef130bfeb873dd15008f90848da2edfee21d6c4b5054303de",
-      "size": 2135,
-      "normalized_sha256": "95f0b69f31981abef130bfeb873dd15008f90848da2edfee21d6c4b5054303de"
+      "sha256": "3f5eec45b594144e234a00898d2d47f576f20d685f41ac921ff22712e5551c82",
+      "size": 2566,
+      "normalized_sha256": "3f5eec45b594144e234a00898d2d47f576f20d685f41ac921ff22712e5551c82"
     },
     "tools/distribution_mirror/publisher.py": {
       "role": "index",
-      "sha256": "795ba7b5d0a300bf20763f248a79e24ed805e0fd2e3efa8beddf7a39e42fe712",
-      "size": 7789,
-      "normalized_sha256": "795ba7b5d0a300bf20763f248a79e24ed805e0fd2e3efa8beddf7a39e42fe712"
+      "sha256": "741416b15342dc25a85f345ad36fa752939779c3098b5388fc93f39f9d38e6a1",
+      "size": 7799,
+      "normalized_sha256": "741416b15342dc25a85f345ad36fa752939779c3098b5388fc93f39f9d38e6a1"
     },
     "tools/distribution_mirror/requirements.txt": {
       "role": "index",
@@ -2525,15 +2525,15 @@
     },
     "tools/sync-distribution-mirror.py": {
       "role": "index",
-      "sha256": "f7a9f9165b3d16b495cc04759bb1eb8d0c9698f7b9cc70b586f8aa73254a5e7a",
-      "size": 1645,
-      "normalized_sha256": "f7a9f9165b3d16b495cc04759bb1eb8d0c9698f7b9cc70b586f8aa73254a5e7a"
+      "sha256": "81bc5516439539cfae19fe3c69a2876c94713c440413753be60f75645fe6dc17",
+      "size": 1679,
+      "normalized_sha256": "81bc5516439539cfae19fe3c69a2876c94713c440413753be60f75645fe6dc17"
     },
     "tools/test_distribution_mirror.py": {
       "role": "observe",
-      "sha256": "38999959d2b37af0092b969e36306a11a344132c001de87589296887b3a01b92",
-      "size": 7475,
-      "normalized_sha256": "38999959d2b37af0092b969e36306a11a344132c001de87589296887b3a01b92"
+      "sha256": "ad68a539643a47c4de0cb94402d706eb98611aeefd8917541d3c24498dda9674",
+      "size": 8639,
+      "normalized_sha256": "ad68a539643a47c4de0cb94402d706eb98611aeefd8917541d3c24498dda9674"
     },
     "web/.gitignore": {
       "role": "index",
