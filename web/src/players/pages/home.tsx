@@ -5,6 +5,7 @@ import type { ChartBase } from '@sitekit/api/types'
 import type { SourceId } from '@sitekit/source'
 import { newestOf } from '@players/newest'
 import { Notice } from '@players/notice'
+import { AnnouncementDialog } from '@players/components/announcement-dialog'
 import { Announcements } from '@players/components/announcements'
 import { CommunityActivity } from '@players/components/community-activity'
 import { FeaturedPlaylists } from '@players/components/featured-playlists'
@@ -58,6 +59,7 @@ export function HomePage() {
       </div>
       <FeaturedPlaylists />
       <Friends />
+      <AnnouncementDialog />
     </div>
   )
 }

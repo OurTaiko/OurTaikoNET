@@ -500,6 +500,7 @@
     "viewParent": "View parent comment",
     "commentPlaceholder": "What do you think of this chart?",
     "danCommentPlaceholder": "What do you think of this dan course?",
+    "announcementCommentPlaceholder": "What do you think of this announcement?",
     "comment": "Comment",
     "signInToComment": "Sign in to comment and vote.",
     "loadingComments": "Loading comments…",

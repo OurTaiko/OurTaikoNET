@@ -310,6 +310,7 @@
   "announcements": {
     "heading": "公告",
     "pinned": "置顶",
+    "comments": "评论数",
     "none": "还没有公告。",
     "pages": "公告翻页",
     "manage": "管理公告",

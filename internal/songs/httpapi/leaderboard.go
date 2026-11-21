@@ -37,7 +37,7 @@ func (s *Server) leaderboard(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	page, ok := queryPage(w, r)
+	page, ok := answers.Page(w, r)
 	if !ok {
 		return
 	}

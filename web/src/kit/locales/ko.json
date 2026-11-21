@@ -498,6 +498,7 @@
     "viewParent": "상위 댓글 보기",
     "commentPlaceholder": "이 채보에 대한 생각을 남겨 주세요…",
     "danCommentPlaceholder": "이 단위에 대한 생각을 남겨 주세요…",
+    "announcementCommentPlaceholder": "이 공지에 대한 생각을 남겨 주세요…",
     "comment": "댓글 달기",
     "signInToComment": "로그인하면 댓글과 투표를 할 수 있습니다.",
     "loadingComments": "댓글을 불러오는 중…",

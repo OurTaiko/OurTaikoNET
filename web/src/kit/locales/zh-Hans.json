@@ -498,6 +498,7 @@
     "viewParent": "查看上级评论",
     "commentPlaceholder": "说说你对这首谱面的看法…",
     "danCommentPlaceholder": "说说你对这个段位的看法…",
+    "announcementCommentPlaceholder": "说说你对这条公告的看法…",
     "comment": "发表评论",
     "signInToComment": "登录后即可评论和投票。",
     "loadingComments": "正在加载评论…",

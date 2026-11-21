@@ -1,51 +1,25 @@
 package httpapi
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/comments"
 	"ourtaiko.dev/net/internal/web"
 )
 
 // Votes on charts, 段位 courses and comments: an upvote (1) or a 何意味 "what?" (-1), which the
 // API and the tables still call a downvote. The website shows the two counts side by side.
-type voteRequest struct {
-	Value *int `json:"value"`
-}
-
 // VoteResult is the target's tally after the viewer's vote was applied.
-type VoteResult struct {
-	Score     int `json:"score"`
-	Upvotes   int `json:"upvotes"`
-	Downvotes int `json:"downvotes"`
-	MyVote    int `json:"myVote"`
-}
+type VoteResult = comments.VoteResult
 
 func readVote(w http.ResponseWriter, r *http.Request) (int, bool) {
-	var body voteRequest
-	if !decode(w, r, &body) {
-		return 0, false
-	}
-	if body.Value == nil || *body.Value < -1 || *body.Value > 1 {
-		problem(w, 400, "VOTE_INVALID", "投票值必须为 1、0 或 -1")
-		return 0, false
-	}
-	return *body.Value, true
+	return comments.ReadVote(answers, w, r)
 }
 
 // applyVote sets, changes or withdraws (value 0) one user's vote on a row.
-func applyVote(ctx context.Context, tx pgx.Tx, table, column string, target any, user string, value int) error {
-	var e error
-	if value == 0 {
-		_, e = tx.Exec(ctx, `DELETE FROM `+table+` WHERE `+column+`=$1 AND user_id=$2`, target, user)
-	} else {
-		_, e = tx.Exec(ctx, `INSERT INTO `+table+`(`+column+`,user_id,value) VALUES($1,$2,$3)
-		 ON CONFLICT(`+column+`,user_id) DO UPDATE SET value=EXCLUDED.value,voted_at=now() WHERE `+table+`.value<>EXCLUDED.value`, target, user, value)
-	}
-	return e
-}
+var applyVote = comments.ApplyVote
 
 func (s *Server) voteChart(w http.ResponseWriter, r *http.Request) {
 	s.voteSubject(w, r, chartSubject)
@@ -118,51 +92,6 @@ func (s *Server) voteSubject(w http.ResponseWriter, r *http.Request, load subjec
 				break
 			}
 		}
-	}
-	if e == nil {
-		e = tx.Commit(ctx)
-	}
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	result.Score = result.Upvotes - result.Downvotes
-	web.Respond(w, 200, result)
-}
-
-func (s *Server) voteComment(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.required(w, r, true)
-	if !ok {
-		return
-	}
-	value, ok := readVote(w, r)
-	if !ok {
-		return
-	}
-	ctx := r.Context()
-	tx, e := s.DB.Begin(ctx)
-	if e != nil {
-		internal(w, e)
-		return
-	}
-	defer tx.Rollback(ctx)
-	c, ok := lockComment(w, r, tx, "FOR UPDATE OF m")
-	if !ok {
-		return
-	}
-	// Withdrawing a vote stays possible after a comment was deleted.
-	if value != 0 && c.gone {
-		problem(w, 409, "COMMENT_DELETED", "评论已删除")
-		return
-	}
-	if e = applyVote(ctx, tx, "comment_votes", "comment_id", c.id, u.User.ID, value); e != nil {
-		internal(w, e)
-		return
-	}
-	result := VoteResult{MyVote: value}
-	e = tx.QueryRow(ctx, `SELECT upvotes,downvotes FROM comments WHERE id=$1`, c.id).Scan(&result.Upvotes, &result.Downvotes)
-	if e == nil && value == 1 && c.authorID != u.User.ID {
-		e = notifyUpvoteMilestone(ctx, tx, "comment_upvotes", c.authorID, Notice{ChartID: c.chartID, DanID: c.danID, CommentID: c.id}, result.Upvotes)
 	}
 	if e == nil {
 		e = tx.Commit(ctx)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -50,4 +51,18 @@ func (p Problems) DecodeLimit(w http.ResponseWriter, r *http.Request, v any, lim
 		return false
 	}
 	return true
+}
+
+// Page reads ?page=, 1 when there is none. It reports false after answering.
+func (p Problems) Page(w http.ResponseWriter, r *http.Request) (int, bool) {
+	raw := r.URL.Query().Get("page")
+	if raw == "" {
+		return 1, true
+	}
+	page, err := strconv.Atoi(raw)
+	if err != nil || page < 1 || page > 10000 {
+		p.Problem(w, 400, "QUERY_INVALID", "页码需要为 1–10000 的整数")
+		return 0, false
+	}
+	return page, true
 }

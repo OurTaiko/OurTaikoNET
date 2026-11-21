@@ -27,6 +27,13 @@ export const endpoints = {
   // a new one; PUT or DELETE one by its id).
   announcements: (page: number, pageSize: number) =>
     `${API_ROOT}/announcements?page=${page}&pageSize=${pageSize}`,
+  announcement: (id: string) => `${API_ROOT}/announcements/${encodeURIComponent(id)}`,
+  // The comments under one, and one of the site's comments by its id: itself (GET with an
+  // order for its thread, PATCH, DELETE) and the viewer's vote on it.
+  announcementComments: (id: string) =>
+    `${API_ROOT}/announcements/${encodeURIComponent(id)}/comments`,
+  comment: (id: string) => `${API_ROOT}/comments/${encodeURIComponent(id)}`,
+  commentVote: (id: string) => `${API_ROOT}/comments/${encodeURIComponent(id)}/vote`,
   adminAnnouncements: `${API_ROOT}/admin/announcements`,
   adminAnnouncement: (id: string) => `${API_ROOT}/admin/announcements/${encodeURIComponent(id)}`,
   myTitles: `${API_ROOT}/me/titles`,

@@ -1,36 +1,37 @@
-// The comments under a chart or a 段位 course, page after page, or the one thread a permalink
-// shows. The subject's addresses are taken when it is made, on a page of its source: by the time a
-// later page is asked for the visitor may be in another area.
+// The comments under a chart, a 段位 course or an announcement, page after page, or the one
+// thread a permalink shows. The subject's addresses are taken when it is made, on a page of its
+// host: by the time a later page is asked for the visitor may be in another area.
 import { infiniteQueryOptions, type InfiniteData } from '@tanstack/react-query'
 import { api } from '../api/client'
-import { endpoints } from '../api/endpoints'
 import type { CommentPage, CommentSort, CommentThread } from '../api/types'
 import { queryClient } from '../query/client'
-import { SOURCE } from '../source'
 
 export type CommentsRead = Pick<CommentPage, 'items' | 'total'>
 export type CommentPages = InfiniteData<CommentsRead, number>
 
+/** What of a subject says where its comments are kept and read. */
+type Read = {
+  host: string
+  path: string
+  comments: (query: { sort: string; page: number }) => string
+  commentThread: (commentId: string, sort: string) => string
+}
+
 export const commentKeys = {
-  all: () => [SOURCE, 'comments'] as const,
-  // The subject's identity is its path; its callbacks are rebuilt each render.
-  subject: (path: string) => [...commentKeys.all(), path] as const,
-  section: (path: string, focusId: string, sort: CommentSort) =>
-    [...commentKeys.subject(path), focusId, sort] as const,
+  // The subject's identity is its host and its path; its callbacks are rebuilt each render.
+  subject: ({ host, path }: Pick<Read, 'host' | 'path'>) => [host, 'comments', path] as const,
+  section: (subject: Pick<Read, 'host' | 'path'>, focusId: string, sort: CommentSort) =>
+    [...commentKeys.subject(subject), focusId, sort] as const,
 }
 
 export const commentQueries = {
   /** Another order keeps the comments on show until it comes; another subject or thread does not. */
-  section: (
-    subject: { path: string; comments: (query: { sort: string; page: number }) => string },
-    focusId: string | undefined,
-    sort: CommentSort,
-  ) => {
+  section: (subject: Read, focusId: string | undefined, sort: CommentSort) => {
     const { path } = subject
     const focus = focusId ?? ''
-    const thread = focusId ? endpoints.commentThread(focusId, sort) : ''
+    const thread = focusId ? subject.commentThread(focusId, sort) : ''
     return infiniteQueryOptions({
-      queryKey: commentKeys.section(path, focus, sort),
+      queryKey: commentKeys.section(subject, focus, sort),
       queryFn: ({ pageParam, signal }): Promise<CommentsRead> =>
         thread
           ? api<CommentThread>(thread, { signal }).then((r) => ({ items: [r.item], total: 1 }))
@@ -47,5 +48,5 @@ export const commentQueries = {
 }
 
 /** After a comment changed: the subject's other orders are out of date, and asked again when shown. */
-export const invalidateSubjectComments = (path: string) =>
-  queryClient.invalidateQueries({ queryKey: commentKeys.subject(path), refetchType: 'none' })
+export const invalidateSubjectComments = (subject: Pick<Read, 'host' | 'path'>) =>
+  queryClient.invalidateQueries({ queryKey: commentKeys.subject(subject), refetchType: 'none' })
