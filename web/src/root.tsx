@@ -12,6 +12,7 @@ import { I18nextProvider } from 'react-i18next'
 import { IconContext } from '@phosphor-icons/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { applyTone } from '@sitekit/accent'
+import { applyFont } from '@sitekit/font'
 import { i18n, setAreaCatalogues, type Language } from '@sitekit/i18n'
 import { moveInArea, setVisitor } from '@sitekit/navigation'
 import { queryClient } from '@sitekit/query/client'
@@ -167,6 +168,8 @@ export function start() {
   })
   document.addEventListener('click', followLink)
   setVisitor((address, replace) => void go(address, replace ? 'replace' : 'push'))
+  // Not awaited: the page is shown in the bundled font until the chosen one has arrived.
+  void applyFont()
   createRoot(document.getElementById('root')!).render(<Root />)
   void go(location.pathname + location.search + location.hash, 'arrive')
 }

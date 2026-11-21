@@ -165,6 +165,10 @@ nameplate catalogs' `mirrorBaseUrl`. A moved song file carries `fallbackUrl`, an
 keeps the canonical address. No API route reads a cover (`PUT`/`DELETE` remain). See [regional deployment](deploy/README.md#regional-resource-mirror-rollout)
 and [OSS/ESA policy](deploy/aliyun-mirror.md) for configuration, lazy back-to-origin and rollout.
 
+## Built-in fonts
+
+The website's settings sheet offers, besides the bundled default (Roboto Flex, then the system's CJK fonts), the built-in fonts listed in `web/src/kit/font.ts`. They live in the public bucket under `fonts/<font>/<version>/` (`fonts/misans/4.003/MiSans-VF.ttf`, `fonts/noto-sans-sc/a85815a/NotoSansSC-VF.ttf`, the latter shared with OurTaikoEdit's web version), stored Brotli-compressed (`Content-Type: font/ttf`, `Content-Encoding: br`, `Cache-Control: public,max-age=31536000,immutable`, metadata `sha256` of the stored bytes) and never replaced in place: a new version goes in a new folder and the list in `font.ts` changes with it. A chosen font is fetched from the visitor's root (the mirror for mainland visitors, then the canonical root) without holding up the page, read with `FontFace`, and put first in the site's font stack (`--font-chosen` in `styles.css`) once it has arrived; the choice is kept in the browser (`ourtaiko-net-font`). Chart pictures drawn by TJARenderer keep their own font stack.
+
 ## The chart editor
 
 The website's `/edit` page and every chart's edit page (`/<source>/charts/<id>/edit`) show

@@ -1,12 +1,21 @@
 // The settings sheet the top bar's gear opens: a pane floating at the right on wide screens, a
 // sheet from the bottom on narrow ones. The light or dark theme and the accent are kept in this
-// browser; About says where the site's source is, as its license (the AGPL) asks.
+// browser, and so is the font, one of the built-in ones fetched when chosen; About says where the site's source is, as its license (the AGPL) asks.
 import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
-import { ArrowSquareOutIcon, MonitorIcon, MoonIcon, SunIcon, XIcon } from '@phosphor-icons/react'
+import {
+  ArrowSquareOutIcon,
+  CheckIcon,
+  CircleNotchIcon,
+  MonitorIcon,
+  MoonIcon,
+  SunIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { chooseTone, useChosenTone, type Tone } from '../accent'
+import { builtInFonts, chooseFont, useFontState, type FontId } from '../font'
 import { useTheme, type Theme } from '../theme-context'
 import type { SourceId } from '../source'
 import { Button } from '../components/ui/button'
@@ -62,6 +71,66 @@ function Choices<T extends string>({
         </button>
       ))}
     </div>
+  )
+}
+
+/** The built-in fonts, one taken; a chosen one is fetched while the page goes on in its font. */
+function FontChoices() {
+  const { t } = useTranslation()
+  const { chosen, shown, loading, failed } = useFontState()
+  const options: { id: FontId; name: string; megabytes?: number }[] = [
+    { id: 'default', name: t('shell.fontDefault') },
+    ...builtInFonts,
+  ]
+  const nameOf = (id: FontId) => options.find((option) => option.id === id)!.name
+  return (
+    <>
+      <div
+        role="radiogroup"
+        aria-label={t('shell.font')}
+        data-testid="font-choice"
+        className="flex flex-col gap-1 bg-muted p-1 rounded-[20px]"
+      >
+        {options.map((option) => {
+          const taken = option.id === chosen
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={taken}
+              onClick={() => void chooseFont(option.id)}
+              className={cn(
+                'flex items-center gap-3 px-4 rounded-full min-w-0 h-10 font-semibold text-muted-foreground text-sm text-left outline-none transition-all duration-200 ease-emphasized focus-visible:ring-3 focus-visible:ring-ring/40',
+                taken && 'bg-card text-foreground shadow-elev-1',
+              )}
+            >
+              <span className="flex-1 truncate">{option.name}</span>
+              {option.megabytes !== undefined && (
+                <span className="font-normal text-muted-foreground text-xs tabular-nums">
+                  {t('shell.fontSize', { size: option.megabytes })}
+                </span>
+              )}
+              {taken && loading ? (
+                <CircleNotchIcon className="size-4 animate-spin shrink-0" aria-hidden="true" />
+              ) : (
+                <CheckIcon
+                  className={cn('size-4 shrink-0', !(taken && shown === chosen) && 'invisible')}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <p aria-live="polite" className="text-muted-foreground text-xs leading-relaxed">
+        {loading
+          ? t('shell.fontLoading', { font: nameOf(chosen) })
+          : failed
+            ? t('shell.fontFailed', { font: nameOf(chosen), shown: nameOf(shown) })
+            : t('shell.fontHint')}
+      </p>
+    </>
   )
 }
 
@@ -141,6 +210,9 @@ export function SettingsSheet({
                   ? t('shell.accentSourceHint', { source: t(`shell.${area}`) })
                   : t('shell.accentHint')}
               </p>
+            </Section>
+            <Section title={t('shell.font')}>
+              <FontChoices />
             </Section>
             <Section title={t('shell.about')}>
               <div className="space-y-3 bg-muted/60 p-4 rounded-[20px] text-sm">
