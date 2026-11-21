@@ -293,6 +293,9 @@ export function UploadCollaborators({
  * Searches members by nickname and lists them to choose from. A user with a
  * note cannot be chosen; the note says why.
  */
+// A short list: it sits in a dialog, under what was already chosen.
+const searchPageSize = 12
+
 export function UserSearch({
   pressed,
   note,
@@ -314,7 +317,9 @@ export function UserSearch({
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pending, setPending] = useState(false)
-  const directory = useQuery(directoryQuery({ q: query, sort: 'active', page: page }))
+  const directory = useQuery(
+    directoryQuery({ q: query, sort: 'active', page: page, pageSize: searchPageSize }),
+  )
   const result = directory.data
   const error = result ? '' : (directory.error?.message ?? '')
   const changePending = useCallback(

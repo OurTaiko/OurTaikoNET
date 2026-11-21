@@ -290,6 +290,35 @@
   }
 }
 
+/* A line that never wraps (ScrollingText): text longer than its box slides to its end and back,
+   --shift pixels. With less motion asked for it stays still and scrolls sideways by hand. */
+.scrolling-text {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.scrolling-text-moving {
+  animation: scrolling-text linear infinite alternate;
+}
+@keyframes scrolling-text {
+  0%,
+  20% {
+    translate: 0;
+  }
+  80%,
+  100% {
+    translate: calc(-1 * var(--shift));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrolling-text {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .scrolling-text-moving {
+    animation: none;
+  }
+}
+
 /* The marker under the word of a page heading that says what the page is. */
 /* The don/ka stripe: the drum's two hits, used sparingly as a divider. */
 .drum-stripe {

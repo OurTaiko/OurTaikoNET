@@ -41,12 +41,15 @@ type Chart struct {
 	AuthorAvatarPath string `json:"authorAvatarPath"`
 	Description      string `json:"description"`
 	// Votes and comments; MyVote is only filled for the signed-in detail view.
-	Score        int       `json:"score"`
-	Upvotes      int       `json:"upvotes"`
-	Downvotes    int       `json:"downvotes"`
-	CommentCount int       `json:"commentCount"`
-	MyVote       int       `json:"myVote"`
-	CreatedAt    time.Time `json:"createdAt"`
+	Score        int `json:"score"`
+	Upvotes      int `json:"upvotes"`
+	Downvotes    int `json:"downvotes"`
+	CommentCount int `json:"commentCount"`
+	// PlayCount is how many scores the chart has, over all its blocks; the scores of replaced
+	// files count too.
+	PlayCount int       `json:"playCount"`
+	MyVote    int       `json:"myVote"`
+	CreatedAt time.Time `json:"createdAt"`
 	// UpdateAt is when the chart or anything about it last changed.
 	UpdateAt    time.Time `json:"updateAt"`
 	Duration    float64   `json:"duration"`
@@ -152,6 +155,7 @@ const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_
  c.title,c.subtitle,c.bpm,c.offset_seconds,c.demo_start,COALESCE(af.sha256||'.'||af.extension,''),c.title_translations,c.subtitle_translations,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',d.id,'course',d.course,'side',d.side,'level',d.level,'maker',d.maker,'branching',d.branching,'chartHash',d.content_hash) ORDER BY ` + slotOrder + `) FROM chart_difficulties d WHERE d.chart_id=c.id),'[]'),
  COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),
+ (SELECT count(*) FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id WHERE d.chart_id=c.id),
  c.movie_offset,COALESCE(mf.sha256,''),COALESCE(mf.byte_size,0),COALESCE(mf.storage_key,''),
  COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,'')
  FROM charts c LEFT JOIN chart_resources tf ON tf.id=c.tja_file LEFT JOIN chart_resources af ON af.id=c.audio_file
@@ -167,7 +171,7 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 	e := row.Scan(&c.ID, &c.NumberID, &c.NijiiroID, &c.OfficialID, &c.OwnerIDs, &c.Description, &c.CreatedAt, &c.UpdateAt, &c.Duration, &c.DemoEnd, &flags,
 		&c.TJAName, &c.AudioName, &c.TJAHash, &c.TJASize, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.CoverHash, &c.PreviewPath,
 		&c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties,
-		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
+		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.PlayCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
 		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey)
 	if e == nil {
 		c.SongCoverPath = s.filePath(coverKey)

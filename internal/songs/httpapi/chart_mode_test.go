@@ -111,6 +111,11 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 	if w := call("POST", "/api/game/scores", `{"songId":"`+c.ID+`","difficulty":"Oni","good":1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":1}`, web.NewID()); w.Code != 400 {
 		t.Fatal("retired score form accepted", w.Code, w.Body.String())
 	}
+	// A chart's plays are the scores of all its blocks, a retried one counted once.
+	var played Chart
+	if w := call("GET", "/api/charts/"+c.ID, "", ""); w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &played) != nil || played.PlayCount != len(c.Difficulties) {
+		t.Fatal(w.Code, played.PlayCount, w.Body.String())
+	}
 	// Every block has its own leaderboard; the default is the first of the hardest course.
 	for i, d := range c.Difficulties {
 		w := call("GET", fmt.Sprintf("/api/charts/%s/leaderboard?difficultyId=%d", c.ID, d.ID), "", "")
