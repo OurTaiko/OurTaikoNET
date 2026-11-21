@@ -988,6 +988,7 @@
     "about": "정보",
     "license": "OurTaikoNET은 GNU Affero 일반 공중 사용 허가서 3판(또는 그 이후 판)으로 공개된 자유 소프트웨어입니다. 누구나 소스 코드를 받고, 고치고, 공유할 수 있습니다.",
     "sourceCode": "소스 코드",
+    "revision": "웹사이트 버전",
     "layoutCredit": "레이아웃 참고:",
     "signedOut": "로그인하지 않음",
     "signInHint": "로그인하고 기록과 플레이리스트를 동기화",

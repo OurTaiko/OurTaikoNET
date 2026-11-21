@@ -988,6 +988,7 @@
     "about": "关于",
     "license": "OurTaikoNET 是自由软件，以 GNU Affero 通用公共许可证第 3 版（或更新版本）发布，任何人都可以获取、修改和分享它的源代码。",
     "sourceCode": "源代码",
+    "revision": "网站版本",
     "layoutCredit": "界面布局参照了",
     "signedOut": "未登录",
     "signInHint": "登录以同步成绩与歌单",

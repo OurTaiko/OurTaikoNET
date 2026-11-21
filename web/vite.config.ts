@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: { alias },
+    // The commit this build is made from, shown under About in the settings (src/kit/revision.ts).
+    // GitHub Actions gives it to the deploy workflow's build; other builds have none.
+    define: {
+      'import.meta.env.VITE_REVISION': JSON.stringify(process.env.GITHUB_SHA ?? ''),
+    },
     server: {
       watch: { usePolling: env.VITE_USE_POLLING === 'true' },
       proxy: {
