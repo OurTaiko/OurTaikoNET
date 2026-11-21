@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-21T19:47:05Z",
+  "updated_at": "2026-11-21T20:00:31Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "f4b00cb8526c668344ad98c9566948358bdbde872f980750ea58154f19d055c6",
-      "size": 183026,
-      "normalized_sha256": "f4b00cb8526c668344ad98c9566948358bdbde872f980750ea58154f19d055c6"
+      "sha256": "a30dfb05a88d0ca123078e41f777868f91c1a73ec3436d791af876386258189d",
+      "size": 183032,
+      "normalized_sha256": "a30dfb05a88d0ca123078e41f777868f91c1a73ec3436d791af876386258189d"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -2986,9 +2986,9 @@
     },
     "web/src/kit/components/chart-card.tsx": {
       "role": "index",
-      "sha256": "36d41b69e534c8dbd0c74afc076c9c020fd51b9b646eb26a03d98a03186134dd",
-      "size": 6591,
-      "normalized_sha256": "36d41b69e534c8dbd0c74afc076c9c020fd51b9b646eb26a03d98a03186134dd"
+      "sha256": "966c8ad331bff7e533aa478ba6c9f2802c6a2f68d7d9b12e3cdd646391bf91e8",
+      "size": 6910,
+      "normalized_sha256": "966c8ad331bff7e533aa478ba6c9f2802c6a2f68d7d9b12e3cdd646391bf91e8"
     },
     "web/src/kit/components/chart-cover.tsx": {
       "role": "index",
@@ -4234,9 +4234,9 @@
     },
     "web/src/sources/fanmade/components/chart-card.tsx": {
       "role": "index",
-      "sha256": "f4a17bb79344f5141ee036f8e896a90f7bf1a8b1efff20ef8d042fc705dc1ce0",
-      "size": 626,
-      "normalized_sha256": "f4a17bb79344f5141ee036f8e896a90f7bf1a8b1efff20ef8d042fc705dc1ce0"
+      "sha256": "7a57e3095f88c2439115e945416abd544713203d9b4772ad10f55b3141d0466b",
+      "size": 600,
+      "normalized_sha256": "7a57e3095f88c2439115e945416abd544713203d9b4772ad10f55b3141d0466b"
     },
     "web/src/sources/fanmade/components/chart-search.tsx": {
       "role": "index",
@@ -4318,9 +4318,9 @@
     },
     "web/src/sources/official/components/chart-card.tsx": {
       "role": "index",
-      "sha256": "3914a08df30f85811b8733a795a717163e7a7d9db4fabd9e3f7f5630372bd6fc",
-      "size": 1846,
-      "normalized_sha256": "3914a08df30f85811b8733a795a717163e7a7d9db4fabd9e3f7f5630372bd6fc"
+      "sha256": "25d956770b81ef556f0d6b87e4f734d60a3c970f770a39b6b7d8da588ca379ab",
+      "size": 1820,
+      "normalized_sha256": "25d956770b81ef556f0d6b87e4f734d60a3c970f770a39b6b7d8da588ca379ab"
     },
     "web/src/sources/official/components/chart-search.tsx": {
       "role": "index",
