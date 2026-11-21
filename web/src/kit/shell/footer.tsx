@@ -23,7 +23,6 @@ import {
 import { useVisitSummary } from './visits'
 import { refreshSource, useDistributionSource } from '../distribution'
 
-const playerAddress = 'https://play.ourtaiko.org/'
 const licenseAddress = 'https://www.gnu.org/licenses/agpl-3.0.html'
 // The country database that routes mainland visitors' 3D Don files (CC BY 4.0, which asks for
 // this credit in DB-IP's own words).
@@ -130,12 +129,6 @@ export function FrameFooter({ source }: { source: SourceId }) {
             <li>
               <Away href={qqGroupAddress} className={linkClass}>
                 {t('shell.footer.qqGroup')}
-              </Away>
-            </li>
-            <li>
-              <Away href={playerAddress} className={linkClass}>
-                {t('shell.player')}
-                <span className="text-muted-foreground/70 text-xs">(play.ourtaiko.org)</span>
               </Away>
             </li>
           </Column>

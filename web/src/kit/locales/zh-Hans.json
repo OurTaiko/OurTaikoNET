@@ -948,7 +948,7 @@
     "manageGroup": "管理",
     "visits": "访问统计",
     "titleAdmin": "称号管理",
-    "player": "OurTaiko Player",
+    "player": "OurTaikoPlay",
     "signIn": "登录",
     "signOut": "退出登录",
     "closeMenu": "关闭菜单",
@@ -1003,7 +1003,7 @@
       "notice": "本站是玩家社区项目，与万代南梦宫娱乐无关。「太鼓之达人」及相关素材版权归其所有。"
     },
     "featured": "首页推荐",
-    "editor": "谱面编辑器"
+    "editor": "OurTaikoEdit"
   },
   "chat": {
     "title": "消息",

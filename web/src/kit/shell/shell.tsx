@@ -191,7 +191,6 @@ export function Frame({ children }: { children: ReactNode }) {
       icon: PlaylistIcon,
     },
     { key: 'dans', href: `/${source}/dans`, label: t('shell.dans'), icon: MedalIcon },
-    { key: 'editor', href: '/edit', label: t('shell.editor'), icon: PencilRulerIcon },
   ]
   const players: Item[] = [
     {
@@ -290,6 +289,11 @@ export function Frame({ children }: { children: ReactNode }) {
     icon: GameControllerIcon,
     external: true,
   }
+  // The other OurTaiko programs: the chart editor here, the game on its own site.
+  const more: Item[] = [
+    { key: 'editor', href: '/edit', label: t('shell.editor'), icon: PencilRulerIcon },
+    player,
+  ]
   const lit = (item: Item) =>
     !item.external &&
     here !== item.except &&
@@ -463,7 +467,7 @@ export function Frame({ children }: { children: ReactNode }) {
           {group('players', t('shell.players'), players.map(entry))}
           {you.length > 0 && group('you', t('shell.you'), you.map(entry))}
           {manage.length > 0 && group('manage', t('shell.manageGroup'), manage.map(entry))}
-          {group('more', t('shell.more'), entry(player))}
+          {group('more', t('shell.more'), more.map(entry))}
         </div>
       </nav>
       {account}
@@ -485,6 +489,7 @@ export function Frame({ children }: { children: ReactNode }) {
     { key: 'players', label: t('shell.players'), items: players },
     ...(you.length ? [{ key: 'you', label: t('shell.you'), items: you }] : []),
     ...(manage.length ? [{ key: 'manage', label: t('shell.manageGroup'), items: manage }] : []),
+    { key: 'more', label: t('shell.more'), items: more },
   ]
   const found = sections.find((section) => section.items.some(lit))
   // A page of a source that is no item of the menu (signing in, the account) is still among
