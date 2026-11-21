@@ -71,6 +71,12 @@ function chartSource(chart: ChartBase | null) {
   })
 }
 
+// The name the text gives its song (WAVE, before the first #START): the stored text names the
+// file by its hash, not by the chart's audio name, and the editor finds the song by this.
+function songFile(tja: string) {
+  return /^\s*WAVE\s*:\s*(.*?)\s*$/im.exec(tja.split(/#START/i)[0])?.[1] ?? ''
+}
+
 // The chart's audio, handed to the editor with the text (null: the chart has none).
 function chartAudio(chart: ChartBase | null) {
   const address = chart ? endpoints.resources(chart.id) : ''
@@ -285,7 +291,7 @@ function ChartEditor({
             name: chartText(chart, i18n.resolvedLanguage).title,
             tjaName: chart.tjaName,
             tja: source,
-            audioName: chart.audioName,
+            audioName: songFile(source) || chart.audioName,
             audio: audio ? audio.slice(0) : null,
           },
         })
