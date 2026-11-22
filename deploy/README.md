@@ -174,8 +174,7 @@ Setting it up, each step with the owner's go-ahead:
    all of them. `nginx -t`, then reload.
 4. **Mainland server.** Install `mainland-proxy.conf` with a certificate for
    `otnet.sakura-bot.cn`. Set the CA bundle path to the system's (`/etc/pki/tls/certs/ca-bundle.crt`
-   on CentOS-like systems); with nginx older than 1.25.1, write `listen 443 ssl http2;` instead
-   of `http2 on;`. nginx resolves `net.ourtaiko.org` when it starts: reload it if that address
+   on CentOS-like systems). nginx resolves `net.ourtaiko.org` when it starts: reload it if that address
    ever changes.
 5. **DNS.** Point `otnet.sakura-bot.cn` at the mainland server.
 6. **Check** from mainland China: the site loads and signs in at `https://otnet.sakura-bot.cn`
