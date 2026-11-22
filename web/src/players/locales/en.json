@@ -272,6 +272,9 @@
     "country": "Country or region",
     "addresses": "IP addresses",
     "unknownCountry": "Unknown",
+    "sitesHeading": "Site addresses",
+    "site": "Address",
+    "unknownSite": "Not recorded",
     "table": "Show the days as a table",
     "day": "Day"
   },

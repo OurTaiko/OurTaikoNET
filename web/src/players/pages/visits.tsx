@@ -113,8 +113,97 @@ function Bars({ bars, format }: { bars: Bar[]; format: (n: number) => string }) 
   )
 }
 
+/** One row of SourcesCard: where some of the period's views came from. */
+interface Source {
+  key: string
+  label: string
+  /** The row of the views it is not known of: shown dimmed. */
+  unknown: boolean
+  views: number
+  addresses: number
+}
+
+/**
+ * Where the period's views came from, most first (by country, or by the site's address they
+ * were seen at): each one's views, the different addresses they came from, and its share of
+ * all the period's views.
+ */
+function SourcesCard({
+  title,
+  name,
+  testId,
+  views,
+  rows,
+}: {
+  title: string
+  name: string
+  testId: string
+  views: number
+  rows: Source[]
+}) {
+  const { t, i18n } = useTranslation()
+  const number = new Intl.NumberFormat(i18n.language)
+  const percent = new Intl.NumberFormat(i18n.language, {
+    style: 'percent',
+    maximumFractionDigits: 1,
+  })
+  const most = Math.max(1, ...rows.map((row) => row.views))
+  return (
+    <Card className="rounded-3xl">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t('visits.noPages')}</p>
+        ) : (
+          <Table data-testid={testId}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{name}</TableHead>
+                <TableHead className="text-right">{t('visits.views')}</TableHead>
+                <TableHead className="text-right">{t('visits.addresses')}</TableHead>
+                <TableHead className="w-1/3 text-right">{t('visits.share')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.key}>
+                  <TableCell className={cn(row.unknown && 'text-muted-foreground')}>
+                    {row.label}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {number.format(row.views)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {number.format(row.addresses)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end items-center gap-2">
+                      <div className="flex-1 max-sm:hidden">
+                        <div
+                          className="bg-primary rounded-full h-1.5"
+                          style={{ width: `${(row.views / most) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
+                        {percent.format(views ? row.views / views : 0)}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // How much the site is visited: today, the chosen period day by day and hour by hour, the
-// pages seen most and the countries the views came from, all in the reader's time zone. Only the site's administrator sees it;
+// pages seen most, the countries the views came from and the site's addresses they were seen
+// at, all in the reader's time zone. Only the site's administrator sees it;
 // everyone sees the totals at the foot of every page.
 export function VisitsPage() {
   const { t, i18n } = useTranslation()
@@ -145,7 +234,7 @@ export function VisitsPage() {
   const pages = report?.pages ?? []
   const mostSeen = Math.max(1, ...pages.map((page) => page.views))
   const countries = report?.countries ?? []
-  const mostFrom = Math.max(1, ...countries.map((country) => country.views))
+  const sites = report?.sites ?? []
   // A country by its name in the reader's language; one the browser cannot name by its letters.
   const regions = new Intl.DisplayNames(i18n.language, { type: 'region', fallback: 'code' })
   const countryName = (code: string) => {
@@ -309,55 +398,33 @@ export function VisitsPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl">
-            <CardHeader>
-              <CardTitle>{t('visits.countriesHeading')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {countries.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('visits.noPages')}</p>
-              ) : (
-                <Table data-testid="visits-countries">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('visits.country')}</TableHead>
-                      <TableHead className="text-right">{t('visits.views')}</TableHead>
-                      <TableHead className="text-right">{t('visits.addresses')}</TableHead>
-                      <TableHead className="w-1/3 text-right">{t('visits.share')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {countries.map((country) => (
-                      <TableRow key={country.country}>
-                        <TableCell className={cn(!country.country && 'text-muted-foreground')}>
-                          {countryName(country.country)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {format(country.views)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {format(country.addresses)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end items-center gap-2">
-                            <div className="flex-1 max-sm:hidden">
-                              <div
-                                className="bg-primary rounded-full h-1.5"
-                                style={{ width: `${(country.views / mostFrom) * 100}%` }}
-                              />
-                            </div>
-                            <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
-                              {percent.format(views ? country.views / views : 0)}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <SourcesCard
+            title={t('visits.countriesHeading')}
+            name={t('visits.country')}
+            testId="visits-countries"
+            views={views}
+            rows={countries.map((country) => ({
+              key: country.country,
+              label: countryName(country.country),
+              unknown: !country.country,
+              views: country.views,
+              addresses: country.addresses,
+            }))}
+          />
+
+          <SourcesCard
+            title={t('visits.sitesHeading')}
+            name={t('visits.site')}
+            testId="visits-sites"
+            views={views}
+            rows={sites.map((site) => ({
+              key: site.site,
+              label: site.site || t('visits.unknownSite'),
+              unknown: !site.site,
+              views: site.views,
+              addresses: site.addresses,
+            }))}
+          />
 
           <details className="bg-card shadow-elev-1 px-6 py-4 rounded-3xl">
             <summary className="font-semibold text-sm cursor-pointer">{t('visits.table')}</summary>

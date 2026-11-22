@@ -272,6 +272,9 @@
     "country": "国家/地区",
     "addresses": "IP 数",
     "unknownCountry": "未知",
+    "sitesHeading": "访问域名",
+    "site": "域名",
+    "unknownSite": "未记录",
     "table": "以表格查看每日数据",
     "day": "日期"
   },

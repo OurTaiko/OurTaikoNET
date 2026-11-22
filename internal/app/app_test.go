@@ -221,6 +221,33 @@ func TestNewBringsAnOlderDatabaseUpToDate(t *testing.T) {
 	}
 }
 
+// 0018 keeps which of the site's addresses a view was seen at: the views made before the second
+// address opened were all seen at net.ourtaiko.org; of the later ones it is not known.
+func TestViewsBeforeTheSecondAddressWereTheSitesOwn(t *testing.T) {
+	ctx := context.Background()
+	pool, url := netdbtest.NewURL(t, "fanmade")
+	if _, err := pool.Exec(ctx, `ALTER TABLE net.visit_views DROP COLUMN site`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM net.schema_migrations WHERE version>=18`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd) VALUES
+ (timestamptz '2026-11-22 02:53:24+00', '/before', sha256('a'), sha256('b')),
+ (timestamptz '2026-11-22 02:53:25+00', '/after', sha256('a'), sha256('b'))`); err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Close()
+	var sites string
+	if err := pool.QueryRow(ctx, `SELECT string_agg(page || '=' || COALESCE(site, '?'), ' ' ORDER BY at) FROM net.visit_views`).Scan(&sites); err != nil || sites != "/before=net.ourtaiko.org /after=?" {
+		t.Fatalf("sites %q %v", sites, err)
+	}
+}
+
 // The players' part reads both sources' scores and the sources ask it for awards, all inside
 // one program; from outside, the award route does not exist.
 func TestPlayersAcrossSources(t *testing.T) {

@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -94,12 +96,22 @@ func (s *Server) countVisit(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 		// A count that could not be written is the site's trouble, not the visitor's.
-		visitor := visits.Visitor{Host: host, Browser: agent, Country: s.visitCountry(host)}
+		visitor := visits.Visitor{Host: host, Browser: agent, Country: s.visitCountry(host), Site: s.visitSite(r)}
 		if err := s.visitStore().Record(ctx, page, visitor); err != nil {
 			log.Printf("request=%s counting a visit: %v", w.Header().Get("X-Request-ID"), err)
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// visitSite is the host name of the site's address the request came to (web.Origins): the page
+// it counts was seen there.
+func (s *Server) visitSite(r *http.Request) string {
+	u, err := url.Parse(web.Origin(r.Context(), s.Config.Origin))
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Host)
 }
 
 // visitZone is the time zone the request names (?tz=), or false once it has answered 400.
@@ -154,7 +166,9 @@ func (s *Server) visitSummary(w http.ResponseWriter, r *http.Request) {
 // for the site's administrator: the summary, each of the last days of that time zone (oldest
 // first, today last), the views in each of its hours over them, the pages seen most, and the
 // countries the views came from ("countries": [{"country": "JP", "views", "addresses"}], most
-// views first, "" being the unknown country). No address is given out.
+// views first, "" being the unknown country), and the site's addresses they were seen at
+// ("sites": [{"site": "net.ourtaiko.org", "views", "addresses"}], "" being the views it is not
+// known of). No visitor's address is given out.
 func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.siteAdmin(w, r); !ok {
 		return
@@ -177,7 +191,7 @@ func (s *Server) visitReport(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		var report visits.Report
 		if report, err = store.Report(r.Context(), loc, days, visitReportPages); err == nil {
-			web.Respond(w, 200, map[string]any{"zone": loc.String(), "total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "hours": report.Hours, "pages": report.Pages, "countries": report.Countries})
+			web.Respond(w, 200, map[string]any{"zone": loc.String(), "total": summary.Total, "today": summary.Today, "since": summary.Since, "days": report.Days, "hours": report.Hours, "pages": report.Pages, "countries": report.Countries, "sites": report.Sites})
 			return
 		}
 	}
