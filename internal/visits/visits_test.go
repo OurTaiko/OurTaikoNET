@@ -224,3 +224,38 @@ func TestViewsAreCountedByCountry(t *testing.T) {
 		t.Fatalf("two days later %v %v", r.Countries, err)
 	}
 }
+
+func TestViewsAreCountedBySite(t *testing.T) {
+	ctx := context.Background()
+	pool := netdbtest.NewShared(t)
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	store := Store{DB: pool, Now: func() time.Time { return now }}
+	// A view made before the site was kept.
+	if _, err := pool.Exec(ctx, `INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd) VALUES ($1, '/', sha256('a'), sha256('b'))`, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []Visitor{
+		{Host: "1.1.1.1", Browser: "Safari", Site: "net.ourtaiko.org"},
+		{Host: "1.1.1.2", Browser: "Safari", Site: "net.ourtaiko.org"},
+		{Host: "2.2.2.2", Browser: "Safari", Site: "otnet.sakura-bot.cn"},
+		{Host: "2.2.2.2", Browser: "Firefox", Site: "otnet.sakura-bot.cn"},
+		{Host: "3.3.3.3", Browser: "Safari", Site: "127.0.0.1:5173"},
+		// No site known, and sites that are none.
+		{Host: "4.4.4.4", Browser: "Safari"},
+		{Host: "4.4.4.5", Browser: "Safari", Site: "Net.OurTaiko.org"},
+		{Host: "4.4.4.6", Browser: "Safari", Site: "https://net.ourtaiko.org"},
+	} {
+		if err := store.Record(ctx, "/", v); err != nil {
+			t.Fatal(v, err)
+		}
+	}
+	r, err := store.Report(ctx, time.UTC, 1, 10)
+	if err != nil || fmt.Sprint(r.Sites) != "[{ 4 3} {net.ourtaiko.org 2 2} {otnet.sakura-bot.cn 2 1} {127.0.0.1:5173 1 1}]" {
+		t.Fatalf("sites %v %v", r.Sites, err)
+	}
+	// The views of another period are not of this one's sites.
+	now = now.Add(48 * time.Hour)
+	if r, err = store.Report(ctx, time.UTC, 1, 10); err != nil || len(r.Sites) != 0 {
+		t.Fatalf("two days later %v %v", r.Sites, err)
+	}
+}

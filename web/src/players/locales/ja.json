@@ -272,6 +272,9 @@
     "country": "国・地域",
     "addresses": "IP 数",
     "unknownCountry": "不明",
+    "sitesHeading": "アクセスされたドメイン",
+    "site": "ドメイン",
+    "unknownSite": "記録なし",
     "table": "日別データを表で見る",
     "day": "日付"
   },

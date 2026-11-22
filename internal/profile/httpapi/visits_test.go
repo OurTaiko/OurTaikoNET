@@ -2,11 +2,14 @@ package httpapi
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"testing"
 	"time"
 
 	"ourtaiko.dev/net/internal/visits"
+	"ourtaiko.dev/net/internal/web"
 )
 
 const safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Safari/605.1.15"
@@ -80,6 +83,7 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 		Hours        []int64
 		Pages        []visits.PageCount
 		Countries    []visits.CountryCount
+		Sites        []visits.SiteCount
 	}
 	c.json("GET", "/api/admin/visits?days=7&tz=Asia/Shanghai", "", 200, &report)
 	if report.Zone != "Asia/Shanghai" || len(report.Hours) != 24 || report.Hours[12] != visitsAMinute {
@@ -95,8 +99,30 @@ func TestTheWebsiteCountsItsVisits(t *testing.T) {
 	if fmt.Sprint(report.Countries) != fmt.Sprintf("[{JP %d 1}]", visitsAMinute) {
 		t.Fatalf("countries %+v", report.Countries)
 	}
+	// Every view was seen at the site's own address: the test's requests came to no other.
+	if fmt.Sprint(report.Sites) != fmt.Sprintf("[{127.0.0.1:5175 %d 1}]", visitsAMinute) {
+		t.Fatalf("sites %+v", report.Sites)
+	}
 	c.json("GET", "/api/admin/visits", "", 200, &report)
 	if len(report.Days) != 30 || report.Zone != "UTC" || report.Days[29].Day != "2026-11-16" {
 		t.Fatalf("%d days by default, in %q", len(report.Days), report.Zone)
+	}
+}
+
+// A view is counted under the address of the site the request came to (web.Origins).
+func TestAVisitKeepsTheSitesAddressItCameTo(t *testing.T) {
+	s := &Server{Config: Config{Origin: "https://net.example"}}
+	origins, err := web.NewOrigins("https://net.example", []string{"https://cn.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for host, want := range map[string]string{"cn.example": "cn.example", "net.example": "net.example", "fanmade.example": "net.example"} {
+		var got string
+		r := httptest.NewRequest("POST", "/api/visits", nil)
+		r.Host = host
+		origins.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = s.visitSite(r) })).ServeHTTP(httptest.NewRecorder(), r)
+		if got != want {
+			t.Errorf("at %s: %q, want %q", host, got, want)
+		}
 	}
 }

@@ -11,7 +11,11 @@
 //
 // Each view also keeps the address it came from and the country that address was in then
 // (migration 0016), for good: the site's administrator reads the visits by country. The views
-// made before have neither and are of an unknown country.
+// made before have neither and are of an unknown country. And it keeps which of the site's own
+// addresses the page was seen at (migration 0018; web.Origins), so that the visits through the
+// address in mainland China can be told from the others. The views made before the second address
+// opened were all seen at net.ourtaiko.org and are kept so; those made between then and 0018 have
+// none.
 package visits
 
 import (
@@ -45,6 +49,8 @@ var (
 	robot = regexp.MustCompile(`(?i)bot|crawl|spider|slurp|headless|lighthouse|preview|monitor|curl|wget|python|scrapy|http-?client`)
 	// A country as the views keep it: its two capital letters (ISO 3166-1 alpha-2).
 	countryCode = regexp.MustCompile(`^[A-Z]{2}$`)
+	// A site's address as the views keep it: its host name, lower case, with a port if it has one.
+	siteHost = regexp.MustCompile(`^[a-z0-9.-]{1,253}(:[0-9]{1,5})?$`)
 	// The name of a time zone as browsers give it (Asia/Shanghai, UTC, Etc/GMT+8).
 	zoneName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+\-]*(/[A-Za-z0-9_+\-]+)*$`)
 )
@@ -128,22 +134,27 @@ func dayText(n int64) string {
 
 // Visitor is who a view was made by. Host is where the request came from, as web.ClientIP gives
 // it, and Browser the browser's name (User-Agent): together they tell the visitor from others.
-// Country is the country Host is in (two capital letters), empty when it is not known.
+// Country is the country Host is in (two capital letters), empty when it is not known. Site is
+// the host name of the site's address the page was seen at (net.ourtaiko.org), empty when it is
+// not known.
 type Visitor struct {
-	Host, Browser, Country string
+	Host, Browser, Country, Site string
 }
 
 // Record counts one view of page (as Page gives it) by v, now. What tells the visitor from
 // others is stored hashed with the salts of the two spans the moment lies in; the address is
-// kept as it is when Host is one, and the country when it is one.
+// kept as it is when Host is one, the country when it is one, and the site when it is one.
 func (s Store) Record(ctx context.Context, page string, v Visitor) error {
 	now := s.now()
-	var address, country any
+	var address, country, site any
 	if ip, err := netip.ParseAddr(v.Host); err == nil && ip.Zone() == "" {
 		address = ip.Unmap()
 	}
 	if countryCode.MatchString(v.Country) {
 		country = v.Country
+	}
+	if siteHost.MatchString(v.Site) {
+		site = v.Site
 	}
 	day := utcDay(now)
 	// The two spans that hold today: the one that began yesterday and the one beginning today.
@@ -163,12 +174,12 @@ WITH salts AS (
     ON CONFLICT (span) DO UPDATE SET salt = s.salt
     RETURNING span, salt
 )
-INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd, address, country)
+INSERT INTO net.visit_views (at, page, visitor_even, visitor_odd, address, country, site)
 SELECT $5, $6,
        sha256((SELECT salt FROM salts WHERE span = $1::date) || convert_to($7, 'UTF8')),
        sha256((SELECT salt FROM salts WHERE span = $2::date) || convert_to($7, 'UTF8')),
-       $8::inet, $9`,
-		dayText(even), dayText(odd), salts[:16], salts[16:], now, page, v.Host+"\n"+v.Browser, address, country)
+       $8::inet, $9, $10`,
+		dayText(even), dayText(odd), salts[:16], salts[16:], now, page, v.Host+"\n"+v.Browser, address, country, site)
 	return err
 }
 
@@ -262,19 +273,30 @@ type CountryCount struct {
 	Addresses int64  `json:"addresses"`
 }
 
+// SiteCount is one of the site's addresses in a report: the views seen at it and the different
+// addresses they came from. The site without a name ("") is the views it is not known of: those
+// made between the second address opening and 0018.
+type SiteCount struct {
+	Site      string `json:"site"`
+	Views     int64  `json:"views"`
+	Addresses int64  `json:"addresses"`
+}
+
 // Report is the last days in full, in the reader's time zone: each day, oldest first and with
 // the days nobody came; the views made in each hour of the day (0 to 23) over those days; the
-// pages seen most; and every country the views came from, the one with most views first.
+// pages seen most; every country the views came from and every address of the site they were
+// seen at, the one with most views first.
 type Report struct {
 	Days      []DayCount     `json:"days"`
 	Hours     []int64        `json:"hours"`
 	Pages     []PageCount    `json:"pages"`
 	Countries []CountryCount `json:"countries"`
+	Sites     []SiteCount    `json:"sites"`
 }
 
 // Report reads the last days days of loc, today included, and the pages most seen pages of them.
 func (s Store) Report(ctx context.Context, loc *time.Location, days, pages int) (Report, error) {
-	out := Report{Days: []DayCount{}, Hours: make([]int64, 24), Pages: []PageCount{}, Countries: []CountryCount{}}
+	out := Report{Days: []DayCount{}, Hours: make([]int64, 24), Pages: []PageCount{}, Countries: []CountryCount{}, Sites: []SiteCount{}}
 	now := s.now().In(loc)
 	last := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	first := last.AddDate(0, 0, 1-days)
@@ -342,9 +364,24 @@ SELECT COALESCE(country, '') AS country, count(*) AS views, count(DISTINCT addre
 	if err != nil {
 		return out, err
 	}
-	out.Countries, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (CountryCount, error) {
+	if out.Countries, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (CountryCount, error) {
 		var c CountryCount
 		return c, row.Scan(&c.Country, &c.Views, &c.Addresses)
+	}); err != nil {
+		return out, err
+	}
+
+	rows, err = s.DB.Query(ctx, `
+SELECT COALESCE(site, '') AS site, count(*) AS views, count(DISTINCT address) AS addresses
+  FROM net.visit_views
+ WHERE at >= $1 AND at < $2
+ GROUP BY 1 ORDER BY views DESC, site`, start, stop)
+	if err != nil {
+		return out, err
+	}
+	out.Sites, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (SiteCount, error) {
+		var c SiteCount
+		return c, row.Scan(&c.Site, &c.Views, &c.Addresses)
 	})
 	return out, err
 }

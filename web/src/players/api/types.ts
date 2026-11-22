@@ -177,6 +177,13 @@ export type VisitReport = {
    * "" is the unknown one, which also holds the views made before addresses were kept.
    */
   countries: { country: string; views: number; addresses: number }[]
+  /**
+   * The site's addresses the views of those days were seen at (its own and those of
+   * APP_OTHER_ORIGINS, such as the one in mainland China), most views first: the host name, its
+   * views and the different addresses they came from. The site "" holds the views it is not
+   * known of (made between the second address opening and its being kept).
+   */
+  sites: { site: string; views: number; addresses: number }[]
 }
 
 // The playlists the home page recommends, in the order shown. Each names a public playlist of a
