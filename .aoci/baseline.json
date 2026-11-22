@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-21T23:47:43Z",
+  "updated_at": "2026-11-22T01:01:33Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "8f5b552fd56e45afc419655e5b0e1b6065245bfe97dce3efc7310e82f8579b1c",
-      "size": 191796,
-      "normalized_sha256": "8f5b552fd56e45afc419655e5b0e1b6065245bfe97dce3efc7310e82f8579b1c"
+      "sha256": "04da3044df99eb42887e572ca49ece792005b972656b38b1146099cbb75de503",
+      "size": 191903,
+      "normalized_sha256": "04da3044df99eb42887e572ca49ece792005b972656b38b1146099cbb75de503"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -4096,9 +4096,9 @@
     },
     "web/src/players/components/featured-playlists.tsx": {
       "role": "index",
-      "sha256": "62e82166835f564065d1d63c171bbbc3e4881af90d90cc6691c36a6c4aa86ba6",
-      "size": 13175,
-      "normalized_sha256": "62e82166835f564065d1d63c171bbbc3e4881af90d90cc6691c36a6c4aa86ba6"
+      "sha256": "829cf8adde4dfb861ff420dc467974cc6a2ce1be65ae33d64f651211fc97b3da",
+      "size": 14514,
+      "normalized_sha256": "829cf8adde4dfb861ff420dc467974cc6a2ce1be65ae33d64f651211fc97b3da"
     },
     "web/src/players/components/friends.tsx": {
       "role": "index",
@@ -4162,15 +4162,15 @@
     },
     "web/src/players/featured.test.ts": {
       "role": "observe",
-      "sha256": "a86c933df35b7fdd28c0a9baa3d4c206e1921d54aea56db716c7986ff05c1f5e",
-      "size": 932,
-      "normalized_sha256": "a86c933df35b7fdd28c0a9baa3d4c206e1921d54aea56db716c7986ff05c1f5e"
+      "sha256": "c0d44d20d99ebe411370fe171ae801663eb1a6e09750ffbf3b44471777bde938",
+      "size": 1687,
+      "normalized_sha256": "c0d44d20d99ebe411370fe171ae801663eb1a6e09750ffbf3b44471777bde938"
     },
     "web/src/players/featured.tsx": {
       "role": "index",
-      "sha256": "3186dac44ecc0045e7d737ebdaef86a43b55dd86b4e114827d9ec2cc7d5a9b31",
-      "size": 3254,
-      "normalized_sha256": "3186dac44ecc0045e7d737ebdaef86a43b55dd86b4e114827d9ec2cc7d5a9b31"
+      "sha256": "c0603e519de13816e64c4f40f1598f36d1b829fc78918623b2064929865a2862",
+      "size": 3760,
+      "normalized_sha256": "c0603e519de13816e64c4f40f1598f36d1b829fc78918623b2064929865a2862"
     },
     "web/src/players/i18n.ts": {
       "role": "index",

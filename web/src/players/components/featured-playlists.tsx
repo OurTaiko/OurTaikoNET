@@ -5,6 +5,7 @@ import { HeartIcon, MusicNotesIcon } from '@phosphor-icons/react'
 import type { ChartBase, Playlist } from '@sitekit/api/types'
 import { chartText } from '@sitekit/chart-language'
 import { LevelChips } from '@sitekit/components/difficulty-badges'
+import { useCardCover } from '@sitekit/components/card-cover'
 import { Badge } from '@sitekit/components/ui/badge'
 import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
@@ -18,6 +19,7 @@ import {
   playlistKey,
   playlistPage,
   usePlaylistsNamed,
+  wallJackets,
 } from '@players/featured'
 import { playerQueries } from '@players/queries'
 import { CarouselBar, useCarousel, useDrift } from './carousel'
@@ -97,30 +99,65 @@ function Songs({
   )
 }
 
-/** The cover on a stack of two sheets: a playlist is several songs. */
-function CoverStack({ playlist, large = false }: { playlist: Playlist; large?: boolean }) {
-  const corner = large ? 'rounded-[20px]' : 'rounded-[16px]'
+// Where the photos of the wall lie: the middle of each in percent of the wall, and how far it
+// is turned. `band` is the wall across the top of a narrow slide, `square` beside a wide one.
+// Together they cover the wall, so that no ground shows between them.
+const places = [
+  { band: [4, 24], square: [11, 11], turn: -6 },
+  { band: [18, 20], square: [42, 7], turn: 4 },
+  { band: [82, 22], square: [72.5, 9], turn: -3 },
+  { band: [96, 26], square: [95, 13], turn: 7 },
+  { band: [31, 24], square: [6, 39], turn: 5 },
+  { band: [69, 22], square: [94, 44], turn: -5 },
+  { band: [31, 78], square: [9, 70], turn: -4 },
+  { band: [69, 80], square: [92.5, 73], turn: 6 },
+  { band: [4, 78], square: [12, 92.5], turn: 6 },
+  { band: [18, 80], square: [40, 96], turn: -5 },
+  { band: [82, 78], square: [69, 94], turn: 3 },
+  { band: [96, 76], square: [96, 91], turn: -7 },
+]
+
+/** One song's cover on the wall, as a photo with a white edge. Nothing when it cannot be shown. */
+function Photo({ path, place }: { path: string; place: (typeof places)[number] }) {
+  const cover = useCardCover(path)
+  if (!cover.source) return null
   return (
-    <span className={cn('block relative shrink-0', large ? 'w-49 h-42' : 'w-29 h-24')}>
-      <span
-        className={cn(
-          'absolute bg-primary/15',
-          corner,
-          large ? 'top-5 left-7 w-42 h-32' : 'top-3 left-5 w-24 h-18',
-        )}
-      />
-      <span
-        className={cn(
-          'absolute bg-primary/30',
-          corner,
-          large ? 'top-2.5 left-3.5 w-42 h-37' : 'top-1.5 left-2.5 w-24 h-21',
-        )}
-      />
+    <img
+      src={cover.source}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={cover.onError}
+      style={
+        {
+          '--x': `${place.band[0]}%`,
+          '--y': `${place.band[1]}%`,
+          '--sx': `${place.square[0]}%`,
+          '--sy': `${place.square[1]}%`,
+          '--turn': `${place.turn}deg`,
+        } as CSSProperties
+      }
+      className="top-(--y) @xl:top-(--sy) left-(--x) @xl:left-(--sx) absolute bg-muted shadow-elev-1 border-[3px] border-white @xl:border-4 rounded-md h-[62%] @xl:h-[35%] aspect-square object-cover -translate-1/2 rotate-(--turn)"
+    />
+  )
+}
+
+/**
+ * What a playlist's photo wall holds, for a positioned box: its cover in the middle, on the covers of its songs laid about
+ * it (wallJackets). The cover alone until the songs are read, and where none has a cover.
+ */
+function PhotoWall({ playlist, songs }: { playlist: Playlist; songs: ChartBase[] | undefined }) {
+  const jackets = wallJackets(songs ?? [], places.length)
+  return (
+    <>
+      {jackets.map((path, index) => (
+        <Photo key={index} path={path} place={places[index]} />
+      ))}
       <PlaylistCover
         playlist={playlist}
-        className={cn('top-0 left-0 absolute shadow-elev-1', corner, large ? 'size-42' : 'size-24')}
+        className="top-1/2 left-1/2 absolute shadow-elev-2 border-[5px] border-white @xl:border-[6px] rounded-[10px] h-[84%] @xl:h-[51%] aspect-square -translate-1/2 -rotate-2"
       />
-    </span>
+    </>
   )
 }
 
@@ -152,42 +189,35 @@ function Slide({
         !shown && 'invisible opacity-0',
       )}
     >
-      {/* The name below is the link a keyboard and a screen reader get; the covers are for the pointer. */}
+      {/* The name below is the link a keyboard and a screen reader get; the wall is for the pointer. */}
       <a
         href={page}
         tabIndex={-1}
         aria-hidden="true"
-        className="hidden @xl:flex justify-center items-center bg-secondary w-62 shrink-0"
+        className="block relative bg-muted @xl:w-80 h-36 @xl:h-auto overflow-hidden shrink-0"
       >
-        <CoverStack playlist={playlist} large />
+        <PhotoWall playlist={playlist} songs={songs} />
       </a>
       <div className="flex flex-col flex-1 gap-2 p-4 @xl:p-6 min-w-0">
-        <div className="flex gap-3.5 min-w-0">
-          <a href={page} tabIndex={-1} aria-hidden="true" className="@xl:hidden shrink-0">
-            <CoverStack playlist={playlist} />
+        <p className="flex flex-wrap items-center gap-1.5">
+          <SourceTag source={source} />
+          <Badge variant="outline" className="tabular-nums">
+            <MusicNotesIcon aria-hidden="true" />
+            {t('playlists.songCount', { count: playlist.chartCount })}
+          </Badge>
+          <Badge variant="outline" className="tabular-nums">
+            <HeartIcon aria-hidden="true" />
+            {t('playlists.favoriteCount', { count: playlist.favoriteCount })}
+          </Badge>
+        </p>
+        <h3 className="font-extrabold text-xl @xl:text-2xl line-clamp-2 leading-tight">
+          <a
+            href={page}
+            className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring hover:underline underline-offset-4"
+          >
+            {playlist.name}
           </a>
-          <div className="flex flex-col flex-1 gap-2 min-w-0">
-            <p className="flex flex-wrap items-center gap-1.5">
-              <SourceTag source={source} />
-              <Badge variant="outline" className="tabular-nums">
-                <MusicNotesIcon aria-hidden="true" />
-                {t('playlists.songCount', { count: playlist.chartCount })}
-              </Badge>
-              <Badge variant="outline" className="tabular-nums">
-                <HeartIcon aria-hidden="true" />
-                {t('playlists.favoriteCount', { count: playlist.favoriteCount })}
-              </Badge>
-            </p>
-            <h3 className="font-extrabold text-xl @xl:text-[1.75rem] line-clamp-2 @xl:line-clamp-1 leading-tight">
-              <a
-                href={page}
-                className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring hover:underline underline-offset-4"
-              >
-                {playlist.name}
-              </a>
-            </h3>
-          </div>
-        </div>
+        </h3>
         {note && (
           <p className="text-muted-foreground text-sm line-clamp-2 @xl:line-clamp-1 break-words">
             {note}
@@ -276,7 +306,7 @@ export function FeaturedPlaylists() {
         {t('home.featured')}
       </h2>
       {count === 0 ? (
-        <Skeleton className="rounded-[28px] w-full h-[14rem] sm:h-[23.25rem]" />
+        <Skeleton className="rounded-[28px] w-full h-[30rem] sm:h-[23.25rem]" />
       ) : (
         <div
           className={cn(
