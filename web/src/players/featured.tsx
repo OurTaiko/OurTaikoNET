@@ -2,7 +2,7 @@
 // playlists a list names from their sources, a playlist's page, and its cover.
 import { useQueries } from '@tanstack/react-query'
 import { PlaylistIcon } from '@phosphor-icons/react'
-import type { Playlist } from '@sitekit/api/types'
+import type { ChartBase, Playlist } from '@sitekit/api/types'
 import { useCardCover } from '@sitekit/components/card-cover'
 import { playlistCoverSource } from '@sitekit/components/playlist-card'
 import { cn } from '@sitekit/lib/utils'
@@ -52,6 +52,17 @@ export function usePlaylistsNamed(named: { source: string; playlistId: string }[
     loading: asked.some(({ ids }, index) => ids.length > 0 && answers[index].isPending),
     error: answers.find((answer) => !answer.data && answer.error)?.error ?? null,
   }
+}
+
+/**
+ * The covers of a playlist's songs for the photo wall around its own: each once, in the songs'
+ * order, then again from the first until there are `count`. None when no song has a cover.
+ */
+export function wallJackets(charts: Pick<ChartBase, 'songCoverPath'>[], count: number): string[] {
+  const covers = [...new Set(charts.flatMap((chart) => chart.songCoverPath || []))]
+  return covers.length
+    ? Array.from({ length: count }, (_, index) => covers[index % covers.length])
+    : []
 }
 
 /** A playlist's cover, or the playlist mark on its source's colour where it has none. */
