@@ -151,18 +151,19 @@ two addresses apart, as it keeps their local storage: a visitor signs in at each
 chart editor's local projects at one are not seen at the other. Requests to any other host name
 (the old sites' included) are answered in `APP_ORIGIN`.
 
-Setting it up, each step with the owner's go-ahead:
+**Live since 2026-11-22.** The mainland server is `sakura` (an SSH alias; Tencent Cloud, BT
+Panel's nginx 1.22). Each step was done with the owner's go-ahead, in this order, and is kept
+for a server set up anew:
 
 1. **Backend.** Release the version that reads `APP_OTHER_ORIGINS`. Add
    `APP_OTHER_ORIGINS=https://otnet.sakura-bot.cn` to `api.env` and recreate the container; it
    logs `also served at [...]` at start. Leave `MULTIPLAY_PUBLIC_URL` unset so that the game
    that asked at the mainland address dials it.
-2. **Account center.** Add `https://otnet.sakura-bot.cn/api/v1/auth/sso/callback` to the
-   redirect URIs of the Application `OurTaikoNet`, beside the one there.
-3. **Los Angeles proxy.** Add `otnet.sakura-bot.cn` to the domains of the 1Panel website
-   `net.ourtaiko.org` (no certificate is needed for it: the mainland server connects under the
-   name `net.ourtaiko.org`). In that site's server block, believe `X-Real-IP` from the mainland
-   server's address alone, so that its rate limits and region go by the visitor:
+2. **Los Angeles proxy.** The site's server block
+   (`/opt/1panel/www/conf.d/net.ourtaiko.org.conf`) lists `otnet.sakura-bot.cn` in
+   `server_name` beside `net.ourtaiko.org` (no certificate is needed for it: the mainland server
+   connects under the name `net.ourtaiko.org`), and believes `X-Real-IP` from the mainland
+   server's address alone, so that rate limits and region go by the visitor:
 
    ```
    set_real_ip_from <the mainland server's public address>;
@@ -171,16 +172,30 @@ Setting it up, each step with the owner's go-ahead:
 
    The site's own `proxy_set_header X-Real-IP $remote_addr` then passes the visitor's address
    on. Without these lines every mainland visitor is the mainland server: one rate limit for
-   all of them. `nginx -t`, then reload.
-4. **Mainland server.** Install `mainland-proxy.conf` with a certificate for
-   `otnet.sakura-bot.cn`. Set the CA bundle path to the system's (`/etc/pki/tls/certs/ca-bundle.crt`
-   on CentOS-like systems); with nginx older than 1.25.1, write `listen 443 ssl http2;` instead
-   of `http2 on;`. nginx resolves `net.ourtaiko.org` when it starts: reload it if that address
-   ever changes.
-5. **DNS.** Point `otnet.sakura-bot.cn` at the mainland server.
-6. **Check** from mainland China: the site loads and signs in at `https://otnet.sakura-bot.cn`
-   and returns there; posting a comment works; `GET /api/v1/game/multiplay` there answers that
-   address; the backend's logs show the visitor's address, not the mainland server's.
+   all of them. These were written into the file by hand (the version before is kept beside it
+   as `.net.ourtaiko.org.conf.before-otnet-20261122`); check they survive when the site is
+   changed in 1Panel. `nginx -t`, then reload, in the OpenResty container.
+3. **Account center.** Add `https://otnet.sakura-bot.cn/api/v1/auth/sso/callback` to the
+   redirect URIs of the Application `OurTaikoNet`, beside the one there (in the `ourtaiko-sso`
+   container's `manage.py shell`, `Application.redirect_uris` is space-separated).
+4. **Certificate.** On the mainland server, acme.sh (`/root/.acme.sh`, from its official
+   repository; Let's Encrypt, no account email) issued `otnet.sakura-bot.cn` by webroot
+   (`/www/wwwroot/otnet.sakura-bot.cn-acme`, which the port-80 server block answers from) and
+   installs it as `/www/server/panel/vhost/cert/otnet.sakura-bot.cn/{fullchain,privkey}.pem`,
+   reloading nginx; its cron job renews it.
+5. **Mainland proxy.** `mainland-proxy.conf` is
+   `/www/server/panel/vhost/nginx/otnet.sakura-bot.cn.conf` there, with those paths, without
+   the IPv6 `listen` lines (the server has no IPv6 address) and with an `error_log` of its own
+   (`/www/wwwlogs/otnet.sakura-bot.cn.error.log`; the server's own is at `crit`). Set the CA
+   bundle path to the system's (`/etc/pki/tls/certs/ca-bundle.crt` on CentOS-like systems).
+   nginx resolves `net.ourtaiko.org` when it starts: reload it if that address ever changes.
+6. **DNS.** `otnet.sakura-bot.cn` points at the mainland server.
+7. **Check**: the site loads at `https://otnet.sakura-bot.cn`; sign-in goes to the account
+   center with that address's callback; a write from that address's pages is taken and one
+   from the other address refused; `GET /api/v1/game/multiplay` there answers that address; a
+   gRPC call there reaches the rooms (an unknown method answers `grpc-status: 12`, as at
+   `net.ourtaiko.org`); the Los Angeles access log shows the visitor's address, not the
+   mainland server's.
 
 To take it away, point DNS elsewhere or stop the mainland server, then remove the value from
 `APP_OTHER_ORIGINS`, the redirect URI and the domain.
