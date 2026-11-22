@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowsClockwiseIcon } from '@phosphor-icons/react'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
+import { Input } from '@sitekit/components/ui/input'
 import {
   Table,
   TableBody,
@@ -13,191 +15,48 @@ import {
   TableRow,
 } from '@sitekit/components/ui/table'
 import { cn } from '@sitekit/lib/utils'
+import { BarChart, RankList } from '@players/components/visit-charts'
+import type { Bar } from '@players/components/visit-charts'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
+import { pagesWith, peakHour, periodTotals } from '@players/visit-stats'
 import { browserZone } from '@sitekit/shell/visits'
 
-// The periods offered, in days; today is the last day of each.
+// The periods offered, in days; today is the last day of each. The address names any but the
+// first shown (?days=90), so a period can be come back to.
 const periods = [7, 30, 90, 365]
+const usual = 30
 
-/** A round number at or above `most` whose half is round too: the top of a chart's scale. */
-function scaleTop(most: number) {
-  if (most <= 4) return 4
-  const power = 10 ** Math.floor(Math.log10(most))
-  const step = (power === 1 ? [10] : [1, 2, 4, 5, 10]).find((s) => s * power >= most) ?? 10
-  return step * power
-}
-
-function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="font-extrabold text-2xl tabular-nums tracking-tight">{value}</p>
-      {note && <p className="text-muted-foreground text-xs">{note}</p>}
-    </div>
-  )
-}
-
-type Bar = { key: string; label: string; mark: string; value: number }
-
-// One number a day (or an hour) as bars on one scale from zero. A whole column answers the
-// pointer, not only its bar, and says its label and number above the plot; the table below
-// the charts has every day for those who do not point.
-function Bars({ bars, format }: { bars: Bar[]; format: (n: number) => string }) {
-  const [at, setAt] = useState<number | null>(null)
-  const top = scaleTop(Math.max(0, ...bars.map((bar) => bar.value)))
-  const shown = at !== null && at < bars.length ? bars[at] : null
-  const marks = [bars[0], bars[Math.floor((bars.length - 1) / 2)], bars[bars.length - 1]]
-  return (
-    <div>
-      <p className="h-5 text-sm tabular-nums" aria-hidden="true">
-        {shown && (
-          <>
-            <span className="text-muted-foreground">{shown.label}</span>{' '}
-            <span className="font-semibold">{format(shown.value)}</span>
-          </>
-        )}
-      </p>
-      <div className="flex gap-2 mt-1">
-        <div className="flex flex-col justify-between w-10 h-44 text-muted-foreground text-xs text-right tabular-nums leading-none">
-          <span>{format(top)}</span>
-          <span>{format(top / 2)}</span>
-          <span>0</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="relative h-44" onPointerLeave={() => setAt(null)}>
-            {[0, 50, 100].map((line) => (
-              <div
-                key={line}
-                className="right-0 left-0 absolute border-border/70 border-t"
-                style={{ top: `${line}%` }}
-              />
-            ))}
-            <div
-              className={cn(
-                'absolute inset-0 flex items-end',
-                bars.length > 120 ? 'gap-0' : bars.length > 45 ? 'gap-px' : 'gap-0.5',
-              )}
-            >
-              {bars.map((bar, i) => {
-                const value = bar.value
-                return (
-                  <div
-                    key={bar.key}
-                    className="flex flex-1 justify-center items-end h-full"
-                    onPointerEnter={() => setAt(i)}
-                    onPointerDown={() => setAt(i)}
-                  >
-                    <div
-                      className={cn(
-                        'bg-primary rounded-t-[4px] w-full max-w-7 transition-opacity',
-                        bars.length > 120 && 'rounded-t-none',
-                        at !== null && at !== i && 'opacity-40',
-                      )}
-                      style={{ height: `${(value / top) * 100}%`, minHeight: value > 0 ? 2 : 0 }}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          <div className="flex justify-between mt-1.5 text-muted-foreground text-xs tabular-nums">
-            {marks.map((bar, i) => (
-              <span key={i}>{bar?.mark}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** One row of SourcesCard: where some of the period's views came from. */
-interface Source {
-  key: string
-  label: string
-  /** The row of the views it is not known of: shown dimmed. */
-  unknown: boolean
-  views: number
-  addresses: number
-}
-
-/**
- * Where the period's views came from, most first (by country, or by the site's address they
- * were seen at): each one's views, the different addresses they came from, and its share of
- * all the period's views.
- */
-function SourcesCard({
+/** One of the three counts at the top: its views large, and what else is known of it below. */
+function Count({
   title,
-  name,
-  testId,
   views,
-  rows,
+  lines,
 }: {
   title: string
-  name: string
-  testId: string
-  views: number
-  rows: Source[]
+  views: string
+  lines: { label: string; value?: string }[]
 }) {
-  const { t, i18n } = useTranslation()
-  const number = new Intl.NumberFormat(i18n.language)
-  const percent = new Intl.NumberFormat(i18n.language, {
-    style: 'percent',
-    maximumFractionDigits: 1,
-  })
-  const most = Math.max(1, ...rows.map((row) => row.views))
+  const { t } = useTranslation()
   return (
-    <Card className="rounded-3xl">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t('visits.noPages')}</p>
-        ) : (
-          <Table data-testid={testId}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{name}</TableHead>
-                <TableHead className="text-right">{t('visits.views')}</TableHead>
-                <TableHead className="text-right">{t('visits.addresses')}</TableHead>
-                <TableHead className="w-1/3 text-right">{t('visits.share')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell className={cn(row.unknown && 'text-muted-foreground')}>
-                    {row.label}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {number.format(row.views)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {number.format(row.addresses)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end items-center gap-2">
-                      <div className="flex-1 max-sm:hidden">
-                        <div
-                          className="bg-primary rounded-full h-1.5"
-                          style={{ width: `${(row.views / most) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
-                        {percent.format(views ? row.views / views : 0)}
-                      </span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+    <div className="space-y-1 px-6 max-md:py-4 md:first:pl-0 md:last:pr-0 max-md:first:pt-0 max-md:last:pb-0 max-md:px-0 min-w-0">
+      <h2 className="font-bold text-sm">{title}</h2>
+      <p className="font-extrabold text-4xl tabular-nums tracking-tight">
+        {views}
+        <span className="ml-1.5 font-normal text-muted-foreground text-sm tracking-normal">
+          {t('visits.views')}
+        </span>
+      </p>
+      {lines.map((line) => (
+        <p key={line.label} className="text-muted-foreground text-sm tabular-nums">
+          {line.label}
+          {line.value !== undefined && (
+            <span className="ml-1.5 font-semibold text-foreground">{line.value}</span>
+          )}
+        </p>
+      ))}
+    </div>
   )
 }
 
@@ -209,7 +68,12 @@ export function VisitsPage() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const allowed = !!session.user?.siteAdmin
-  const [period, setPeriod] = useState(30)
+  const [params, setParams] = useSearchParams()
+  const asked = Number(params.get('days'))
+  const period = periods.includes(asked) ? asked : usual
+  const setPeriod = (n: number) =>
+    setParams(n === usual ? {} : { days: String(n) }, { replace: true })
+  const [search, setSearch] = useState('')
   const [zone] = useState(browserZone)
   const visits = useQuery({ ...playerQueries.visits(period, zone), enabled: allowed })
   const answer = visits.data
@@ -221,18 +85,14 @@ export function VisitsPage() {
 
   const number = new Intl.NumberFormat(i18n.language)
   const format = (n: number) => number.format(n)
-  const percent = new Intl.NumberFormat(i18n.language, {
-    style: 'percent',
-    maximumFractionDigits: 1,
-  })
   // The report of the period before stays up, dimmed, while the next one is read.
   const report = answer?.report
   const stale = answer?.period !== period
   const days = report?.days ?? []
-  const views = days.reduce((sum, day) => sum + day.views, 0)
-  const visitors = days.reduce((sum, day) => sum + day.visitors, 0)
+  const { views, visitors, average, peak } = periodTotals(days)
   const pages = report?.pages ?? []
-  const mostSeen = Math.max(1, ...pages.map((page) => page.views))
+  const found = pagesWith(pages, search)
+  const busiest = peakHour(report?.hours ?? [])
   const countries = report?.countries ?? []
   const sites = report?.sites ?? []
   // A country by its name in the reader's language; one the browser cannot name by its letters.
@@ -245,8 +105,23 @@ export function VisitsPage() {
       return code
     }
   }
-  const dayBars = (pick: (day: (typeof days)[number]) => number): Bar[] =>
-    days.map((day) => ({ key: day.day, label: day.day, mark: day.day.slice(5), value: pick(day) }))
+  // A day in full, with its day of the week: 2026-11-21 is a date of the report's time zone,
+  // so it is read and written as one of UTC to stay that date.
+  const fullDay = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  })
+  const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'short', timeZone: 'UTC' })
+  const dayBars: Bar[] = days.map((day) => {
+    const date = new Date(`${day.day}T00:00:00Z`)
+    return {
+      key: day.day,
+      label: `${fullDay.format(date)} ${weekday.format(date)}`,
+      mark: day.day.slice(5),
+      value: day.views,
+      part: day.visitors,
+    }
+  })
   const hourBars: Bar[] = (report?.hours ?? []).map((value, h) => ({
     key: String(h),
     label: t('visits.hour', { h }),
@@ -259,172 +134,192 @@ export function VisitsPage() {
       <div className="flex flex-wrap justify-between items-end gap-4">
         <div className="space-y-1">
           <h1 className="font-semibold text-2xl tracking-tight">{t('visits.heading')}</h1>
-          <p className="max-w-2xl text-muted-foreground text-sm">{t('visits.about')}</p>
           {report && (
             <p className="text-muted-foreground text-xs" data-testid="visits-zone">
               {t('visits.zone', { zone: report.zone })}
             </p>
           )}
         </div>
-        <div className="flex gap-1.5" role="group" aria-label={t('visits.range')}>
-          {periods.map((n) => (
-            <Button
-              key={n}
-              size="sm"
-              variant={n === period ? 'default' : 'outline'}
-              aria-pressed={n === period}
-              onClick={() => setPeriod(n)}
-            >
-              {t('visits.days', { n })}
-            </Button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          <div className="flex gap-1.5" role="group" aria-label={t('visits.range')}>
+            {periods.map((n) => (
+              <Button
+                key={n}
+                size="sm"
+                variant={n === period ? 'default' : 'outline'}
+                aria-pressed={n === period}
+                onClick={() => setPeriod(n)}
+              >
+                {t('visits.days', { n })}
+              </Button>
+            ))}
+          </div>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t('visits.refresh')}
+            title={t('visits.refresh')}
+            disabled={visits.isFetching}
+            onClick={() => void visits.refetch()}
+          >
+            <ArrowsClockwiseIcon
+              className={cn(visits.isFetching && 'motion-safe:animate-spin')}
+              aria-hidden="true"
+            />
+          </Button>
         </div>
       </div>
       {error && <Notice>{error}</Notice>}
 
       {report && (
-        <div className={cn('space-y-6 transition-opacity', stale && 'opacity-60')}>
-          <div className="gap-4 grid grid-cols-1 md:grid-cols-3">
-            {[
-              {
-                title: t('visits.today'),
-                count: report.today,
-                visitorsLabel: t('visits.visitors'),
-                note: '',
-              },
-              {
-                title: t('visits.period', { n: answer.period }),
-                count: { views, visitors },
-                visitorsLabel: t('visits.visitorDays'),
-                note: '',
-              },
-              {
-                title: t('visits.total'),
-                count: report.total,
-                visitorsLabel: t('visits.visitorDays'),
-                note: report.since ? t('visits.since', { day: report.since }) : '',
-              },
-            ].map((tile) => (
-              <Card key={tile.title} className="rounded-3xl">
-                <CardHeader>
-                  <CardTitle className="flex flex-wrap justify-between items-baseline gap-2">
-                    {tile.title}
-                    {tile.note && (
-                      <span className="font-normal text-muted-foreground text-xs">{tile.note}</span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="gap-4 grid grid-cols-2">
-                  <Figure label={t('visits.views')} value={format(tile.count.views)} />
-                  <Figure label={tile.visitorsLabel} value={format(tile.count.visitors)} />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="gap-4 grid grid-cols-1 xl:grid-cols-2">
-            <Card className="rounded-3xl">
-              <CardHeader>
-                <CardTitle>{t('visits.viewsHeading')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Bars bars={dayBars((day) => day.views)} format={format} />
-              </CardContent>
-            </Card>
-            <Card className="rounded-3xl">
-              <CardHeader>
-                <CardTitle>{t('visits.visitorsHeading')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Bars bars={dayBars((day) => day.visitors)} format={format} />
-              </CardContent>
-            </Card>
-          </div>
-
-          {hourBars.length > 0 && (
-            <Card className="rounded-3xl">
-              <CardHeader>
-                <CardTitle>{t('visits.hoursHeading')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Bars bars={hourBars} format={format} />
-              </CardContent>
-            </Card>
-          )}
-
-          <Card className="rounded-3xl">
-            <CardHeader>
-              <CardTitle>{t('visits.pagesHeading')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pages.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('visits.noPages')}</p>
-              ) : (
-                <Table data-testid="visits-pages">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('visits.page')}</TableHead>
-                      <TableHead className="text-right">{t('visits.views')}</TableHead>
-                      <TableHead className="w-1/3 text-right">{t('visits.share')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pages.map((page) => (
-                      <TableRow key={page.page}>
-                        <TableCell className="font-mono text-xs break-all whitespace-normal">
-                          {page.page}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {format(page.views)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end items-center gap-2">
-                            <div className="flex-1 max-sm:hidden">
-                              <div
-                                className="bg-primary rounded-full h-1.5"
-                                style={{ width: `${(page.views / mostSeen) * 100}%` }}
-                              />
-                            </div>
-                            <span className="w-14 text-muted-foreground text-xs text-right tabular-nums">
-                              {percent.format(views ? page.views / views : 0)}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+        <div className={cn('space-y-4 transition-opacity', stale && 'opacity-60')}>
+          <Card>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 divide-border max-md:divide-y md:divide-x">
+              <Count
+                title={t('visits.today')}
+                views={format(report.today.views)}
+                lines={[{ label: t('visits.visitors'), value: format(report.today.visitors) }]}
+              />
+              <Count
+                title={t('visits.period', { n: answer.period })}
+                views={format(views)}
+                lines={[
+                  { label: t('visits.visitorDays'), value: format(visitors) },
+                  {
+                    label: [
+                      t('visits.average', { n: format(average) }),
+                      peak && t('visits.peak', { day: peak.day.slice(5), n: format(peak.views) }),
+                    ]
+                      .filter(Boolean)
+                      .join(t('visits.listComma')),
+                  },
+                ]}
+              />
+              <Count
+                title={t('visits.total')}
+                views={format(report.total.views)}
+                lines={[
+                  { label: t('visits.visitorDays'), value: format(report.total.visitors) },
+                  ...(report.since ? [{ label: t('visits.since', { day: report.since }) }] : []),
+                ]}
+              />
             </CardContent>
           </Card>
 
-          <SourcesCard
-            title={t('visits.countriesHeading')}
-            name={t('visits.country')}
-            testId="visits-countries"
-            views={views}
-            rows={countries.map((country) => ({
-              key: country.country,
-              label: countryName(country.country),
-              unknown: !country.country,
-              views: country.views,
-              addresses: country.addresses,
-            }))}
-          />
+          <div className="gap-4 grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('visits.trendHeading')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BarChart
+                  bars={dayBars}
+                  format={format}
+                  names={{ value: t('visits.views'), part: t('visits.visitors') }}
+                />
+              </CardContent>
+            </Card>
+            {hourBars.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('visits.hoursHeading')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BarChart
+                    bars={hourBars}
+                    format={format}
+                    idle={
+                      busiest !== null && (
+                        <span className="text-muted-foreground">
+                          {t('visits.peakHour', { hour: t('visits.hour', { h: busiest }) })}
+                        </span>
+                      )
+                    }
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-          <SourcesCard
-            title={t('visits.sitesHeading')}
-            name={t('visits.site')}
-            testId="visits-sites"
-            views={views}
-            rows={sites.map((site) => ({
-              key: site.site,
-              label: site.site || t('visits.unknownSite'),
-              unknown: !site.site,
-              views: site.views,
-              addresses: site.addresses,
-            }))}
-          />
+          <div className="items-start gap-4 grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <Card>
+              <CardHeader className="flex flex-wrap justify-between items-center gap-3">
+                <CardTitle>{t('visits.pagesHeading')}</CardTitle>
+                {pages.length > 0 && (
+                  <Input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t('visits.filterPages')}
+                    aria-label={t('visits.filterPages')}
+                    className="w-48 h-8"
+                  />
+                )}
+              </CardHeader>
+              <CardContent>
+                <RankList
+                  // A list filtered anew starts folded again.
+                  key={search}
+                  testId="visits-pages"
+                  name={t('visits.page')}
+                  total={views}
+                  empty={pages.length ? t('visits.noMatch') : t('visits.noPages')}
+                  mono
+                  rows={found.map((page) => ({
+                    key: page.page,
+                    label: page.page,
+                    href: page.page,
+                    views: page.views,
+                  }))}
+                />
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('visits.countriesHeading')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RankList
+                    testId="visits-countries"
+                    name={t('visits.country')}
+                    total={views}
+                    empty={t('visits.noPages')}
+                    limit={8}
+                    rows={countries.map((country) => ({
+                      key: country.country,
+                      label: countryName(country.country),
+                      dim: !country.country,
+                      views: country.views,
+                      addresses: country.addresses,
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('visits.sitesHeading')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RankList
+                    testId="visits-sites"
+                    name={t('visits.site')}
+                    total={views}
+                    empty={t('visits.noPages')}
+                    limit={8}
+                    rows={sites.map((site) => ({
+                      key: site.site,
+                      label: site.site || t('visits.unknownSite'),
+                      dim: !site.site,
+                      views: site.views,
+                      addresses: site.addresses,
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           <details className="bg-card shadow-elev-1 px-6 py-4 rounded-3xl">
             <summary className="font-semibold text-sm cursor-pointer">{t('visits.table')}</summary>
@@ -450,6 +345,11 @@ export function VisitsPage() {
                 </TableBody>
               </Table>
             </div>
+          </details>
+
+          <details className="px-6 text-muted-foreground text-sm">
+            <summary className="cursor-pointer">{t('visits.aboutHeading')}</summary>
+            <p className="mt-2 max-w-2xl">{t('visits.about')}</p>
           </details>
         </div>
       )}
