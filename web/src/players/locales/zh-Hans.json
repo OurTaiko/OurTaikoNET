@@ -260,8 +260,6 @@
     "visitorDays": "访客（按天合计）",
     "range": "时间范围",
     "days": "{{n}} 天",
-    "viewsHeading": "每日浏览量",
-    "visitorsHeading": "每日访客",
     "hoursHeading": "各时段浏览量",
     "hour": "{{h}} 时",
     "pagesHeading": "最常访问的页面",
@@ -276,7 +274,18 @@
     "site": "域名",
     "unknownSite": "未记录",
     "table": "以表格查看每日数据",
-    "day": "日期"
+    "day": "日期",
+    "refresh": "刷新",
+    "average": "日均 {{n}}",
+    "peak": "最高 {{day}}：{{n}}",
+    "trendHeading": "每日走势",
+    "peakHour": "高峰 {{hour}}",
+    "filterPages": "筛选页面",
+    "noMatch": "没有符合的页面。",
+    "showAll": "显示全部 {{n}} 项",
+    "showLess": "收起",
+    "aboutHeading": "统计方式",
+    "listComma": "，"
   },
   "manage": {
     "heading": "用户组",

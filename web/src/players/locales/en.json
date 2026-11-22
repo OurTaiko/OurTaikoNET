@@ -260,8 +260,6 @@
     "visitorDays": "Visitors (summed by day)",
     "range": "Period",
     "days": "{{n}} days",
-    "viewsHeading": "Views per day",
-    "visitorsHeading": "Visitors per day",
     "hoursHeading": "Views by hour of day",
     "hour": "{{h}}:00",
     "pagesHeading": "Most visited pages",
@@ -276,7 +274,18 @@
     "site": "Address",
     "unknownSite": "Not recorded",
     "table": "Show the days as a table",
-    "day": "Day"
+    "day": "Day",
+    "refresh": "Refresh",
+    "average": "{{n}} a day on average",
+    "peak": "Busiest: {{day}}, {{n}}",
+    "trendHeading": "Day by day",
+    "peakHour": "Busiest at {{hour}}",
+    "filterPages": "Filter pages",
+    "noMatch": "No page matches.",
+    "showAll": "Show all {{n}}",
+    "showLess": "Show fewer",
+    "aboutHeading": "How visits are counted",
+    "listComma": " · "
   },
   "manage": {
     "heading": "User groups",

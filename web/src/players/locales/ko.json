@@ -260,8 +260,6 @@
     "visitorDays": "방문자(일별 합계)",
     "range": "기간",
     "days": "{{n}}일",
-    "viewsHeading": "일별 조회수",
-    "visitorsHeading": "일별 방문자",
     "hoursHeading": "시간대별 조회수",
     "hour": "{{h}}시",
     "pagesHeading": "가장 많이 본 페이지",
@@ -276,7 +274,18 @@
     "site": "도메인",
     "unknownSite": "기록 없음",
     "table": "일별 데이터를 표로 보기",
-    "day": "날짜"
+    "day": "날짜",
+    "refresh": "새로고침",
+    "average": "일평균 {{n}}",
+    "peak": "최고 {{day}}: {{n}}",
+    "trendHeading": "일별 추이",
+    "peakHour": "피크 {{hour}}",
+    "filterPages": "페이지 필터",
+    "noMatch": "일치하는 페이지가 없습니다.",
+    "showAll": "{{n}}개 모두 보기",
+    "showLess": "접기",
+    "aboutHeading": "집계 방식",
+    "listComma": ", "
   },
   "manage": {
     "heading": "사용자 그룹",
