@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-19T19:30:42Z",
-  "updated_at": "2026-11-22T02:28:52Z",
+  "updated_at": "2026-11-22T02:57:58Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "5c575f2d85d8b5759d524bb00ddd79fbbabd3fb25c92874f7322771c1b39c37f",
-      "size": 193960,
-      "normalized_sha256": "5c575f2d85d8b5759d524bb00ddd79fbbabd3fb25c92874f7322771c1b39c37f"
+      "sha256": "4cd959a939153ffa409e509799d5f808c320280ec6d3287b2612864a22a98679",
+      "size": 194016,
+      "normalized_sha256": "4cd959a939153ffa409e509799d5f808c320280ec6d3287b2612864a22a98679"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -327,9 +327,9 @@
     },
     "deploy/README.md": {
       "role": "index",
-      "sha256": "7f38dabe432905c69927fd39ff438572095b0455117da68e4d8249709be976fb",
-      "size": 27935,
-      "normalized_sha256": "7f38dabe432905c69927fd39ff438572095b0455117da68e4d8249709be976fb"
+      "sha256": "38c17a8348f53b742b7f5f4613a296af779687d9e92bd234c52cad871488d348",
+      "size": 29194,
+      "normalized_sha256": "38c17a8348f53b742b7f5f4613a296af779687d9e92bd234c52cad871488d348"
     },
     "deploy/aliyun-mirror.json": {
       "role": "index",
@@ -357,9 +357,9 @@
     },
     "deploy/mainland-proxy.conf": {
       "role": "index",
-      "sha256": "261528001e25a882c9575b030d5b9b52a3f4fa9f519f69e1920e766c40709a5f",
-      "size": 3276,
-      "normalized_sha256": "261528001e25a882c9575b030d5b9b52a3f4fa9f519f69e1920e766c40709a5f"
+      "sha256": "dfe21857cc4740783f0c9e3915d3e395c8e622d74f82224bfe407ee9241f64a8",
+      "size": 4298,
+      "normalized_sha256": "dfe21857cc4740783f0c9e3915d3e395c8e622d74f82224bfe407ee9241f64a8"
     },
     "deploy/net.locations.conf": {
       "role": "index",
