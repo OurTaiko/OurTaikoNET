@@ -4,9 +4,15 @@
 
 **这个仓库推送到 `main` 即由 CI 发布到正式环境（net.ourtaiko.org）。** 不要直接推送 `main`，一律通过分支和 PR；只在用户明确要求时提交、推送或开 PR。
 
-## 0. 推荐使用 AOCI 建立仓库认知
+## 0. AOCI：只读使用，PR 不修改索引
 
-本仓库维护 AOCI 认知索引（`aoci.txt` 等），推荐用它在动手前掌握系统全貌：新会话先 `aoci_rules`、`aoci_overview`；改动完成后调用一次 `aoci_maintain` 维护受影响的条目。具体规则见下方「AOCI Repository Cognition」一节（该节由 AOCI 管理，不要手工改动它的标记之间的内容）。AOCI 索引文件的更新与业务改动分开提交（`chore(aoci): …`）。
+本仓库维护 AOCI 认知索引（`aoci.txt`、`aoci.code.txt`、`aoci.database.txt`、`aoci.meta.txt` 和 `.aoci/`），推荐用它在动手前掌握系统全貌：新会话先 `aoci_rules`、`aoci_overview`。具体规则见下方「AOCI Repository Cognition」一节（该节由 AOCI 管理，不要手工改动它的标记之间的内容）。
+
+**PR 一律不修改 AOCI 文件**：`aoci*.txt` 和 `.aoci/` 下受版本控制的文件（`baseline.json`、`config.json`、`database-baseline.json` 等）。每次维护索引都会改 `.aoci/baseline.json` 里的更新时间和它为 `aoci.code.txt` 记录的指纹，所以两个同时开着的 PR 只要都维护过索引就必然冲突；这种冲突也不能手工合并，合并结果与两边记录的指纹都对不上，AOCI 会拒绝。
+
+- 这是仓库所有者的明确禁止，适用下方 AOCI 一节第 9 条：做功能、修复、文档等工作时，不调用 `aoci_maintain`、`aoci_update_entry`，不运行 `aoci scope acknowledge` 等会写这些文件的命令。工具若在本地改了它们，提交前用 `git checkout -- 'aoci*.txt' .aoci` 还原，不要提交。
+- 索引因此会落后于代码：AOCI 把改过的文件标为 stale，这些条目不可靠，以源码为准。
+- 索引只由单独的 AOCI 维护 PR 补齐：仅在用户要求时开，从最新的 `main` 建分支，只包含 AOCI 文件，提交写作 `chore(aoci): …`。它不触发发布（`deploy.yml` 跳过 `aoci*.txt` 与 `.aoci/`）；同一时间只开一个。
 
 ## 1. 修改代码时做最佳实践，不打补丁
 

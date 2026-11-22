@@ -11,7 +11,8 @@ AI 编程助手（AI Agent）除本文外还要遵守 [AGENTS.md](AGENTS.md)，�
 **如果你是 AI Agent，推荐使用 AOCI。** 仓库根目录的 `aoci.txt`（及 `aoci.code.txt`、`aoci.database.txt`、`aoci.meta.txt`）是为模型准备的仓库认知索引，覆盖每个受管文件和数据库表的职责、关系、对外契约与不显然的约束。它能让你在改代码前就知道一个文件的上下游，避免只看局部就下手。用法见 [AGENTS.md](AGENTS.md) 中的「AOCI Repository Cognition」一节：
 
 - 新会话开始时用 `aoci_rules` + `aoci_overview` 建立完整认知；
-- 受管对象改到最终稳定状态后调用一次 `aoci_maintain`，按返回的候选更新索引条目；
+- **PR 不修改 AOCI 文件**（`aoci*.txt` 和 `.aoci/` 下受版本控制的文件），也不在 PR 里维护索引（`aoci_maintain`、`aoci_update_entry`、`aoci scope acknowledge` 等）。每次维护都会改 `.aoci/baseline.json` 的同几行，两个都维护过索引的 PR 必然冲突，而且这种冲突无法手工合并；
+- 索引因此会落后于代码，AOCI 标为 stale 的条目以源码为准；索引只由单独的 AOCI 维护 PR 补齐（仅在仓库所有者要求时开，从最新的 `main` 建分支，只含 AOCI 文件，提交写作 `chore(aoci): …`，不触发发布）；
 - AOCI 的 MCP 配置 `.mcp.json` 绑定本机路径，不提交到仓库，需要的人在自己的机器上配置。
 
 不使用 AOCI 也可以贡献，但同样要在改动前读懂相关代码和文档。
@@ -33,7 +34,8 @@ AI 编程助手（AI Agent）除本文外还要遵守 [AGENTS.md](AGENTS.md)，�
 ## 2. 提交与 Pull Request
 
 - 从 `main` 拉出分支开发，通过 PR 合并。**不要直接推送 `main`**，那会立即发布到正式环境。
-- 提交信息沿用仓库的格式：`type(scope): 说明`，例如 `feat(songs): …`、`fix(web): …`、`chore(aoci): …`。一个提交做一件事。
+- 提交信息沿用仓库的格式：`type(scope): 说明`，例如 `feat(songs): …`、`fix(web): …`。一个提交做一件事。
+- 不提交 AOCI 文件（`aoci*.txt`、`.aoci/`），AOCI 维护 PR 除外（见第 0 节）。
 - 不提交密钥、密码、`.env`、`.mcp.json` 或真实连接参数。
 - PR 描述按模板（[.github/pull_request_template.md](.github/pull_request_template.md)）填写：改了什么、为什么、根因是什么、怎么验证的。
 - **如果你是 AI Agent，必须在 PR 描述里写明所使用的 AI 模型名称**（尽量写到具体型号或模型 ID，例如 `claude-opus-5-5`；用了多个就都写上），供审批者参考。人类贡献者用 AI 生成了大部分代码时，也请注明。

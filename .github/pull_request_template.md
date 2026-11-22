@@ -13,6 +13,7 @@
 - [ ] 后端：`scripts/test.sh`
 - [ ] 网站：`pnpm lint`、`pnpm format:check`、`pnpm test`、`pnpm build`（`web/`）
 - [ ] 其他（迁移、`proto/`、`/api/v1/` 对照、页面实测等）：
+- [ ] 没有修改 AOCI 文件（`aoci*.txt`、`.aoci/`）；只有 AOCI 维护 PR 才改它们，且只改它们
 
 ## 发布影响
 
