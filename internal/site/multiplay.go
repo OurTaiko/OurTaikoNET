@@ -22,6 +22,9 @@ type Multiplay struct {
 	Protocol    int    `json:"protocol"`
 	MaxProtocol int    `json:"maxProtocol"`
 	MaxMembers  int    `json:"maxMembers"`
+	// AtSite is set when URL is the site's own origin: a request that came to another of the
+	// site's addresses (web.Origins) is told to dial that one, whose proxy passes the rooms on.
+	AtSite bool `json:"-"`
 }
 
 // Option is something a site may have besides its sources and players' routes.
@@ -44,6 +47,10 @@ func gameMultiplay(m *Multiplay) http.HandlerFunc {
 			web.Respond(w, 404, map[string]string{"code": "MULTIPLAY_UNAVAILABLE", "message": "Multi-Enso is not available on this server"})
 			return
 		}
-		web.Respond(w, 200, m)
+		answer := *m
+		if answer.AtSite {
+			answer.URL = web.Origin(r.Context(), answer.URL)
+		}
+		web.Respond(w, 200, answer)
 	}
 }

@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +21,8 @@ import (
 
 // Source is a song source whose plays are shown. ID is its name in ourtaiko_net (the schema
 // its charts are in, and the source of its rows in net.scores); Site is where its chart pages
-// are, for links.
+// are, for links: an address, or a path on this site, which is answered at the site's address
+// the request came to (sourcesAt).
 type Source struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -176,7 +179,7 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	selected := []Source{}
-	for _, src := range s.Config.Sources {
+	for _, src := range s.sourcesAt(r.Context()) {
 		if source == "all" || source == src.ID {
 			selected = append(selected, src)
 		}
@@ -232,5 +235,17 @@ func (s *Server) userScores(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sources(w http.ResponseWriter, r *http.Request) {
-	web.Respond(w, 200, map[string]any{"sources": s.Config.Sources})
+	web.Respond(w, 200, map[string]any{"sources": s.sourcesAt(r.Context())})
+}
+
+// sourcesAt is Config.Sources with each Site that is a path on this site made the address of
+// it at the site's origin the request of ctx came to (web.Origins).
+func (s *Server) sourcesAt(ctx context.Context) []Source {
+	sources := slices.Clone(s.Config.Sources)
+	for i := range sources {
+		if strings.HasPrefix(sources[i].Site, "/") {
+			sources[i].Site = web.Origin(ctx, s.Config.Origin) + sources[i].Site
+		}
+	}
+	return sources
 }

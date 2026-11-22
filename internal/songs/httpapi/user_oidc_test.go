@@ -16,9 +16,11 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
-	pool := testDB(t, Fanmade)
-	ctx := context.Background()
+// accountCenterOIDC is a stand-in account center that signs in whoever the code names, and a
+// client of it whose callback is callback. The string holds the redirect_uri the last code was
+// redeemed with.
+func accountCenterOIDC(t *testing.T, callback string) (*account.Client, *string) {
+	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +29,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var issuer string
+	var issuer, redirected string
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
@@ -40,6 +42,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 				w.WriteHeader(400)
 				return
 			}
+			redirected = r.Form.Get("redirect_uri")
 			if r.Form.Get("code_verifier") != "test-verifier" {
 				t.Error("PKCE verifier lost")
 				w.WriteHeader(400)
@@ -72,12 +75,19 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 			w.WriteHeader(404)
 		}
 	}))
-	defer remote.Close()
+	t.Cleanup(remote.Close)
 	issuer = remote.URL
-	client, err := account.New(account.Config{Issuer: issuer, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "test-secret", RedirectURL: "http://127.0.0.1/callback", EncryptionKey: strings.Repeat("b", 64)})
+	client, err := account.New(account.Config{Issuer: issuer, ServiceID: "fanmade", ServiceKey: strings.Repeat("a", 64), ClientID: "web", ClientSecret: "test-secret", RedirectURL: callback, EncryptionKey: strings.Repeat("b", 64)})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return client, &redirected
+}
+
+func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
+	pool := testDB(t, Fanmade)
+	ctx := context.Background()
+	client, _ := accountCenterOIDC(t, "http://127.0.0.1/callback")
 	app := New(pool, Config{Origin: "http://localhost", SSO: client})
 	callback := func(id string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -107,7 +117,7 @@ func TestUserOIDCLoginAndSessionAreAtomic(t *testing.T) {
 	}
 	var encryptedRefresh []byte
 	var deadline, accessExpiry time.Time
-	if err = pool.QueryRow(ctx, `SELECT upstream_refresh_token,expires_at,upstream_expires_at FROM sessions WHERE user_id=$1`, id).Scan(&encryptedRefresh, &deadline, &accessExpiry); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT upstream_refresh_token,expires_at,upstream_expires_at FROM sessions WHERE user_id=$1`, id).Scan(&encryptedRefresh, &deadline, &accessExpiry); err != nil {
 		t.Fatal(err)
 	}
 	plain, err := client.Unseal(encryptedRefresh, "refresh:"+web.Hash(cookie.Value))

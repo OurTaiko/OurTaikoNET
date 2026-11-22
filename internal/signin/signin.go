@@ -34,7 +34,8 @@ type Sessions struct {
 	// DevUserID is set (local development only).
 	SSO       *account.Client
 	DevUserID string
-	// Origin is the website's address, which sign-in returns to.
+	// Origin is the website's own address. Sign-in returns to the address it began at
+	// (web.Origins), this one or another; the account center sends it back there.
 	Origin       string
 	CookieSecure bool
 	// Cookie names the session cookie. FlowCookie ties a sign-in at the account center to the
@@ -211,6 +212,7 @@ func (s *Sessions) Open(ctx context.Context, user, access, refresh string, acces
 // Login begins a sign-in: GET …/auth/sso/login?returnTo=<page>. Without an account center it
 // signs the development user in at once, if there is one.
 func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
+	origin := web.Origin(r.Context(), s.Origin)
 	destination := s.SafeReturn(r.URL.Query().Get("returnTo"))
 	if strings.HasPrefix(destination, "/api/") {
 		s.Problem(w, 400, "RETURN_PATH_INVALID", "返回地址必须是网站页面")
@@ -218,7 +220,7 @@ func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.SSO == nil {
 		if s.DevUserID == "" {
-			http.Redirect(w, r, s.Origin+s.ErrorPage, http.StatusSeeOther)
+			http.Redirect(w, r, origin+s.ErrorPage, http.StatusSeeOther)
 			return
 		}
 		rawSession, expires, e := s.Open(r.Context(), s.DevUserID, "", "", time.Time{})
@@ -227,10 +229,10 @@ func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.SetCookie(w, rawSession, expires)
-		http.Redirect(w, r, s.Origin+destination, http.StatusSeeOther)
+		http.Redirect(w, r, origin+destination, http.StatusSeeOther)
 		return
 	}
-	_, cfg, e := s.SSO.OIDC(r.Context())
+	_, cfg, e := s.oidc(r.Context(), origin)
 	if e != nil {
 		s.Internal(w, e)
 		return
@@ -253,7 +255,8 @@ func (s *Sessions) Login(w http.ResponseWriter, r *http.Request) {
 // opens a session only for a player the account center has just vouched for, in the browser
 // that began the sign-in, and withdraws the account center's tokens if anything is amiss.
 func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
-	fail := func() { http.Redirect(w, r, s.Origin+s.ErrorPage, http.StatusSeeOther) }
+	origin := web.Origin(r.Context(), s.Origin)
+	fail := func() { http.Redirect(w, r, origin+s.ErrorPage, http.StatusSeeOther) }
 	if s.SSO == nil {
 		fail()
 		return
@@ -271,7 +274,7 @@ func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	provider, cfg, e := s.SSO.OIDC(r.Context())
+	provider, cfg, e := s.oidc(r.Context(), origin)
 	if e != nil {
 		fail()
 		return
@@ -318,7 +321,19 @@ func (s *Sessions) Callback(w http.ResponseWriter, r *http.Request) {
 		_, _ = s.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, web.Hash(old.Value))
 	}
 	s.SetCookie(w, rawSession, expires)
-	http.Redirect(w, r, s.Origin+s.SafeReturn(destination), http.StatusSeeOther)
+	http.Redirect(w, r, origin+s.SafeReturn(destination), http.StatusSeeOther)
+}
+
+// oidc is the account center's sign-in for a browser at origin: the one Application, which
+// sends the browser back to the callback at that origin. The site's own origin uses the
+// callback as configured (SSO_REDIRECT_URL); each other one has its own, which the account
+// center must list for the Application too.
+func (s *Sessions) oidc(ctx context.Context, origin string) (*oidc.Provider, *oauth2.Config, error) {
+	provider, cfg, e := s.SSO.OIDC(ctx)
+	if e == nil && origin != strings.TrimRight(s.Origin, "/") {
+		cfg.RedirectURL, e = account.RedirectAt(cfg.RedirectURL, origin)
+	}
+	return provider, cfg, e
 }
 
 // Logout ends the request's session: POST …/auth/logout. It works when the account center

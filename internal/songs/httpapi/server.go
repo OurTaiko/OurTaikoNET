@@ -22,7 +22,9 @@ import (
 
 type Config struct {
 	// Source is the song source this server serves; nil is the Fanmade source.
-	Source          *Source
+	Source *Source
+	// Origin is the site's own address; a request that came to another of its addresses is
+	// answered in that one (web.Origins).
 	Origin, Storage string
 	// Site is the built website; nil serves the API alone.
 	Site         fs.FS
@@ -216,8 +218,9 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		// Native game requests come without an Origin; a browser always sends one.
-		if game := isGameRequest(r); r.Method != "GET" && r.Method != "HEAD" && ((game && r.Header.Get("Origin") != "") || (!game && r.Header.Get("Origin") != s.Config.Origin)) {
+		// Native game requests come without an Origin; a browser always sends one, that of the
+		// site's address it came to (web.Origins).
+		if game := isGameRequest(r); r.Method != "GET" && r.Method != "HEAD" && ((game && r.Header.Get("Origin") != "") || (!game && r.Header.Get("Origin") != web.Origin(r.Context(), s.Config.Origin))) {
 			problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
 			return
 		}

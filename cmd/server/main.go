@@ -100,6 +100,16 @@ func main() {
 		LegacyFanmadeHost: os.Getenv("LEGACY_FANMADE_HOST"), LegacyOfficialHost: os.Getenv("LEGACY_OFFICIAL_HOST"), LegacyProfileHost: os.Getenv("LEGACY_PROFILE_HOST"),
 		FanmadeSite: strings.TrimRight(os.Getenv("FANMADE_SITE"), "/"), OfficialSite: strings.TrimRight(os.Getenv("OFFICIAL_SITE"), "/"),
 	}
+	// More addresses of the same site, such as one in mainland China whose proxy passes
+	// everything here: comma-separated origins.
+	for _, origin := range strings.Split(os.Getenv("APP_OTHER_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			cfg.OtherOrigins = append(cfg.OtherOrigins, origin)
+		}
+	}
+	if len(cfg.OtherOrigins) > 0 {
+		log.Printf("also served at %v", cfg.OtherOrigins)
+	}
 	var err error
 	if cfg.TrustedProxies, err = web.ParseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		log.Fatal(err)

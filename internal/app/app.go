@@ -37,6 +37,7 @@ import (
 	"ourtaiko.dev/net/internal/rewards"
 	"ourtaiko.dev/net/internal/site"
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // SchemaVersion is the version of ourtaiko_net this program works with: the baseline and
@@ -53,6 +54,9 @@ type Config struct {
 	DatabaseURL string
 	// Origin is the website's origin, checked on requests that change something.
 	Origin string
+	// OtherOrigins are more addresses of the same site, such as one in mainland China whose
+	// proxy passes everything here: a request is answered in the one it came to (web.Origins).
+	OtherOrigins []string
 	// StorageDir holds each source's files (or, with object storage, its staged uploads) in a
 	// folder named after the source.
 	StorageDir     string
@@ -67,7 +71,7 @@ type Config struct {
 	DevUserID string
 
 	// Where each source's chart pages are on the website; players' score lists link there.
-	// Empty: <Origin>/fanmade and <Origin>/official.
+	// Empty: /fanmade and /official on the site, at whichever of its addresses was asked.
 	FanmadeSite, OfficialSite string
 
 	// WebDir is where the built website is (web/'s dist), served for every address
@@ -101,6 +105,8 @@ type App struct {
 	legacy  legacy.Hosts
 	webDir  string
 	origin  string
+	// origins tells each request which of the site's addresses it came to (Handler).
+	origins web.Origins
 	// sso is the account center's client when there is one; Start refreshes its copy of
 	// players' profiles.
 	sso *account.Client
@@ -135,6 +141,11 @@ func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Reque
 // schema this program was built for; see Init.
 func New(ctx context.Context, cfg Config) (*App, error) {
 	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir, origin: cfg.Origin}
+	origins, err := web.NewOrigins(cfg.Origin, cfg.OtherOrigins)
+	if err != nil {
+		return nil, err
+	}
+	a.origins = origins
 	// A release that changes the schema carries the change and applies it as it starts.
 	applied, err := netdb.Migrate(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -190,10 +201,10 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 	fanmadeSite, officialSite := cfg.FanmadeSite, cfg.OfficialSite
 	if fanmadeSite == "" {
-		fanmadeSite = cfg.Origin + "/fanmade"
+		fanmadeSite = "/fanmade"
 	}
 	if officialSite == "" {
-		officialSite = cfg.Origin + "/official"
+		officialSite = "/official"
 	}
 	a.rewards = rewards.NewStore(shared)
 	a.shared = shared
@@ -273,7 +284,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		}
 		a.roomsSite = &site.Multiplay{URL: cfg.Multiplay.PublicURL, Protocol: multiplay.MinProtocol, MaxProtocol: multiplay.Protocol, MaxMembers: timings.MaxMembers}
 		if a.roomsSite.URL == "" {
-			a.roomsSite.URL = cfg.Origin
+			a.roomsSite.URL, a.roomsSite.AtSite = strings.TrimRight(cfg.Origin, "/"), true
 		}
 	}
 	// Version 2 gives paths; in development the files on disk are served under its own root.
@@ -308,7 +319,7 @@ func (a *App) Handler() http.Handler {
 	// The chart editor (OurTaikoEdit's web version) as a bare page at /edit/app/, its build from the
 	// public bucket; the website shows it in its frame.
 	page := edit.Handler(edit.Config{Root: files.Root, Manifest: "edit-nightly.json", Router: a.v1.Router}, site.Web(a.webDir, a.origin, routes))
-	return a.rewards.Announce(legacy.Handler(a.legacy, page))
+	return a.origins.Handler(a.rewards.Announce(legacy.Handler(a.legacy, page)))
 }
 
 // versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
