@@ -19,6 +19,8 @@ import (
 )
 
 type Config struct {
+	// Origin is the site's own address; a request that came to another of its addresses is
+	// answered in that one (web.Origins).
 	Origin       string
 	CookieSecure bool
 	// SSO is nil when no account center is configured; sign-in is then unavailable unless
@@ -184,9 +186,9 @@ func (s *Server) Handler() http.Handler {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		// Services call /internal/ from their servers, without an Origin; a browser always
-		// sends one with a write.
+		// sends one with a write, that of the site's address it came to (web.Origins).
 		service := strings.HasPrefix(r.URL.Path, "/internal/")
-		if r.Method != "GET" && r.Method != "HEAD" && ((service && r.Header.Get("Origin") != "") || (!service && r.Header.Get("Origin") != s.Config.Origin)) {
+		if r.Method != "GET" && r.Method != "HEAD" && ((service && r.Header.Get("Origin") != "") || (!service && r.Header.Get("Origin") != web.Origin(r.Context(), s.Config.Origin))) {
 			problem(w, 403, "ORIGIN_INVALID", "请求来源无效，请从本站页面操作")
 			return
 		}

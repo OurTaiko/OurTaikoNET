@@ -27,7 +27,8 @@ type Config struct {
 	// /api/v2/files/, which serves those folders and sends every other path to the canonical
 	// root. Empty in production: the files are in the bucket.
 	OnDisk map[string]objectstore.Store
-	// Origin is this site's address, the root's on disk.
+	// Origin is this site's address, the root's on disk (or the other address of the site the
+	// request came to, web.Origins).
 	Origin string
 }
 
@@ -52,7 +53,7 @@ func Handler(api http.Handler, cfg Config) http.Handler {
 // everyone else, and this server's in development with files on disk.
 func (cfg Config) source(r *http.Request) distribution.SourceAnswer {
 	if len(cfg.OnDisk) > 0 {
-		return distribution.SourceAnswer{BaseURL: cfg.Origin + "/api/v2/files/", CanonicalBaseURL: files.Root}
+		return distribution.SourceAnswer{BaseURL: web.Origin(r.Context(), cfg.Origin) + "/api/v2/files/", CanonicalBaseURL: files.Root}
 	}
 	return cfg.Router.Source(r)
 }

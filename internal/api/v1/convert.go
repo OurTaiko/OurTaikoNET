@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ourtaiko.dev/net/internal/files"
+	"ourtaiko.dev/net/internal/web"
 )
 
 // The version-free API answers files as paths under the distribution root (package files),
@@ -189,7 +190,12 @@ func (c *converter) resource(chart, kind string, link map[string]any) {
 				base = c.r.URL.Path[:i]
 			}
 		}
-		address = c.cfg.Origin + base + "/charts/" + chart + "/" + kind
+		origin := c.cfg.Origin
+		if c.r != nil {
+			// A shared cache keeps answers of each host apart already: no need to vary.
+			origin = web.Origin(c.r.Context(), origin)
+		}
+		address = origin + base + "/charts/" + chart + "/" + kind
 	} else {
 		address, fallback = c.song(p)
 	}

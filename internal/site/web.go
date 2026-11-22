@@ -8,6 +8,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"ourtaiko.dev/net/internal/web"
 )
 
 // Web serves the website in front of the API.
@@ -20,7 +22,8 @@ import (
 //
 // A song's, a playlist's, a 段位 course's or a player's page gets index.html with its own title,
 // description and link-card tags (head.go), looked up through api; origin is the site's address
-// for the absolute addresses those tags hold (empty: the request's own).
+// for the absolute addresses those tags hold, or the other address of the site the request came
+// to (web.Origins); empty: the request's own.
 //
 // An empty dir gives api alone, as in development, where the website's own server is in front.
 func Web(dir, origin string, api http.Handler) http.Handler {
@@ -59,10 +62,11 @@ func isAPI(p string) bool {
 	return strings.HasPrefix(p, "/api/") || p == "/healthz" || p == "/readyz"
 }
 
-// siteOrigin is origin, or when it is empty the address r came to.
+// siteOrigin is the site's origin r came to (web.Origin), or when origin is empty the address r
+// came to.
 func siteOrigin(r *http.Request, origin string) string {
 	if origin != "" {
-		return strings.TrimSuffix(origin, "/")
+		return web.Origin(r.Context(), origin)
 	}
 	scheme := "http"
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {

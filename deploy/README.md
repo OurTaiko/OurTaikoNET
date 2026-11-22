@@ -132,6 +132,59 @@ Each step touches production and is done with the owner's go-ahead.
 6. **Release** the backend, then the website (then still OurTaikoNetWeb). **Done on 2026-11-14**,
    before steps 3 and 5.
 
+## The address in mainland China
+
+The site has a second address, **otnet.sakura-bot.cn** (ICP-registered), for visitors in
+mainland China whose connection to Los Angeles is unreliable. A server in mainland China runs
+nginx with [mainland-proxy.conf](mainland-proxy.conf): it ends the visitor's TLS there and
+passes every request, Multi-Enso's gRPC included, to `net.ourtaiko.org` over connections it
+keeps open, with the visitor's address in `X-Real-IP` and the host name unchanged. Files do not
+come this way: mainland visitors already get them from the mirror (next section).
+
+It is the same site, database and account: the backend lists the address in
+`APP_OTHER_ORIGINS` and answers each request in the address it came to (`internal/web`,
+`Origins`). A write is accepted only from the pages of its own address, sign-in begins and ends
+there (the account center's callback is `SSO_REDIRECT_URL`'s path at that address), and the
+full addresses an answer gives (players' score links, the address the game is told to dial for
+Multi-Enso when `MULTIPLAY_PUBLIC_URL` is empty) are on it. A browser keeps the sessions of the
+two addresses apart, as it keeps their local storage: a visitor signs in at each, and the
+chart editor's local projects at one are not seen at the other. Requests to any other host name
+(the old sites' included) are answered in `APP_ORIGIN`.
+
+Setting it up, each step with the owner's go-ahead:
+
+1. **Backend.** Release the version that reads `APP_OTHER_ORIGINS`. Add
+   `APP_OTHER_ORIGINS=https://otnet.sakura-bot.cn` to `api.env` and recreate the container; it
+   logs `also served at [...]` at start. Leave `MULTIPLAY_PUBLIC_URL` unset so that the game
+   that asked at the mainland address dials it.
+2. **Account center.** Add `https://otnet.sakura-bot.cn/api/v1/auth/sso/callback` to the
+   redirect URIs of the Application `OurTaikoNet`, beside the one there.
+3. **Los Angeles proxy.** Add `otnet.sakura-bot.cn` to the domains of the 1Panel website
+   `net.ourtaiko.org` (no certificate is needed for it: the mainland server connects under the
+   name `net.ourtaiko.org`). In that site's server block, believe `X-Real-IP` from the mainland
+   server's address alone, so that its rate limits and region go by the visitor:
+
+   ```
+   set_real_ip_from <the mainland server's public address>;
+   real_ip_header X-Real-IP;
+   ```
+
+   The site's own `proxy_set_header X-Real-IP $remote_addr` then passes the visitor's address
+   on. Without these lines every mainland visitor is the mainland server: one rate limit for
+   all of them. `nginx -t`, then reload.
+4. **Mainland server.** Install `mainland-proxy.conf` with a certificate for
+   `otnet.sakura-bot.cn`. Set the CA bundle path to the system's (`/etc/pki/tls/certs/ca-bundle.crt`
+   on CentOS-like systems); with nginx older than 1.25.1, write `listen 443 ssl http2;` instead
+   of `http2 on;`. nginx resolves `net.ourtaiko.org` when it starts: reload it if that address
+   ever changes.
+5. **DNS.** Point `otnet.sakura-bot.cn` at the mainland server.
+6. **Check** from mainland China: the site loads and signs in at `https://otnet.sakura-bot.cn`
+   and returns there; posting a comment works; `GET /api/v1/game/multiplay` there answers that
+   address; the backend's logs show the visitor's address, not the mainland server's.
+
+To take it away, point DNS elsewhere or stop the mainland server, then remove the value from
+`APP_OTHER_ORIGINS`, the redirect URI and the domain.
+
 ## Regional resource mirror rollout
 
 Keep `DON_CATALOG_URL` on the canonical CloudFront catalog. Prepare and verify the mirror
@@ -192,7 +245,8 @@ Multi-Enso (the game's online rooms, `internal/multiplay`; root `README.md`, "Mu
 the container `ourtaiko-net-rooms`, the program `ourtaiko-rooms` of the site's image. It
 listens on 8081 in clear text (h2c), mapped to `127.0.0.1:8097` on the server, and asks the
 site at `http://net:8082` on the private network `rooms`. The game is told to dial `MULTIPLAY_PUBLIC_URL`,
-by default `APP_ORIGIN`: `https://net.ourtaiko.org`, port 443, where the proxy ends TLS and
+by default the site's address the game asked at (`APP_ORIGIN`, `https://net.ourtaiko.org`, or the
+address in mainland China, whose proxy passes the service on in turn): port 443, where the proxy ends TLS and
 passes the one path of the service on:
 
 ```

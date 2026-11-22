@@ -216,7 +216,7 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 			PlayerTotals
 		}{id, p.Nickname, files.Path(p.AvatarURL), totals},
 		"nameplate":         plate,
-		"sources":           s.Config.Sources,
+		"sources":           s.sourcesAt(r.Context()),
 		"profilesAvailable": answered,
 		"totalsAvailable":   err == nil,
 	})

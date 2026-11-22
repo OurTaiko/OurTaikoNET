@@ -245,7 +245,7 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 `); err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), LegacyProfileHost: "profile.ourtaiko.org"})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", OtherOrigins: []string{"https://cn.example"}, StorageDir: t.TempDir(), LegacyProfileHost: "profile.ourtaiko.org"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,8 +259,9 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		return w
 	}
 
-	// One list of a player's plays, from both sources, at the new address and the old one.
-	for _, host := range []string{"net.ourtaiko.org", "profile.ourtaiko.org"} {
+	// One list of a player's plays, from both sources, at the new address and the old one; at
+	// another address of the site, its links are on that one.
+	for host, site := range map[string]string{"net.ourtaiko.org": "http://localhost", "profile.ourtaiko.org": "http://localhost", "cn.example": "https://cn.example"} {
 		w := get("GET", host, "/api/v1/users/"+player+"/scores?view=all")
 		var list struct {
 			Items []struct {
@@ -286,8 +287,8 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		for _, item := range list.Items {
 			got[item.Source] = item.Title + " " + item.ChartURL
 		}
-		if len(list.Items) != 2 || got["fanmade"] != "Fan song http://localhost/fanmade/charts/"+strings.Repeat("f", 32) ||
-			got["official"] != "Official song http://localhost/official/charts/"+strings.Repeat("d", 32) {
+		if len(list.Items) != 2 || got["fanmade"] != "Fan song "+site+"/fanmade/charts/"+strings.Repeat("f", 32) ||
+			got["official"] != "Official song "+site+"/official/charts/"+strings.Repeat("d", 32) {
 			t.Errorf("%s: scores %v from %s", host, got, w.Body.String())
 		}
 	}

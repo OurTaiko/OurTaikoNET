@@ -292,7 +292,7 @@ func TestMultiEnsoIsOffUnlessConfigured(t *testing.T) {
 func TestTheSiteAnswersRoomsThatRunElsewhere(t *testing.T) {
 	_, url := netdbtest.NewURL(t, "fanmade")
 	ctx := context.Background()
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "https://net.example", StorageDir: t.TempDir(), Multiplay: Multiplay{InternalAddr: "127.0.0.1:0"}})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "https://net.example", OtherOrigins: []string{"https://cn.example"}, StorageDir: t.TempDir(), Multiplay: Multiplay{InternalAddr: "127.0.0.1:0"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,10 +303,15 @@ func TestTheSiteAnswersRoomsThatRunElsewhere(t *testing.T) {
 	if a.RoomsAddr() != "" || a.RoomsAPIAddr() == "" {
 		t.Fatalf("rooms at %q, their API at %q", a.RoomsAddr(), a.RoomsAPIAddr())
 	}
-	w := httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/game/multiplay", nil))
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"https://net.example","protocol":1,"maxProtocol":2,"maxMembers":5}` {
-		t.Fatalf("%d %s", w.Code, w.Body.String())
+	// The game is told to dial the site's address it asked at, whose proxy passes the rooms on.
+	for host, want := range map[string]string{"net.example": "https://net.example", "cn.example": "https://cn.example", "other.example": "https://net.example"} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/game/multiplay", nil)
+		r.Host = host
+		a.Handler().ServeHTTP(w, r)
+		if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"url":"`+want+`","protocol":1,"maxProtocol":2,"maxMembers":5}` {
+			t.Fatalf("at %s: %d %s", host, w.Code, w.Body.String())
+		}
 	}
 	client := roomsapi.NewClient("http://" + a.RoomsAPIAddr())
 	asking, cancel := context.WithTimeout(ctx, 5*time.Second)

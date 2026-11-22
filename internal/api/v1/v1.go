@@ -24,7 +24,8 @@ type Config struct {
 	// Router picks a visitor's root (nil: always the canonical one).
 	Router *distribution.Router
 	// FilesOnDisk is set when the song files are kept on this server's disk (development):
-	// version 1 then linked to this API's own file routes, under Origin.
+	// version 1 then linked to this API's own file routes, under Origin (or the other address
+	// of the site the request came to, web.Origins).
 	FilesOnDisk bool
 	Origin      string
 	// SourceBase is the source's own API routes, for an old host that serves one source at

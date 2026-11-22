@@ -305,6 +305,21 @@ func (c *Client) OIDC(ctx context.Context) (*oidc.Provider, *oauth2.Config, erro
 	return c.provider, cfg, nil
 }
 
+// RedirectAt is redirect, the sign-in callback (SSO_REDIRECT_URL), at another origin of the
+// same site: the same path on that scheme and host.
+func RedirectAt(redirect, origin string) (string, error) {
+	u, err := url.Parse(redirect)
+	if err != nil {
+		return "", errors.New("SSO redirect URL is not valid")
+	}
+	at, err := url.Parse(origin)
+	if err != nil || at.Host == "" {
+		return "", errors.New("site origin is not valid")
+	}
+	u.Scheme, u.Host = at.Scheme, at.Host
+	return u.String(), nil
+}
+
 // Shown is a signed-in user as the API shows them to their client: the avatar as its file under
 // the distribution root (package files) rather than an address.
 type Shown struct {
