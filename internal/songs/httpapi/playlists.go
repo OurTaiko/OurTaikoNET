@@ -45,11 +45,14 @@ type Playlist struct {
 	Public      bool   `json:"public"`
 	System      bool   `json:"system"`
 	// The category's genre selects the folder artwork in the game.
-	CategoryID string         `json:"categoryId"`
-	Genre      string         `json:"genre"`
-	OwnerID    string         `json:"ownerId,omitempty"`
-	Owner      *PlaylistOwner `json:"owner"`
-	CoverHash  string         `json:"coverHash,omitempty"`
+	CategoryID string `json:"categoryId"`
+	Genre      string `json:"genre"`
+	// ScenePreset is the play backdrop the game uses for songs opened from the playlist (a
+	// stage preset's name); empty for none.
+	ScenePreset string         `json:"scenePreset"`
+	OwnerID     string         `json:"ownerId,omitempty"`
+	Owner       *PlaylistOwner `json:"owner"`
+	CoverHash   string         `json:"coverHash,omitempty"`
 	// SongListCoverPath is the cover's file (package files), as a chart's SongCoverPath.
 	SongListCoverPath string `json:"songListCoverPath,omitempty"`
 	coverKey          string
@@ -93,7 +96,7 @@ func playlistID(raw string) (string, bool) {
 const playlistChartCount = `(SELECT count(*) FROM playlist_items i JOIN charts c ON c.id=i.chart_id WHERE i.playlist_id=p.id AND ` + publishedChart + `)`
 
 // $1 is the viewer, empty for a guest.
-const playlistSelect = `SELECT p.id,p.owner_id,p.name,p.description,p.is_public,p.category_flag,
+const playlistSelect = `SELECT p.id,p.owner_id,p.name,p.description,p.is_public,p.category_flag,p.scene_preset,
  COALESCE((SELECT sha256 FROM chart_resources WHERE id=p.cover_file),''),COALESCE((SELECT storage_key FROM chart_resources WHERE id=p.cover_file),''),p.created_at,p.updated_at,` + playlistChartCount + `,
  (SELECT count(*) FROM playlist_favorites f WHERE f.playlist_id=p.id),
  EXISTS(SELECT 1 FROM playlist_favorites f WHERE f.playlist_id=p.id AND f.user_id=$1)
@@ -103,7 +106,7 @@ func (src *Source) readPlaylist(row pgx.Row) (Playlist, error) {
 	var p Playlist
 	var flag CategoryFlags
 	var created, updated time.Time
-	e := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.Description, &p.Public, &flag, &p.CoverHash, &p.coverKey, &created, &updated, &p.ChartCount, &p.FavoriteCount, &p.Favorited)
+	e := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.Description, &p.Public, &flag, &p.ScenePreset, &p.CoverHash, &p.coverKey, &created, &updated, &p.ChartCount, &p.FavoriteCount, &p.Favorited)
 	category := src.categoryByFlag(flag)
 	p.CategoryID, p.Genre, p.CreatedAt, p.UpdatedAt = category.ID, category.Genre, &created, &updated
 	return p, e

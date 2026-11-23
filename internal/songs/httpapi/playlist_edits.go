@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode"
@@ -18,6 +19,16 @@ type playlistRequest struct {
 	Description *string `json:"description"`
 	Public      *bool   `json:"public"`
 	CategoryID  *string `json:"categoryId"`
+	ScenePreset *string `json:"scenePreset"`
+}
+
+// A stage preset's name as the game writes it (SCENEPRESET): letters, digits and underscores.
+// Which presets exist is the game's to know, so only the form is checked; empty names none.
+var scenePresetForm = regexp.MustCompile(`^[A-Za-z0-9_]{0,32}$`)
+
+// onlyScenePreset reports whether the request changes the scene preset and nothing else.
+func (body *playlistRequest) onlyScenePreset() bool {
+	return body.ScenePreset != nil && body.Name == nil && body.Description == nil && body.Public == nil && body.CategoryID == nil
 }
 
 // normalize trims and validates the fields that are present.
@@ -46,6 +57,14 @@ func (body *playlistRequest) normalize(w http.ResponseWriter, src *Source) (Cate
 			return 0, false
 		}
 		body.Description = &text
+	}
+	if body.ScenePreset != nil {
+		preset := strings.TrimSpace(*body.ScenePreset)
+		if !scenePresetForm.MatchString(preset) {
+			problem(w, 400, "SCENE_PRESET_INVALID", "演奏背景的名称只能是 32 个以内的字母、数字和下划线")
+			return 0, false
+		}
+		body.ScenePreset = &preset
 	}
 	flag, _ := src.categoryFlag("variety")
 	if body.CategoryID != nil {
@@ -106,12 +125,15 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "PLAYLIST_LIMIT", "每位用户最多创建 100 个歌单")
 		return
 	}
-	id, description := web.NewID(), ""
+	id, description, preset := web.NewID(), "", ""
 	if body.Description != nil {
 		description = *body.Description
 	}
-	if _, e = tx.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,description,is_public,category_flag) VALUES($1,$2,$3,$4,$5,$6)`,
-		id, u.User.ID, *body.Name, description, body.Public != nil && *body.Public, flag); e == nil {
+	if body.ScenePreset != nil {
+		preset = *body.ScenePreset
+	}
+	if _, e = tx.Exec(ctx, `INSERT INTO playlists(id,owner_id,name,description,is_public,category_flag,scene_preset) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+		id, u.User.ID, *body.Name, description, body.Public != nil && *body.Public, flag, preset); e == nil {
 		e = tx.Commit(ctx)
 	}
 	if e != nil {
@@ -122,8 +144,9 @@ func (s *Server) createPlaylist(w http.ResponseWriter, r *http.Request) {
 }
 
 // lockOwnPlaylist locks a playlist for the rest of tx and reports whether the
-// user owns it. Others see a private playlist as missing.
-func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, raw, user string) (string, bool) {
+// user owns it. Others see a private playlist as missing; anyPublic lets the user
+// (an administrator) have a public playlist that is someone else's.
+func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, raw, user string, anyPublic bool) (string, bool) {
 	id, valid := playlistID(raw)
 	var owner string
 	var public bool
@@ -136,7 +159,7 @@ func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, raw,
 		internal(w, e)
 	case e != nil || (owner != user && !public):
 		problem(w, 404, "PLAYLIST_NOT_FOUND", "歌单不存在或未公开")
-	case owner != user:
+	case owner != user && !anyPublic:
 		problem(w, 403, "FORBIDDEN", "只能修改自己的歌单")
 	default:
 		return id, true
@@ -147,6 +170,11 @@ func lockOwnPlaylist(w http.ResponseWriter, ctx context.Context, tx pgx.Tx, raw,
 // ownPlaylist runs change in a transaction holding the user's playlist. change
 // reports false after it has written its own error response.
 func (s *Server) ownPlaylist(w http.ResponseWriter, r *http.Request, user string, change func(tx pgx.Tx, id string) (bool, error)) (string, bool) {
+	return s.heldPlaylist(w, r, user, false, change)
+}
+
+// heldPlaylist is ownPlaylist that, with anyPublic, also takes a public playlist of someone else.
+func (s *Server) heldPlaylist(w http.ResponseWriter, r *http.Request, user string, anyPublic bool, change func(tx pgx.Tx, id string) (bool, error)) (string, bool) {
 	ctx := r.Context()
 	tx, e := s.DB.Begin(ctx)
 	if e != nil {
@@ -154,7 +182,7 @@ func (s *Server) ownPlaylist(w http.ResponseWriter, r *http.Request, user string
 		return "", false
 	}
 	defer tx.Rollback(ctx)
-	id, ok := lockOwnPlaylist(w, ctx, tx, r.PathValue("id"), user)
+	id, ok := lockOwnPlaylist(w, ctx, tx, r.PathValue("id"), user, anyPublic)
 	if !ok {
 		return "", false
 	}
@@ -186,11 +214,15 @@ func (s *Server) editPlaylist(w http.ResponseWriter, r *http.Request) {
 	if body.CategoryID != nil {
 		category = &flag
 	}
-	// An empty description clears it; only an absent field keeps the old value.
-	id, ok := s.ownPlaylist(w, r, u.User.ID, func(tx pgx.Tx, id string) (bool, error) {
+	// An administrator may choose the backdrop of any public playlist, and nothing else of it.
+	admin := u.User.IsAdmin && body.onlyScenePreset()
+	// An empty description or scene preset clears it; only an absent field keeps the old value.
+	// A playlist is not newer for an administrator's choice: its owner's own list stays in order.
+	id, ok := s.heldPlaylist(w, r, u.User.ID, admin, func(tx pgx.Tx, id string) (bool, error) {
 		_, e := tx.Exec(r.Context(), `UPDATE playlists SET name=COALESCE($2,name),description=COALESCE($3,description),
- is_public=COALESCE($4,is_public),category_flag=COALESCE($5,category_flag),updated_at=now() WHERE id=$1`,
-			id, body.Name, body.Description, body.Public, category)
+ is_public=COALESCE($4,is_public),category_flag=COALESCE($5,category_flag),scene_preset=COALESCE($6,scene_preset),
+ updated_at=CASE WHEN owner_id=$7 THEN now() ELSE updated_at END WHERE id=$1`,
+			id, body.Name, body.Description, body.Public, category, body.ScenePreset, u.User.ID)
 		return true, e
 	})
 	if !ok {

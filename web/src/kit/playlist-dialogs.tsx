@@ -6,6 +6,7 @@ import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
 import type { ChartBase, MyPlaylists, Playlist } from './api/types'
 import { CategorySelect } from './categories'
+import { ChoiceSelect } from './components/choice-select'
 import { CoverUploadDialog } from './components/cover-dialog'
 import type { SavedCover } from './cover'
 import { ToggleRow } from './components/toggle-row'
@@ -18,6 +19,7 @@ import { Textarea } from './components/ui/textarea'
 import { Modal } from './notifications'
 import { invalidatePlaylistLists, invalidatePlaylists, playlistQueries } from './queries/playlists'
 import { queryClient } from './query/client'
+import { scenePresetChoices, scenePresetQuery } from './scene-presets'
 import { useSession } from './session'
 
 // Creates a playlist, or edits the one given. C is the site's Chart, so onSaved hands back its Playlist.
@@ -36,6 +38,7 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
   const [name, setName] = useState(playlist?.name ?? '')
   const [description, setDescription] = useState(playlist?.description ?? '')
   const [categoryId, setCategoryId] = useState(playlist?.categoryId ?? 'variety')
+  const [scenePreset, setScenePreset] = useState(playlist?.scenePreset ?? '')
   const [isPublic, setIsPublic] = useState(playlist?.public ?? false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -43,7 +46,7 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
     setBusy(true)
     setError('')
     try {
-      const body = { name, description, categoryId, public: isPublic }
+      const body = { name, description, categoryId, scenePreset, public: isPublic }
       const saved = await api<Playlist<C>>(
         playlist ? endpoints.playlist(playlist.id) : endpoints.playlists,
         jsonRequest(playlist ? 'PATCH' : 'POST', body, csrfToken),
@@ -106,6 +109,7 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
           disabled={busy}
         />
       </div>
+      <ScenePresetField value={scenePreset} onChange={setScenePreset} disabled={busy} />
       <div className="space-y-2">
         <Label className="inline-flex items-center gap-2">
           <Checkbox
@@ -116,6 +120,99 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
           <span>{t('playlists.public')}</span>
         </Label>
       </div>
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+    </Modal>
+  )
+}
+
+// The play backdrop: none, or one of the game's presets (scene-presets.ts). The playlist's own
+// stays a choice when the catalog no longer has it or cannot be read, so saving keeps it.
+function ScenePresetField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+}) {
+  const { t } = useTranslation()
+  const { data: presets = [] } = useQuery(scenePresetQuery())
+  // The value the dialog opened with: a choice for as long as it is open.
+  const [current] = useState(value)
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{t('playlists.scenePreset')}</p>
+      <ChoiceSelect
+        label={t('playlists.scenePreset')}
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        items={scenePresetChoices(presets, current).map((preset) => ({
+          value: preset,
+          label: preset || t('playlists.scenePresetNone'),
+        }))}
+      />
+      <p className="text-sm text-muted-foreground">{t('playlists.scenePresetHelp')}</p>
+    </div>
+  )
+}
+
+// An administrator's change to someone else's public playlist: its play backdrop, nothing else.
+export function PlaylistScenePresetDialog<C extends ChartBase = ChartBase>({
+  playlist,
+  onSaved,
+  onDismiss,
+}: {
+  playlist: Playlist<C>
+  onSaved: (playlist: Playlist<C>) => void
+  onDismiss: () => void
+}) {
+  const { t } = useTranslation()
+  const { csrfToken } = useSession()
+  const [scenePreset, setScenePreset] = useState(playlist.scenePreset)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const save = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const saved = await api<Playlist<C>>(
+        endpoints.playlist(playlist.id),
+        jsonRequest('PATCH', { scenePreset }, csrfToken),
+      )
+      void invalidatePlaylistLists()
+      onSaved(saved)
+      onDismiss()
+    } catch (e) {
+      setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      title={t('playlists.changeScenePreset')}
+      busy={busy}
+      onDismiss={onDismiss}
+      actions={
+        <>
+          <DialogClose render={<Button type="button" variant="outline" />} disabled={busy}>
+            {t('messages.cancel')}
+          </DialogClose>
+          <Button
+            disabled={busy || scenePreset === playlist.scenePreset}
+            onClick={() => void save()}
+          >
+            {busy ? t('messages.saving') : t('messages.saveChanges')}
+          </Button>
+        </>
+      }
+    >
+      <ScenePresetField value={scenePreset} onChange={setScenePreset} disabled={busy} />
       {error && (
         <p role="alert" className="text-destructive">
           {error}

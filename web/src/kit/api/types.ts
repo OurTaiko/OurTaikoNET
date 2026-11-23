@@ -289,6 +289,8 @@ export type Playlist<C extends ChartBase = ChartBase> = {
   system: boolean
   categoryId: string
   genre: string
+  /** The play backdrop the game uses for songs opened from it (scene-presets.ts); "" for none. */
+  scenePreset: string
   ownerId?: string
   owner: { id: string; nickname: string; avatarPath?: string } | null
   coverHash?: string
