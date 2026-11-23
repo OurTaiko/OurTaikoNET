@@ -54,7 +54,7 @@ func testChartImagesFollowTheirHeaders(t *testing.T, w interactionWorld) {
 		_ = png.Encode(&b, img)
 		return b.Bytes()
 	}
-	// Distinct images: equal ones would share one stored file.
+	// Distinct images: equal ones would share one stored file (TestStoreFileTwiceInOneChange).
 	red, blue, green := picture(color.NRGBA{R: 255, A: 255}), picture(color.NRGBA{B: 255, A: 255}), picture(color.NRGBA{G: 255, A: 255})
 	type part struct {
 		field, name string

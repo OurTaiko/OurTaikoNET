@@ -50,13 +50,24 @@ func (s *Server) storeFile(ctx context.Context, tx pgx.Tx, path, name, extension
 	if e := lockObject(ctx, tx, key); e != nil {
 		return 0, e
 	}
+	stored, e := s.objectStored(ctx, key, size)
+	if e != nil {
+		return 0, e
+	}
+	var id int64
+	switch e = tx.QueryRow(ctx, `SELECT id FROM chart_resources WHERE storage_key=$1`, key).Scan(&id); {
+	case e == nil && stored:
+		// Nothing to write, so nothing to record as pending. This is also what tx finds when
+		// it stored the same content before (a cover that is the background image too): its
+		// own uncommitted removal of that pending write is one the statement below, which
+		// runs outside tx, would wait for until tx ends, and tx would be waiting for it.
+		return id, nil
+	case e != nil && !errors.Is(e, pgx.ErrNoRows):
+		return 0, e
+	}
 	// Records the write before it happens, so an object left by a failed
 	// upload can be found again.
 	if _, e := s.DB.Exec(ctx, `INSERT INTO pending_objects(storage_key) VALUES($1) ON CONFLICT DO NOTHING`, key); e != nil {
-		return 0, e
-	}
-	stored, e := s.objectStored(ctx, key, size)
-	if e != nil {
 		return 0, e
 	}
 	if !stored {
@@ -70,7 +81,6 @@ func (s *Server) storeFile(ctx context.Context, tx pgx.Tx, path, name, extension
 			return 0, e
 		}
 	}
-	var id int64
 	e = tx.QueryRow(ctx, `INSERT INTO chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES($1,$2,$3,$4,$5)
  ON CONFLICT(storage_key) DO UPDATE SET storage_key=EXCLUDED.storage_key RETURNING id`, key, name, digest, size, extension).Scan(&id)
 	if e == nil {
