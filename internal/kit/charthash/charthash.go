@@ -39,7 +39,10 @@ type Inspection struct {
 	Wave           string            `json:"wave"`
 	Movie          string            `json:"movie"`
 	MovieOffset    float64           `json:"movieOffset"`
-	Blocks         []Block           `json:"blocks"`
+	// ScenePreset is SCENEPRESET as the game reads it, empty when the chart names none; nil
+	// from a tool older than v0.16.0, which does not say.
+	ScenePreset *string `json:"scenePreset"`
+	Blocks      []Block `json:"blocks"`
 }
 
 // Block is one #START block in file order.

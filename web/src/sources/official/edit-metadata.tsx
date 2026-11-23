@@ -10,6 +10,7 @@ import { endpoints } from '@sitekit/api/endpoints'
 import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { api, jsonRequest, replaceMovie } from '@sitekit/api/client'
 import { MovieSettings, movieChanges, movieDraft } from '@sitekit/components/movie-settings'
+import { ScenePresetField } from '@sitekit/components/scene-preset-field'
 import { useNotification } from '@sitekit/notification-context'
 import { chartWritten } from '@sitekit/queries/chart-writes'
 import type { Chart, Locale } from './api/types'
@@ -74,6 +75,8 @@ export function EditMetadata({
   const [demoEnd, setDemoEnd] = useState(String(chart.demoEnd))
   const [movie, setMovie] = useState(() => movieDraft(chart))
   const movieEdit = movieChanges(chart, movie)
+  // SCENEPRESET is a line of the TJA, so a song registered without files has none to edit.
+  const [scenePreset, setScenePreset] = useState(chart.scenePreset)
   const { notify } = useNotification()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -140,6 +143,7 @@ export function EditMetadata({
             ...(chart.hasFiles && !movieEdit.file && movieEdit.offset !== undefined
               ? { movieOffset: movieEdit.offset }
               : {}),
+            ...(chart.hasFiles && scenePreset !== chart.scenePreset ? { scenePreset } : {}),
             nijiiroId: nijiiro,
             officialId: official || null,
             categoryIds,
@@ -271,6 +275,16 @@ export function EditMetadata({
         )}
         {chart.hasFiles && (
           <MovieSettings chart={chart} draft={movie} onChange={setMovie} disabled={busy} />
+        )}
+        {chart.hasFiles && (
+          <ScenePresetField
+            value={scenePreset}
+            onChange={setScenePreset}
+            disabled={busy}
+            label={t('messages.scenePreset')}
+            noneLabel={t('messages.scenePresetNone')}
+            help={t('messages.scenePresetHelp')}
+          />
         )}
         <CategoryPicker value={categoryIds} onChange={setCategoryIds} disabled={busy} />
         <fieldset className="space-y-3 [&>legend]:mb-2 [&>legend]:text-sm [&>legend]:font-medium">

@@ -37,6 +37,9 @@ func (s *Server) RunContentHashBackfill(ctx context.Context) {
 	if err := s.backfillContentHashes(ctx, version+":", constants.Version); err != nil && ctx.Err() == nil {
 		log.Printf("content hash backfill: %v", err)
 	}
+	if err := s.backfillScenePresets(ctx); err != nil && ctx.Err() == nil {
+		log.Printf("scene preset backfill: %v", err)
+	}
 }
 
 func (s *Server) backfillContentHashes(ctx context.Context, prefix string, constantsVersion int) error {
@@ -79,35 +82,8 @@ func (s *Server) backfillChartHashes(parent context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var key string
-	var size int64
-	err = tx.QueryRow(ctx, `SELECT r.storage_key,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1 FOR UPDATE OF c SKIP LOCKED`, id).Scan(&key, &size)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	dir, err := os.MkdirTemp(s.Config.Storage, "hash-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	path := filepath.Join(dir, "stored.tja")
-	in, err := s.Config.Objects.Open(ctx, key)
-	if err != nil {
-		return err
-	}
-	data, err := io.ReadAll(io.LimitReader(in, size+1))
-	in.Close()
-	if err != nil {
-		return err
-	}
-	if err = os.WriteFile(path, data, 0600); err != nil {
-		return err
-	}
-	result, err := tja.Inspector.Inspect(ctx, path)
-	if err != nil {
+	result, found, err := s.inspectStored(ctx, tx, id)
+	if err != nil || !found {
 		return err
 	}
 	for _, b := range result.Blocks {
@@ -138,4 +114,96 @@ func (s *Server) backfillChartHashes(parent context.Context, id string) error {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// inspectStored locks the chart's row and reads its stored TJA with TJAParser; found is false
+// for a chart that is gone, has no TJA, or is locked by someone else (left for the next start).
+func (s *Server) inspectStored(ctx context.Context, tx pgx.Tx, id string) (result charthash.Inspection, found bool, err error) {
+	var key string
+	var size int64
+	err = tx.QueryRow(ctx, `SELECT r.storage_key,r.byte_size FROM charts c JOIN chart_resources r ON r.id=c.tja_file WHERE c.id=$1 FOR UPDATE OF c SKIP LOCKED`, id).Scan(&key, &size)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return result, false, nil
+	}
+	if err != nil {
+		return result, false, err
+	}
+	dir, err := os.MkdirTemp(s.Config.Storage, "hash-")
+	if err != nil {
+		return result, false, err
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "stored.tja")
+	in, err := s.Config.Objects.Open(ctx, key)
+	if err != nil {
+		return result, false, err
+	}
+	data, err := io.ReadAll(io.LimitReader(in, size+1))
+	in.Close()
+	if err != nil {
+		return result, false, err
+	}
+	if err = os.WriteFile(path, data, 0600); err != nil {
+		return result, false, err
+	}
+	result, err = tja.Inspector.Inspect(ctx, path)
+	return result, err == nil, err
+}
+
+// backfillScenePresets fills scene_preset of the charts stored before the column, or by a tool
+// that did not report it, from what TJAParser reads in their files. A chart's preset is NULL
+// only until then, so each chart is read once.
+func (s *Server) backfillScenePresets(ctx context.Context) error {
+	rows, err := s.DB.Query(ctx, `SELECT id FROM charts WHERE status<>'deleted' AND tja_file IS NOT NULL AND scene_preset IS NULL ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	log.Printf("scene preset backfill: %d charts", len(ids))
+	var failures []error
+	done := 0
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		reported, err := s.backfillScenePreset(ctx, id)
+		if err != nil {
+			log.Printf("scene preset backfill for %s failed: %v", id, err)
+			failures = append(failures, err)
+			continue
+		}
+		if !reported {
+			return errors.New("this tjaparser does not report scenePreset (v0.16.0 or newer does)")
+		}
+		done++
+	}
+	log.Printf("scene preset backfill: %d charts done, %d failed", done, len(failures))
+	return errors.Join(failures...)
+}
+
+// backfillScenePreset fills one chart; reported is false when the tool does not say the preset.
+func (s *Server) backfillScenePreset(parent context.Context, id string) (reported bool, err error) {
+	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+	defer cancel()
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	result, found, err := s.inspectStored(ctx, tx, id)
+	if err != nil || !found {
+		return true, err
+	}
+	preset := tja.ScenePresetName(result.ScenePreset)
+	if preset == nil {
+		return false, nil
+	}
+	// Reading the file is not a change to the chart: update_at stays.
+	if _, err = tx.Exec(ctx, `UPDATE charts SET scene_preset=$2 WHERE id=$1 AND scene_preset IS NULL`, id, *preset); err != nil {
+		return false, err
+	}
+	return true, tx.Commit(ctx)
 }

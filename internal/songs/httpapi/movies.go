@@ -232,6 +232,23 @@ func (s *Server) rewriteMovie(ctx context.Context, tx pgx.Tx, chartID, movieSHA 
 	return retired, nil
 }
 
+// rewriteScenePreset sets SCENEPRESET in the chart's stored TJA to name (empty clears it) and
+// keeps it on the chart, as rewriteMovie does for the movie headers: the game reads the preset
+// from the file. It returns the replaced TJA to release once committed.
+func (s *Server) rewriteScenePreset(ctx context.Context, tx pgx.Tx, chartID, name string) ([]int64, error) {
+	tjaFile, retired, err := s.rewriteStoredTJA(ctx, tx, chartID, func(data []byte) ([]byte, bool) {
+		stored, ok := tja.SetSongHeader(data, "SCENEPRESET", name)
+		return stored, ok && tja.SongHeader(stored, "SCENEPRESET") == name
+	})
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE charts SET tja_file=$2,scene_preset=$3 WHERE id=$1`, chartID, tjaFile, name); err != nil {
+		return nil, err
+	}
+	return retired, nil
+}
+
 // rewriteStoredTJA stores the chart's TJA as edit changes it and returns the new file, for the
 // caller to point the chart at, and the old one to release once committed (none when the
 // content did not change). Only headers change, so a file stored under older rules is not

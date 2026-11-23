@@ -709,6 +709,12 @@ export function Detail() {
                   <dd className="tabular-nums">
                     {hasFiles ? formatDuration(chart.duration) : '—'}
                   </dd>
+                  {chart.scenePreset && (
+                    <>
+                      <dt>{t('messages.scenePreset')}</dt>
+                      <dd className="wrap-anywhere">{chart.scenePreset}</dd>
+                    </>
+                  )}
                   {votes > 0 && (
                     <>
                       <dt>{t('interactions.approval')}</dt>

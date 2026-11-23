@@ -7,7 +7,7 @@
 # whose hashes match the game's (OurTaikoPlay Packages/manifest.json).
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS tjaparser
 ARG TARGETARCH
-ARG TJAPARSER_REF=v0.13.0
+ARG TJAPARSER_REF=v0.16.0
 RUN apk add --no-cache git \
     && git clone --depth 1 --branch "$TJAPARSER_REF" https://github.com/OurTaiko/TJAParser.git /src
 WORKDIR "/src/dotnet~"

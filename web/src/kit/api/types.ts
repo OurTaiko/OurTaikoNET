@@ -99,6 +99,11 @@ export type ChartBase = {
   movieSize?: number
   /** Background image (BGIMAGE) as stored WebP; absent when the chart has none. */
   bgimageHash?: string
+  /**
+   * The play backdrop the game uses for this chart (scene-presets.ts): the TJA's SCENEPRESET,
+   * which the site rewrites. "" for none.
+   */
+  scenePreset: string
   score: number
   upvotes: number
   downvotes: number

@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"regexp"
 	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/kit/tja"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -23,9 +23,6 @@ type playlistRequest struct {
 }
 
 // A stage preset's name as the game writes it (SCENEPRESET): letters, digits and underscores.
-// Which presets exist is the game's to know, so only the form is checked; empty names none.
-var scenePresetForm = regexp.MustCompile(`^[A-Za-z0-9_]{0,32}$`)
-
 // onlyScenePreset reports whether the request changes the scene preset and nothing else.
 func (body *playlistRequest) onlyScenePreset() bool {
 	return body.ScenePreset != nil && body.Name == nil && body.Description == nil && body.Public == nil && body.CategoryID == nil
@@ -60,7 +57,7 @@ func (body *playlistRequest) normalize(w http.ResponseWriter, src *Source) (Cate
 	}
 	if body.ScenePreset != nil {
 		preset := strings.TrimSpace(*body.ScenePreset)
-		if !scenePresetForm.MatchString(preset) {
+		if !tja.ValidScenePreset(preset) {
 			problem(w, 400, "SCENE_PRESET_INVALID", "演奏背景的名称只能是 32 个以内的字母、数字和下划线")
 			return 0, false
 		}
