@@ -378,3 +378,110 @@ func TestPlaylistLimits(t *testing.T) {
 		t.Fatal("second page", code, page.Total, len(page.Items))
 	}
 }
+
+// A playlist names the play backdrop the game uses for songs opened from it: its owner chooses
+// it, an administrator may choose it for any public playlist and change nothing else, and the
+// game's folders and the categories carry it.
+func TestPlaylistScenePreset(t *testing.T) {
+	world := interactionWorldOf(t, Fanmade)
+	c, s := world.c, world.s
+	ctx := context.Background()
+	for _, preset := range []string{"no such-one", "间", strings.Repeat("A", 33), "A B"} {
+		if code := c.do("owner", "POST", "/api/playlists", `{"name":"a","scenePreset":"`+preset+`"}`, nil); code != 400 {
+			t.Fatal("invalid scene preset accepted", preset, code)
+		}
+	}
+	var p Playlist
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"Plain"}`, &p); code != 201 || p.ScenePreset != "" {
+		t.Fatalf("created without one %d %+v", code, p)
+	}
+	if code := c.do("owner", "POST", "/api/playlists", `{"name":"Stage","scenePreset":" TOHO "}`, &p); code != 201 || p.ScenePreset != "TOHO" {
+		t.Fatalf("created %d %+v", code, p)
+	}
+	path := "/api/playlists/" + p.ID
+	// Another field leaves it; an empty one clears it.
+	if code := c.do("owner", "PATCH", path, `{"description":"x"}`, &p); code != 200 || p.ScenePreset != "TOHO" || p.Description != "x" {
+		t.Fatalf("kept %d %+v", code, p)
+	}
+	if code := c.do("owner", "PATCH", path, `{"scenePreset":""}`, &p); code != 200 || p.ScenePreset != "" {
+		t.Fatalf("cleared %d %+v", code, p)
+	}
+	if code := c.do("owner", "PATCH", path, `{"scenePreset":"not ok"}`, nil); code != 400 {
+		t.Fatal("invalid edit", code)
+	}
+	if code := c.do("owner", "PATCH", path, `{"scenePreset":"Miku_2"}`, &p); code != 200 || p.ScenePreset != "Miku_2" {
+		t.Fatalf("set %d %+v", code, p)
+	}
+
+	// Private, it is nobody else's to see, an administrator's neither.
+	for _, user := range []string{"alice", "admin"} {
+		if code := c.do(user, "PATCH", path, `{"scenePreset":"GUMI"}`, nil); code != 404 {
+			t.Fatal("private playlist reachable", user, code)
+		}
+	}
+	if code := c.do("owner", "PATCH", path, `{"public":true}`, &p); code != 200 || !p.Public {
+		t.Fatalf("published %d %+v", code, p)
+	}
+	updated := *p.UpdatedAt
+	if code := c.do("alice", "PATCH", path, `{"scenePreset":"GUMI"}`, nil); code != 403 {
+		t.Fatal("another player chose the backdrop", code)
+	}
+	// An administrator chooses the backdrop, and only that.
+	for _, body := range []string{`{"scenePreset":"GUMI","name":"Theirs"}`, `{"name":"Theirs"}`, `{"scenePreset":"GUMI","public":false}`, `{}`} {
+		if code := c.do("admin", "PATCH", path, body, nil); code != 403 {
+			t.Fatal("administrator edited a playlist", body, code)
+		}
+	}
+	var chosen Playlist
+	if code := c.do("admin", "PATCH", path, `{"scenePreset":"GUMI"}`, &chosen); code != 200 || chosen.ScenePreset != "GUMI" || chosen.Name != "Stage" ||
+		chosen.OwnerID != playlistOwner || !chosen.UpdatedAt.Equal(updated) {
+		t.Fatalf("administrator's choice %d %+v (was updated %v)", code, chosen, updated)
+	}
+	var mine MyPlaylists
+	if code := c.do("owner", "GET", "/api/me/playlists", "", &mine); code != 200 || len(mine.Owned) != 2 || mine.Owned[0].ScenePreset != "GUMI" || mine.Owned[1].ScenePreset != "" {
+		t.Fatalf("listed %d %+v", code, mine.Owned)
+	}
+
+	// The game's folder of the playlist carries it; a system playlist names none.
+	resetRateLimit(s)
+	if code := c.do("owner", "PUT", path+"/items/"+world.song, `{}`, nil); code != 201 {
+		t.Fatal("add", code)
+	}
+	tx, e := s.DB.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer tx.Rollback(ctx)
+	folders, e := s.gamePlaylists(ctx, tx, &User{ID: playlistOwner})
+	if e != nil {
+		t.Fatal(e)
+	}
+	found := false
+	for _, folder := range folders {
+		if folder.ID == p.ID {
+			found = folder.ScenePreset == "GUMI"
+		} else if folder.Kind == "system" && folder.ScenePreset != "" {
+			t.Fatalf("system playlist names a backdrop %+v", folder)
+		}
+	}
+	if !found {
+		t.Fatalf("the game's folder has no scene preset: %+v", folders)
+	}
+	encoded, _ := json.Marshal(folders)
+	if !strings.Contains(string(encoded), `"scenePreset":"GUMI"`) {
+		t.Fatal("not in the game's answer", string(encoded))
+	}
+
+	// Every category carries the field, empty until its source names one.
+	var categories struct {
+		Items []map[string]any `json:"items"`
+	}
+	if code := c.do("", "GET", "/api/categories", "", &categories); code != 200 || len(categories.Items) == 0 {
+		t.Fatal("categories", code)
+	}
+	for _, category := range categories.Items {
+		if preset, ok := category["scenePreset"]; !ok || preset != "" {
+			t.Fatalf("category %+v", category)
+		}
+	}
+}

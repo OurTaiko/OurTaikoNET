@@ -13,6 +13,9 @@ type Category struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Genre string `json:"genre"`
+	// ScenePreset is the play backdrop the game uses for songs opened from the category (a stage
+	// preset's name); empty for none, as every category's is until the source names one.
+	ScenePreset string `json:"scenePreset"`
 	// Published charts in the category; a chart may be in several.
 	ChartCount int `json:"chartCount"`
 }

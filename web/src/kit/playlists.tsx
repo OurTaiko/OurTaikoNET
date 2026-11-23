@@ -8,6 +8,7 @@ import {
   ArrowLeftIcon,
   ArrowUpIcon,
   HeartIcon,
+  MountainsIcon,
   PlaylistIcon,
   PlusIcon,
   SortDescendingIcon,
@@ -20,6 +21,7 @@ import { chartText } from './chart-language'
 import { SiteChartCard } from './components/chart-card'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
+import { Badge } from './components/ui/badge'
 import { Button, buttonVariants } from './components/ui/button'
 import { Card } from './components/ui/card'
 import { DialogClose } from './components/ui/dialog'
@@ -52,7 +54,7 @@ import {
   emptyStateClassName,
 } from './components/playlist-card'
 import { useCardCover } from './components/card-cover'
-import { PlaylistDialog, PlaylistCoverDialog } from './playlist-dialogs'
+import { PlaylistDialog, PlaylistCoverDialog, PlaylistScenePresetDialog } from './playlist-dialogs'
 
 const sorts = ['updated', 'newest', 'favorites'] as const
 type Sort = (typeof sorts)[number]
@@ -435,7 +437,9 @@ function PlaylistView({ id }: { id: string }) {
   const playlistText = usePlaylistText()
   const [busy, setBusy] = useState(false)
   const [deleted, setDeleted] = useState(false)
-  const [dialog, setDialog] = useState<'' | 'edit' | 'cover' | 'delete' | 'songs'>('')
+  const [dialog, setDialog] = useState<'' | 'edit' | 'cover' | 'delete' | 'songs' | 'scenePreset'>(
+    '',
+  )
   const [arranging, setArranging] = useState(false)
   // A private playlist loads once the session is known.
   const read = useQuery({
@@ -478,6 +482,8 @@ function PlaylistView({ id }: { id: string }) {
   const text = playlistText(playlist)
   const charts = playlist.charts ?? []
   const owned = !playlist.system && !!userId && playlist.ownerId === userId
+  // An administrator may remove someone else's public playlist, or choose its play backdrop.
+  const moderated = !playlist.system && !owned && !!session.user?.isAdmin && playlist.public
   const key = playlistKeys.detail(id)
   const setPlaylist = async (next: Playlist) => {
     // An answer already on its way was read before this change, and must not undo it.
@@ -617,7 +623,12 @@ function PlaylistView({ id }: { id: string }) {
                 </Button>
               )
             )}
-            {!playlist.system && (owned || (session.user?.isAdmin && playlist.public)) && (
+            {moderated && (
+              <Button variant="ghost" disabled={busy} onClick={() => setDialog('scenePreset')}>
+                {t('playlists.changeScenePreset')}
+              </Button>
+            )}
+            {(owned || moderated) && (
               <Button
                 variant="ghost"
                 className="text-destructive hover:text-destructive"
@@ -634,6 +645,12 @@ function PlaylistView({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <SourceTag source={SOURCE} />
               <PlaylistFacts playlist={playlist} />
+              {playlist.scenePreset && (
+                <Badge variant="outline" title={t('playlists.scenePresetHelp')}>
+                  <MountainsIcon aria-hidden="true" />
+                  {t('playlists.scenePresetBadge', { name: playlist.scenePreset })}
+                </Badge>
+              )}
             </div>
             <h1
               id="playlist-heading"
@@ -703,6 +720,13 @@ function PlaylistView({ id }: { id: string }) {
       )}
       {dialog === 'edit' && (
         <PlaylistDialog
+          playlist={playlist}
+          onDismiss={() => setDialog('')}
+          onSaved={(saved) => void setPlaylist({ ...saved, charts, chartCount: charts.length })}
+        />
+      )}
+      {dialog === 'scenePreset' && moderated && (
+        <PlaylistScenePresetDialog
           playlist={playlist}
           onDismiss={() => setDialog('')}
           onSaved={(saved) => void setPlaylist({ ...saved, charts, chartCount: charts.length })}
