@@ -28,9 +28,6 @@ type Config struct {
 	// of the site the request came to, web.Origins).
 	FilesOnDisk bool
 	Origin      string
-	// SourceBase is the source's own API routes, for an old host that serves one source at
-	// /api/v1/ (/api/v1/sources/fanmade); empty takes them from the request's path.
-	SourceBase string
 }
 
 // Handler serves api, the version-free API, at /api/v1/.

@@ -1,4 +1,4 @@
-# The OurTaikoNet server: the API of net.ourtaiko.org and of the three old addresses. The
+# The OurTaikoNet server: the API of net.ourtaiko.org. The
 # website (web/) is not in the image; the server serves it from WEB_DIR, where its own
 # releases are put (deploy/README.md).
 

@@ -1,9 +1,11 @@
 # Deploying OurTaikoNet
 
 Status: **in production since the switch on 2026-11-14, 04:06 UTC.** The one container
-`ourtaiko-net` (`127.0.0.1:8096`) answers <https://net.ourtaiko.org> and the three old host
-names: `fanmade.ourtaiko.org`, `database.ourtaiko.org` and `profile.ourtaiko.org` get their
-old APIs from it and have their pages redirected to the new site (`internal/legacy`). Its
+`ourtaiko-net` (`127.0.0.1:8096`) answers <https://net.ourtaiko.org>. The three old host
+names `fanmade.ourtaiko.org`, `database.ourtaiko.org` and `profile.ourtaiko.org` are no longer
+served by it: until 2026-11-23 it answered their old APIs and sent their pages on; since then
+their pages are redirected to the new site by rules at Cloudflare, and their old APIs are gone
+(the code and the `LEGACY_*_HOST` settings were removed). Its
 database `ourtaiko_net` is the only one written; files are in the bucket the old sites used,
 each source signing with its old site's key. The three old containers, their images and
 their deploy folders were removed on 2026-11-14, 07:30 UTC: there is no going back to them.
@@ -14,8 +16,8 @@ administrator until the role is given in the account center's admin (Client role
 `rollback.yml` has not been run.
 
 One container, `ourtaiko-net`, on the server that runs the three old sites, beside them until
-the switch. It answers `net.ourtaiko.org`, and from the switch on the three old host names as
-well (`internal/legacy`). The website is `web/` in this repository: its builds are put in a
+the switch. It answers `net.ourtaiko.org` (and, from the switch until 2026-11-23, the three old
+host names). The website is `web/` in this repository: its builds are put in a
 directory on the server and this container serves the current one. Until 2026-11-14 the
 website was a repository of its own, OurTaikoNetWeb (archived on 2026-11-14); its history is kept here,
 under `web/`, with the same commit hashes.
@@ -292,7 +294,7 @@ stay one location for the panel to read it.
    Copy `deploy/net.multiplay.conf` there as `proxy/multiplay.conf`, beside `root.conf`;
    if the block includes `root.conf` by name only, add a line that includes the new file.
    Then `nginx -t` and `nginx -s reload` in the OpenResty container, as for
-   `net.locations.conf`. The three old host names do not need the location. (On 2026-11-14
+   `net.locations.conf`. (On 2026-11-14
    the block included `proxy/*.conf`, and the file is there as `proxy/multiplay.conf`. It is
    a copy: a change to `deploy/net.multiplay.conf` has to be copied again by hand.)
 4. **Check from outside**, with [grpcurl](https://github.com/fullstorydev/grpcurl) from a
@@ -437,8 +439,10 @@ restore it into a scratch database with `--no-owner`.
 
 Still there, on purpose:
 
-- The three old host names, their 1Panel sites and certificates, and `LEGACY_*_HOST` here:
-  every released game before 2026-11-14 asks the old addresses.
+- The three old host names, their 1Panel sites and certificates, and `LEGACY_*_HOST` in
+  `api.env`: every released game before 2026-11-14 asked the old addresses. Since 2026-11-23
+  the server no longer reads `LEGACY_*_HOST` and answers nothing for those names; their
+  pages are redirected at Cloudflare. The settings and the 1Panel sites can go.
 - The roles `ourtaiko_viewer` and `ourtaiko_database_editor`: the console's accounts, in use.
 - `/usr/local/libexec/ourtaiko-fanmade-backup`: the account center's daily backup runs it.
 - The two IAM users of the old Fanmade and Database sites: this server signs with their keys

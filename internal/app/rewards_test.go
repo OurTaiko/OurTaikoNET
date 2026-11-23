@@ -24,7 +24,7 @@ func TestEveryAnswerSaysWhatWasGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), SSO: sso, LegacyFanmadeHost: "fanmade.ourtaiko.org"})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: t.TempDir(), SSO: sso})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,15 +113,6 @@ INSERT INTO net.title_rules(title_id,kind,source,chart_id,clear) VALUES ('cleare
 	}
 	if w := send("GET", "/api/v1/me/rewards", "", "", ""); w.Code != 401 {
 		t.Fatal("a guest's rewards", w.Code)
-	}
-	// A game that still uses an old domain is told and fetches there too.
-	old := httptest.NewRequest("GET", "/api/v1/game/rewards", nil)
-	old.Host = "fanmade.ourtaiko.org"
-	old.Header.Set("Authorization", "Bearer "+game)
-	ow := httptest.NewRecorder()
-	h.ServeHTTP(ow, old)
-	if ow.Code != 200 || !strings.Contains(ow.Body.String(), `"title"`) || ow.Header().Get(rewards.Header) != "1" {
-		t.Fatal("old domain", ow.Code, ow.Header(), ow.Body.String())
 	}
 	seen := `{"ids":[` + jsonInt(fromWeb.Rewards[0].ID) + `]}`
 	// The website marks with its CSRF token, the game without one.

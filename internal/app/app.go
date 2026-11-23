@@ -29,7 +29,6 @@ import (
 	"ourtaiko.dev/net/internal/inproc"
 	"ourtaiko.dev/net/internal/kit/distribution"
 	"ourtaiko.dev/net/internal/kit/objectstore"
-	"ourtaiko.dev/net/internal/legacy"
 	"ourtaiko.dev/net/internal/multiplay"
 	"ourtaiko.dev/net/internal/multiplay/roomsapi"
 	"ourtaiko.dev/net/internal/netdb"
@@ -78,11 +77,6 @@ type Config struct {
 	// that is not the API's. Empty: the API alone, as in development.
 	WebDir string
 
-	// The host names of the three old sites. Their APIs are answered as those sites answered,
-	// and their pages are sent to the same pages under Origin (package legacy). Empty: that
-	// old address is not served.
-	LegacyFanmadeHost, LegacyOfficialHost, LegacyProfileHost string
-
 	// Where the 3D Don's catalog is read (profile/httpapi don.go); empty: the public bucket's.
 	DonCatalogURL       string
 	DonMirrorCatalogURL string
@@ -102,7 +96,6 @@ type App struct {
 	// across sources. It is OurTaikoProfile's code.
 	Players *profile.Server
 	pools   []*pgxpool.Pool
-	legacy  legacy.Hosts
 	webDir  string
 	origin  string
 	// origins tells each request which of the site's addresses it came to (Handler).
@@ -140,7 +133,7 @@ func (a sourceAwards) Grant(ctx context.Context, tx pgx.Tx, request awards.Reque
 // New connects to the database and builds both sources. The database must already hold the
 // schema this program was built for; see Init.
 func New(ctx context.Context, cfg Config) (*App, error) {
-	a := &App{legacy: legacy.Hosts{}, webDir: cfg.WebDir, origin: cfg.Origin}
+	a := &App{webDir: cfg.WebDir, origin: cfg.Origin}
 	origins, err := web.NewOrigins(cfg.Origin, cfg.OtherOrigins)
 	if err != nil {
 		return nil, err
@@ -255,16 +248,6 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		a.Close()
 		return nil, err
 	}
-	// Each old host still answers its API; its pages are those of the new site now.
-	if cfg.LegacyFanmadeHost != "" {
-		a.legacy[cfg.LegacyFanmadeHost] = legacy.Site{API: a.versions(a.withRewards(a.Fanmade.Handler()), "/api/v1/sources/fanmade"), Page: legacy.Under(cfg.Origin, "/fanmade")}
-	}
-	if cfg.LegacyOfficialHost != "" {
-		a.legacy[cfg.LegacyOfficialHost] = legacy.Site{API: a.versions(a.withRewards(a.Official.Handler()), "/api/v1/sources/official"), Page: legacy.Under(cfg.Origin, "/official")}
-	}
-	if cfg.LegacyProfileHost != "" {
-		a.legacy[cfg.LegacyProfileHost] = legacy.Site{API: legacy.PublicOnly(a.versions(a.Players.Handler(), "")), Page: legacy.Players(cfg.Origin)}
-	}
 	if cfg.Multiplay.ListenAddr != "" && cfg.Multiplay.InternalAddr != "" {
 		a.Close()
 		return nil, errors.New("Multi-Enso runs in this program (MULTIPLAY_LISTEN_ADDR) or in cmd/rooms (MULTIPLAY_INTERNAL_ADDR), not both")
@@ -295,7 +278,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	return a, nil
 }
 
-// Handler serves the new address, and the old ones for the hosts configured.
+// Handler serves the site, at each of its addresses.
 func (a *App) Handler() http.Handler {
 	var options []site.Option
 	if a.roomsSite != nil {
@@ -310,31 +293,20 @@ func (a *App) Handler() http.Handler {
 	ready := a.Fanmade.Handler()
 	routes := http.NewServeMux()
 	routes.Handle("/readyz", ready)
-	// The website and new clients use version 2; released games, version 1. The old hosts
-	// (a.legacy) only ever had version 1.
+	// The website and new clients use version 2; released games, version 1.
 	api := a.withRewards(current)
 	v1 := apiv1.Handler(api, a.v1)
 	routes.Handle("/", mount.Serve(map[string]http.Handler{apiv1.Version: v1, apiv2.Version: apiv2.Handler(api, a.v2)}, api))
-	// Every answer, the old domains' too, says how many rewards its player has not seen.
+	// Every answer says how many rewards its player has not seen.
 	// The chart editor (OurTaikoEdit's web version) as a bare page at /edit/app/, its build from the
 	// public bucket; the website shows it in its frame.
 	page := edit.Handler(edit.Config{Root: files.Root, Manifest: "edit-nightly.json", Router: a.v1.Router}, site.Web(a.webDir, a.origin, routes))
-	return a.origins.Handler(a.rewards.Announce(legacy.Handler(a.legacy, page)))
-}
-
-// versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
-// (package apiv1). Health checks and /internal/ reach api as they are.
-// An old host serves one source at /api/v1/ itself; sourceBase is that source's routes on the
-// new site, which version 1 linked to.
-func (a *App) versions(api http.Handler, sourceBase string) http.Handler {
-	v1 := a.v1
-	v1.SourceBase = sourceBase
-	return mount.Serve(map[string]http.Handler{apiv1.Version: apiv1.Handler(api, v1)}, api)
+	return a.origins.Handler(a.rewards.Announce(page))
 }
 
 // withRewards serves the rewards' routes (package rewards) in front of an API: the website asks
 // with its session, the game with its token. Either source knows a game's token; the players'
-// part knows the website. The old domains have them too, for a game that still uses one.
+// part knows the website.
 func (a *App) withRewards(next http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	a.rewards.Routes(mux, "/api/me/rewards", a.Players.Require)

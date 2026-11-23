@@ -183,9 +183,9 @@ func (c *converter) resource(chart, kind string, link map[string]any) {
 	delete(link, "path")
 	address, fallback := "", ""
 	if c.cfg.FilesOnDisk {
-		base := c.cfg.SourceBase
-		if base == "" && c.r != nil {
-			base = "/api/v1"
+		// The source's own routes, taken from the request's path (/api/v1/sources/fanmade).
+		base := "/api/v1"
+		if c.r != nil {
 			if i := strings.Index(c.r.URL.Path, "/charts/"); i >= 0 {
 				base = c.r.URL.Path[:i]
 			}

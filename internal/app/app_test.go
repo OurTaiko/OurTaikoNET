@@ -22,8 +22,8 @@ import (
 	songs "ourtaiko.dev/net/internal/songs/httpapi"
 )
 
-// One program, one database: each source answers under its name at the new address and as
-// its old site at the old one, and neither sees the other's charts.
+// One program, one database: each source answers under its name, and neither sees the other's
+// charts.
 func TestBothSourcesFromOneDatabase(t *testing.T) {
 	pool, url := netdbtest.NewURL(t, "fanmade")
 	ctx := context.Background()
@@ -44,35 +44,19 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 		t.Fatal(err)
 	}
 	storage := t.TempDir()
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: storage,
-		LegacyFanmadeHost: "fanmade.ourtaiko.org", LegacyOfficialHost: "database.ourtaiko.org"})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", StorageDir: storage})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer a.Close()
 	h := a.Handler()
-	// A page of an old site is the same page of this one now; the old API stays where it was.
-	for asked, want := range map[string]string{
-		"fanmade.ourtaiko.org/charts/" + strings.Repeat("f", 32): "http://localhost/fanmade/charts/" + strings.Repeat("f", 32),
-		"database.ourtaiko.org/playlists?sort=newest":            "http://localhost/official/playlists?sort=newest",
-	} {
-		host, path, _ := strings.Cut(asked, "/")
-		r := httptest.NewRequest("GET", "/"+path, nil)
-		r.Host = host
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, r)
-		if w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != want {
-			t.Errorf("%s: %d to %q, want 301 to %q", asked, w.Code, w.Header().Get("Location"), want)
-		}
-	}
 	// With files on this server's disk, a chart's download links are this site's own routes
-	// of the chart's source, whichever address asked, and they answer.
+	// of the chart's source, and they answer.
 	if err := os.WriteFile(filepath.Join(storage, "fanmade", strings.Repeat("1", 64)+".tja"), []byte("TITLE:Fan"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	for _, asked := range []struct{ host, path string }{
 		{"net.ourtaiko.org", "/api/v1/sources/fanmade/charts/" + strings.Repeat("f", 32) + "/resources"},
-		{"fanmade.ourtaiko.org", "/api/v1/charts/" + strings.Repeat("f", 32) + "/resources"},
 	} {
 		r := httptest.NewRequest("GET", asked.path, nil)
 		r.Host = asked.host
@@ -123,11 +107,9 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 	if w = get("net.ourtaiko.org", "/api/v2/files/3dchara/cos/0.glb"); w.Code != 302 || w.Header().Get("Location") != "https://distrib.ourtaiko.org/3dchara/cos/0.glb" {
 		t.Fatalf("v2 file elsewhere: %d %s", w.Code, w.Header().Get("Location"))
 	}
-	// Nothing outside the folders, no API without a version or of an unknown one, and the old
-	// hosts only ever had version 1.
+	// Nothing outside the folders, and no API without a version or of an unknown one.
 	for _, asked := range []struct{ host, path string }{
 		{"net.ourtaiko.org", "/api/v2/files/fanmade/%2e%2e/x"}, {"net.ourtaiko.org", "/api/charts"}, {"net.ourtaiko.org", "/api/v3/charts"},
-		{"fanmade.ourtaiko.org", "/api/v2/charts/" + strings.Repeat("f", 32)},
 	} {
 		if w = get(asked.host, asked.path); w.Code != 404 {
 			t.Fatalf("%s%s: %d", asked.host, asked.path, w.Code)
@@ -162,12 +144,11 @@ INSERT INTO official.chart_difficulties(chart_id,course,side,level,content_hash)
 	}{
 		{"net.ourtaiko.org", "/api/v1/sources/fanmade/game/catalog", 200, "Fan song"},
 		{"net.ourtaiko.org", "/api/v1/sources/official/game/catalog", 200, "Official song"},
-		{"fanmade.ourtaiko.org", "/api/v1/game/catalog", 200, "Fan song"},
-		{"database.ourtaiko.org", "/api/v1/game/catalog", 200, "Official song"},
-		// The new address has no catalog of its own outside a source, and the old addresses
-		// do not know the new routes.
+		// There is no catalog outside a source, and an old site's host name is no different
+		// from any other: its old routes are gone.
 		{"net.ourtaiko.org", "/api/v1/game/catalog", 404, ""},
-		{"fanmade.ourtaiko.org", "/api/v1/sources/official/game/catalog", 404, ""},
+		{"fanmade.ourtaiko.org", "/api/v1/game/catalog", 404, ""},
+		{"database.ourtaiko.org", "/api/v1/game/catalog", 404, ""},
 	} {
 		status, got := titles(c.host, c.path)
 		if status != c.status || (c.want != "" && (len(got) != 1 || got[0] != c.want)) {
@@ -272,7 +253,7 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 `); err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", OtherOrigins: []string{"https://cn.example"}, StorageDir: t.TempDir(), LegacyProfileHost: "profile.ourtaiko.org"})
+	a, err := New(ctx, Config{DatabaseURL: url, Origin: "http://localhost", OtherOrigins: []string{"https://cn.example"}, StorageDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,9 +267,9 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		return w
 	}
 
-	// One list of a player's plays, from both sources, at the new address and the old one; at
-	// another address of the site, its links are on that one.
-	for host, site := range map[string]string{"net.ourtaiko.org": "http://localhost", "profile.ourtaiko.org": "http://localhost", "cn.example": "https://cn.example"} {
+	// One list of a player's plays, from both sources; at another address of the site, its
+	// links are on that one.
+	for host, site := range map[string]string{"net.ourtaiko.org": "http://localhost", "cn.example": "https://cn.example"} {
 		w := get("GET", host, "/api/v1/users/"+player+"/scores?view=all")
 		var list struct {
 			Items []struct {
@@ -383,16 +364,11 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	}
 
 	// Nameplates are public; asking for awards is not possible from outside.
-	if w := get("GET", "profile.ourtaiko.org", "/api/v1/users/"+player+"/nameplate"); w.Code != 200 {
-		t.Errorf("nameplate at the old address: %d %s", w.Code, w.Body.String())
-	}
 	if w := get("GET", "net.ourtaiko.org", "/api/v1/users/"+player+"/nameplate"); w.Code != 200 {
-		t.Errorf("nameplate at the new address: %d %s", w.Code, w.Body.String())
+		t.Errorf("nameplate: %d %s", w.Code, w.Body.String())
 	}
-	for _, host := range []string{"net.ourtaiko.org", "profile.ourtaiko.org", "fanmade.ourtaiko.org"} {
-		if w := get("POST", host, "/internal/v1/awards"); w.Code != 404 {
-			t.Errorf("POST /internal/v1/awards on %s: %d, want 404", host, w.Code)
-		}
+	if w := get("POST", "net.ourtaiko.org", "/internal/v1/awards"); w.Code != 404 {
+		t.Errorf("POST /internal/v1/awards: %d, want 404", w.Code)
 	}
 }
 

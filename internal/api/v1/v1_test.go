@@ -145,8 +145,8 @@ func TestUnchangedAnswers(t *testing.T) {
 }
 
 func TestFilesOnDisk(t *testing.T) {
-	cfg := Config{FilesOnDisk: true, Origin: "http://localhost", SourceBase: "/api/v1/sources/fanmade"}
-	_, answer := serve(t, cfg, "/api/v1/charts/x/resources", "203.0.113.2", `{"chartId":"x","resources":{"tja":{"path":"fanmade/a.tja","sha256":"a","size":1}}}`)
+	cfg := Config{FilesOnDisk: true, Origin: "http://localhost"}
+	_, answer := serve(t, cfg, "/api/v1/sources/fanmade/charts/x/resources", "203.0.113.2", `{"chartId":"x","resources":{"tja":{"path":"fanmade/a.tja","sha256":"a","size":1}}}`)
 	if tja := answer["resources"].(map[string]any)["tja"].(map[string]any); tja["url"] != "http://localhost/api/v1/sources/fanmade/charts/x/tja" {
 		t.Fatal(asJSON(answer))
 	}
