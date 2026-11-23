@@ -79,8 +79,11 @@ type Chart struct {
 	AudioKey     string        `json:"-"`
 	// Background movie (BGMOVIE), transcoded; empty when the chart has none.
 	MovieHash string `json:"movieHash,omitempty"`
-	MovieSize int64  `json:"movieSize,omitempty"`
-	MovieKey  string `json:"-"`
+	// ScenePreset is the stage preset the chart's TJA names (SCENEPRESET), which the game plays
+	// it on before any folder's; empty for none. PATCH /charts/{id} changes it in the file.
+	ScenePreset string `json:"scenePreset"`
+	MovieSize   int64  `json:"movieSize,omitempty"`
+	MovieKey    string `json:"-"`
 	// Background image (BGIMAGE), stored as WebP; empty when the chart has none.
 	BackgroundHash string `json:"bgimageHash,omitempty"`
 	BackgroundSize int64  `json:"bgimageSize,omitempty"`
@@ -157,7 +160,7 @@ const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_
  COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),
  (SELECT count(*) FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id WHERE d.chart_id=c.id),
  c.movie_offset,COALESCE(mf.sha256,''),COALESCE(mf.byte_size,0),COALESCE(mf.storage_key,''),
- COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,'')
+ COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,''),COALESCE(c.scene_preset,'')
  FROM charts c LEFT JOIN chart_resources tf ON tf.id=c.tja_file LEFT JOIN chart_resources af ON af.id=c.audio_file
  LEFT JOIN chart_resources cf ON cf.id=c.cover_file LEFT JOIN chart_resources pf ON pf.id=c.preview_file
  LEFT JOIN chart_resources mf ON mf.id=c.movie_file LEFT JOIN chart_resources bf ON bf.id=c.bgimage_file `
@@ -172,7 +175,7 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 		&c.TJAName, &c.AudioName, &c.TJAHash, &c.TJASize, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.CoverHash, &c.PreviewPath,
 		&c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties,
 		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.PlayCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
-		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey)
+		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey, &c.ScenePreset)
 	if e == nil {
 		c.SongCoverPath = s.filePath(coverKey)
 		c.OwnerID = c.OwnerIDs[0]

@@ -227,7 +227,7 @@ Open <http://127.0.0.1:5173> (that address, not `localhost`: the backend accepts
 | `LISTEN_ADDR`, `APP_ORIGIN` | `127.0.0.1:8090` and `http://127.0.0.1:5173` |
 | `APP_OTHER_ORIGINS` | Usually empty. More addresses of the same site, comma-separated: a request to one of their hosts is answered in it (sign-in, the origin of writes, full addresses). Production uses it for the address in mainland China (`deploy/README.md`) |
 | `STORAGE_DIR` | Where uploaded files go, for example `.data` |
-| `TJAPARSER_BIN` | A build of TJAParser `v0.13.0`, for example kept under `.data/tools/` |
+| `TJAPARSER_BIN` | A build of TJAParser `v0.16.0`, for example kept under `.data/tools/` |
 | `DEV_USER_ID` | 32 lowercase hex digits. With no account center configured, signing in signs in as this player, who may manage everything. Only accepted on a loopback address |
 
 Multi-Enso is off unless these are set as well, in `.env` or before the command:

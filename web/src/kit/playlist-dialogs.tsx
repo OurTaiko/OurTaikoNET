@@ -6,7 +6,7 @@ import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
 import type { ChartBase, MyPlaylists, Playlist } from './api/types'
 import { CategorySelect } from './categories'
-import { ChoiceSelect } from './components/choice-select'
+import { ScenePresetField } from './components/scene-preset-field'
 import { CoverUploadDialog } from './components/cover-dialog'
 import type { SavedCover } from './cover'
 import { ToggleRow } from './components/toggle-row'
@@ -19,7 +19,6 @@ import { Textarea } from './components/ui/textarea'
 import { Modal } from './notifications'
 import { invalidatePlaylistLists, invalidatePlaylists, playlistQueries } from './queries/playlists'
 import { queryClient } from './query/client'
-import { scenePresetChoices, scenePresetQuery } from './scene-presets'
 import { useSession } from './session'
 
 // Creates a playlist, or edits the one given. C is the site's Chart, so onSaved hands back its Playlist.
@@ -109,7 +108,14 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
           disabled={busy}
         />
       </div>
-      <ScenePresetField value={scenePreset} onChange={setScenePreset} disabled={busy} />
+      <ScenePresetField
+        value={scenePreset}
+        onChange={setScenePreset}
+        disabled={busy}
+        label={t('playlists.scenePreset')}
+        noneLabel={t('playlists.scenePresetNone')}
+        help={t('playlists.scenePresetHelp')}
+      />
       <div className="space-y-2">
         <Label className="inline-flex items-center gap-2">
           <Checkbox
@@ -126,39 +132,6 @@ export function PlaylistDialog<C extends ChartBase = ChartBase>({
         </p>
       )}
     </Modal>
-  )
-}
-
-// The play backdrop: none, or one of the game's presets (scene-presets.ts). The playlist's own
-// stays a choice when the catalog no longer has it or cannot be read, so saving keeps it.
-function ScenePresetField({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string
-  onChange: (value: string) => void
-  disabled: boolean
-}) {
-  const { t } = useTranslation()
-  const { data: presets = [] } = useQuery(scenePresetQuery())
-  // The value the dialog opened with: a choice for as long as it is open.
-  const [current] = useState(value)
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{t('playlists.scenePreset')}</p>
-      <ChoiceSelect
-        label={t('playlists.scenePreset')}
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        items={scenePresetChoices(presets, current).map((preset) => ({
-          value: preset,
-          label: preset || t('playlists.scenePresetNone'),
-        }))}
-      />
-      <p className="text-sm text-muted-foreground">{t('playlists.scenePresetHelp')}</p>
-    </div>
   )
 }
 
@@ -212,7 +185,14 @@ export function PlaylistScenePresetDialog<C extends ChartBase = ChartBase>({
         </>
       }
     >
-      <ScenePresetField value={scenePreset} onChange={setScenePreset} disabled={busy} />
+      <ScenePresetField
+        value={scenePreset}
+        onChange={setScenePreset}
+        disabled={busy}
+        label={t('playlists.scenePreset')}
+        noneLabel={t('playlists.scenePresetNone')}
+        help={t('playlists.scenePresetHelp')}
+      />
       {error && (
         <p role="alert" className="text-destructive">
           {error}

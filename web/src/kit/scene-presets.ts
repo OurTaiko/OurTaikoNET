@@ -59,8 +59,9 @@ export function readScenePresets(text: string): string[] {
 }
 
 /**
- * The choices for a playlist whose preset is `current`: none (""), then `presets`, and `current`
- * when it is not among them (the catalog changed or could not be read), so that saving keeps it.
+ * The choices for a playlist or chart whose preset is `current`: none (""), then `presets`, and
+ * `current` when it is not among them (the catalog changed or could not be read, or a chart's file
+ * named a preset of its own), so that saving keeps it.
  */
 export function scenePresetChoices(presets: readonly string[], current: string): string[] {
   const choices = ['', ...presets]

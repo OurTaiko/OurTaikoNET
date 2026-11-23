@@ -145,6 +145,17 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	scenePreset := c.ScenePreset
+	if len(patch.ScenePreset) > 0 {
+		if isNull(patch.ScenePreset) || json.Unmarshal(patch.ScenePreset, &scenePreset) != nil || !tja.ValidScenePreset(scenePreset) {
+			problem(w, 422, "SCENE_PRESET_INVALID", "演奏背景的名称只能是 32 个以内的字母、数字和下划线")
+			return
+		}
+		if scenePreset != c.ScenePreset && !c.HasFiles {
+			problem(w, 422, "METADATA_LOCKED", "没有谱面文件的乐曲不能设置演奏背景")
+			return
+		}
+	}
 	if !patchTranslations(patch.TitleTranslations, c.TitleTranslations) || !patchTranslations(patch.SubtitleTranslations, c.SubtitleTranslations) {
 		problem(w, 422, "TRANSLATIONS_INVALID", "译名必须为 en / ja / zh / ko 到不超过 500 字节文本的映射")
 		return
@@ -206,6 +217,14 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if scenePreset != c.ScenePreset {
+		replaced, e := s.rewriteScenePreset(r.Context(), tx, c.ID, scenePreset)
+		if e != nil {
+			internal(w, e)
+			return
+		}
+		retired = append(retired, replaced...)
+	}
 	if e = tx.Commit(r.Context()); e != nil {
 		internal(w, e)
 		return
@@ -244,6 +263,8 @@ type metadataPatch struct {
 	// MOVIEOFFSET in seconds, for a chart with a movie; it is rewritten in the stored TJA,
 	// where players read it.
 	MovieOffset json.RawMessage `json:"movieOffset"`
+	// ScenePreset rewrites SCENEPRESET in the stored TJA; empty clears it.
+	ScenePreset json.RawMessage `json:"scenePreset"`
 	// Every block's maker, as [{course, side, maker}].
 	DifficultyMakers json.RawMessage `json:"difficultyMakers"`
 }

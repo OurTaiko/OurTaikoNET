@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sitekit/components/ui
 import { Textarea } from '@sitekit/components/ui/textarea'
 import { ChartAudioPlayer } from '@sitekit/components/audio-player'
 import { MovieSettings, movieChanges, movieDraft } from '@sitekit/components/movie-settings'
+import { ScenePresetField } from '@sitekit/components/scene-preset-field'
 import { Input } from '@sitekit/components/ui/input'
 import { Button } from '@sitekit/components/ui/button'
 import { useEffect, useRef, useState } from 'react'
@@ -37,6 +38,7 @@ type Patch = {
   demoStart?: number
   demoEnd?: number
   movieOffset?: number
+  scenePreset?: string
   categoryIds?: string[]
   titleTranslations?: Partial<Record<Locale, string | null>>
   subtitleTranslations?: Partial<Record<Locale, string | null>>
@@ -90,6 +92,7 @@ export function EditMetadata({
     Number(demoEnd) !== (chart.demoEnd ?? chart.demoStart + 15)
   const [movie, setMovie] = useState(() => movieDraft(chart))
   const movieEdit = movieChanges(chart, movie)
+  const [scenePreset, setScenePreset] = useState(chart.scenePreset)
   const [busy, setBusy] = useState(false)
   const { notify } = useNotification()
   const setError = (message: string) => notify(message, 'error')
@@ -103,6 +106,7 @@ export function EditMetadata({
     categoriesChanged ||
     previewChanged ||
     movieEdit.changed ||
+    scenePreset !== chart.scenePreset ||
     namesChanged ||
     languages.some(
       ({ code }) =>
@@ -158,6 +162,7 @@ export function EditMetadata({
       return
     }
     if (!movieEdit.file && movieEdit.offset !== undefined) patch.movieOffset = movieEdit.offset
+    if (scenePreset !== chart.scenePreset) patch.scenePreset = scenePreset
     const invalidText = (text: string) =>
       new TextEncoder().encode(text).length > 500 ||
       Array.from(text).some((char) => {
@@ -321,6 +326,16 @@ export function EditMetadata({
                 disabled={busy}
                 className="mt-4"
               />
+              <div className="mt-4 rounded-[20px] border p-4">
+                <ScenePresetField
+                  value={scenePreset}
+                  onChange={setScenePreset}
+                  disabled={busy}
+                  label={t('messages.scenePreset')}
+                  noneLabel={t('messages.scenePresetNone')}
+                  help={t('messages.scenePresetHelp')}
+                />
+              </div>
             </TabsContent>
             <TabsContent value="description" className="space-y-3 pt-3">
               <Label htmlFor="edit-description">{t('messages.metadataTab_description')}</Label>

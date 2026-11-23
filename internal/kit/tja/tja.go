@@ -82,6 +82,10 @@ type Metadata struct {
 	Movie        string       `json:"-"`
 	MovieOffset  float64      `json:"movieOffset"`
 	Difficulties []Difficulty `json:"difficulties"`
+	// ScenePreset is the stage preset the chart names (SCENEPRESET), as TJAParser reads it:
+	// empty when it names none or a name ScenePresetName does not take, nil when the tool
+	// does not report it.
+	ScenePreset *string `json:"-"`
 }
 
 func SafeFilename(s string) bool {
@@ -190,6 +194,7 @@ func Parse(data []byte, audioName string) (Metadata, *Issue) {
 			d.Maker = b.Maker
 		}
 	}
+	m.ScenePreset = ScenePresetName(result.ScenePreset)
 	m.TitleTranslations = result.Titles
 	m.SubtitleTranslations = result.Subtitles
 	if title, ok := result.Titles["origin"]; ok {
@@ -490,6 +495,25 @@ func SetMovieHeaders(data []byte, name string, offset float64) ([]byte, bool) {
 		lines = append(lines[:wave+1], append(added, lines[wave+1:]...)...)
 	}
 	return []byte(strings.Join(lines, "\n")), true
+}
+
+var scenePresetForm = regexp.MustCompile(`^[A-Za-z0-9_]{0,32}$`)
+
+// ValidScenePreset reports whether name can be kept as a stage preset: up to 32 letters,
+// digits and underscores, or empty for none. Which presets exist is the game's to know.
+func ValidScenePreset(name string) bool { return scenePresetForm.MatchString(name) }
+
+// ScenePresetName is the stage preset a site keeps for what TJAParser read from a chart
+// (Inspection.ScenePreset): the name itself, empty for one it does not take, nil for nil.
+func ScenePresetName(read *string) *string {
+	if read == nil {
+		return nil
+	}
+	name := ""
+	if ValidScenePreset(*read) {
+		name = *read
+	}
+	return &name
 }
 
 // SongHeader returns a song header (key in capitals, matched in any case) before the first

@@ -11,7 +11,7 @@
 # (default: next to this repository). A stand-in account center gives every player a name and lets nobody sign
 # in, so only public answers are compared.
 #
-# Needs TJAPARSER_BIN (TJAParser v0.13.0) and ffmpeg on PATH, as the servers do.
+# Needs TJAPARSER_BIN (TJAParser v0.16.0) and ffmpeg on PATH, as the servers do.
 # Ports used on 127.0.0.1: 18999, 18080, 18081, 18083, 18090. CHARTS limits how many charts are asked
 # about one by one (default 0 = all); SHOW how many differences are listed (default 40).
 set -eu
@@ -23,7 +23,7 @@ export PGHOST="${PGHOST:-/tmp}" PGPORT="${PGPORT:-5432}"
 src_fanmade="${1:?fanmade database name}"
 src_official="${2:?official database name}"
 src_profile="${3:?profile database name}"
-: "${TJAPARSER_BIN:?set TJAPARSER_BIN to a build of TJAParser v0.13.0}"
+: "${TJAPARSER_BIN:?set TJAPARSER_BIN to a build of TJAParser v0.16.0}"
 export TJAPARSER_BIN
 work="$(mktemp -d)"
 pids=""

@@ -42,4 +42,6 @@ it('offers none first and keeps a current preset the catalog lacks', () => {
   expect(scenePresetChoices(['TOHO', 'ANIMAL'], 'ANIMAL')).toEqual(['', 'TOHO', 'ANIMAL'])
   expect(scenePresetChoices(['TOHO'], 'OLD')).toEqual(['', 'TOHO', 'OLD'])
   expect(scenePresetChoices([], 'OLD')).toEqual(['', 'OLD'])
+  // A chart's SCENEPRESET comes from its file and need not be a name a playlist could take.
+  expect(scenePresetChoices(['TOHO'], 'My stage')).toEqual(['', 'TOHO', 'My stage'])
 })
