@@ -64,6 +64,18 @@ type Block struct {
 	// The don and ka notes each route plays ("unbranched", or "normal", "expert", "master"),
 	// for the difficulty constants; absent when the block cannot be played.
 	Notes map[string]constants.Notes `json:"notes"`
+	// Scoring is the block's 真打 scoring; nil when the block cannot be played, or from a tool
+	// older than v0.18.0, which does not say.
+	Scoring *Scoring `json:"scoring"`
+}
+
+// Scoring is TJAParser's ShinuchiScoring of a block: a play scores
+// (good + Ad-Lib 良) × GoodPoints + (ok + Ad-Lib 可) × OkPoints + drumroll × LongHitPoints.
+type Scoring struct {
+	GoodPoints      int `json:"goodPoints"`
+	OkPoints        int `json:"okPoints"`
+	LongHitPoints   int `json:"longHitPoints"`
+	KiwamiThreshold int `json:"kiwamiThreshold"`
 }
 
 // Unreadable is the tool refusing the file as a whole (exit code 4): its message names the

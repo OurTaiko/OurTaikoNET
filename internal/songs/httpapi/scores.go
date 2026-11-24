@@ -57,6 +57,9 @@ type Score struct {
 	SubmittedAt time.Time `json:"submittedAt"`
 	// The play's recording is kept: GET /api/scores/{id}/replay.
 	HasReplay bool `json:"hasReplay"`
+	// ScoreRank is the rank against the block's kiwami line (net.score_rank): 0 none, 1–6 白粋 to
+	// 紫雅, 7 極; nil for a score the site did not work out (block not scored, content replaced).
+	ScoreRank *int `json:"scoreRank"`
 }
 
 func (v *scoreSubmission) valid() bool {
@@ -93,13 +96,18 @@ func (v *scoreSubmission) adLibValue() []int64 {
 }
 
 // scoreSelect reads scores, aliased sc, with the block each was played on.
-const scoreColumns = `sc.id,sc.user_id,d.chart_id,sc.difficulty_id,d.course,d.side,sc.good,sc.ok,sc.bad,sc.score,sc.drumroll,sc.max_combo,sc.clear_status,sc.is_latest,sc.submitted_at,sc.adlib,sc.mines,sc.replay_data IS NOT NULL`
+const scoreColumns = `sc.id,sc.user_id,d.chart_id,sc.difficulty_id,d.course,d.side,sc.good,sc.ok,sc.bad,sc.score,sc.drumroll,sc.max_combo,sc.clear_status,sc.is_latest,sc.submitted_at,sc.adlib,sc.mines,sc.replay_data IS NOT NULL,sc.score_rank`
 const scoreSelect = `SELECT ` + scoreColumns + ` FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id`
 
 func readScore(row pgx.Row) (Score, error) {
 	var v Score
-	err := row.Scan(&v.ID, &v.UserID, &v.SongID, &v.DifficultyID, &v.Course, &v.Side, &v.Good, &v.OK, &v.Bad, &v.Score, &v.Drumroll, &v.MaxCombo, &v.ClearStatus, &v.IsLatest, &v.SubmittedAt, &v.AdLib, &v.Mines, &v.HasReplay)
+	err := row.Scan(v.fields()...)
 	return v, err
+}
+
+// fields are the scan targets of scoreColumns, in order.
+func (v *Score) fields() []any {
+	return []any{&v.ID, &v.UserID, &v.SongID, &v.DifficultyID, &v.Course, &v.Side, &v.Good, &v.OK, &v.Bad, &v.Score, &v.Drumroll, &v.MaxCombo, &v.ClearStatus, &v.IsLatest, &v.SubmittedAt, &v.AdLib, &v.Mines, &v.HasReplay, &v.ScoreRank}
 }
 
 func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
@@ -175,8 +183,11 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		err = tx.QueryRow(r.Context(), `SELECT payload_digest FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key).Scan(&oldDigest)
 		if err == nil {
 			if oldDigest != digest {
+				// A score the site worked out (scores_shinuchi, with a rank) is not the game's, so the
+				// game's is left out of the comparison; one the game's value was kept for is compared.
 				var same bool
-				err = tx.QueryRow(r.Context(), `SELECT jsonb_strip_nulls(jsonb_build_object('difficultyId',difficulty_id,'good',good,'ok',ok,'bad',bad,'score',score,'drumroll',drumroll,'max_combo',max_combo,'replay_data',replay_data,'ClearStatus',NULLIF(clear_status,0),'adlib',CASE WHEN adlib='{0,0}' THEN NULL ELSE to_jsonb(adlib) END,'mines',NULLIF(mines,0)))=$3::jsonb FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key, string(payload)).Scan(&same)
+				err = tx.QueryRow(r.Context(), `SELECT jsonb_strip_nulls(jsonb_build_object('difficultyId',difficulty_id,'good',good,'ok',ok,'bad',bad,'score',CASE WHEN score_rank IS NULL THEN score END,'drumroll',drumroll,'max_combo',max_combo,'replay_data',replay_data,'ClearStatus',NULLIF(clear_status,0),'adlib',CASE WHEN adlib='{0,0}' THEN NULL ELSE to_jsonb(adlib) END,'mines',NULLIF(mines,0)))
+ =CASE WHEN score_rank IS NULL THEN $3::jsonb ELSE $3::jsonb - 'score' END FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key, string(payload)).Scan(&same)
 				if err != nil {
 					internal(w, err)
 					return

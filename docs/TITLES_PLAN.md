@@ -69,7 +69,7 @@ Each new kind is one query for "who meets it" in `titlerules.met`, a value in th
 
 ## Stage 3: trust
 
-Scores are the game's word; the server ranks them and does not check them. A title for a hard feat can be had with a made-up score.
+The counts are the game's word; the server works the score and its rank out of them by the chart's scoring (migration 0021) and does not check the counts. A title for a hard feat can be had with made-up counts.
 
 | # | What | Notes |
 |---|---|---|

@@ -83,8 +83,7 @@ func (s *Server) replayList(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var v ReplayListing
 		var translations []byte
-		if err = rows.Scan(&v.ID, &v.UserID, &v.SongID, &v.DifficultyID, &v.Course, &v.Side, &v.Good, &v.OK, &v.Bad, &v.Score.Score, &v.Drumroll, &v.MaxCombo, &v.ClearStatus, &v.IsLatest, &v.SubmittedAt, &v.AdLib, &v.Mines, &v.HasReplay,
-			&v.Title, &translations, &v.Subtitle, &v.Level, &total); err != nil {
+		if err = rows.Scan(append(v.Score.fields(), &v.Title, &translations, &v.Subtitle, &v.Level, &total)...); err != nil {
 			internal(w, err)
 			return
 		}

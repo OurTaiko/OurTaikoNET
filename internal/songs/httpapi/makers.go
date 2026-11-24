@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"ourtaiko.dev/net/internal/kit/charthash"
 	"ourtaiko.dev/net/internal/kit/constants"
 	"ourtaiko.dev/net/internal/kit/tja"
 )
@@ -73,13 +74,22 @@ func difficultyMakers(difficulties []tja.Difficulty) string {
 // chart. Rows are rewritten only when something differs, so storing the same
 // file again neither changes their IDs nor touches the chart's update_at.
 func setDifficulties(ctx context.Context, tx pgx.Tx, chartID string, blocks []tja.Difficulty) error {
-	rows, err := tx.Query(ctx, `SELECT course,side,level,maker,branching,COALESCE(content_hash,'') FROM chart_difficulties WHERE chart_id=$1`, chartID)
+	// Scoring read under another rule counts as none, so it is read again.
+	rows, err := tx.Query(ctx, `SELECT course,side,level,maker,branching,COALESCE(content_hash,''),
+ CASE WHEN scoring_version=$2 THEN good_points END,CASE WHEN scoring_version=$2 THEN ok_points END,
+ CASE WHEN scoring_version=$2 THEN long_hit_points END,CASE WHEN scoring_version=$2 THEN kiwami_threshold END
+ FROM chart_difficulties WHERE chart_id=$1`, chartID, tja.ScoringVersion)
 	if err != nil {
 		return err
 	}
 	stored, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (tja.Difficulty, error) {
 		var d tja.Difficulty
-		return d, row.Scan(&d.Course, &d.Side, &d.Level, &d.Maker, &d.Branching, &d.Hash)
+		var good, ok, long, kiwami *int
+		err := row.Scan(&d.Course, &d.Side, &d.Level, &d.Maker, &d.Branching, &d.Hash, &good, &ok, &long, &kiwami)
+		if good != nil && ok != nil && long != nil && kiwami != nil {
+			d.Scoring = &charthash.Scoring{GoodPoints: *good, OkPoints: *ok, LongHitPoints: *long, KiwamiThreshold: *kiwami}
+		}
+		return d, err
 	})
 	if err != nil {
 		return err
@@ -96,7 +106,12 @@ func setDifficulties(ctx context.Context, tx pgx.Tx, chartID string, blocks []tj
 		wanted[[2]string{d.Course, d.Side}] = d
 	}
 	same := len(stored) == len(wanted) && !slices.ContainsFunc(stored, func(d tja.Difficulty) bool {
-		return !reflect.DeepEqual(wanted[[2]string{d.Course, d.Side}], d)
+		w := wanted[[2]string{d.Course, d.Side}]
+		if w.Scoring == nil {
+			// A tool that does not say the scoring leaves what is stored.
+			w.Scoring = d.Scoring
+		}
+		return !reflect.DeepEqual(w, d)
 	})
 	if same {
 		return nil
@@ -132,6 +147,28 @@ func setDifficulties(ctx context.Context, tx pgx.Tx, chartID string, blocks []tj
 		if err != nil {
 			return err
 		}
+		// After the row: a new content_hash has retired the old content's scores already.
+		if d.Scoring != nil {
+			if err = storeScoring(ctx, tx, chartID, d.Course, d.Side, d.Hash, d.Scoring); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// storeScoring writes a block's 真打 scoring as read under tja.ScoringVersion; nil is a block the
+// tool cannot score, whose scores keep what the game sent. hash, when given, is the content the
+// scoring was read from: a row holding other content is left alone. New points for the same
+// content rescore the block's current scores (trigger chart_difficulties_rescore).
+func storeScoring(ctx context.Context, tx pgx.Tx, chartID, course, side, hash string, s *charthash.Scoring) error {
+	var good, ok, long, kiwami *int
+	if s != nil {
+		good, ok, long, kiwami = &s.GoodPoints, &s.OkPoints, &s.LongHitPoints, &s.KiwamiThreshold
+	}
+	_, err := tx.Exec(ctx, `UPDATE chart_difficulties SET good_points=$4,ok_points=$5,long_hit_points=$6,kiwami_threshold=$7,scoring_version=$8
+ WHERE chart_id=$1 AND course=$2 AND side=$3 AND ($9='' OR content_hash=$9)
+  AND (good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version) IS DISTINCT FROM ($4::integer,$5::integer,$6::integer,$7::integer,$8::smallint)`,
+		chartID, course, side, good, ok, long, kiwami, tja.ScoringVersion, hash)
+	return err
 }

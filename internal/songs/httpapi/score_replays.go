@@ -116,7 +116,7 @@ func (s *Server) scoreReplay(w http.ResponseWriter, r *http.Request) {
 	 JOIN chart_difficulties d ON d.id=sc.difficulty_id JOIN charts c ON c.id=d.chart_id
 	 WHERE sc.id=$1 AND sc.replay_data IS NOT NULL AND `+publishedChart, id)
 	var v Score
-	err := row.Scan(&v.ID, &v.UserID, &v.SongID, &v.DifficultyID, &v.Course, &v.Side, &v.Good, &v.OK, &v.Bad, &v.Score, &v.Drumroll, &v.MaxCombo, &v.ClearStatus, &v.IsLatest, &v.SubmittedAt, &v.AdLib, &v.Mines, &v.HasReplay, &replay)
+	err := row.Scan(append(v.fields(), &replay)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 404, "REPLAY_NOT_FOUND", "这条成绩没有回放")
 		return
