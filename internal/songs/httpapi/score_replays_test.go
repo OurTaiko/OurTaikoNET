@@ -99,7 +99,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO charts(id,owner_ids,title,bpm,duration,tja_file,audio_file) VALUES('11111111111111111111111111111111',ARRAY['89b6ef3a5cb57b6e04f74711d15a8a5f'],'Recording fixture',120,10,test_file('tja','test.tja',repeat('a',64),1),test_file('ogg','test.ogg',repeat('b',64),1));
- INSERT INTO chart_difficulties(chart_id,course,side,level,maker) SELECT chart_id,course,'single',level,maker FROM (VALUES ('11111111111111111111111111111111','Oni',5,'')) v(chart_id,course,level,maker);`)
+ INSERT INTO chart_difficulties(chart_id,course,side,level,maker,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version) SELECT chart_id,course,'single',level,maker,1000,500,100,1000000,1 FROM (VALUES ('11111111111111111111111111111111','Oni',5,'')) v(chart_id,course,level,maker);`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,10 @@ func TestScoreReplayCompatibility(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT test_slot($1,'Oni')`, song).Scan(&slot); err != nil {
 		t.Fatal(err)
 	}
-	base := fmt.Sprintf(`{"difficultyId":%d,"good":10,"ok":0,"bad":0,"score":10000,"drumroll":0,"max_combo":10}`, slot)
+	// What a released game sends. Its score is not the site's: the site's is 10 良 at 1000 (the
+	// block's scoring), and the request digests without the game's.
+	base := fmt.Sprintf(`{"difficultyId":%d,"good":10,"ok":0,"bad":0,"score":12345,"drumroll":0,"max_combo":10}`, slot)
+	digested := strings.Replace(base, `,"score":12345`, "", 1)
 	app := testServer(t, pool, Config{Origin: origin})
 	_, err = pool.Exec(ctx, `INSERT INTO test_sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'',now()+interval '1 day')`, web.Hash("game:"+token), user)
 	if err != nil {
@@ -144,6 +147,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 			t.Fatalf("want %d got %d: %s", want, response.StatusCode, data)
 		}
 		var score Score
+		// The receipt has the site's score, not the game's.
 		if want < 300 && (json.Unmarshal(data, &score) != nil || score.ID == "" || score.Score != 10000) {
 			t.Fatal("bad score receipt")
 		}
@@ -158,7 +162,7 @@ func TestScoreReplayCompatibility(t *testing.T) {
 		legacy := call(path, base, key, 201)
 		var digest string
 		var isNull bool
-		if err := pool.QueryRow(ctx, `SELECT replay_data IS NULL,payload_digest FROM scores WHERE id=$1`, legacy.ID).Scan(&isNull, &digest); err != nil || !isNull || digest != web.Hash(base) {
+		if err := pool.QueryRow(ctx, `SELECT replay_data IS NULL,payload_digest FROM scores WHERE id=$1`, legacy.ID).Scan(&isNull, &digest); err != nil || !isNull || digest != web.Hash(digested) {
 			t.Fatalf("legacy payload/digest changed: null=%v err=%v", isNull, err)
 		}
 		// A retry after upgrading the server must match an old request exactly.
@@ -403,7 +407,8 @@ func TestScoreReplayIsReadBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	var oni int64
-	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,'Oni','single',5) RETURNING id`, w.song).Scan(&oni); err != nil {
+	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version)
+ VALUES($1,'Oni','single',5,1000,500,100,1000000,1) RETURNING id`, w.song).Scan(&oni); err != nil {
 		t.Fatal(err)
 	}
 	game := New(s.DB, Config{Source: Official, Storage: t.TempDir(), Origin: "http://localhost", DevUserID: testUsers["alice"].ID})

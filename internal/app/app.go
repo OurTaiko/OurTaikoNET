@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -98,6 +99,9 @@ type Config struct {
 type App struct {
 	Fanmade  *songs.Server
 	Official *songs.Server
+	// scoring is set while Start reads the charts' 真打 scoring (RunScoringBackfill): until
+	// then a score could not be worked out, so the site serves only its health checks.
+	scoring atomic.Bool
 	// Players is what belongs to no source: titles, nameplates, awards, a player's scores
 	// across sources. It is OurTaikoProfile's code.
 	Players *profile.Server
@@ -319,7 +323,21 @@ func (a *App) Handler() http.Handler {
 	// The chart editor (OurTaikoEdit's web version) as a bare page at /edit/app/, its build from the
 	// public bucket; the website shows it in its frame.
 	page := edit.Handler(edit.Config{Root: files.Root, Manifest: "edit-nightly.json", Router: a.v1.Router}, site.Web(a.webDir, a.origin, routes))
-	return a.origins.Handler(a.rewards.Announce(legacy.Handler(a.legacy, page)))
+	return a.afterScoring(a.origins.Handler(a.rewards.Announce(legacy.Handler(a.legacy, page))))
+}
+
+// afterScoring answers 503 with Retry-After while the charts' scoring is being read at start
+// (Start), on every host and path but the health checks, so a release goes ahead and the game
+// sends its queued scores again later.
+func (a *App) afterScoring(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if a.scoring.Load() && r.URL.Path != "/healthz" && r.URL.Path != "/readyz" {
+			w.Header().Set("Retry-After", "60")
+			web.Problems{}.Problem(w, http.StatusServiceUnavailable, "SCORING_IN_PROGRESS", "服务器正在读取谱面的计分数据，请稍后再试")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // versions serves api, the version-free API (paths /api/…), at each version's prefix: /api/v1/
@@ -351,6 +369,25 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	if err := a.startRooms(); err != nil {
 		return err
+	}
+	// Blocks without their scoring (stored before it was kept, or under an older rule) are read
+	// before the site serves again; with none it serves at once.
+	pending, err := a.Fanmade.ScoringPending(ctx)
+	if err == nil && !pending {
+		pending, err = a.Official.ScoringPending(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	if pending {
+		a.scoring.Store(true)
+		log.Print("reading the charts' scoring: answering 503 until done")
+		go func() {
+			a.Fanmade.RunScoringBackfill(ctx)
+			a.Official.RunScoringBackfill(ctx)
+			a.scoring.Store(false)
+			log.Print("charts' scoring read: serving")
+		}()
 	}
 	// Deleting replaced files, renaming them and writing missing preview clips is the work of
 	// the server that owns the files. One that only reads them goes by a copy of the database

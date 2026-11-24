@@ -27,6 +27,11 @@ import (
 )
 
 const Version = "tja-v13"
+
+// ScoringVersion is the scoring rule TJAParser's scoring is read under
+// (chart_difficulties.scoring_version): 1 is ShinuchiScoring of v0.17.0. A newer rule bumps
+// it, and blocks read under an older one are read again at startup (RunContentHashBackfill).
+const ScoringVersion = 1
 const MaxTJA = 2 * 1024 * 1024
 const MaxAudio = 100 * 1024 * 1024
 
@@ -61,6 +66,9 @@ type Difficulty struct {
 	// Routes are the raw values of the difficulty constants (定数) TJAParser's notes give, by
 	// route (difficulty_constants); nil when the tool reported no notes.
 	Routes constants.Routes `json:"-"`
+	// Scoring is the block's 真打 scoring TJAParser gives (chart_difficulties.good_points…);
+	// nil from a tool that does not say.
+	Scoring *charthash.Scoring `json:"-"`
 	// Constants are the block's published constants by route, in a chart's detail only.
 	Constants []constants.Shown `json:"constants,omitempty"`
 	Line      int               `json:"-"`
@@ -190,6 +198,7 @@ func Parse(data []byte, audioName string) (Metadata, *Issue) {
 		}
 		d.Hash, d.Line = b.Hash, b.Line
 		d.Routes = constants.OfRoutes(b.Notes)
+		d.Scoring = b.Scoring
 		if b.Maker != "" {
 			d.Maker = b.Maker
 		}

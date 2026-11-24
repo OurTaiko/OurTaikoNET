@@ -961,28 +961,29 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 }
 
 // saveDanAttemptScore saves a score that came with its attempt, under the key the attempt gives
-// it, and returns its id; nil when the block is gone, its chart is not published, or the
-// block or the audio is not what the game played.
+// it, and returns its id; nil when the block is gone, its chart is not published, the site
+// cannot score it, or the block or the audio is not what the game played.
 func (s *Server) saveDanAttemptScore(ctx context.Context, tx pgx.Tx, user, key string, v *danAttemptScore) (*string, error) {
-	var published bool
+	var published, scorable bool
 	var chartHash, audioHash string
-	err := tx.QueryRow(ctx, `SELECT `+publishedChart+`,COALESCE(d.content_hash,''),COALESCE(af.sha256,'')
+	err := tx.QueryRow(ctx, `SELECT `+publishedChart+`,d.good_points IS NOT NULL,COALESCE(d.content_hash,''),COALESCE(af.sha256,'')
 	 FROM chart_difficulties d JOIN charts c ON c.id=d.chart_id LEFT JOIN chart_resources af ON af.id=c.audio_file WHERE d.id=$1 FOR SHARE OF c`, v.DifficultyID).
-		Scan(&published, &chartHash, &audioHash)
+		Scan(&published, &scorable, &chartHash, &audioHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !published || (v.ChartHash != "" && v.ChartHash != chartHash) || (v.AudioHash != "" && v.AudioHash != audioHash) {
+	if !published || !scorable || (v.ChartHash != "" && v.ChartHash != chartHash) || (v.AudioHash != "" && v.AudioHash != audioHash) {
 		return nil, nil
 	}
 	payload, _ := json.Marshal(v.scoreSubmission)
 	var id string
-	err = tx.QueryRow(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
-	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
-		web.NewID(), user, v.DifficultyID, *v.Good, *v.OK, *v.Bad, *v.Score, *v.Drumroll, *v.MaxCombo, key, web.Hash(string(payload)), v.ReplayData, v.ClearStatus, v.adLibValue(), v.Mines).Scan(&id)
+	// score and score_rank are worked out by the trigger scores_shinuchi.
+	err = tx.QueryRow(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
+	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+		web.NewID(), user, v.DifficultyID, *v.Good, *v.OK, *v.Bad, *v.Drumroll, *v.MaxCombo, key, web.Hash(string(payload)), v.ReplayData, v.ClearStatus, v.adLibValue(), v.Mines).Scan(&id)
 	if err != nil {
 		return nil, err
 	}

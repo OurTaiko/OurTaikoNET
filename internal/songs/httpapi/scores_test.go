@@ -210,7 +210,6 @@ func TestSubmitScore(t *testing.T) {
 		{"combo range", strings.Replace(body, `"max_combo":250`, `"max_combo":2147483648`, 1), "", cookie, nil, 422, "SCORE_INVALID"},
 		{"combo fraction", strings.Replace(body, `"max_combo":250`, `"max_combo":1.5`, 1), "", cookie, nil, 400, "REQUEST_INVALID"},
 		{"combo string", strings.Replace(body, `"max_combo":250`, `"max_combo":"250"`, 1), "", cookie, nil, 400, "REQUEST_INVALID"},
-		{"score range", strings.Replace(body, `"score":900000`, `"score":9007199254740992`, 1), "", cookie, nil, 422, "SCORE_INVALID"},
 		{"overflow", strings.Replace(body, `"good":300`, `"good":999999999999999999999`, 1), "", cookie, nil, 400, "REQUEST_INVALID"},
 		{"spoof user", strings.TrimSuffix(body, "}") + `,"userId":"d1ee9badde8bb6f733b2315472711632"}`, "", cookie, nil, 400, "REQUEST_INVALID"},
 		{"trailing", body + " {}", "", cookie, nil, 400, "REQUEST_INVALID"},
@@ -240,15 +239,22 @@ func TestSubmitScore(t *testing.T) {
 	if first.SongID != song || first.DifficultyID != oni || first.Course != "Oni" || first.Side != "single" || !first.IsLatest {
 		t.Fatalf("bad block: %+v", first)
 	}
-	if first.UserID != "89b6ef3a5cb57b6e04f74711d15a8a5f" || first.Good != 300 || first.OK != 10 || first.Bad != 2 || first.Score != 900000 || first.Drumroll != 50 || first.MaxCombo != 250 || first.SubmittedAt.IsZero() {
+	// The score is the site's, from the counts and the block's scoring (300 良 at 1000, 10 可 at
+	// 500, 50 drumroll hits at 100), not the 900000 the request says; it ranks under 白粋.
+	if first.UserID != "89b6ef3a5cb57b6e04f74711d15a8a5f" || first.Good != 300 || first.OK != 10 || first.Bad != 2 || first.Score != 310000 || first.Drumroll != 50 || first.MaxCombo != 250 || first.SubmittedAt.IsZero() ||
+		first.ScoreRank == nil || *first.ScoreRank != 0 {
 		t.Fatalf("bad receipt: %+v", first)
 	}
 	stored, err := readScore(pool.QueryRow(ctx, scoreSelect+` WHERE sc.id=$1`, first.ID))
 	// Drivers may use time.Local for a UTC database timestamp; compare the same zone.
 	stored.SubmittedAt = stored.SubmittedAt.UTC()
 	first.SubmittedAt = first.SubmittedAt.UTC()
-	if err != nil || stored != first {
+	if err != nil || stored.ScoreRank == nil || *stored.ScoreRank != *first.ScoreRank {
 		t.Fatalf("stored receipt mismatch: %+v %v", stored, err)
+	}
+	stored.ScoreRank, first.ScoreRank = nil, nil
+	if stored != first {
+		t.Fatalf("stored receipt mismatch: %+v", stored)
 	}
 	w = call(body, key, cookie, nil)
 	assertStatus(w, 200, "")
@@ -257,7 +263,15 @@ func TestSubmitScore(t *testing.T) {
 	if replay.ID != first.ID || replay.MaxCombo != 250 {
 		t.Fatal("retry inserted a new score")
 	}
-	assertStatus(call(strings.Replace(body, "900000", "900001", 1), key, cookie, nil), 409, "IDEMPOTENCY_CONFLICT")
+	// The request's score is not used, so it is not part of the request: another one, one out of
+	// any range, or none at all is the same request.
+	for _, other := range []string{`"score":900001,`, `"score":9007199254740992,`, ""} {
+		w = call(strings.Replace(body, `"score":900000,`, other, 1), key, cookie, nil)
+		assertStatus(w, 200, "")
+		if json.Unmarshal(w.Body.Bytes(), &replay); replay.ID != first.ID || replay.Score != 310000 {
+			t.Fatal("the request's score was used", other, w.Body.String())
+		}
+	}
 	assertStatus(call(strings.Replace(body, `"max_combo":250`, `"max_combo":249`, 1), key, cookie, nil), 409, "IDEMPOTENCY_CONFLICT")
 	assertStatus(call(body, key, cookie2, nil), 201, "")
 	assertStatus(call(body, "", cookie, nil), 201, "")
@@ -326,7 +340,8 @@ func testScorePlayCounts(t *testing.T, w interactionWorld) {
 		t.Fatal(err)
 	}
 	var oni int64
-	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,'Oni','single',5) RETURNING id`, w.song).Scan(&oni); err != nil {
+	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version)
+ VALUES($1,'Oni','single',5,1000,500,100,1000000,1) RETURNING id`, w.song).Scan(&oni); err != nil {
 		t.Fatal(err)
 	}
 	// The game signs in with a game token; a local server without an account center has one for DEV_USER_ID.
@@ -406,8 +421,10 @@ func testScorePlayCounts(t *testing.T, w interactionWorld) {
 	if code := rec.Code; code != 200 || len(list.Scores) != 2 || list.Scores[1].AdLib != [2]int64{3, 1} || list.Scores[1].Mines != 2 {
 		t.Fatal(code, list)
 	}
+	// The leaderboard has the player's best play: the one with the Ad-Libs, which the site's
+	// score counts (5+3 良 at 1000, 1+1 可 at 500, 2 drumroll hits at 100).
 	var board leaderboardResponse
-	if code := c.do("", "GET", w.chart(w.song)+"/leaderboard", "", &board); code != 200 || len(board.Items) != 1 || !strings.Contains(fmt.Sprint(board.Items[0].Score), "[0 0]") {
+	if code := c.do("", "GET", w.chart(w.song)+"/leaderboard", "", &board); code != 200 || len(board.Items) != 1 || board.Items[0].AdLib != [2]int64{3, 1} || board.Items[0].Mines != 2 || board.Items[0].Score.Score != 9200 {
 		t.Fatal(code, board)
 	}
 }

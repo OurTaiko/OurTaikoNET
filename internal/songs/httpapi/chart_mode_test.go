@@ -90,6 +90,8 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		data, _ := json.Marshal(map[string]any{"difficultyId": difficulty, "good": 10, "ok": 0, "bad": 0, "score": points, "drumroll": 0, "max_combo": 10, "ClearStatus": 2})
 		return string(data)
 	}
+	// The site works each score out from the counts (scores_shinuchi): what it stored is kept.
+	stored := map[int64]int64{}
 	for i, d := range c.Difficulties {
 		key := web.NewID()
 		body := score(d.ID, 1000+i)
@@ -98,6 +100,7 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 			v.SongID != c.ID || v.DifficultyID != d.ID || v.Course != "Oni" || v.Side != d.Side || !v.IsLatest {
 			t.Fatal(w.Code, w.Body.String())
 		}
+		stored[d.ID] = v.Score
 		if w := call("POST", "/api/game/scores", body, key); w.Code != 200 {
 			t.Fatal("retry", w.Code, w.Body.String())
 		}
@@ -117,10 +120,10 @@ func TestChartSlotsUploadScoresAndSearch(t *testing.T) {
 		t.Fatal(w.Code, played.PlayCount, w.Body.String())
 	}
 	// Every block has its own leaderboard; the default is the first of the hardest course.
-	for i, d := range c.Difficulties {
+	for _, d := range c.Difficulties {
 		w := call("GET", fmt.Sprintf("/api/charts/%s/leaderboard?difficultyId=%d", c.ID, d.ID), "", "")
 		var v leaderboardResponse
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || v.Total != 1 || len(v.Items) != 1 || v.DifficultyID != d.ID || v.Side != d.Side || v.Items[0].Side != d.Side || v.Items[0].Score.Score != int64(1000+i) {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || v.Total != 1 || len(v.Items) != 1 || v.DifficultyID != d.ID || v.Side != d.Side || v.Items[0].Side != d.Side || v.Items[0].Score.Score != stored[d.ID] {
 			t.Fatal(w.Code, w.Body.String())
 		}
 	}

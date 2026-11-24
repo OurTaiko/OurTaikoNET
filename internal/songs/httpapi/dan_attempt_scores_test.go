@@ -20,7 +20,9 @@ func TestDanAttemptNamesItsScores(t *testing.T) {
 	if _, err := s.DB.Exec(ctx, `UPDATE charts SET status='published' WHERE id=$1`, w.song); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,'Oni','single',5) RETURNING id`, w.song).Scan(&oni); err != nil {
+	// The block has the simple scoring of the test blocks: the site scores a play 1000 a 良.
+	if err := s.DB.QueryRow(ctx, `INSERT INTO chart_difficulties(chart_id,course,side,level,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version)
+ VALUES($1,'Oni','single',5,1000,500,100,1000000,1) RETURNING id`, w.song).Scan(&oni); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(ctx, `INSERT INTO dan_courses(id,owner_id,title,exams,code) VALUES($1,$2,'{"ja":"初段"}','[]','DAN001')`, course, testUsers["alice"].ID); err != nil {
@@ -97,14 +99,20 @@ func TestDanAttemptNamesItsScores(t *testing.T) {
 	}
 	together := `{"courseId":"` + course + `","verdict":1,"scores":[` + sent(1000, `,"chartHash":"`+blockHash+`","replay_data":`+officialTestReplayV2) + `]}`
 	made := post("dan-attempt-key-0001", together, 200)
-	if len(made.Scores) != 1 || made.Scores[0] == nil || made.Scores[0].Score != 1000 || !made.Scores[0].HasReplay || len(made.Attempt.ScoreIDs) != 1 || *made.Attempt.ScoreIDs[0] != made.Scores[0].ID {
+	// The score is the site's (5 良 at 1000), not the 1000 the game sent.
+	if len(made.Scores) != 1 || made.Scores[0] == nil || made.Scores[0].Score != 5000 || !made.Scores[0].HasReplay || len(made.Attempt.ScoreIDs) != 1 || *made.Attempt.ScoreIDs[0] != made.Scores[0].ID {
 		t.Fatal("the attempt and its score", made)
 	}
 	first := made.Scores[0].ID
 	if again := post("dan-attempt-key-0001", together, 200); *again.Attempt.ScoreIDs[0] != first || again.Scores[0].ID != first {
 		t.Fatal("retry", again)
 	}
-	post("dan-attempt-key-0001", strings.Replace(together, `"score":1000`, `"score":1001`, 1), 409)
+	// The game's score is not part of the request: another one is the same attempt, other counts
+	// are not.
+	if again := post("dan-attempt-key-0001", strings.Replace(together, `"score":1000`, `"score":1001`, 1), 200); again.Scores[0].ID != first {
+		t.Fatal("retry with another score", again)
+	}
+	post("dan-attempt-key-0001", strings.Replace(together, `"max_combo":5`, `"max_combo":4`, 1), 409)
 	post("dan-attempt-key-0002", `{"courseId":"`+course+`","verdict":1,"scores":[{"difficultyId":`+fmt.Sprint(oni)+`}]}`, 422)
 	// Played on other files, or no score for the song: left out, the attempt kept.
 	if out := post("dan-attempt-key-0002", `{"courseId":"`+course+`","verdict":0,"scores":[`+sent(5, `,"chartHash":"v2:stale"`)+`,null]}`, 200); len(out.Attempt.ScoreIDs) != 2 || out.Attempt.ScoreIDs[0] != nil || out.Attempt.ScoreIDs[1] != nil || out.Scores[0] != nil {

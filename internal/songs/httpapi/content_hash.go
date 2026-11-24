@@ -207,3 +207,97 @@ func (s *Server) backfillScenePreset(parent context.Context, id string) (reporte
 	}
 	return true, tx.Commit(ctx)
 }
+
+// scoringPendingCharts selects the charts with a block whose scoring has not been read under
+// tja.ScoringVersion.
+const scoringPendingCharts = `SELECT DISTINCT c.id FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
+ WHERE c.status<>'deleted' AND c.tja_file IS NOT NULL AND d.scoring_version IS DISTINCT FROM $1`
+
+// ScoringPending reports whether a chart has blocks to read for their scoring (backfillScoring).
+func (s *Server) ScoringPending(ctx context.Context) (bool, error) {
+	var pending bool
+	err := s.DB.QueryRow(ctx, `SELECT EXISTS(`+scoringPendingCharts+`)`, tja.ScoringVersion).Scan(&pending)
+	return pending, err
+}
+
+// RunScoringBackfill reads the scoring of the blocks that need it (backfillScoring), when the
+// site has TJAParser's command-line tool; failures are logged, and tried again on the next start.
+func (s *Server) RunScoringBackfill(ctx context.Context) {
+	if _, ok := tja.Inspector.(charthash.CLI); !ok {
+		return
+	}
+	if err := s.backfillScoring(ctx); err != nil && ctx.Err() == nil {
+		log.Printf("scoring backfill: %v", err)
+	}
+}
+
+// backfillScoring reads the 真打 scoring of blocks stored before it was kept, or read under an
+// older rule than tja.ScoringVersion, from their charts' files. Storing it rescores each block's
+// current scores from their counts, rank included (trigger chart_difficulties_rescore). Scores of
+// replaced content (not is_latest) keep their values: the file they were played on is gone. A
+// block the tool cannot play is marked read, with no points: its scores keep their values, and
+// new ones are refused (submitScore).
+func (s *Server) backfillScoring(ctx context.Context) error {
+	rows, err := s.DB.Query(ctx, scoringPendingCharts+` ORDER BY c.id`, tja.ScoringVersion)
+	if err != nil {
+		return err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	log.Printf("scoring backfill: %d charts", len(ids))
+	var failures []error
+	done := 0
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		reported, err := s.backfillChartScoring(ctx, id)
+		if err != nil {
+			log.Printf("scoring backfill for %s failed: %v", id, err)
+			failures = append(failures, err)
+			continue
+		}
+		if !reported {
+			return errors.New("this tjaparser does not report scoring (v0.18.0 or newer does)")
+		}
+		done++
+	}
+	log.Printf("scoring backfill: %d charts done, %d failed", done, len(failures))
+	return errors.Join(failures...)
+}
+
+// backfillChartScoring reads one chart; reported is false when the tool does not say the scoring.
+func (s *Server) backfillChartScoring(parent context.Context, id string) (reported bool, err error) {
+	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+	defer cancel()
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	result, found, err := s.inspectStored(ctx, tx, id)
+	if err != nil || !found {
+		return true, err
+	}
+	for _, b := range result.Blocks {
+		if b.Error != "" {
+			log.Printf("scoring backfill: chart %s %s/%s cannot be played: %s", id, b.Name, b.Side, b.Error)
+			if err = storeScoring(ctx, tx, id, b.Name, b.Side, "", nil); err != nil {
+				return true, err
+			}
+			continue
+		}
+		if b.Hash == "" {
+			continue
+		}
+		if b.Scoring == nil {
+			return false, nil
+		}
+		if err = storeScoring(ctx, tx, id, b.Name, b.Side, b.Hash, b.Scoring); err != nil {
+			return true, err
+		}
+	}
+	return true, tx.Commit(ctx)
+}
