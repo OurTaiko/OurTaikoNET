@@ -60,9 +60,11 @@ CREATE TABLE test_sessions (token_hash text PRIMARY KEY, user_id text NOT NULL, 
 		t.Fatal(err)
 	}
 	// test_slot adds a chart's single block of a course, or finds it again. Its content hash
-	// is made up from the chart and course: what a real upload gets from TJAParser.
+	// is made up from the chart and course, and its scoring is a simple one (良 1000, 可 500,
+	// long hit 100, kiwami line 1000000): what a real upload gets from TJAParser.
 	if _, err = pool.Exec(ctx, `CREATE FUNCTION test_slot(chart text, slot_course text, slot_level integer DEFAULT 5, slot_maker text DEFAULT '') RETURNS bigint LANGUAGE sql AS $$
- INSERT INTO chart_difficulties(chart_id,course,side,level,maker,content_hash) VALUES(chart,slot_course,'single',slot_level,slot_maker,'v1:'||encode(sha256((chart||'/'||slot_course)::bytea),'hex'))
+ INSERT INTO chart_difficulties(chart_id,course,side,level,maker,content_hash,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version)
+ VALUES(chart,slot_course,'single',slot_level,slot_maker,'v1:'||encode(sha256((chart||'/'||slot_course)::bytea),'hex'),1000,500,100,1000000,1)
  ON CONFLICT(chart_id,course,side) DO UPDATE SET level=chart_difficulties.level RETURNING id $$`); err != nil {
 		t.Fatal(err)
 	}

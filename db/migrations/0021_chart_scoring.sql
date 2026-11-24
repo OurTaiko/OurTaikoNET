@@ -3,9 +3,9 @@
 -- and the kiwami line. A score is then the site's, worked out from the counts the game sent:
 --   (good + Ad-Lib 良) × good_points + (ok + Ad-Lib 可) × ok_points + drumroll × long_hit_points
 -- scoring_version is the rule the points were read with (tja.ScoringVersion); NULL until the
--- block has been read for it, so blocks from before this column are filled at startup. With
--- the version set, NULL points mean the tool cannot score the block, and its scores keep what
--- the game sent.
+-- block has been read for it, so blocks from before this column are read at startup, before the
+-- site serves again. With the version set, NULL points mean the tool cannot score the block: its
+-- scores keep their values, and the API takes no new ones.
 ALTER TABLE fanmade.chart_difficulties
     ADD COLUMN IF NOT EXISTS good_points integer,
     ADD COLUMN IF NOT EXISTS ok_points integer,
@@ -59,14 +59,16 @@ CREATE OR REPLACE FUNCTION net.score_rank(score bigint, kiwami integer) RETURNS 
   ELSE 0 END)::smallint
 $$;
 
--- The rank of a score worked out by the site; NULL for one whose block is not scored, or that
--- was played on content since replaced.
+-- The rank of a score worked out by the site; NULL for one whose block is not scored yet, or one
+-- played on content since replaced before ranks were kept.
 ALTER TABLE net.scores ADD COLUMN IF NOT EXISTS score_rank smallint
     CONSTRAINT scores_score_rank_check CHECK (score_rank BETWEEN 0 AND 7);
 COMMENT ON COLUMN net.scores.score_rank IS 'Rank against the block''s kiwami line (net.score_rank); NULL while the block is not scored.';
 
--- A new score takes the site's value and rank when its block is scored, whatever the game sent:
--- an older game scores by an older rule.
+-- A new score is the site's: the API no longer takes the game's (an older game scores by an
+-- older rule), and takes none for a block without points (the site reads them before it serves,
+-- and refuses a block it cannot score). A score written to the database directly on such a block
+-- keeps its value, without a rank.
 CREATE OR REPLACE FUNCTION fanmade.scores_shinuchi() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path TO 'fanmade', 'net'
@@ -75,8 +77,8 @@ DECLARE scored bigint; kiwami integer;
 BEGIN
  SELECT net.shinuchi_score(NEW.good, NEW.ok, NEW.drumroll, NEW.adlib, d.good_points, d.ok_points, d.long_hit_points), d.kiwami_threshold
   INTO scored, kiwami FROM chart_difficulties d WHERE d.id=NEW.difficulty_id;
- IF scored IS NOT NULL THEN NEW.score := scored; END IF;
- NEW.score_rank := CASE WHEN scored IS NULL THEN NULL ELSE net.score_rank(scored, kiwami) END;
+ NEW.score := COALESCE(scored, NEW.score);
+ NEW.score_rank := net.score_rank(scored, kiwami);
  RETURN NEW;
 END $$;
 CREATE OR REPLACE FUNCTION official.scores_shinuchi() RETURNS trigger
@@ -87,8 +89,8 @@ DECLARE scored bigint; kiwami integer;
 BEGIN
  SELECT net.shinuchi_score(NEW.good, NEW.ok, NEW.drumroll, NEW.adlib, d.good_points, d.ok_points, d.long_hit_points), d.kiwami_threshold
   INTO scored, kiwami FROM chart_difficulties d WHERE d.id=NEW.difficulty_id;
- IF scored IS NOT NULL THEN NEW.score := scored; END IF;
- NEW.score_rank := CASE WHEN scored IS NULL THEN NULL ELSE net.score_rank(scored, kiwami) END;
+ NEW.score := COALESCE(scored, NEW.score);
+ NEW.score_rank := net.score_rank(scored, kiwami);
  RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS scores_shinuchi ON fanmade.scores;

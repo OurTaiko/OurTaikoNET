@@ -18,14 +18,17 @@ import (
 // Pointers distinguish required zero-valued counts from missing/null fields.
 type scoreSubmission struct {
 	// The chart_difficulties row of the block that was really played.
-	DifficultyID int64           `json:"difficultyId"`
-	Good         *int64          `json:"good"`
-	OK           *int64          `json:"ok"`
-	Bad          *int64          `json:"bad"`
-	Score        *int64          `json:"score"`
-	Drumroll     *int64          `json:"drumroll"`
-	MaxCombo     *int64          `json:"max_combo"`
-	ReplayData   json.RawMessage `json:"replay_data,omitempty"`
+	DifficultyID int64  `json:"difficultyId"`
+	Good         *int64 `json:"good"`
+	OK           *int64 `json:"ok"`
+	Bad          *int64 `json:"bad"`
+	// Deprecated: the score is the site's, worked out from the counts (scores_shinuchi).
+	// Released games still send theirs: it is read so the request is not refused, and
+	// dropped (normalize). Clients leave it out.
+	Score      *int64          `json:"score,omitempty"`
+	Drumroll   *int64          `json:"drumroll"`
+	MaxCombo   *int64          `json:"max_combo"`
+	ReplayData json.RawMessage `json:"replay_data,omitempty"`
 	// Omit zero from the digest to preserve retries of pre-ClearStatus requests.
 	ClearStatus int `json:"ClearStatus,omitempty"`
 	// Ad-Libs hit as [良, 可] and mines hit, outside good/ok/bad; optional, and left out of the
@@ -77,11 +80,13 @@ func (v *scoreSubmission) valid() bool {
 	if v.Mines < 0 || v.Mines > 2147483647 {
 		return false
 	}
-	return v.Score != nil && *v.Score >= 0 && *v.Score <= 9007199254740991 && v.ClearStatus >= 0 && v.ClearStatus <= 3
+	return v.ClearStatus >= 0 && v.ClearStatus <= 3
 }
 
-// normalize drops an all-zero adlib, so it digests as a request without one.
+// normalize drops the game's score, which the site does not use, and an all-zero adlib, so
+// each digests as a request without it.
 func (v *scoreSubmission) normalize() {
+	v.Score = nil
 	if len(v.AdLib) == 2 && v.AdLib[0] == 0 && v.AdLib[1] == 0 {
 		v.AdLib = nil
 	}
@@ -138,7 +143,7 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !input.valid() {
-		problem(w, 422, "SCORE_INVALID", "需要有效的谱面块 ID 和全部六项非负整数；计数（含最大连击）上限 2147483647，分数上限 9007199254740991；ClearStatus 必须为 0–3；adlib 若有须为两个非负整数，mines 须为非负整数")
+		problem(w, 422, "SCORE_INVALID", "需要有效的谱面块 ID 和全部五项计数（good、ok、bad、drumroll、max_combo），均为非负整数，上限 2147483647；ClearStatus 必须为 0–3；adlib 若有须为两个非负整数，mines 须为非负整数")
 		return
 	}
 	key := r.Header.Get("Idempotency-Key")
@@ -158,8 +163,8 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	// Serialize submissions against resource replacement on the same song.
 	// A replacement may have removed the block together with this very score.
-	var published bool
-	err = tx.QueryRow(r.Context(), `SELECT `+publishedChart+` FROM chart_difficulties d JOIN charts c ON c.id=d.chart_id WHERE d.id=$1 FOR SHARE OF c`, input.DifficultyID).Scan(&published)
+	var published, scorable bool
+	err = tx.QueryRow(r.Context(), `SELECT `+publishedChart+`,d.good_points IS NOT NULL FROM chart_difficulties d JOIN charts c ON c.id=d.chart_id WHERE d.id=$1 FOR SHARE OF c`, input.DifficultyID).Scan(&published, &scorable)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		internal(w, err)
@@ -183,11 +188,9 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		err = tx.QueryRow(r.Context(), `SELECT payload_digest FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key).Scan(&oldDigest)
 		if err == nil {
 			if oldDigest != digest {
-				// A score the site worked out (scores_shinuchi, with a rank) is not the game's, so the
-				// game's is left out of the comparison; one the game's value was kept for is compared.
+				// Requests digested before the score was dropped (normalize) differ only by it.
 				var same bool
-				err = tx.QueryRow(r.Context(), `SELECT jsonb_strip_nulls(jsonb_build_object('difficultyId',difficulty_id,'good',good,'ok',ok,'bad',bad,'score',CASE WHEN score_rank IS NULL THEN score END,'drumroll',drumroll,'max_combo',max_combo,'replay_data',replay_data,'ClearStatus',NULLIF(clear_status,0),'adlib',CASE WHEN adlib='{0,0}' THEN NULL ELSE to_jsonb(adlib) END,'mines',NULLIF(mines,0)))
- =CASE WHEN score_rank IS NULL THEN $3::jsonb ELSE $3::jsonb - 'score' END FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key, string(payload)).Scan(&same)
+				err = tx.QueryRow(r.Context(), `SELECT jsonb_strip_nulls(jsonb_build_object('difficultyId',difficulty_id,'good',good,'ok',ok,'bad',bad,'drumroll',drumroll,'max_combo',max_combo,'replay_data',replay_data,'ClearStatus',NULLIF(clear_status,0),'adlib',CASE WHEN adlib='{0,0}' THEN NULL ELSE to_jsonb(adlib) END,'mines',NULLIF(mines,0)))=$3::jsonb FROM scores WHERE user_id=$1 AND idempotency_key=$2`, u.User.ID, key, string(payload)).Scan(&same)
 				if err != nil {
 					internal(w, err)
 					return
@@ -218,11 +221,18 @@ func (s *Server) submitScore(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "CHART_NOT_FOUND", "歌曲不存在或已下架")
 		return
 	}
+	// The site works the score out by the block's scoring; a block TJAParser cannot score (its
+	// file no longer reads) takes no new scores.
+	if !scorable {
+		problem(w, 422, "DIFFICULTY_NOT_SCORABLE", "这个谱面块无法计分，请重新上传谱面")
+		return
+	}
+	// score and score_rank are worked out by the trigger scores_shinuchi.
 	result, err := readScore(tx.QueryRow(r.Context(), `WITH sc AS (INSERT INTO scores
-	 (id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
-	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13,$14,$15) RETURNING *)
+	 (id,user_id,difficulty_id,good,ok,bad,drumroll,max_combo,idempotency_key,payload_digest,replay_data,clear_status,adlib,mines)
+	 VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),$10,$11,$12,$13,$14) RETURNING *)
 	 SELECT `+scoreColumns+` FROM sc JOIN chart_difficulties d ON d.id=sc.difficulty_id`,
-		web.NewID(), u.User.ID, input.DifficultyID, *input.Good, *input.OK, *input.Bad, *input.Score, *input.Drumroll, *input.MaxCombo, key, digest, input.ReplayData, input.ClearStatus, input.adLibValue(), input.Mines))
+		web.NewID(), u.User.ID, input.DifficultyID, *input.Good, *input.OK, *input.Bad, *input.Drumroll, *input.MaxCombo, key, digest, input.ReplayData, input.ClearStatus, input.adLibValue(), input.Mines))
 	if err != nil {
 		internal(w, err)
 		return

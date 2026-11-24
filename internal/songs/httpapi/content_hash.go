@@ -40,9 +40,6 @@ func (s *Server) RunContentHashBackfill(ctx context.Context) {
 	if err := s.backfillScenePresets(ctx); err != nil && ctx.Err() == nil {
 		log.Printf("scene preset backfill: %v", err)
 	}
-	if err := s.backfillScoring(ctx); err != nil && ctx.Err() == nil {
-		log.Printf("scoring backfill: %v", err)
-	}
 }
 
 func (s *Server) backfillContentHashes(ctx context.Context, prefix string, constantsVersion int) error {
@@ -211,14 +208,37 @@ func (s *Server) backfillScenePreset(parent context.Context, id string) (reporte
 	return true, tx.Commit(ctx)
 }
 
+// scoringPendingCharts selects the charts with a block whose scoring has not been read under
+// tja.ScoringVersion.
+const scoringPendingCharts = `SELECT DISTINCT c.id FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
+ WHERE c.status<>'deleted' AND c.tja_file IS NOT NULL AND d.scoring_version IS DISTINCT FROM $1`
+
+// ScoringPending reports whether a chart has blocks to read for their scoring (backfillScoring).
+func (s *Server) ScoringPending(ctx context.Context) (bool, error) {
+	var pending bool
+	err := s.DB.QueryRow(ctx, `SELECT EXISTS(`+scoringPendingCharts+`)`, tja.ScoringVersion).Scan(&pending)
+	return pending, err
+}
+
+// RunScoringBackfill reads the scoring of the blocks that need it (backfillScoring), when the
+// site has TJAParser's command-line tool; failures are logged, and tried again on the next start.
+func (s *Server) RunScoringBackfill(ctx context.Context) {
+	if _, ok := tja.Inspector.(charthash.CLI); !ok {
+		return
+	}
+	if err := s.backfillScoring(ctx); err != nil && ctx.Err() == nil {
+		log.Printf("scoring backfill: %v", err)
+	}
+}
+
 // backfillScoring reads the 真打 scoring of blocks stored before it was kept, or read under an
 // older rule than tja.ScoringVersion, from their charts' files. Storing it rescores each block's
 // current scores from their counts, rank included (trigger chart_difficulties_rescore). Scores of
 // replaced content (not is_latest) keep their values: the file they were played on is gone. A
-// block the tool cannot play is marked read, with no points, and keeps the scores the game sent.
+// block the tool cannot play is marked read, with no points: its scores keep their values, and
+// new ones are refused (submitScore).
 func (s *Server) backfillScoring(ctx context.Context) error {
-	rows, err := s.DB.Query(ctx, `SELECT DISTINCT c.id FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
- WHERE c.status<>'deleted' AND c.tja_file IS NOT NULL AND d.scoring_version IS DISTINCT FROM $1 ORDER BY c.id`, tja.ScoringVersion)
+	rows, err := s.DB.Query(ctx, scoringPendingCharts+` ORDER BY c.id`, tja.ScoringVersion)
 	if err != nil {
 		return err
 	}

@@ -26,22 +26,23 @@ func TestUserScores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	add := func(id, user, chart, course string, points int64, clear int, latest bool, date string) {
+	// A play of good 良 and nothing else: the site scores it good × 1000 (test_slot's scoring).
+	add := func(id, user, chart, course string, good int64, clear int, latest bool, date string) {
 		t.Helper()
-		_, err := pool.Exec(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,payload_digest,clear_status,is_latest,submitted_at)
- VALUES($1,$2,test_slot($3,$4),10,0,0,$5,0,10,repeat('a',64),$6,$7,$8::timestamptz)`, id, user, chart, course, points, clear, latest, date)
+		_, err := pool.Exec(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,drumroll,max_combo,payload_digest,clear_status,is_latest,submitted_at)
+ VALUES($1,$2,test_slot($3,$4),$5,0,0,0,$5,repeat('a',64),$6,$7,$8::timestamptz)`, id, user, chart, course, good, clear, latest, date)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	const alpha, beta, hidden = "11111111111111111111111111111111", "22222222222222222222222222222222", "33333333333333333333333333333333"
-	add("a1", player, alpha, "Oni", 900000, 1, true, "2026-01-01T00:00:00Z")
-	add("a2", player, alpha, "Oni", 950000, 0, true, "2026-01-02T00:00:00Z")
-	add("a3", player, alpha, "Oni", 990000, 3, false, "2025-12-01T00:00:00Z")
-	add("h1", player, alpha, "Hard", 500000, 0, false, "2025-11-01T00:00:00Z")
-	add("b1", player, beta, "Oni", 700000, 2, true, "2026-01-03T00:00:00Z")
-	add("x1", player, hidden, "Oni", 999999, 3, true, "2026-01-04T00:00:00Z")
-	add("o1", other, alpha, "Oni", 100000, 0, true, "2026-01-05T00:00:00Z")
+	add("a1", player, alpha, "Oni", 900, 1, true, "2026-01-01T00:00:00Z")
+	add("a2", player, alpha, "Oni", 950, 0, true, "2026-01-02T00:00:00Z")
+	add("a3", player, alpha, "Oni", 990, 3, false, "2025-12-01T00:00:00Z")
+	add("h1", player, alpha, "Hard", 500, 0, false, "2025-11-01T00:00:00Z")
+	add("b1", player, beta, "Oni", 700, 2, true, "2026-01-03T00:00:00Z")
+	add("x1", player, hidden, "Oni", 999, 3, true, "2026-01-04T00:00:00Z")
+	add("o1", other, alpha, "Oni", 100, 0, true, "2026-01-05T00:00:00Z")
 	handler := testServer(t, pool, Config{}).Handler()
 	type page struct {
 		Items    []UserScore

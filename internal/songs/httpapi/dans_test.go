@@ -374,8 +374,10 @@ func TestDanCourses(t *testing.T) {
 	}
 	made := result("attempt-key-0005", together, 200)
 	var kept []*Score
-	if err = json.Unmarshal(made["scores"], &kept); err != nil || len(kept) != 2 || kept[0] == nil || kept[1] == nil || kept[0].Score != 1000 || kept[1].Score != 2000 || !kept[0].HasReplay || kept[1].HasReplay || kept[0].Course != "Oni" {
-		t.Fatal("the scores come back as the game keeps them", err, string(made["scores"]))
+	// Each score is the site's (5 良 at 1000), not the 1000 and 2000 the game sent, and is its song's.
+	if err = json.Unmarshal(made["scores"], &kept); err != nil || len(kept) != 2 || kept[0] == nil || kept[1] == nil || kept[0].Score != 5000 || kept[1].Score != 5000 ||
+		kept[0].DifficultyID != slot(songA) || kept[1].DifficultyID != slot(songB) || !kept[0].HasReplay || kept[1].HasReplay || kept[0].Course != "Oni" {
+		t.Fatal("the scores come back as the site keeps them", err, string(made["scores"]))
 	}
 	firstA, firstB := kept[0].ID, kept[1].ID
 	if got := scores(made); got != firstA+","+firstB {
@@ -392,7 +394,11 @@ func TestDanCourses(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM scores WHERE id=ANY($1) AND is_latest AND idempotency_key IS NOT NULL`, []string{firstA, firstB}).Scan(&onBoard); err != nil || onBoard != 2 {
 		t.Fatal("scores like any other", err, onBoard)
 	}
-	result("attempt-key-0005", strings.Replace(together, `"score":2000`, `"score":2001`, 1), 409)
+	// The game's score is not part of the body; the counts are.
+	if again := result("attempt-key-0005", strings.Replace(together, `"score":2000`, `"score":2001`, 1), 200); scores(again) != firstA+","+firstB {
+		t.Fatal("retry with another score", again)
+	}
+	result("attempt-key-0005", strings.Replace(together, `"max_combo":5}]}`, `"max_combo":4}]}`, 1), 409)
 	// A score that is not a score refuses the attempt, and nothing of it is kept.
 	result("attempt-key-0006", `{"courseId":"`+created.ID+`","verdict":1,"scores":[`+sent(songA, 1, "")+`,{"difficultyId":`+fmt.Sprint(slot(songB))+`,"good":-1,"ok":0,"bad":0,"score":1,"drumroll":0,"max_combo":0}]}`, 422)
 	result("attempt-key-0006", `{"courseId":"`+created.ID+`","verdict":1,"songsPlayed":1,"scores":[`+sent(songA, 1, "")+`,`+sent(songB, 1, "")+`]}`, 422)

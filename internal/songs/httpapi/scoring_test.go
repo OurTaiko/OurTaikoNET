@@ -79,7 +79,7 @@ func testChartScoring(t *testing.T, w interactionWorld) {
 		web.Hash("game:"+game), testUsers["alice"].ID); err != nil {
 		t.Fatal(err)
 	}
-	post := func(body, key string, want int) Score {
+	upload := func(body, key string, want int) []byte {
 		t.Helper()
 		r := httptest.NewRequest("POST", "/api/game/scores", strings.NewReader(body))
 		r.Header.Set("Authorization", "Bearer "+game)
@@ -89,9 +89,16 @@ func testChartScoring(t *testing.T, w interactionWorld) {
 		}
 		rec := httptest.NewRecorder()
 		w.c.handler.ServeHTTP(rec, r)
-		var v Score
-		if rec.Code != want || json.Unmarshal(rec.Body.Bytes(), &v) != nil {
+		if rec.Code != want {
 			t.Fatalf("POST %s: %d, want %d: %s", body, rec.Code, want, rec.Body.String())
+		}
+		return rec.Body.Bytes()
+	}
+	post := func(body, key string, want int) Score {
+		t.Helper()
+		var v Score
+		if data := upload(body, key, want); json.Unmarshal(data, &v) != nil {
+			t.Fatalf("POST %s: %s", body, data)
 		}
 		return v
 	}
@@ -129,13 +136,24 @@ func testChartScoring(t *testing.T, w interactionWorld) {
 		t.Fatalf("retry answered %+v after %+v", again, first)
 	}
 
-	// A block from before the scoring: its current scores keep what the game sent until the
-	// startup backfill reads the file, which rescores them and leaves the chart's update_at.
+	// A block from before the scoring takes no new scores: the site could not work them out.
 	if _, err = s.DB.Exec(ctx, `UPDATE chart_difficulties SET good_points=NULL,ok_points=NULL,long_hit_points=NULL,kiwami_threshold=NULL,scoring_version=NULL WHERE id=$1`, block); err != nil {
 		t.Fatal(err)
 	}
-	if v := submit(played, 201); v.Score != 1 || v.ScoreRank != nil {
-		t.Fatalf("an unscored block kept %d rank %d", v.Score, rank(v.ScoreRank))
+	if refused := upload(played, "", 422); !strings.Contains(string(refused), `"code":"DIFFICULTY_NOT_SCORABLE"`) {
+		t.Fatalf("an unscored block took a score: %s", refused)
+	}
+	// Its stored scores keep their values, as one from before the scoring written here with the
+	// game's value does, until the startup backfill reads the file: that rescores them, with
+	// their ranks, and leaves the chart's update_at.
+	var stale int64
+	var staleRank *int
+	if err = s.DB.QueryRow(ctx, `INSERT INTO scores(id,user_id,difficulty_id,good,ok,bad,score,drumroll,max_combo,payload_digest)
+ VALUES($1,$2,$3,2,1,0,1,30,3,repeat('a',64)) RETURNING score,score_rank`, web.NewID(), testUsers["alice"].ID, block).Scan(&stale, &staleRank); err != nil {
+		t.Fatal(err)
+	}
+	if stale != 1 || staleRank != nil {
+		t.Fatalf("an unscored block's score kept %d rank %d", stale, rank(staleRank))
 	}
 	var updated time.Time
 	if err = s.DB.QueryRow(ctx, `SELECT update_at FROM charts WHERE id=$1`, c.ID).Scan(&updated); err != nil {

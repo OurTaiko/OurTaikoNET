@@ -16,6 +16,11 @@ func testLeaderboard(t *testing.T, w interactionWorld) {
 	c, s := w.c, w.s
 	ctx := context.Background()
 	oni, hard, easy, otherOni := w.slot(t, w.song, "Oni"), w.slot(t, w.song, "Hard"), w.slot(t, w.song, "Easy"), w.slot(t, w.other, "Oni")
+	// The ranking goes by the stored score, whoever worked it out. The scores below are written
+	// with the values the ranking is about, so their blocks have no points and keep them.
+	if _, err := s.DB.Exec(ctx, `UPDATE chart_difficulties SET good_points=NULL,ok_points=NULL,long_hit_points=NULL,kiwami_threshold=NULL WHERE id IN ($1,$2)`, oni, otherOni); err != nil {
+		t.Fatal(err)
+	}
 	// The first player is alice, whom the account center knows; of the rest it has never heard.
 	players := []string{testUsers["alice"].ID}
 	for i := 1; i < 23; i++ {

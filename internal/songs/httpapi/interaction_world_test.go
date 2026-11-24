@@ -62,11 +62,12 @@ func (w interactionWorld) addChart(t *testing.T, id, title string) {
 	}
 }
 
-// slot adds a chart's single block of a course, or finds it again.
+// slot adds a chart's single block of a course, or finds it again. Its scoring is a simple one
+// (良 1000, 可 500, long hit 100, kiwami line 1000000), as every block has one.
 func (w interactionWorld) slot(t *testing.T, chart, course string) int64 {
 	t.Helper()
 	var id int64
-	if err := w.s.DB.QueryRow(context.Background(), `INSERT INTO chart_difficulties(chart_id,course,side,level) VALUES($1,$2,'single',5)
+	if err := w.s.DB.QueryRow(context.Background(), `INSERT INTO chart_difficulties(chart_id,course,side,level,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version) VALUES($1,$2,'single',5,1000,500,100,1000000,1)
  ON CONFLICT(chart_id,course,side) DO UPDATE SET level=EXCLUDED.level RETURNING id`, chart, course).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
