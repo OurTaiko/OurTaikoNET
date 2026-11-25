@@ -97,6 +97,7 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 	var title struct {
 		Title struct {
 			ID, Name, Style  string
+			Visibility       string
 			NameTranslations map[string]string
 			Layers           struct{ Band, Effect, Icon *string }
 		}
@@ -106,6 +107,10 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 	layers := title.Title.Layers
 	if got.Rewards[0].Kind != "title" || title.Title.ID != "hello" || title.Title.Style != "gold" || title.Title.NameTranslations["en"] != "Hello" || title.Service != "fanmade" || title.CourseTitle != "十段" ||
 		layers.Band == nil || *layers.Band != "band/lumen-title-gold" || layers.Effect == nil || *layers.Effect != "effect/lumen-title-gold" || layers.Icon != nil {
+		t.Fatal(string(got.Rewards[0].Data))
+	}
+	// A title is told as private or public by its visibility, and by nothing else.
+	if title.Title.Visibility != "public" || strings.Contains(string(got.Rewards[0].Data), `"official"`) {
 		t.Fatal(string(got.Rewards[0].Data))
 	}
 	var dan struct {

@@ -24,8 +24,7 @@ import (
 // Visibility is private or public. A private title is its maker's alone: they hold it, change it
 // as they like, and nobody else can be given it. A public one stands in the catalog with how it
 // is obtained (Obtain, and its rules), and only title managers decide who gets it; it became
-// public by a review its maker asked for (title_reviews.go), or a manager made it. Official is
-// what clients from before visibility read: a public title.
+// public by a review its maker asked for (title_reviews.go), or a manager made it.
 type Title struct {
 	ID               string          `json:"id"`
 	Name             string          `json:"name"`
@@ -35,7 +34,6 @@ type Title struct {
 	Style            string          `json:"style"`
 	Layers           Layers          `json:"layers"`
 	Visibility       string          `json:"visibility"`
-	Official         bool            `json:"official"`
 	OwnerID          *string         `json:"ownerId"`
 }
 
@@ -115,7 +113,7 @@ func scanTitle(row rowScanner, extra ...any) (Title, error) {
 	var t Title
 	var translations []byte
 	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Obtain, &t.Style, &t.Layers.Band, &t.Layers.Effect, &t.Layers.Icon, &t.Visibility, &t.OwnerID}, extra...)...)
-	t.NameTranslations, t.Official = translations, t.Visibility == public
+	t.NameTranslations = translations
 	return t, err
 }
 
