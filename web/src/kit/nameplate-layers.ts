@@ -2,10 +2,11 @@ import { askSource, fallbackFileUrl, fetchFile, fileUrl } from './distribution'
 import { parseOtanim, type Otanim } from './don3d/otanim'
 import { verifiedResource, type ResourceFile } from './resource-download'
 
-// The layered nameplate the game draws (OurTaikoPlay's Resources/Nameplate, published to the
-// bucket's nameplate/ by tools/nameplate/publish-lumen.sh): every title is a band, an effect over
-// it and an icon on its end, each an .otanim drawn on the whole 408x96 plate canvas, and the
-// plate itself is a list of layouts saying what to draw in which order and where the text goes.
+// The layered nameplate the game draws (the set OurTaikoPlay's Tools/nameplate-samples/lumen
+// bakes, published to the bucket's nameplate/ by tools/nameplate/publish-lumen.sh, where the game
+// downloads it from as well): every title is a band, an effect over it and an icon on its end,
+// each an .otanim drawn on the whole 408x96 plate canvas, and the plate itself is a list of
+// layouts saying what to draw in which order and where the text goes.
 
 export type Slot = 'band' | 'effect' | 'icon'
 export const slots: Slot[] = ['band', 'effect', 'icon']
