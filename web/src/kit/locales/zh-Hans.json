@@ -476,8 +476,7 @@
     "SCENE_PRESET_INVALID": "演奏背景的名称只能是 32 个以内的字母、数字和下划线。",
     "OWN_PLAYLIST": "不能收藏自己的歌单。",
     "FAVORITE_LIMIT": "最多收藏 200 个歌单。",
-    "DAN_TITLE_NOT_FOUND": "OurTaiko Profile 上没有这个称号。",
-    "DAN_TITLE_NOT_OWNED": "只能使用段位创建者自己的社区称号或官方称号。",
+    "DAN_TITLE_NOT_FOUND": "称号目录里没有这个公开称号。",
     "DAN_LIMIT_REACHED": "每人最多发布 10 个非官方段位。",
     "DAN_CODE_TAKEN": "这个段位码已被使用。",
     "DAN_CODE_INVALID": "段位码需为 6 位大写字母或数字。"
@@ -804,7 +803,7 @@
     "rewardLevel": "授予条件",
     "addReward": "添加称号",
     "removeReward": "移除称号",
-    "titleCatalog": "在 OurTaiko Profile 创建或查看称号",
+    "titleCatalog": "查看称号目录",
     "levels": {
       "red": "赤合格以上",
       "red1": "赤合格以上",
@@ -846,12 +845,11 @@
     "cancel": "取消",
     "signInToEdit": "请先登录。",
     "rewardTitleLabel": "称号",
-    "titleMissing": "（OurTaiko Profile 上已没有这个称号，不会授予）",
-    "titleNotUsable": "（这是别人的社区称号，不会授予）",
-    "officialTitleLater": "官方称号：段位标记为官方后才授予",
+    "titleMissing": "（称号目录里没有这个公开称号，不会授予）",
+    "officialTitleLater": "段位被标记为官方后才会发放称号",
     "titlesUnavailable": "暂时读不到 OurTaiko Profile 的称号，请直接填写称号 ID，或稍后刷新。",
     "reloadTitles": "重新读取称号",
-    "noUsableTitles": "你还没有可用的称号。"
+    "noUsableTitles": "称号目录里还没有公开称号。"
   },
   "ourtaikoProfile": {
     "view": "在 OurTaiko Profile 查看全部成绩、称号与段位",
@@ -1020,7 +1018,8 @@
     },
     "featured": "首页推荐",
     "announcements": "公告管理",
-    "editor": "OurTaikoEdit"
+    "editor": "OurTaikoEdit",
+    "myTitles": "我的称号"
   },
   "chat": {
     "title": "消息",
@@ -1048,7 +1047,8 @@
     "placeholder": "输入消息",
     "send": "发送",
     "youSaid": "我：{{text}}",
-    "systemReadOnly": "系统通知只能查看，不能回复。"
+    "systemReadOnly": "系统通知只能查看，不能回复。",
+    "titleCenter": "称号中心"
   },
   "meta": {
     "siteDescription": "OurTaikoNET：太鼓自制谱面社区。试听、下载玩家创作的自制谱面，分享歌单，挑战段位道场，记录你的成绩与称号。",
@@ -1083,5 +1083,26 @@
       "puchi": "小伙伴",
       "paint": "妆容"
     }
+  },
+  "titleCenter": {
+    "empty": "还没有称号相关的通知。",
+    "unknown": "有一条新的称号通知，请刷新页面查看。",
+    "requested": {
+      "publish": "{{user}} 申请公开称号「{{title}}」",
+      "change": "{{user}} 申请更改公开称号「{{title}}」"
+    },
+    "approved": {
+      "publish": "你的称号「{{title}}」通过了审核，现在是公开称号",
+      "change": "你对称号「{{title}}」的更改申请已通过"
+    },
+    "returned": {
+      "publish": "你的称号「{{title}}」的公开申请被退回",
+      "change": "你对称号「{{title}}」的更改申请被退回"
+    },
+    "removed": "你创建的称号「{{title}}」已被称号管理员删除",
+    "reply": "管理员留言：",
+    "toReviews": "去审核",
+    "toMine": "查看我的称号",
+    "readOnly": "称号中心只能查看，不能回复。"
   }
 }

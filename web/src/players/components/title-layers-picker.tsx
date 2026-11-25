@@ -82,7 +82,7 @@ export function TitleLayersPicker({
           )
         })}
       </div>
-      <TitleBandArt layers={value} name={name} className="h-10" />
+      <TitleBandArt layers={value} name={name} className="h-7" />
     </div>
   )
 }

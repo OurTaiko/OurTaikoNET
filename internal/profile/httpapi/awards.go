@@ -68,9 +68,9 @@ type GrantedTitle struct {
 	New bool `json:"new"`
 }
 
-// SkippedTitle is a title an award asked for and could not give: no such title (not_found), an
-// official title from a community course (official_only), or another player's community title
-// (not_owner).
+// SkippedTitle is a title an award asked for and could not give: no such title (not_found), a
+// private title, which is its maker's alone (private), or a course that is not official
+// (official_only).
 type SkippedTitle struct {
 	ID     string `json:"id"`
 	Reason string `json:"reason"`
@@ -86,10 +86,9 @@ type Granted struct {
 // unique per service), the player, the course and its maker, whether it is official, the
 // verdict (0 failed, 1–3 red, 4–6 gold), the 段位 the course stands for (official courses only; 五級 6 .. 達人 24)
 // and the titles it gives on a pass. A failed attempt is recorded and gives nothing. A badge
-// only goes up. A title the course may not give is skipped and the rest are given: official
-// titles come from official courses only, and a player's community title from that player's
-// courses only (the ones administrators keep from any course). Asking again with the same key
-// returns what was granted the first time.
+// only goes up. A title the course may not give is skipped and the rest are given: only public
+// titles are given, and only by official courses, the ones the site's managers answer for.
+// Asking again with the same key returns what was granted the first time.
 func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 	service, ok := s.service(w, r)
 	if !ok {
@@ -151,7 +150,7 @@ func (s *Server) Grant(ctx context.Context, tx pgx.Tx, service string, request A
 
 // grant does the work of award in tx and returns what was granted, as awards.granted keeps it.
 func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body AwardRequest) ([]byte, error) {
-	if len(body.Key) < 1 || len(body.Key) > 100 || !account.ValidSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 || (body.CourseOwner != "" && !account.ValidSubject(body.CourseOwner)) ||
+	if len(body.Key) < 1 || len(body.Key) > 100 || !account.ValidSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 ||
 		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
 		return nil, &AwardRejection{Status: 422, Code: "AWARD_INVALID", Message: "奖励请求无效"}
 	}
@@ -186,10 +185,10 @@ func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body Awar
 				reason = "not_found"
 			case err != nil:
 				return nil, err
-			case t.Official && !body.Official:
+			case t.Visibility != public:
+				reason = "private"
+			case !body.Official:
 				reason = "official_only"
-			case !t.Official && t.OwnerID != nil && *t.OwnerID != body.CourseOwner:
-				reason = "not_owner"
 			}
 			if reason != "" {
 				granted.Skipped = append(granted.Skipped, SkippedTitle{ID: id, Reason: reason})

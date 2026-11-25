@@ -113,20 +113,20 @@ type itemCheck func(ctx context.Context, tx pgx.Tx) (status int, code, message s
 
 // createTitleRule is POST /api/admin/titles/{id}/rules {kind, source, chartId, category,
 // course, clear, count}: from now on the title is given to whoever meets the rule, and at once
-// to everyone who meets it already. Only a title of the catalog's own takes rules, not one a
-// player made. It answers {rule, granted}: the rule and how many players got the title now.
+// to everyone who meets it already. Only a public title takes rules: a private one is its
+// maker's alone. It answers {rule, granted}: the rule and how many players got the title now.
 func (s *Server) createTitleRule(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	s.createRule(w, r, titlerules.Rule{TitleID: &id}, func(ctx context.Context, tx pgx.Tx) (int, string, string, error) {
-		var owned bool
-		err := tx.QueryRow(ctx, `SELECT owner_id IS NOT NULL FROM net.titles WHERE id=$1 FOR SHARE`, id).Scan(&owned)
+		var visibility string
+		err := tx.QueryRow(ctx, `SELECT visibility FROM net.titles WHERE id=$1 FOR SHARE`, id).Scan(&visibility)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			return 404, "TITLE_NOT_FOUND", "称号不存在", nil
 		case err != nil:
 			return 0, "", "", err
-		case owned:
-			return 422, "RULE_TITLE_OWNED", "玩家自制的称号不能设置发放条件", nil
+		case visibility != public:
+			return 422, "RULE_TITLE_PRIVATE", "私有称号不能设置发放条件", nil
 		}
 		return 0, "", "", nil
 	})

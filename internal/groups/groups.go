@@ -146,6 +146,17 @@ func Give(ctx context.Context, tx pgx.Tx, user string, set Set, by string) (befo
 	return before, err
 }
 
+// In lists the players who are in every group of want, by ID.
+func In(ctx context.Context, db interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}, want Set) ([]string, error) {
+	rows, err := db.Query(ctx, `SELECT id FROM net.users WHERE groups & $1 = $1 ORDER BY id`, int64(want))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
 // Members lists the players who are in any group, or, when ids are given, those players
 // whatever their groups (one who is not known has none).
 func Members(ctx context.Context, db interface {

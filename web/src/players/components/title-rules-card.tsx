@@ -38,7 +38,7 @@ export type RuleTarget = { title: string } | { donPart: DonPartKind; donItem: nu
 const donParts: DonPartKind[] = ['cos', 'head', 'body', 'puchi', 'paint']
 
 // What gives an item by itself: the rules there are, and a form for one more. The item is a title
-// (only the catalog's own, not the ones players made) or a part of the Don.
+// (a public one: a private title is its maker's alone) or a part of the Don.
 export function TitleRulesCard({
   titles,
   rules,
@@ -68,7 +68,7 @@ export function TitleRulesCard({
     clear: '1',
     count: '',
   })
-  const eligible = titles.filter((title) => !title.ownerId)
+  const eligible = titles.filter((title) => title.visibility === 'public')
   const plays = form.kind === 'chart_clear' || form.kind === 'category_clear'
   const sourced = plays || form.kind === 'charts_uploaded'
   const counted = form.kind === 'category_clear' || form.kind === 'charts_uploaded'

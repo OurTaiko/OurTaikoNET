@@ -116,7 +116,7 @@ export function ProfilePlate({ userId, className }: { userId: string; className?
         <TitleBandArt
           layers={layersOf(plate.title)}
           name={plate.title.nameTranslations?.[language] || plate.title.name}
-          className="h-5"
+          className="h-3.5"
         />
       )}
     </span>

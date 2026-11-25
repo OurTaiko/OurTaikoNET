@@ -48,6 +48,7 @@ export const sitePages = [
   'announcements',
   'chats',
   'notifications',
+  'me',
   'manage',
   'edit',
 ]

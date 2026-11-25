@@ -18,11 +18,13 @@ import type {
   Group,
   GroupMember,
   HeldTitle,
+  ListedTitle,
+  MyTitles,
   PublicProfile,
   ScorePage,
   ScoreSort,
   ScoreView,
-  Title,
+  ReviewPage,
   TitleRule,
   VisitReport,
 } from '@players/api/types'
@@ -56,6 +58,10 @@ export const playerKeys = {
   don: (id: string, mine: boolean) => [...playerKeys.user(id), 'don', mine] as const,
   donItems: (mine: boolean) => [...playerKeys.all(), 'don-items', mine] as const,
   titles: () => [...playerKeys.all(), 'titles'] as const,
+  myTitles: () => [...playerKeys.all(), 'my-titles'] as const,
+  adminTitles: () => [...playerKeys.all(), 'admin-titles'] as const,
+  reviews: (status: 'pending' | 'decided', page: number) =>
+    [...playerKeys.all(), 'title-reviews', status, page] as const,
   activity: () => [...playerKeys.all(), 'activity'] as const,
   featured: () => [...playerKeys.all(), 'featured'] as const,
   announcements: () => [...playerKeys.all(), 'announcements'] as const,
@@ -128,7 +134,27 @@ export const playerQueries = {
     queryOptions({
       queryKey: playerKeys.titles(),
       queryFn: ({ signal }) =>
-        api<{ titles: Title[]; rules?: TitleRule[] }>(endpoints.titles, { signal }),
+        api<{ titles: ListedTitle[]; rules?: TitleRule[] }>(endpoints.titles, { signal }),
+    }),
+  /** The titles the signed-in player made, with each one's latest review. */
+  myTitles: () =>
+    queryOptions({
+      queryKey: playerKeys.myTitles(),
+      queryFn: ({ signal }) => api<MyTitles>(endpoints.myTitles, { signal }),
+    }),
+  /** Every title there is, private ones too, for the title managers. */
+  adminTitles: () =>
+    queryOptions({
+      queryKey: playerKeys.adminTitles(),
+      queryFn: ({ signal }) => api<{ titles: ListedTitle[] }>(endpoints.adminTitles, { signal }),
+    }),
+  /** The requests for review that wait for a title manager, or the ones decided. */
+  reviews: (status: 'pending' | 'decided', page: number) =>
+    queryOptions({
+      queryKey: playerKeys.reviews(status, page),
+      queryFn: ({ signal }) =>
+        api<ReviewPage>(endpoints.adminTitleReviews(status, page), { signal }),
+      placeholderData: keepPreviousData,
     }),
   activity: () =>
     queryOptions({

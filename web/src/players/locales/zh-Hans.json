@@ -154,21 +154,69 @@
     "catalog": "称号目录",
     "catalogEmpty": "还没有称号。",
     "mine": "我的称号",
-    "quota": "社区称号已用 {{used}} / {{limit}} 个",
-    "changeBand": "改外观",
+    "quota": "私有称号 {{used}} / {{limit}}",
     "edit": "修改",
     "delete": "删除",
-    "confirmDelete": "删除称号「{{name}}」？已经获得它的玩家也会失去它。",
-    "deleted": "已删除。",
-    "saved": "已保存。",
+    "confirmDelete": "删除称号「{{name}}」？此操作不能撤销。",
     "create": "新建称号",
     "editing": "修改称号",
-    "officialBandOnly": "这个称号已被设为官方，你只能修改它的外观。",
-    "limitReached": "社区称号已达 {{limit}} 个上限。删除一个，或请管理员把其中一个设为官方后再新建。",
+    "limitReached": "私有称号已达 {{limit}} 个上限。删除一个，或把其中一个提审公开后再新建。",
     "save": "保存",
     "createButton": "创建",
     "cancel": "取消",
-    "byRule": "达成条件获得"
+    "byRule": "达成条件获得",
+    "byMe": "自己创建",
+    "have": "已拥有",
+    "holders": "{{count}} 人拥有",
+    "madeBy": "创作者",
+    "total": "共 {{total}} 个",
+    "totalHeld": "共 {{total}} 个，已拥有 {{held}} 个",
+    "search": "搜索称号",
+    "searchPlaceholder": "名称、说明或创作者",
+    "show": {
+      "label": "筛选",
+      "all": "全部",
+      "held": "已拥有",
+      "missing": "未拥有"
+    },
+    "makeYourOwn": "想要自己的称号？在「我的称号」里创建，马上就能佩戴；提审通过后还能公开给其他玩家获得。",
+    "noMatch": "没有符合条件的称号。",
+    "visibility": {
+      "private": "私有",
+      "public": "公开"
+    },
+    "plateHint": "名牌会显示在你的主页、排行榜和游戏里。",
+    "made": "我创建的称号",
+    "madeHint": "新建的称号是私有的：只有你自己拥有，可以随时修改。提审通过后变为公开，不再占用名额，之后要修改需提交更改申请。",
+    "noneMade": "还没有创建过称号。",
+    "privateHint": "私有称号只有你自己拥有和佩戴，可以随时修改。",
+    "review": {
+      "pending": "审核中",
+      "ask": "提审公开",
+      "askChange": "申请更改",
+      "withdraw": "撤回申请",
+      "send": "提交申请",
+      "sent": "申请已提交，审核结果会发到消息里的「称号中心」。",
+      "publishHint": "称号会按现在的样子送审，审核期间不能修改。通过后变为公开：出现在称号目录里，其他玩家可以按管理员设置的条件获得。",
+      "changeHint": "公开称号的修改需要称号管理员审核。通过后，所有拥有它的玩家看到的都是新的样子。",
+      "publishRequest": "获取条件说明",
+      "changeRequest": "更改说明",
+      "requestHint": "写给称号管理员：你希望玩家怎样获得这个称号，或这次为什么要改。具体的发放条件由管理员设置。",
+      "asked": "申请说明：",
+      "replied": "管理员回复：",
+      "publish": {
+        "pending": "公开申请审核中",
+        "approved": "公开申请已通过",
+        "returned": "公开申请被退回",
+        "withdrawn": "公开申请已撤回"
+      },
+      "change": {
+        "pending": "更改申请审核中",
+        "approved": "更改申请已通过",
+        "returned": "更改申请被退回",
+        "withdrawn": "更改申请已撤回"
+      }
+    }
   },
   "dans": {
     "badges": "段位徽章",
@@ -189,27 +237,23 @@
     }
   },
   "admin": {
-    "editTitle": "新建或修改称号",
+    "editTitle": "修改称号",
     "id": "ID",
     "name": "名称",
     "nameIn": "名称（{{language}}）",
     "description": "说明",
-    "official": "官方称号（社区段位不能授予）",
     "save": "保存",
-    "saved": "已保存。",
     "catalog": "全部称号",
     "edit": "修改",
     "delete": "删除",
-    "confirmDelete": "删除称号 {{id}}？已获得它的玩家也会失去它。",
-    "deleted": "已删除。",
-    "grant": "手动授予称号",
+    "confirmDelete": "删除称号「{{name}}」？拥有它的 {{count}} 名玩家也会失去它，此操作不能撤销。",
+    "grant": "手动发放称号",
     "userId": "用户 ID",
     "title": "称号",
     "grantButton": "授予",
     "revokeButton": "收回",
     "granted": "已授予。",
     "revoked": "已收回。",
-    "madeBy": "创建者",
     "look": "外观",
     "layers": {
       "preset": "从称号套用",
@@ -221,7 +265,29 @@
       "loading": "正在读取名牌素材…",
       "unavailable": "名牌素材暂时读不到。",
       "inTitles": "用于 {{titles}}"
-    }
+    },
+    "newTitle": "新建称号",
+    "tabs": {
+      "reviews": "审核",
+      "titles": "称号",
+      "grants": "发放",
+      "don": "咚酱装扮"
+    },
+    "searchPlaceholder": "名称、ID 或创作者",
+    "show": {
+      "label": "筛选",
+      "all": "全部",
+      "public": "公开",
+      "private": "私有"
+    },
+    "idHint": "小写字母、数字和连字符，创建后不能修改。",
+    "idInvalid": "ID 只能用小写字母、数字和连字符。",
+    "idTaken": "这个 ID 已被使用。",
+    "obtain": "获取方式",
+    "obtainHint": "公开显示在称号目录里，说明玩家怎样获得这个称号。自动发放的条件在「发放」里另外设置。",
+    "grantPlayer": "选择玩家",
+    "grantHint": "只有公开称号可以发放。发放和收回都会马上生效。",
+    "noPlayer": "还没有选择玩家"
   },
   "languages": {
     "en": "English",
@@ -241,13 +307,18 @@
     "GRANT_NOT_FOUND": "该用户没有这个称号。",
     "FORBIDDEN": "需要管理员权限。",
     "QUERY_INVALID": "查询参数无效。",
-    "TITLE_LIMIT_REACHED": "社区称号最多 5 个。",
-    "TITLE_OFFICIAL": "官方称号只有管理员可以删除。",
-    "TITLE_CHANGED": "这个称号刚被管理员修改过，请刷新页面后重试。",
+    "TITLE_LIMIT_REACHED": "私有称号最多 5 个。",
     "FEATURED_INVALID": "推荐歌单列表无效：数量、推荐语长度或歌单有误。",
     "FEATURED_PLAYLIST_UNAVAILABLE": "有歌单已不存在或不再公开，请移除后再保存。",
     "ANNOUNCEMENT_INVALID": "公告无效：标题需要 1–80 个字符且不能换行，正文不能超过 4000 个字符。",
-    "ANNOUNCEMENT_NOT_FOUND": "公告已不存在。"
+    "ANNOUNCEMENT_NOT_FOUND": "公告已不存在。",
+    "TITLE_PUBLIC": "公开称号不能直接修改或删除：修改请提交更改申请，删除请联系称号管理员。",
+    "TITLE_PRIVATE": "私有称号只属于它的创建者，不能发放，也只有创建者能修改。",
+    "TITLE_REVIEW_PENDING": "这个称号有一份申请正在审核，撤回后才能修改或再次提交。",
+    "REVIEW_INVALID": "申请内容无效：说明、留言和获取方式各不超过 500 字。",
+    "REVIEW_NOT_FOUND": "没有这份申请。",
+    "REVIEW_DECIDED": "这份申请已经处理过了。",
+    "RULE_TITLE_PRIVATE": "私有称号不能设置发放条件。"
   },
   "visits": {
     "heading": "访问统计",
@@ -412,7 +483,6 @@
     "added": "已添加，并发给了 {{n}} 位已达成的玩家。",
     "delete": "删除",
     "confirmDelete": "删除这条条件？已经发出的称号不会收回。",
-    "deleted": "已删除。",
     "chartGone": "（歌曲已下架）",
     "kinds": {
       "chart_clear": "打完某首歌",
@@ -476,5 +546,32 @@
     "unlockedDone": "已解除锁定，所有人都能穿了。",
     "lockedList": "已锁定的装扮",
     "noneLocked": "还没有锁定的装扮，所有装扮都能穿。"
+  },
+  "reviews": {
+    "waiting": "待审核",
+    "hint": "玩家提审自己创建的称号。通过后称号变为公开，并显示你写定的获取方式；发放条件在「发放」里设置。退回时请留言说明原因。",
+    "none": "没有待审核的申请。",
+    "decided": "已处理",
+    "noneDecided": "还没有处理过申请。",
+    "kind": {
+      "publish": "公开申请",
+      "change": "更改申请"
+    },
+    "status": {
+      "pending": "待审核",
+      "approved": "已通过",
+      "returned": "已退回",
+      "withdrawn": "已撤回"
+    },
+    "becomes": "改为",
+    "now": "现在",
+    "asked": "申请改为",
+    "request": "申请说明",
+    "obtainHint": "通过后公开显示的获取方式，可按申请说明改写。",
+    "reply": "给申请人的留言",
+    "replyHint": "通过或退回都可以留言，会发到对方的称号中心。",
+    "approve": "通过",
+    "return": "退回",
+    "by": "由 {{name}} 处理"
   }
 }

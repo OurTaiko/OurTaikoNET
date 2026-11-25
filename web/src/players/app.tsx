@@ -1,6 +1,7 @@
 // The pages that belong to no song source: home, players (their scores on both sources, titles,
-// 段位 badges and nameplate), the title catalog, the site's announcements, messages (chats with other players and the
-// site's notices), and for the site's administrator the manage panel.
+// 段位 badges and nameplate), the title catalog and the signed-in player's own titles, the site's
+// announcements, messages (chats with other players, the site's notices and 称号中心), and for
+// those who manage the site the manage panel.
 import type { ReactNode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +22,7 @@ import { AnnouncementsPage } from './pages/announcements'
 import { AnnouncementsAdminPage } from './pages/announcements-admin'
 import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
+import { MyTitlesPage } from './pages/my-titles'
 import { VisitsPage } from './pages/visits'
 import '../styles.css'
 
@@ -89,6 +91,14 @@ function App() {
                     <PageMeta title={t('shell.titles')} description={t('meta.titles')} />
                     <TitlesPage />
                   </>
+                }
+              />
+              <Route
+                path="me/titles"
+                element={
+                  <Private title={t('shell.myTitles')}>
+                    <MyTitlesPage />
+                  </Private>
                 }
               />
               <Route

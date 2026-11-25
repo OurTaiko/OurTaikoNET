@@ -113,7 +113,7 @@ func TestDanAttemptAndItsAwardAreSavedTogether(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT granted FROM dan_attempts`).Scan(&stored); err != nil || !strings.Contains(string(stored), "granted") {
 		t.Fatal("what was granted is kept with the attempt", string(stored), err)
 	}
-	if request := awards.asked[len(awards.asked)-1]; request.UserID != carol || request.CourseID != course || request.CourseOwner != alice || request.Verdict != 1 {
+	if request := awards.asked[len(awards.asked)-1]; request.UserID != carol || request.CourseID != course || request.Verdict != 1 {
 		t.Fatalf("asked for %+v", request)
 	}
 

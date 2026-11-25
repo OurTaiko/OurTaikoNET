@@ -476,8 +476,7 @@
     "SCENE_PRESET_INVALID": "演奏背景の名前は 32 文字以内の英数字とアンダースコアにしてください。",
     "OWN_PLAYLIST": "自分のプレイリストはお気に入りに追加できません。",
     "FAVORITE_LIMIT": "お気に入りに追加できるプレイリストは 200 個までです。",
-    "DAN_TITLE_NOT_FOUND": "その称号は OurTaiko Profile にありません。",
-    "DAN_TITLE_NOT_OWNED": "使えるのは段位の作成者自身のコミュニティ称号か公式称号だけです。",
+    "DAN_TITLE_NOT_FOUND": "称号一覧にこの公開称号はありません。",
     "DAN_LIMIT_REACHED": "公式でない段位は 1 人 10 個までです。",
     "DAN_CODE_TAKEN": "この段位コードはすでに使われています。",
     "DAN_CODE_INVALID": "段位コードは英大文字と数字 6 桁です。"
@@ -804,7 +803,7 @@
     "rewardLevel": "付与条件",
     "addReward": "称号を追加",
     "removeReward": "称号を外す",
-    "titleCatalog": "OurTaiko Profile で称号を作成・確認する",
+    "titleCatalog": "称号一覧を見る",
     "levels": {
       "red": "赤合格以上",
       "red1": "赤合格以上",
@@ -846,12 +845,11 @@
     "cancel": "キャンセル",
     "signInToEdit": "ログインしてください。",
     "rewardTitleLabel": "称号",
-    "titleMissing": "（OurTaiko Profile にもうない称号のため授与されません）",
-    "titleNotUsable": "（他のプレイヤーのコミュニティ称号のため授与されません）",
-    "officialTitleLater": "公式称号：段位が公式になってから授与",
+    "titleMissing": "（称号一覧にこの公開称号がないため、付与されません）",
+    "officialTitleLater": "称号は段位が公式に設定されてから付与されます",
     "titlesUnavailable": "OurTaiko Profile の称号を読み込めません。称号 ID を直接入力するか、後で再読み込みしてください。",
     "reloadTitles": "称号を再読み込み",
-    "noUsableTitles": "使える称号がまだありません。"
+    "noUsableTitles": "称号一覧にまだ公開称号がありません。"
   },
   "ourtaikoProfile": {
     "view": "OurTaiko Profile ですべてのスコア・称号・段位を見る",
@@ -1020,7 +1018,8 @@
     },
     "featured": "ホームのおすすめ",
     "announcements": "お知らせ管理",
-    "editor": "OurTaikoEdit"
+    "editor": "OurTaikoEdit",
+    "myTitles": "マイ称号"
   },
   "chat": {
     "title": "メッセージ",
@@ -1048,7 +1047,8 @@
     "placeholder": "メッセージを入力",
     "send": "送信",
     "youSaid": "自分：{{text}}",
-    "systemReadOnly": "お知らせには返信できません。"
+    "systemReadOnly": "お知らせには返信できません。",
+    "titleCenter": "称号センター"
   },
   "meta": {
     "siteDescription": "OurTaikoNET：太鼓の創作譜面コミュニティ。プレイヤーが作った創作譜面を試聴・ダウンロードし、プレイリストを共有し、段位道場に挑戦して、成績と称号を集めよう。",
@@ -1083,5 +1083,26 @@
       "puchi": "ぷちキャラ",
       "paint": "メイク"
     }
+  },
+  "titleCenter": {
+    "empty": "称号に関するお知らせはまだありません。",
+    "unknown": "称号に関する新しいお知らせがあります。ページを再読み込みしてください。",
+    "requested": {
+      "publish": "{{user}} さんが称号「{{title}}」の公開を申請しました",
+      "change": "{{user}} さんが公開称号「{{title}}」の変更を申請しました"
+    },
+    "approved": {
+      "publish": "あなたの称号「{{title}}」が審査に通り、公開されました",
+      "change": "称号「{{title}}」の変更申請が承認されました"
+    },
+    "returned": {
+      "publish": "称号「{{title}}」の公開申請が差し戻されました",
+      "change": "称号「{{title}}」の変更申請が差し戻されました"
+    },
+    "removed": "あなたが作成した称号「{{title}}」は称号管理者によって削除されました",
+    "reply": "管理者のメッセージ：",
+    "toReviews": "審査する",
+    "toMine": "マイ称号を見る",
+    "readOnly": "称号センターは閲覧専用で、返信はできません。"
   }
 }

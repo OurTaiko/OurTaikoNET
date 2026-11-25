@@ -36,13 +36,23 @@ export const endpoints = {
   commentVote: (id: string) => `${API_ROOT}/comments/${encodeURIComponent(id)}/vote`,
   adminAnnouncements: `${API_ROOT}/admin/announcements`,
   adminAnnouncement: (id: string) => `${API_ROOT}/admin/announcements/${encodeURIComponent(id)}`,
+  // The titles the player made (GET), a new one (POST), one of them (PUT, DELETE), and the
+  // requests for their review: ask (POST), take back (DELETE).
   myTitles: `${API_ROOT}/me/titles`,
   myTitle: (id: string) => `${API_ROOT}/me/titles/${encodeURIComponent(id)}`,
+  myTitleReviews: (id: string) => `${API_ROOT}/me/titles/${encodeURIComponent(id)}/reviews`,
+  myTitleReview: (id: string) => `${API_ROOT}/me/title-reviews/${encodeURIComponent(id)}`,
   user: (id: string) => `${API_ROOT}/users/${id}`,
   userScores: (id: string, query: URLSearchParams) => `${API_ROOT}/users/${id}/scores?${query}`,
   userTitles: (id: string) => `${API_ROOT}/users/${id}/titles`,
   userDans: (id: string) => `${API_ROOT}/users/${id}/dans`,
+  // For the title managers: every title, one of them (PUT, DELETE), the requests for review
+  // that wait or were decided, and deciding one (POST).
+  adminTitles: `${API_ROOT}/admin/titles`,
   adminTitle: (id: string) => `${API_ROOT}/admin/titles/${encodeURIComponent(id)}`,
+  adminTitleReviews: (status: 'pending' | 'decided', page: number) =>
+    `${API_ROOT}/admin/title-reviews?status=${status}&page=${page}`,
+  adminTitleReview: (id: string) => `${API_ROOT}/admin/title-reviews/${encodeURIComponent(id)}`,
   adminGrants: `${API_ROOT}/admin/grants`,
   // The rules that give a title by themselves.
   adminTitleRules: (id: string) => `${API_ROOT}/admin/titles/${encodeURIComponent(id)}/rules`,

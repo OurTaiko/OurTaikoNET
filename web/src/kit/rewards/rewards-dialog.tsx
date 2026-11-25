@@ -47,7 +47,7 @@ function useViews(catalog: ServedDonCatalog | null): Record<string, View> {
         node: (
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="text-xs text-muted-foreground">{t('rewards.title')}</span>
-            <TitleBandArt layers={layersOf(title)} name={name} className="h-9" />
+            <TitleBandArt layers={layersOf(title)} name={name} className="h-7" />
             {title.description && <p>{title.description}</p>}
             {from && <p className="text-xs text-muted-foreground">{from}</p>}
           </div>

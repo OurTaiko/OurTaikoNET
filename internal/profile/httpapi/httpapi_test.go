@@ -9,9 +9,11 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/groups"
 	"ourtaiko.dev/net/internal/netdb/netdbtest"
 )
 
@@ -106,17 +108,23 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	}
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
 
-	// An administrator (the development user is one) keeps the catalog.
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, 401, nil)
+	// A title manager (the development user is one) makes the site's own titles: public, with no
+	// maker, and the words for how each is obtained.
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 401, nil)
 	c.signIn()
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, 200, nil)
-	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","layers":{"band":"band/lumen-title-wood"},"official":false}`, 200, nil)
+	var kidou Title
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 200, &kidou)
+	if kidou.Visibility != public || !kidou.Official || kidou.OwnerID != nil || kidou.Obtain != "十段に合格" {
+		t.Fatal("a manager's title", kidou)
+	}
+	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
 	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 422, nil)
 	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","layers":{"band":"gold"}}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","obtain":"`+strings.Repeat("長", 501)+`","layers":{"band":"band/lumen-title-wood"}}`, 422, nil)
 	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","style":"gold"}`, 400, nil)
-	var catalog struct{ Titles []Title }
+	var catalog struct{ Titles []ListedTitle }
 	c.json("GET", "/api/titles", "", 200, &catalog)
-	if len(catalog.Titles) != 2 || catalog.Titles[0].ID != "kidou" || string(catalog.Titles[0].NameTranslations) != `{"en":"Taiko Master"}` {
+	if len(catalog.Titles) != 2 || catalog.Titles[0].ID != "kidou" || string(catalog.Titles[0].NameTranslations) != `{"en":"Taiko Master"}` || catalog.Titles[0].Holders != 0 {
 		t.Fatal("catalog", catalog)
 	}
 
@@ -161,7 +169,7 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	if failed.Granted.Dan != nil || len(failed.Granted.Titles) != 0 || failed.Nameplate.Dan.Index != 20 {
 		t.Fatalf("a failed attempt gives nothing %+v", failed)
 	}
-	// A title the course may not give is skipped; the others are still given.
+	// Only a course the managers made official gives titles; one it cannot give is skipped.
 	var skipped reply
 	award(`{"key":"attempt-5","userId":"`+player+`","official":false,"verdict":3,"titles":["kidou","missing"]}`, 200, &skipped, auth)
 	if len(skipped.Granted.Titles) != 0 || len(skipped.Granted.Skipped) != 2 || skipped.Granted.Skipped[0] != (SkippedTitle{"kidou", "official_only"}) || skipped.Granted.Skipped[1] != (SkippedTitle{"missing", "not_found"}) {
@@ -174,10 +182,10 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	if partly.Granted.Dan == nil || !partly.Granted.Dan.Upgraded || len(partly.Granted.Titles) != 1 || partly.Granted.Titles[0].ID != "kidou" || len(partly.Granted.Skipped) != 1 {
 		t.Fatalf("a missing title does not stop the rest %+v", partly.Granted)
 	}
-	var community reply
-	award(`{"key":"attempt-8","userId":"`+player+`","courseTitle":"みんなの段位","official":false,"verdict":3,"titles":["fan"]}`, 200, &community, auth)
-	if len(community.Granted.Titles) != 1 || community.Granted.Titles[0].Official {
-		t.Fatal("a community course gives community titles", community.Granted)
+	var second reply
+	award(`{"key":"attempt-8","userId":"`+player+`","courseTitle":"みんなの段位","official":true,"verdict":3,"titles":["fan"]}`, 200, &second, auth)
+	if len(second.Granted.Titles) != 1 || second.Granted.Titles[0].Visibility != public {
+		t.Fatal("an official course gives any public title", second.Granted)
 	}
 
 	// The player wears one of their titles; the plate is public.
@@ -220,11 +228,16 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 		t.Fatalf("dans %+v", dans)
 	}
 
-	// An administrator grants and takes back a title; a revoked key stops working.
+	// A title manager grants and takes back a title, and the catalog counts who holds each; a
+	// revoked key stops working.
 	c.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
 	public.json("GET", "/api/users/"+other+"/titles", "", 200, &held)
 	if len(held.Titles) != 1 || held.Titles[0].Service != "admin" {
 		t.Fatal("granted", held)
+	}
+	c.json("GET", "/api/titles", "", 200, &catalog)
+	if catalog.Titles[0].Holders != 1 || catalog.Titles[1].ID != "fan" || catalog.Titles[1].Holders != 2 {
+		t.Fatal("holders", catalog)
 	}
 	c.json("DELETE", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 200, nil)
 	c.json("DELETE", "/api/admin/grants", `{"userId":"`+other+`","titleId":"fan"}`, 404, nil)
@@ -246,9 +259,10 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	}
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
 	c.json("POST", "/api/me/titles", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 401, nil)
+	c.json("GET", "/api/me/titles", "", 401, nil)
 	c.signIn()
 
-	// Up to five community titles, looking any way their maker likes: each layer an item of its
+	// Up to five private titles, looking any way their maker likes: each layer an item of its
 	// own slot. The old style alone is not a look.
 	for _, body := range []string{
 		`{"name":" ","layers":{"band":"band/lumen-title-wood"}}`,
@@ -271,86 +285,317 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	} {
 		var title Title
 		c.json("POST", "/api/me/titles", `{"name":"称号","nameTranslations":{"en":"Title"},`+look.body+`}`, 201, &title)
-		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
+		if title.Visibility != private || title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
 			title.Style != look.style || title.Layers.Band != look.band || str(title.Layers.Effect) != look.effect || str(title.Layers.Icon) != look.icon {
 			t.Fatal("made", look.body, title)
 		}
 		made = append(made, title)
 	}
 	c.json("POST", "/api/me/titles", `{"name":"六","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+
+	// A private title is its maker's alone. They hold it from the start, which is no reward, and
+	// wear it; it is not in the catalog, and nobody else can be given it, by a course, a rule or
+	// a manager.
+	var mine struct {
+		Titles      []OwnTitle
+		Limit, Used int
+	}
+	c.json("GET", "/api/me/titles", "", 200, &mine)
+	if len(mine.Titles) != 5 || mine.Limit != 5 || mine.Used != 5 || mine.Titles[4].ID != made[0].ID || mine.Titles[0].Holders != 1 || mine.Titles[0].Review != nil {
+		t.Fatalf("my titles %+v", mine)
+	}
+	var held struct{ Titles []HeldTitle }
+	c.json("GET", "/api/users/"+player+"/titles", "", 200, &held)
+	if len(held.Titles) != 5 || held.Titles[0].Service != "" {
+		t.Fatal("a maker holds what they made", held)
+	}
+	var rewards int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM rewards WHERE user_id=$1`, player).Scan(&rewards); err != nil || rewards != 0 {
+		t.Fatal("making a title is no reward", rewards, err)
+	}
+	var plate Nameplate
+	c.json("PUT", "/api/me/nameplate", `{"titleId":"`+made[0].ID+`","showDan":true}`, 200, &plate)
+	if plate.Title == nil || plate.Title.ID != made[0].ID {
+		t.Fatal("wearing one's own", plate)
+	}
 	w := c.do("GET", "/api/titles", "", nil)
-	var catalog struct{ Titles []Title }
-	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Titles) != 5 || *catalog.Titles[0].OwnerID != player {
+	var catalog struct{ Titles []ListedTitle }
+	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Titles) != 0 {
 		t.Fatal("catalog", w.Code, w.Body.String())
 	}
+	type reply struct{ Granted Granted }
+	var byCourse reply
+	c.json("POST", "/internal/v1/awards", `{"key":"a1","userId":"`+other+`","official":true,"verdict":1,"titles":["`+made[2].ID+`"]}`, 200, &byCourse, auth)
+	if len(byCourse.Granted.Titles) != 0 || byCourse.Granted.Skipped[0] != (SkippedTitle{made[2].ID, "private"}) {
+		t.Fatalf("a private title from a course %+v", byCourse.Granted)
+	}
+	c.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"`+made[2].ID+`"}`, 422, nil)
+	c.json("POST", "/api/admin/titles/"+made[2].ID+"/rules", `{"kind":"site_login"}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/"+made[2].ID, `{"name":"管理员改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
 
-	// The maker changes their community title; another player's is not theirs to change.
+	// The maker changes their private title as they like; another player's is not theirs.
 	var changed Title
 	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","layers":{"band":"band/lumen-title-purple","effect":"effect/lumen-title-purple"}}`, 200, &changed)
 	if changed.Name != "改名" || changed.Style != "purple" || changed.Description != "说明" || string(changed.NameTranslations) != `{}` || str(changed.Layers.Effect) != "effect/lumen-title-purple" {
 		t.Fatal("changed", changed)
 	}
 	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","layers":{"band":"band/"}}`, 422, nil)
-	if _, err = pool.Exec(ctx, `INSERT INTO titles(id,name,style,official,owner_id) VALUES('theirs','他人','wood',false,$1)`, other); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO titles(id,name,style,visibility,owner_id) VALUES('theirs','他人','wood','private',$1)`, other); err != nil {
 		t.Fatal(err)
 	}
 	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 404, nil)
 	c.json("DELETE", "/api/me/titles/theirs", "", 404, nil)
+	c.json("POST", "/api/me/titles/theirs/reviews", `{"request":"x"}`, 404, nil)
 
-	// An administrator makes one official: it keeps its maker, who may now change its look only,
-	// and it no longer takes one of their five places.
-	var official Title
-	c.json("PUT", "/api/admin/titles/"+made[1].ID, `{"name":"公认","layers":{"band":"band/lumen-title-wood"},"official":true}`, 200, &official)
-	if !official.Official || official.OwnerID == nil || *official.OwnerID != player {
-		t.Fatal("official", official)
-	}
-	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","layers":{"band":"band/lumen-title-rainbow"}}`, 200, &official)
-	if official.Style != "rainbow" || official.Name != "公认" || official.Layers.Band != "band/lumen-title-rainbow" {
-		t.Fatal("an official title's maker changes its look only", official)
-	}
-	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","layers":{"band":"band/lumen-title-gold","icon":"icon/lumen-title-crown_gold"}}`, 200, &official)
-	if official.Style != "gold" || official.Name != "公认" || official.Layers.Band != "band/lumen-title-gold" || official.Layers.Effect != nil || str(official.Layers.Icon) != "icon/lumen-title-crown_gold" {
-		t.Fatal("an official title's maker changes its layers", official)
-	}
-	c.json("DELETE", "/api/me/titles/"+made[1].ID, "", 403, nil)
-	var sixth Title
-	c.json("POST", "/api/me/titles", `{"name":"六","layers":{"band":"band/lumen-title-wood"}}`, 201, &sixth)
-	c.json("POST", "/api/me/titles", `{"name":"七","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
-
-	// A community title comes from its maker's courses only; an official one from official
-	// courses, whoever made them.
-	type reply struct{ Granted Granted }
-	var own, foreign, byOfficial reply
-	c.json("POST", "/internal/v1/awards", `{"key":"a1","userId":"`+other+`","courseOwnerId":"`+player+`","verdict":1,"titles":["`+made[2].ID+`"]}`, 200, &own, auth)
-	if len(own.Granted.Titles) != 1 || len(own.Granted.Skipped) != 0 {
-		t.Fatalf("own title %+v", own.Granted)
-	}
-	c.json("POST", "/internal/v1/awards", `{"key":"a2","userId":"`+other+`","courseOwnerId":"`+other+`","verdict":1,"titles":["`+made[3].ID+`"]}`, 200, &foreign, auth)
-	if len(foreign.Granted.Titles) != 0 || foreign.Granted.Skipped[0] != (SkippedTitle{made[3].ID, "not_owner"}) {
-		t.Fatalf("another player's title %+v", foreign.Granted)
-	}
-	c.json("POST", "/internal/v1/awards", `{"key":"a3","userId":"`+player+`","courseOwnerId":"`+other+`","official":true,"verdict":4,"titles":["`+made[1].ID+`"]}`, 200, &byOfficial, auth)
-	if len(byOfficial.Granted.Titles) != 1 {
-		t.Fatalf("an official title from an official course %+v", byOfficial.Granted)
-	}
-	c.json("POST", "/internal/v1/awards", `{"key":"a4","userId":"`+player+`","courseOwnerId":"nope","verdict":1}`, 422, nil, auth)
-
-	// Deleting a community title takes it from the players who earned it.
-	c.json("POST", "/internal/v1/awards", `{"key":"a5","userId":"`+player+`","courseOwnerId":"`+player+`","verdict":1,"titles":["`+made[2].ID+`"]}`, 200, nil, auth)
-	c.json("PUT", "/api/me/nameplate", `{"titleId":"`+made[2].ID+`","showDan":true}`, 200, nil)
-	c.json("DELETE", "/api/me/titles/"+made[2].ID, "", 200, nil)
-	c.json("DELETE", "/api/me/titles/"+made[2].ID, "", 404, nil)
-	var held struct{ Titles []HeldTitle }
-	c.json("GET", "/api/users/"+other+"/titles", "", 200, &held)
-	if len(held.Titles) != 0 {
-		t.Fatal("still held", held)
-	}
-	var plate Nameplate
+	// Deleting a private title takes it off its maker's nameplate, and frees its place.
+	c.json("DELETE", "/api/me/titles/"+made[0].ID, "", 200, nil)
+	c.json("DELETE", "/api/me/titles/"+made[0].ID, "", 404, nil)
 	c.json("GET", "/api/users/"+player+"/nameplate", "", 200, &plate)
 	if plate.Title != nil {
 		t.Fatal("still worn", plate)
 	}
 	c.json("POST", "/api/me/titles", `{"name":"七","layers":{"band":"band/lumen-title-wood"}}`, 201, nil)
+	c.json("POST", "/api/me/titles", `{"name":"八","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+}
+
+// reviewWorld is a site with user groups: boss, who signs in, is a title manager, and so is
+// second; maker makes titles. It gives each a session.
+func reviewWorld(t *testing.T) (pool *pgxpool.Pool, maker, boss *client) {
+	t.Helper()
+	pool = testDB(t)
+	ctx := context.Background()
+	const second = "0000000000000000000000000000cafe"
+	if _, err := pool.Exec(ctx, `INSERT INTO users(id,groups,nickname) VALUES($1,0,'Maker'),($2,$4,'Boss'),($3,$4,'Second')`, player, other, second, int64(groups.TitleManager)); err != nil {
+		t.Fatal(err)
+	}
+	// The account center: an access token is its player's ID.
+	sso := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			AccessToken string `json:"accessToken"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/internal/v1/web/introspect" || !account.ValidSubject(body.AccessToken) {
+			w.WriteHeader(401)
+			w.Write([]byte(`{"code":"UNAUTHORIZED","message":"no"}`))
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"id": body.AccessToken, "username": "player", "nickname": "N", "emailVerified": true}, "expiresAt": time.Now().Add(time.Hour)})
+	}))
+	t.Cleanup(sso.Close)
+	accounts, err := account.New(account.Config{Issuer: sso.URL, ServiceID: "net", ServiceKey: strings.Repeat("k", 64), ClientID: "net", ClientSecret: "secret",
+		RedirectURL: origin + "/api/auth/sso/callback", EncryptionKey: strings.Repeat("b", 64)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := New(pool, Config{Origin: origin, SSO: accounts, Groups: true})
+	open := func(user string) *client {
+		t.Helper()
+		c := &client{t: t, handler: app.Handler()}
+		cookie, _, err := app.OpenSession(ctx, user, user, "refresh", time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.cookie = cookie
+		var me struct{ CSRFToken string }
+		c.json("GET", "/api/me", "", 200, &me)
+		c.csrf = me.CSRFToken
+		return c
+	}
+	return pool, open(player), open(other)
+}
+
+func TestATitleBecomesPublicByReview(t *testing.T) {
+	pool, maker, boss := reviewWorld(t)
+	ctx := context.Background()
+	notices := func(c *client) (items []TitleNotice, unread int) {
+		t.Helper()
+		var page struct {
+			Items  []TitleNotice
+			Unread int
+		}
+		c.json("GET", "/api/me/title-notices", "", 200, &page)
+		return page.Items, page.Unread
+	}
+	type told struct {
+		Review   Review
+		Title    Title
+		UserID   string
+		UserName string
+	}
+	read := func(n TitleNotice) (data told) {
+		t.Helper()
+		if err := json.Unmarshal(n.Data, &data); err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+
+	var title Title
+	maker.json("POST", "/api/me/titles", `{"name":"写谱人","nameTranslations":{"en":"Charter"},"description":"说明","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 201, &title)
+
+	// The maker asks for a review, saying how the title should be obtained. It goes as it is.
+	for _, body := range []string{`{}`, `{"request":"  "}`, `{"request":"` + strings.Repeat("长", 501) + `"}`, `{"request":"x","name":"另一个"}`, `{"request":"x","layers":{"band":"band/lumen-title-wood"}}`} {
+		maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", body, 422, nil)
+	}
+	var asked Review
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":" 上传 10 张谱面的人 "}`, 201, &asked)
+	if asked.Kind != "publish" || asked.Status != "pending" || asked.Request != "上传 10 张谱面的人" || asked.Name != "写谱人" || string(asked.NameTranslations) != `{"en":"Charter"}` ||
+		asked.Layers.Band != "band/lumen-title-gold" || asked.DecidedAt != nil || asked.TitleID != title.ID || asked.UserID != player {
+		t.Fatalf("asked %+v", asked)
+	}
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"再来"}`, 409, nil)
+	// While it waits the title stays as it was asked to be reviewed.
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	var mine struct {
+		Titles []OwnTitle
+		Used   int
+	}
+	maker.json("GET", "/api/me/titles", "", 200, &mine)
+	if len(mine.Titles) != 1 || !mine.Titles[0].Pending || mine.Titles[0].Review == nil || mine.Titles[0].Review.ID != asked.ID || mine.Used != 1 {
+		t.Fatalf("my titles while waiting %+v", mine)
+	}
+
+	// Every title manager is told, and sees the queue; a player does neither.
+	told1, unread := notices(boss)
+	if len(told1) != 1 || unread != 1 || told1[0].Kind != "review_requested" || told1[0].Read {
+		t.Fatalf("the managers are told %+v", told1)
+	}
+	if data := read(told1[0]); data.Review.ID != asked.ID || data.Title.ID != title.ID || data.UserID != player || data.UserName != "N" {
+		t.Fatalf("what they are told %+v", data)
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM title_notices WHERE kind='review_requested'`).Scan(&count); err != nil || count != 2 {
+		t.Fatal("one notice a manager", count, err)
+	}
+	if items, _ := notices(maker); len(items) != 0 {
+		t.Fatal("the maker is not told of their own request", items)
+	}
+	var unreadCount struct{ Count int }
+	boss.json("GET", "/api/me/title-notices/unread", "", 200, &unreadCount)
+	boss.json("POST", "/api/me/title-notices/read", "", 200, nil)
+	if _, after := notices(boss); unreadCount.Count != 1 || after != 0 {
+		t.Fatal("read", unreadCount, after)
+	}
+	maker.json("GET", "/api/admin/title-reviews", "", 403, nil)
+	maker.json("POST", "/api/admin/title-reviews/"+asked.ID, `{"approve":true}`, 403, nil)
+	var queue struct {
+		Items []QueuedReview
+		Total int
+	}
+	boss.json("GET", "/api/admin/title-reviews", "", 200, &queue)
+	if queue.Total != 1 || len(queue.Items) != 1 || queue.Items[0].ID != asked.ID || queue.Items[0].UserName != "Maker" || queue.Items[0].Title.Visibility != private {
+		t.Fatalf("queue %+v", queue)
+	}
+	boss.json("GET", "/api/admin/title-reviews?status=other", "", 400, nil)
+
+	// Returned with a reply: the title stays private and can be changed and asked for again.
+	boss.json("POST", "/api/admin/title-reviews/"+asked.ID, `{"reply":"x"}`, 422, nil)
+	boss.json("POST", "/api/admin/title-reviews/nope", `{"approve":false}`, 404, nil)
+	var decided struct {
+		Review Review
+		Title  Title
+	}
+	boss.json("POST", "/api/admin/title-reviews/"+asked.ID, `{"approve":false,"reply":" 名字太泛了 "}`, 200, &decided)
+	if decided.Review.Status != "returned" || decided.Review.Reply != "名字太泛了" || decided.Review.DecidedAt == nil || decided.Title.Visibility != private {
+		t.Fatalf("returned %+v", decided)
+	}
+	boss.json("POST", "/api/admin/title-reviews/"+asked.ID, `{"approve":true}`, 409, nil)
+	told2, _ := notices(maker)
+	if len(told2) != 1 || told2[0].Kind != "review_returned" || read(told2[0]).Review.Reply != "名字太泛了" {
+		t.Fatalf("the maker is told %+v", told2)
+	}
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"十谱达人","description":"说明","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 200, nil)
+
+	// A request taken back is no longer in the queue.
+	var again Review
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"上传 10 张谱面的人"}`, 201, &again)
+	boss.json("DELETE", "/api/me/title-reviews/"+again.ID, "", 404, nil)
+	maker.json("DELETE", "/api/me/title-reviews/"+again.ID, "", 200, nil)
+	maker.json("DELETE", "/api/me/title-reviews/"+again.ID, "", 404, nil)
+	boss.json("POST", "/api/admin/title-reviews/"+again.ID, `{"approve":true}`, 409, nil)
+	boss.json("GET", "/api/admin/title-reviews", "", 200, &queue)
+	if queue.Total != 0 {
+		t.Fatal("a withdrawn request waits no more", queue)
+	}
+
+	// Approved: the title is public with the manager's words for how it is obtained, in the
+	// catalog, no longer one of its maker's five, and theirs to change only by review.
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"上传 10 张谱面的人"}`, 201, &again)
+	boss.json("POST", "/api/admin/title-reviews/"+again.ID, `{"approve":true,"reply":"欢迎","obtain":"在自制曲源上传 10 张谱面"}`, 200, &decided)
+	if decided.Review.Status != "approved" || decided.Title.Visibility != public || decided.Title.Obtain != "在自制曲源上传 10 张谱面" || decided.Title.Name != "十谱达人" || *decided.Title.OwnerID != player {
+		t.Fatalf("approved %+v", decided)
+	}
+	var catalog struct{ Titles []ListedTitle }
+	maker.json("GET", "/api/titles", "", 200, &catalog)
+	if len(catalog.Titles) != 1 || catalog.Titles[0].ID != title.ID || catalog.Titles[0].OwnerName != "Maker" || catalog.Titles[0].Holders != 1 || catalog.Titles[0].Obtain == "" {
+		t.Fatalf("catalog %+v", catalog)
+	}
+	maker.json("GET", "/api/me/titles", "", 200, &mine)
+	if mine.Used != 0 || mine.Titles[0].Pending || mine.Titles[0].Review.Status != "approved" || mine.Titles[0].Review.Reply != "欢迎" {
+		t.Fatalf("my titles after %+v", mine)
+	}
+	if told3, _ := notices(maker); len(told3) != 2 || told3[0].Kind != "review_approved" || read(told3[0]).Title.Visibility != public {
+		t.Fatalf("told of the approval %+v", told3)
+	}
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	maker.json("DELETE", "/api/me/titles/"+title.ID, "", 403, nil)
+	boss.json("GET", "/api/admin/title-reviews?status=decided", "", 200, &queue)
+	if queue.Total != 3 || queue.Items[0].ID != again.ID || queue.Items[0].ReviewerName != "Boss" {
+		t.Fatalf("decided %+v", queue)
+	}
+
+	// Now the managers give it: by hand, by a rule, by a course they made official.
+	boss.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"`+title.ID+`"}`, 200, nil)
+	boss.json("POST", "/api/admin/titles/"+title.ID+"/rules", `{"kind":"site_login"}`, 201, nil)
+
+	// A change to a public title is asked for whole, and the title changes when it is approved.
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"换个样子"}`, 422, nil)
+	var change Review
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"换个样子","name":"百谱达人","nameTranslations":{"en":"Hundred"},"description":"新说明","layers":{"band":"band/lumen-title-rainbow","icon":"icon/lumen-title-crown_gold"}}`, 201, &change)
+	if change.Kind != "change" || change.Name != "百谱达人" {
+		t.Fatalf("a change %+v", change)
+	}
+	maker.json("GET", "/api/titles", "", 200, &catalog)
+	if catalog.Titles[0].Name != "十谱达人" || !catalog.Titles[0].Pending {
+		t.Fatal("the title waits for the review", catalog)
+	}
+	boss.json("GET", "/api/admin/title-reviews", "", 200, &queue)
+	if queue.Total != 1 || queue.Items[0].Title.Name != "十谱达人" || queue.Items[0].Name != "百谱达人" {
+		t.Fatalf("a change against the title as it is %+v", queue)
+	}
+	boss.json("POST", "/api/admin/title-reviews/"+change.ID, `{"approve":true,"obtain":"在自制曲源上传 100 张谱面"}`, 200, &decided)
+	if decided.Title.Name != "百谱达人" || decided.Title.Style != "rainbow" || decided.Title.Layers.Band != "band/lumen-title-rainbow" || decided.Title.Layers.Effect != nil ||
+		str(decided.Title.Layers.Icon) != "icon/lumen-title-crown_gold" || decided.Title.Description != "新说明" || decided.Title.Obtain != "在自制曲源上传 100 张谱面" || string(decided.Title.NameTranslations) != `{"en":"Hundred"}` {
+		t.Fatalf("changed %+v", decided.Title)
+	}
+
+	// A manager changes a public title directly, sees every title, and removes one: its maker is
+	// told, and the players who held it hold it no more.
+	var direct Title
+	boss.json("PUT", "/api/admin/titles/"+title.ID, `{"name":"千谱达人","obtain":"活动发放","layers":{"band":"band/lumen-title-wood"}}`, 200, &direct)
+	if direct.Name != "千谱达人" || direct.Visibility != public || direct.OwnerID == nil || *direct.OwnerID != player {
+		t.Fatal("a manager's change keeps the maker", direct)
+	}
+	var kept Title
+	maker.json("POST", "/api/me/titles", `{"name":"自用","layers":{"band":"band/lumen-title-wood"}}`, 201, &kept)
+	var all struct{ Titles []ListedTitle }
+	maker.json("GET", "/api/admin/titles", "", 403, nil)
+	boss.json("GET", "/api/admin/titles", "", 200, &all)
+	if len(all.Titles) != 2 || all.Titles[0].ID != kept.ID || all.Titles[0].Visibility != private || all.Titles[1].Holders != 2 {
+		t.Fatalf("every title %+v", all)
+	}
+	boss.json("DELETE", "/api/admin/titles/"+kept.ID, "", 200, nil)
+	boss.json("DELETE", "/api/admin/titles/"+kept.ID, "", 404, nil)
+	if told4, _ := notices(maker); told4[0].Kind != "title_removed" || read(told4[0]).Title.Name != "自用" {
+		t.Fatalf("told of the removal %+v", told4)
+	}
+	boss.json("DELETE", "/api/admin/titles/"+title.ID, "", 200, nil)
+	var held struct{ Titles []HeldTitle }
+	boss.json("GET", "/api/users/"+other+"/titles", "", 200, &held)
+	if len(held.Titles) != 0 {
+		t.Fatal("still held", held)
+	}
 }
 
 func TestScoresOfEveryServiceInOneList(t *testing.T) {
