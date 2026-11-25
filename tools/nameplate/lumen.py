@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Writes the layered nameplate set for the bucket's nameplate/ prefix: lumen.json and lumen/.
 
-The set is the one OurTaikoPlay carries in Assets/OurTaiko/Resources/Nameplate (made there by
-Tools/nameplate-samples/lumen from the arcade nameplate's timeline): every layer a title can be
-made of, as .otanim drawn on the whole 408x96 plate canvas, and the plate's own parts.
+The set is the one OurTaikoPlay's Tools/nameplate-samples/lumen bakes into its set/ folder from
+the arcade nameplate's timeline. The game does not carry it: like the site, it reads lumen.json
+and downloads the files from the bucket. It holds every layer a title can be made of, as .otanim
+drawn on the whole 408x96 plate canvas, and the plate's own parts.
 
     band/<name>.otanim         a title's band
     effect/<name>.otanim       what is drawn over a band (glints, sweeps)
@@ -24,7 +25,7 @@ it reads). lumen.json is
 with each path relative to the nameplate folder, as catalog.json's are. A title's layers are
 named by their keys in files ("band/lumen-title-gold"), the ids titles keep in the database.
 
-Usage: lumen.py <Resources/Nameplate folder> <output folder>
+Usage: lumen.py <OurTaikoPlay>/Tools/nameplate-samples/lumen/set <output folder>
 """
 import hashlib
 import json
