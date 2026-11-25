@@ -4,9 +4,9 @@ import { normalizeLanguage } from './i18n'
 import { TitleBandArt } from './components/nameplate-art'
 import { layersOf, type TitleLayers } from './nameplate-layers'
 
-// The title catalog of OurTaikoProfile (profile.ourtaiko.org), which 段位 courses give titles
-// from. A course may give official titles (once it is official itself), its maker's own
-// community titles, and the community titles Profile's administrators keep (no maker).
+// The title catalog, which 段位 courses give titles from: the public titles (a private one is
+// its maker's alone). A course names any of them, and gives them once the site's managers have
+// made it official.
 
 export type ProfileTitle = {
   id: string
@@ -16,7 +16,8 @@ export type ProfileTitle = {
   style: string
   // Absent in a reward given before titles had layers: its style stands for them.
   layers?: TitleLayers
-  official: boolean
+  // Absent in a reward given before titles were private or public.
+  visibility?: 'private' | 'public'
   ownerId: string | null
 }
 
@@ -45,11 +46,6 @@ export function useProfileTitles() {
     failed: catalog.isError,
     reload: () => void catalog.refetch(),
   }
-}
-
-// Whether a course made by owner can give the title (official ones once it is official).
-export function titleUsableBy(title: ProfileTitle, owner: string) {
-  return title.official || title.ownerId === null || title.ownerId === owner
 }
 
 // The title's name in the page's language, else its own.

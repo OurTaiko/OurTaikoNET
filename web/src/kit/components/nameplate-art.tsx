@@ -242,12 +242,18 @@ function PlateLayers({
 // Room around the plate for what stands out of it (an icon, a burst of sparkles), in plate pixels.
 const OVER = 24
 
-// The band in the 408x96 plate (the plain wood band's extent).
-const BAND = { x: 44, y: 8, w: 320, h: 40 }
+// The band in the 408x96 plate: what the plain wood band covers of the canvas (its picture's own
+// extent, which every band shares), so that a title on its band alone is exactly the band's size.
+const BAND = { x: 48, y: 16, w: 312, h: 29 }
+// The title on its band, as every layout of the plate has it (text_title): 22 canvas pixels,
+// centred at y 34.5 less the text's lift, which is a little under the band's middle. A plate
+// puts it beside the badge; a band alone has none, and centres it between its round ends.
+const TITLE = { size: 22, y: 34.5 - textLift(22), width: 270 }
 
 /**
  * A title on its band alone: the strip a nameplate wears, its band, effect and icon as the game
- * draws them (the icon may stand out of it), and the title's name over it.
+ * draws them (the icon and a burst of sparkles may stand out of it), and the title's name where
+ * the plate puts it on the band. The element is the band: size it by its height.
  */
 export function TitleBandArt({
   layers,
@@ -274,28 +280,38 @@ export function TitleBandArt({
   return (
     <span
       className={cn(
-        '@container relative inline-block aspect-[320/40] h-7 max-w-full align-middle',
+        'inline-flex aspect-[312/29] h-5 max-w-full items-center align-middle',
         className,
       )}
       title={name}
     >
-      <PlateLayers
-        layers={drawn}
-        frame={frame}
-        style={{
-          left: `${(-OVER / BAND.w) * 100}%`,
-          top: `${(-OVER / BAND.h) * 100}%`,
-          width: `${((BAND.w + 2 * OVER) / BAND.w) * 100}%`,
-          height: `${((BAND.h + 2 * OVER) / BAND.h) * 100}%`,
-        }}
-      />
-      {/* The game's title: 22 canvas pixels on a band 40 high (320 wide), black. */}
-      <Squeezed
-        className="font-bold text-black leading-none"
-        style={{ inset: '0 8%', fontSize: `${(22 / BAND.w) * 100}cqw` }}
-      >
-        {name}
-      </Squeezed>
+      {/* Where there is no room for the height asked for, the band is as wide as there is room
+          and keeps its shape, in the middle of the height. */}
+      <span className="@container relative block aspect-[312/29] w-full">
+        <PlateLayers
+          layers={drawn}
+          frame={frame}
+          style={{
+            left: `${(-OVER / BAND.w) * 100}%`,
+            top: `${(-OVER / BAND.h) * 100}%`,
+            width: `${((BAND.w + 2 * OVER) / BAND.w) * 100}%`,
+            height: `${((BAND.h + 2 * OVER) / BAND.h) * 100}%`,
+          }}
+        />
+        <Squeezed
+          className="font-bold text-black leading-none"
+          style={{
+            left: `${((BAND.w - TITLE.width) / 2 / BAND.w) * 100}%`,
+            width: `${(TITLE.width / BAND.w) * 100}%`,
+            top: `${((TITLE.y - TITLE.size - BAND.y) / BAND.h) * 100}%`,
+            height: `${((2 * TITLE.size) / BAND.h) * 100}%`,
+            fontSize: `${(TITLE.size / BAND.w) * 100}cqw`,
+            letterSpacing: `${(2 / BAND.w) * 100}cqw`,
+          }}
+        >
+          {name}
+        </Squeezed>
+      </span>
     </span>
   )
 }

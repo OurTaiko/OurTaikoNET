@@ -13,6 +13,7 @@ import type {
   ScoreView,
 } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
+import { VisibilityMark } from '@players/components/title-form'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { LevelBox } from '@sitekit/components/difficulty-badges'
@@ -35,6 +36,7 @@ import {
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
+import { myTitlesPage } from './titles'
 import { danName, offeredDans, titleName, verdictKey } from '@players/dan'
 import { DanEmblem } from '@sitekit/components/nameplate-art'
 import { formatLocale } from '@players/i18n'
@@ -484,9 +486,7 @@ function TitlesTab({
                     className="h-16 [&_.text-2xl]:text-base"
                   />
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant={h.title.official ? 'default' : 'secondary'}>
-                      {h.title.official ? t('titles.official') : t('titles.community')}
-                    </Badge>
+                    {h.title.visibility === 'private' && <VisibilityMark title={h.title} />}
                     <span>{titleName(h.title, language)}</span>
                     <span>·</span>
                     <span>
@@ -495,7 +495,9 @@ function TitlesTab({
                           ? t('titles.byAdmin')
                           : h.service === 'rule'
                             ? t('titles.byRule')
-                            : h.service)}
+                            : h.title.ownerId === id
+                              ? t('titles.byMe')
+                              : h.service)}
                     </span>
                     <span>·</span>
                     <span>{date.format(new Date(h.grantedAt))}</span>
@@ -518,6 +520,10 @@ function TitlesTab({
         )}
         {mine && (
           <p className="text-sm text-muted-foreground">
+            <Link to={myTitlesPage} className="underline">
+              {t('titles.mine')}
+            </Link>
+            {' · '}
             <Link to="/titles" className="underline">
               {t('titles.catalogLink')}
             </Link>

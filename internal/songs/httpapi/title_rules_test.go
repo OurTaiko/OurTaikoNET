@@ -32,8 +32,8 @@ func TestRulesGiveTitles(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT test_slot($1,'Oni'),test_slot($1,'Easy'),test_slot($2,'Hard'),test_slot($3,'Oni')`, a, b, cc).Scan(&aOni, &aEasy, &bHard, &cOni); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style) SELECT id,id,'wood' FROM unnest(ARRAY['song','genre','genre-oni','site','game','uploader','mine']) id;
- UPDATE net.titles SET owner_id='`+owner+`',official=false WHERE id='mine';
+	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) SELECT id,id,'wood','public' FROM unnest(ARRAY['song','genre','genre-oni','site','game','uploader','mine']) id;
+ UPDATE net.titles SET owner_id='`+owner+`',visibility='private' WHERE id='mine';
  INSERT INTO net.title_rules(title_id,kind) VALUES('site','site_login'),('game','game_login');
  INSERT INTO net.title_rules(title_id,kind,source,chart_id,course,clear) VALUES('song','chart_clear','fanmade','`+a+`','Oni',2);
  INSERT INTO net.title_rules(title_id,kind,source,category_flag,clear,count) VALUES('genre','category_clear','fanmade',1,1,NULL),('genre-oni','category_clear','fanmade',1,1,1);

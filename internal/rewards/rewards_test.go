@@ -27,7 +27,7 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 		}
 	}
 	exec(`INSERT INTO net.users(id) VALUES ($1),($2)`, player, other)
-	exec(`INSERT INTO net.titles(id,name,style,band_item,effect_item,name_translations) VALUES ('hello','はじめまして','gold','band/lumen-title-gold','effect/lumen-title-gold','{"en":"Hello"}'),('gone','x','wood',DEFAULT,NULL,'{}')`)
+	exec(`INSERT INTO net.titles(id,name,style,visibility,band_item,effect_item,name_translations) VALUES ('hello','はじめまして','gold','public','band/lumen-title-gold','effect/lumen-title-gold','{"en":"Hello"}'),('gone','x','wood','public',DEFAULT,NULL,'{}')`)
 	exec(`INSERT INTO net.awards(service,request_key,user_id,course_title) VALUES ('fanmade','attempt-1',$1,'十段')`, player)
 	// A title of a 段位 course, one an administrator gives and takes back before it was seen,
 	// and a badge that gets better, then not.
@@ -158,7 +158,7 @@ func TestAnAnswerWithNothingWrittenIsToldToo(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO net.users(id) VALUES ($1)`, player); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style) VALUES ('t','t','wood')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) VALUES ('t','t','wood','public')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO net.user_titles(user_id,title_id) VALUES ($1,'t')`, player); err != nil {
@@ -186,7 +186,7 @@ func TestCountsAreKeptWhileListeningAndSeenRewardsArePruned(t *testing.T) {
 		}
 	}
 	exec(`INSERT INTO net.users(id) VALUES ($1)`, player)
-	exec(`INSERT INTO net.titles(id,name,style) SELECT id,id,'wood' FROM unnest(ARRAY['a','b','c']) id`)
+	exec(`INSERT INTO net.titles(id,name,style,visibility) SELECT id,id,'wood','public' FROM unnest(ARRAY['a','b','c']) id`)
 	store := NewStore(pool)
 	go store.Run(ctx, func(ctx context.Context) (Listener, func(), error) {
 		conn, err := pool.Acquire(ctx)

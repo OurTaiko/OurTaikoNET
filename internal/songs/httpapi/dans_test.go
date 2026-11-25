@@ -39,10 +39,9 @@ func TestDanCourses(t *testing.T) {
 	var down, reject atomic.Bool
 	var catalogReads atomic.Int32
 	titles := []map[string]any{
-		{"id": "ten-dan", "official": false, "ownerId": alice},
-		{"id": "ten-dan-gold", "official": true, "ownerId": nil},
-		{"id": "shared", "official": false, "ownerId": nil},
-		{"id": "carols", "official": false, "ownerId": carol},
+		{"id": "ten-dan", "visibility": "public", "ownerId": alice},
+		{"id": "ten-dan-gold", "visibility": "public", "ownerId": nil},
+		{"id": "carols", "visibility": "public", "ownerId": carol},
 	}
 	profile := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if down.Load() {
@@ -147,25 +146,22 @@ func TestDanCourses(t *testing.T) {
 	}
 	expect(call("POST", "/api/dans", strings.Replace(course, `"course":"Oni","side":"single","hidden"`, `"course":"Edit","side":"single","hidden"`, 1), alice), 422, nil)
 
-	// Reward titles are on Profile, and official or the maker's own community titles.
+	// Reward titles are of Profile's catalog, the public titles (a private one is not in it):
+	// whoever made them, since only a course made official gives them.
 	var problemBody struct{ Code string }
 	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 422, &problemBody)
 	if problemBody.Code != "DAN_TITLE_NOT_FOUND" {
 		t.Fatal(problemBody)
 	}
-	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"carols"`, 1), alice), 422, &problemBody)
-	if problemBody.Code != "DAN_TITLE_NOT_OWNED" {
-		t.Fatal(problemBody)
-	}
 	reads := catalogReads.Load()
 	var withShared DanCourse
-	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"shared"`, 1), alice), 201, &withShared)
+	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"carols"`, 1), alice), 201, &withShared)
 	if catalogReads.Load() != reads {
 		t.Fatal("the catalog is kept for a minute")
 	}
 	// A title made a moment ago is found by reading the catalog again.
 	mu.Lock()
-	titles = append(titles, map[string]any{"id": "brand-new", "official": false, "ownerId": alice})
+	titles = append(titles, map[string]any{"id": "brand-new", "visibility": "public", "ownerId": alice})
 	mu.Unlock()
 	expect(call("PUT", "/api/dans/"+withShared.ID, strings.Replace(course, `"ten-dan-gold"`, `"brand-new"`, 1), alice), 200, nil)
 	expect(call("DELETE", "/api/dans/"+withShared.ID, "", alice), 200, nil)
@@ -264,7 +260,7 @@ func TestDanCourses(t *testing.T) {
 
 	// Not official yet: the titles come, no 段位.
 	reply := attempt("attempt-key-0001", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, 200)
-	if len(asked) != 1 || asked[0].Official || asked[0].Dan != nil || strings.Join(asked[0].Titles, ",") != "ten-dan,ten-dan-gold" || asked[0].CourseTitle != "十段" || asked[0].UserID != carol || asked[0].CourseOwner != alice {
+	if len(asked) != 1 || asked[0].Official || asked[0].Dan != nil || strings.Join(asked[0].Titles, ",") != "ten-dan,ten-dan-gold" || asked[0].CourseTitle != "十段" || asked[0].UserID != carol {
 		t.Fatalf("award request %+v", asked)
 	}
 	if !strings.Contains(string(reply["profile"]), `"granted"`) {

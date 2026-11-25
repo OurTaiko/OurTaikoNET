@@ -40,13 +40,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Modal, Notice } from './notifications'
-import {
-  TitleBand,
-  profileTitlesPage,
-  titleText,
-  titleUsableBy,
-  useProfileTitles,
-} from './profile-titles'
+import { TitleBand, profileTitlesPage, titleText, useProfileTitles } from './profile-titles'
 import { useSession } from './session'
 import { cn } from './lib/utils'
 import { SourceTag } from './components/source-tag'
@@ -512,16 +506,13 @@ function DanView({ id }: { id: string }) {
                       <code className="text-xs">{reward.id}</code>
                     )}
                     <span>{t(`dans.levels.${reward.on}`)}</span>
-                    {title?.official && !dan.official && (
+                    {title && !dan.official && (
                       <span className="text-muted-foreground">
                         {t('dans.rewardDanNeedsOfficial')}
                       </span>
                     )}
                     {profileTitles && !title && (
                       <span className="text-destructive">{t('dans.titleMissing')}</span>
-                    )}
-                    {title && !titleUsableBy(title, dan.ownerId) && (
-                      <span className="text-destructive">{t('dans.titleNotUsable')}</span>
                     )}
                   </li>
                 )
@@ -750,8 +741,8 @@ function DanEditor({ id }: { id?: string }) {
   ])
   const [rewardDan, setRewardDan] = useState('none')
   const [rewardTitles, setRewardTitles] = useState<DanRewardTitle[]>([])
-  // Who made the course being changed (its titles must be theirs) and whether it is official.
-  const [made, setMade] = useState<{ owner: string; official: boolean } | null>(null)
+  // Whether the course being changed is official: only then does it give its titles.
+  const [made, setMade] = useState<{ official: boolean } | null>(null)
   const [picking, setPicking] = useState<number | null>(null)
   const [saveError, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -777,7 +768,7 @@ function DanEditor({ id }: { id?: string }) {
   })
   if (dan && !seeded && charts.every((chart) => !chart.isPending)) {
     setSeeded(true)
-    setMade({ owner: dan.ownerId, official: dan.official })
+    setMade({ official: dan.official })
     setTitles(dan.title)
     setColor(dan.color)
     setCode(dan.code)
@@ -803,15 +794,14 @@ function DanEditor({ id }: { id?: string }) {
   const error = saveError || (seeded ? '' : (read.error?.message ?? ''))
   if (session.loading) return null
   if (!session.user) return <Notice>{t('dans.signInToEdit')}</Notice>
-  const owner = made?.owner ?? session.user.id
   const official = made?.official ?? false
-  // The titles this course may give, and any it already names that it may not (kept so that
-  // saving shows why).
-  const usable = (profile.titles ?? []).filter((title) => titleUsableBy(title, owner))
+  // The titles a course may give, the public ones, and any this course already names that is
+  // not among them (kept so that saving shows why).
+  const usable = profile.titles ?? []
   const titleItems = (current: string) => {
     const items = usable.map((title) => ({
       value: title.id,
-      label: `${titleText(title, i18n.resolvedLanguage)}（${title.official ? t('dans.official') : t('dans.community')}）`,
+      label: titleText(title, i18n.resolvedLanguage),
     }))
     return current && !usable.some((title) => title.id === current)
       ? [{ value: current, label: current }, ...items]
@@ -1191,13 +1181,10 @@ function DanEditor({ id }: { id?: string }) {
                   <XIcon aria-hidden="true" />
                 </Button>
                 {title && <TitleBand title={title} language={i18n.resolvedLanguage} />}
-                {title?.official && !official && (
+                {title && !official && (
                   <span className="text-xs text-muted-foreground">
                     {t('dans.officialTitleLater')}
                   </span>
-                )}
-                {title && !titleUsableBy(title, owner) && (
-                  <span className="text-xs text-destructive">{t('dans.titleNotUsable')}</span>
                 )}
                 {profile.titles && reward.id && !title && (
                   <span className="text-xs text-destructive">{t('dans.titleMissing')}</span>

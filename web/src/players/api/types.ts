@@ -39,10 +39,43 @@ export type Title = {
   style: string
   // How a nameplate wearing it looks: items of the public nameplate set.
   layers: TitleLayers
-  official: boolean
-  // The player who made it; null for the titles administrators keep.
+  // private: its maker's alone, changed as they like. public: in the catalog, given by what the
+  // title managers set, and changed only by a review.
+  visibility: 'private' | 'public'
+  // How it is obtained, in the words of the title manager who made it public.
+  obtain: string
+  // The player who made it; null for the titles the title managers make themselves.
   ownerId: string | null
 }
+/** A title in a list: with how many hold it, its maker's nickname and whether a review waits. */
+export type ListedTitle = Title & { holders: number; ownerName: string; pending: boolean }
+/**
+ * A maker's request that the title managers review a title: to make a private one public
+ * (publish) or to change a public one (change). It holds the title as asked for.
+ */
+export type Review = {
+  id: string
+  titleId: string
+  userId: string
+  kind: 'publish' | 'change'
+  name: string
+  nameTranslations: Record<string, string>
+  description: string
+  layers: TitleLayers
+  /** What the maker tells the managers: how the title should be obtained, what a change is for. */
+  request: string
+  status: 'pending' | 'approved' | 'returned' | 'withdrawn'
+  /** What the manager who decided answered. */
+  reply: string
+  createdAt: string
+  decidedAt: string | null
+}
+/** A title the player made, with the latest request for its review. */
+export type OwnTitle = ListedTitle & { review: Review | null }
+export type MyTitles = { titles: OwnTitle[]; limit: number; used: number }
+/** A review as the title managers see it: who asked, who decided, and the title as it is now. */
+export type QueuedReview = Review & { userName: string; reviewerName: string; title: Title }
+export type ReviewPage = { items: QueuedReview[]; total: number; page: number; pageSize: number }
 // gold colours the emblem's text (verdict 4–6); combo picks its ring like a song's crown:
 // 0 silver, 1 gold (full combo), 2 rainbow (all good).
 export type DanBadge = {

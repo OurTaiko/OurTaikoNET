@@ -4,20 +4,20 @@ What the title system does today, and what is planned for it. Written 2026-11-16
 
 ## Where it stands
 
-A title comes to a player in three ways:
+A title is private or public (2026-11-25, migration `0023_title_review`; the README's "Titles: private and public" says how). A player makes private titles, theirs alone to hold and wear; a review by the title managers makes one public, and only a public title is given to others. It comes to a player in three ways, all of them set by the title managers:
 
-1. **A 段位 course** names it as a reward (`internal/profile/httpapi/awards.go`, `grant`).
-2. **An administrator** gives it by hand (`POST /api/v1/admin/grants`).
-3. **A rule** gives it by itself (`internal/titlerules`, table `net.title_rules`): clearing a chart, clearing charts of a category, being seen signed in on the website or in the game, having uploaded a number of charts. Done on the branch `feat/titles`; not released.
+1. **A 段位 course** made official names it as a reward (`internal/profile/httpapi/awards.go`, `grant`). A course that is not official gives no title.
+2. **A title manager** gives it by hand (`POST /api/v1/admin/grants`).
+3. **A rule** gives it by itself (`internal/titlerules`, table `net.title_rules`): clearing a chart, clearing charts of a category, being seen signed in on the website or in the game, having uploaded a number of charts.
 
-Every title given is a row of `net.user_titles` pointing at the row of `net.awards` that says why. A player wears one of the titles they hold on their nameplate.
+Every title given is a row of `net.user_titles` pointing at the row of `net.awards` that says why (a maker's own title has none). A player wears one of the titles they hold on their nameplate.
 
 Decisions the rules were built on, all open to change:
 
 - A rule says for itself what "cleared" is: the lowest crown (cleared, full combo, all good) and the lowest course.
 - "Every chart of a category" is as many as there are when the player is judged. A title given stays given.
 - A new rule gives its title at once to everyone who meets it already.
-- Only the catalog's own titles take rules, and only TITLE_MANAGER makes them.
+- Only public titles take rules, and only TITLE_MANAGER makes them.
 - A rule gives a player its title once. After an administrator takes it back, that rule does not give it again.
 - Only scores that still stand (`is_latest`) count. Uploads are counted for a chart's first owner.
 
@@ -49,7 +49,7 @@ OurTaikoPlay reads `X-Pending-Rewards` on every answer, fetches and shows the re
 | # | What | Notes |
 |---|---|---|
 | 1.3 | **Progress** towards the rules that count | For the signed-in player, `GET /api/v1/titles` (or a route of its own) gives `{have, need}` for each `category_clear` and `charts_uploaded` rule they have not met. The counting is the rule's own query without its `HAVING`. Shown on `/titles` as "7 / 10" |
-| 1.4 | **Pick the player by name** when granting by hand | `/manage/titles` asks for a 32-digit ID. The groups panel already searches players by nickname (`GET /api/v1/admin/users?q=`); use the same picker |
+| 1.4 | **Pick the player by name** when granting by hand | Done for titles (2026-11-25): `/manage/titles` searches players by nickname, as the co-creator picker does. The Don's parts still ask for a 32-digit ID |
 
 ## Done since: parts of the Don to earn (2026-11-17)
 
@@ -74,7 +74,7 @@ The counts are the game's word; the server works the score and its rank out of t
 | # | What | Notes |
 |---|---|---|
 | 3.1 | **Rules that ask for a replay** | A flag on the rule: only scores with `replay_data` count. Cheap, and raises the cost of forging |
-| 3.2 | **Rules an administrator confirms** | A flag on the rule: meeting it files a request instead of giving the title, and TITLE_MANAGER approves it in `/manage/titles`. For the few titles that should mean something |
+| 3.2 | **Rules an administrator confirms** | A flag on the rule: meeting it files a request instead of giving the title, and TITLE_MANAGER approves it in `/manage/titles` (which has a queue since 2026-11-25, for the reviews of players' titles). For the few titles that should mean something |
 
 Neither stops a determined forger. Checking a replay against the chart on the server would, and is a project of its own.
 
@@ -82,8 +82,8 @@ Neither stops a determined forger. Checking a replay against the chart on the se
 
 | # | What | Notes |
 |---|---|---|
-| 4.1 | **Split the catalog page** | `/titles` lists every title on one page, and every player may make five. The catalog's own titles and the players' apart, the players' by page |
-| 4.2 | **How many hold each title** | A count in the catalog. Rarity for players, and how an administrator sees that a rule works |
+| 4.1 | **Split the catalog page** | Done (2026-11-25): `/titles` is the public titles, with a search; a player's own are at `/me/titles`. By page once there are many |
+| 4.2 | **How many hold each title** | Done (2026-11-25): `holders` in the catalog and in the managers' list |
 | 4.3 | **Rules whose chart is gone** | They stay and nobody can meet them. Mark them in `/manage/titles` so they get cleaned up |
 | 4.4 | **Categories from the backend** | The website keeps its own list of each source's category IDs for the rule form, and their names in four languages (`web/src/players/title-rules.ts`, `rules.categories.*`). Read them from the sources' own routes instead, so that a new category is added in one place |
 

@@ -21,6 +21,7 @@ import {
   GearSixIcon,
   HouseIcon,
   ChatsCircleIcon,
+  SealCheckIcon,
   IdentificationCardIcon,
   ListIcon,
   MagnifyingGlassIcon,
@@ -212,6 +213,7 @@ export function Frame({ children }: { children: ReactNode }) {
           label: t('shell.myPage'),
           icon: IdentificationCardIcon,
         },
+        { key: 'myTitles', href: '/me/titles', label: t('shell.myTitles'), icon: SealCheckIcon },
         {
           key: 'chats',
           href: '/chats',

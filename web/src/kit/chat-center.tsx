@@ -1,7 +1,8 @@
-// Messages: players writing to each other, and the site's own notices as one chat among them,
-// 系统通知 (./notification-center). The button in the top bar counts what is unread of both and
+// Messages: players writing to each other, and what the site itself tells a player as two chats
+// among them: its notices, 系统通知 (./notification-center), and what it says about titles,
+// 称号中心 (./title-center). The button in the top bar counts what is unread of all three and
 // lists the latest; /chats is every chat, and /chats/<id> one of them (/chats/system the
-// notices).
+// notices, /chats/titles 称号中心).
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -51,6 +52,14 @@ import {
   setChatBlocked,
 } from './queries/chats'
 import type { Chat } from './queries/chats'
+import {
+  TitleCenter,
+  TitleCenterAvatar,
+  TitleNoticeLine,
+  latestTitleNoticeQuery,
+  titleCenter,
+  useTitleNoticeCount,
+} from './title-center'
 import { useSession } from './session'
 import { useHideBuddy } from './shell/buddy'
 
@@ -96,6 +105,7 @@ export function ChatBell() {
   const { user } = useSession()
   const chats = useChatUnread()
   const notices = useNoticeCount()
+  const titleNotices = useTitleNoticeCount()
   const lastLine = useLastLine()
   useEffect(() => setChatSession(user?.id ?? null), [user?.id])
   // The menu reads what it lists each time it is opened.
@@ -106,8 +116,9 @@ export function ChatBell() {
     enabled: open,
   })
   const recentNotice = useQuery({ ...latestNoticeQuery(notices), enabled: open })
+  const recentTitleNotice = useQuery({ ...latestTitleNoticeQuery(titleNotices), enabled: open })
   if (!user) return null
-  const count = chats + notices
+  const count = chats + notices + titleNotices
   return (
     <DropdownMenu onOpenChange={(isOpen) => setOpen(isOpen)}>
       <DropdownMenuTrigger
@@ -162,6 +173,22 @@ export function ChatBell() {
               </span>
               <Badge count={notices} />
             </DropdownMenuItem>
+            {/* 称号中心 is listed once it has said something. */}
+            {recentTitleNotice.data && (
+              <DropdownMenuItem
+                className="items-center gap-3 rounded-xl p-2"
+                onClick={() => visit(chatPage(titleCenter))}
+              >
+                <TitleCenterAvatar className="size-9" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{t('chat.titleCenter')}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    <TitleNoticeLine n={recentTitleNotice.data} />
+                  </span>
+                </span>
+                <Badge count={titleNotices} />
+              </DropdownMenuItem>
+            )}
             {recentChats.data?.map((chat) => (
               <DropdownMenuItem
                 key={chat.id}
@@ -247,11 +274,13 @@ function Chats({ open }: { open?: string }) {
   // The Don's corner is the send button's.
   useHideBuddy(!!open)
   const notices = useNoticeCount()
+  const titleNotices = useTitleNoticeCount()
   const lastLine = useLastLine()
   const list = useQuery(chatQueries.list)
   const chats = list.data ?? null
   const error = list.error?.message ?? ''
   const { data: notice } = useQuery(latestNoticeQuery(notices))
+  const { data: titleNotice } = useQuery(latestTitleNoticeQuery(titleNotices))
   const back = (
     <Link
       to={chatsPage}
@@ -322,6 +351,20 @@ function Chats({ open }: { open?: string }) {
             notice?.createdAt,
             notices,
           )}
+          {row(
+            titleCenter,
+            <TitleCenterAvatar className="size-11" />,
+            t('chat.titleCenter'),
+            titleNotice ? (
+              <TitleNoticeLine n={titleNotice} />
+            ) : titleNotice === null ? (
+              t('titleCenter.empty')
+            ) : (
+              ''
+            ),
+            titleNotice?.createdAt,
+            titleNotices,
+          )}
           {chats?.map((chat) =>
             row(
               chat.id,
@@ -368,6 +411,16 @@ function Chats({ open }: { open?: string }) {
                 {back}
                 <SystemAvatar className="size-9" />
                 <h2 className="min-w-0 flex-1 truncate font-bold">{t('chat.system')}</h2>
+              </>
+            }
+          />
+        ) : open === titleCenter ? (
+          <TitleCenter
+            header={
+              <>
+                {back}
+                <TitleCenterAvatar className="size-9" />
+                <h2 className="min-w-0 flex-1 truncate font-bold">{t('chat.titleCenter')}</h2>
               </>
             }
           />

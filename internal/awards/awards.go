@@ -69,7 +69,6 @@ type Request struct {
 	UserID      string   `json:"userId"`
 	CourseID    string   `json:"courseId"`
 	CourseTitle string   `json:"courseTitle"`
-	CourseOwner string   `json:"courseOwnerId"`
 	Official    bool     `json:"official"`
 	Verdict     int      `json:"verdict"`
 	Dan         *int     `json:"dan"`
@@ -124,12 +123,10 @@ func (e *Rejection) Error() string {
 	return fmt.Sprintf("OurTaikoProfile rejected the award: HTTP %d %s", e.Status, e.Code)
 }
 
-// Title is what a course needs to know of a title of Profile's catalog: whether it is
-// official, and the player who made it (none for the titles Profile's administrators keep).
+// Title is what a course needs to know of a title of Profile's catalog: that it is there. The
+// catalog is the public titles, the only ones a course can give.
 type Title struct {
-	ID       string  `json:"id"`
-	Official bool    `json:"official"`
-	OwnerID  *string `json:"ownerId"`
+	ID string `json:"id"`
 }
 
 // Titles is Profile's title catalog (GET /api/titles) by id, kept for a minute; fresh reads

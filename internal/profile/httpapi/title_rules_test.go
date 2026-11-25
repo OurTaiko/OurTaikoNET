@@ -17,7 +17,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	c := &client{t: t, handler: app.Handler()}
 	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"site_login"}`, 401, nil)
 	c.signIn()
-	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"},"official":true}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
 	c.json("POST", "/api/admin/titles/none/rules", `{"kind":"site_login"}`, 404, nil)
 
 	// A rule gives its title at once to those who meet it: the administrator is signed in.
@@ -83,7 +83,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	}
 	last := made.Rule.ID
 
-	// A title a player made takes no rules.
+	// A private title, its maker's alone, takes no rules.
 	var own Title
 	c.json("POST", "/api/me/titles", `{"name":"わたしの","layers":{"band":"band/lumen-title-wood"}}`, 201, &own)
 	c.json("POST", "/api/admin/titles/"+own.ID+"/rules", `{"kind":"site_login"}`, 422, nil)
@@ -105,7 +105,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	c.json("DELETE", fmt.Sprintf("/api/admin/rules/%d", last), "", 404, nil)
 	c.json("DELETE", "/api/admin/rules/x", "", 404, nil)
 	c.json("GET", "/api/users/"+player+"/titles", "", 200, &held)
-	if len(held.Titles) != 1 {
+	if len(held.Titles) != 2 || held.Titles[0].Title.ID != own.ID || held.Titles[1].Title.ID != "first" {
 		t.Fatal(held)
 	}
 	c.json("DELETE", "/api/admin/titles/first", "", 200, nil)
@@ -129,7 +129,7 @@ func TestTheBuiltInAccountEarnsNoUploadTitles(t *testing.T) {
  SELECT repeat('c',32),ARRAY[$1::text],'Song',120,10,10,(SELECT id FROM official.chart_resources WHERE extension='tja'),(SELECT id FROM official.chart_resources WHERE extension='ogg'),1`, account.SystemUserID); err != nil {
 		t.Fatal(err)
 	}
-	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"},"official":true}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
 	var made struct{ Granted int }
 	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","source":"official","count":1}`, 201, &made)
 	if made.Granted != 0 {

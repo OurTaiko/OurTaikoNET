@@ -17,19 +17,29 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Title is one title of the catalog. Layers is how a nameplate wearing it looks; Style is the band
-// of the six that game versions released before the layers draw (legacyStyle). OwnerID is the
-// player who made it (null for the titles administrators keep).
+// Title is one title. Layers is how a nameplate wearing it looks; Style is the band of the six
+// that game versions released before the layers draw (legacyStyle). OwnerID is the player who
+// made it (null for the titles the title managers make themselves).
+//
+// Visibility is private or public. A private title is its maker's alone: they hold it, change it
+// as they like, and nobody else can be given it. A public one stands in the catalog with how it
+// is obtained (Obtain, and its rules), and only title managers decide who gets it; it became
+// public by a review its maker asked for (title_reviews.go), or a manager made it. Official is
+// what clients from before visibility read: a public title.
 type Title struct {
 	ID               string          `json:"id"`
 	Name             string          `json:"name"`
 	NameTranslations json.RawMessage `json:"nameTranslations"`
 	Description      string          `json:"description"`
+	Obtain           string          `json:"obtain"`
 	Style            string          `json:"style"`
 	Layers           Layers          `json:"layers"`
+	Visibility       string          `json:"visibility"`
 	Official         bool            `json:"official"`
 	OwnerID          *string         `json:"ownerId"`
 }
+
+const private, public = "private", "public"
 
 // Layers are the band, the effect over it and the icon on its end that a nameplate wears for a
 // title (OurTaikoPlay's NameplateLayers): items of the public nameplate catalog
@@ -93,19 +103,19 @@ func legacyStyle(band string) string {
 	return "wood"
 }
 
-// Players make community titles for their own 段位 courses: at most five each, looking any way
-// they like.
+// A player keeps at most five private titles, looking any way they like. One that a review made
+// public no longer takes a place.
 const playerTitleLimit = 5
 
-const titleColumns = `t.id,t.name,t.name_translations,t.description,t.style,t.band_item,t.effect_item,t.icon_item,t.official,t.owner_id`
+const titleColumns = `t.id,t.name,t.name_translations,t.description,t.obtain,t.style,t.band_item,t.effect_item,t.icon_item,t.visibility,t.owner_id`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanTitle(row rowScanner, extra ...any) (Title, error) {
 	var t Title
 	var translations []byte
-	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Style, &t.Layers.Band, &t.Layers.Effect, &t.Layers.Icon, &t.Official, &t.OwnerID}, extra...)...)
-	t.NameTranslations = translations
+	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Obtain, &t.Style, &t.Layers.Band, &t.Layers.Effect, &t.Layers.Icon, &t.Visibility, &t.OwnerID}, extra...)...)
+	t.NameTranslations, t.Official = translations, t.Visibility == public
 	return t, err
 }
 
@@ -250,27 +260,45 @@ func (s *Server) userProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// titleCatalog is GET /api/titles: every title, readable from any website (the 段位 editors of
-// the other OurTaiko websites pick reward titles from it), and the rules that give titles by
-// themselves (title_rules.go).
-func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	rows, err := s.DB.Query(r.Context(), `SELECT `+titleColumns+` FROM titles t ORDER BY t.official DESC,t.created_at,t.id`)
+// ListedTitle is a title in a list of titles: with how many players hold it, its maker's
+// nickname as the site keeps it (empty without a maker, or one never seen), and whether a review
+// of it is pending.
+type ListedTitle struct {
+	Title
+	Holders   int    `json:"holders"`
+	OwnerName string `json:"ownerName"`
+	Pending   bool   `json:"pending"`
+}
+
+const listedTitles = `SELECT ` + titleColumns + `,(SELECT count(*) FROM user_titles u WHERE u.title_id=t.id),COALESCE(o.nickname,''),
+ EXISTS(SELECT 1 FROM title_reviews r WHERE r.title_id=t.id AND r.status='pending')
+ FROM titles t LEFT JOIN users o ON o.id=t.owner_id`
+
+// listTitles reads the titles query gives (listedTitles and what follows it).
+func listTitles(ctx context.Context, db queryer, query string, args ...any) ([]ListedTitle, error) {
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		internal(w, err)
-		return
+		return nil, err
 	}
 	defer rows.Close()
-	titles := []Title{}
+	titles := []ListedTitle{}
 	for rows.Next() {
-		t, err := scanTitle(rows)
-		if err != nil {
-			internal(w, err)
-			return
+		var t ListedTitle
+		if t.Title, err = scanTitle(rows, &t.Holders, &t.OwnerName, &t.Pending); err != nil {
+			return nil, err
 		}
 		titles = append(titles, t)
 	}
-	if err = rows.Err(); err != nil {
+	return titles, rows.Err()
+}
+
+// titleCatalog is GET /api/titles: every public title, the managers' own first, readable from any
+// website, and the rules that give titles by themselves (title_rules.go). A private title is not
+// in it: it is seen on its maker's nameplate and in their own list (myTitles).
+func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	titles, err := listTitles(r.Context(), s.DB, listedTitles+` WHERE t.visibility='public' ORDER BY t.owner_id IS NOT NULL,t.created_at,t.id`)
+	if err != nil {
 		internal(w, err)
 		return
 	}
@@ -280,6 +308,20 @@ func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.Respond(w, 200, map[string]any{"titles": titles, "rules": rules})
+}
+
+// adminTitles is GET /api/admin/titles: every title there is, private ones too (a private title
+// is worn in public, so the managers see them all and may remove one), newest first.
+func (s *Server) adminTitles(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.admin(w, r); !ok {
+		return
+	}
+	titles, err := listTitles(r.Context(), s.DB, listedTitles+` ORDER BY t.created_at DESC,t.id`)
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	web.Respond(w, 200, map[string]any{"titles": titles})
 }
 
 // HeldTitle is a title a player holds and what gave it.
@@ -432,7 +474,6 @@ type titleBody struct {
 	NameTranslations map[string]string `json:"nameTranslations"`
 	Description      string            `json:"description"`
 	Layers           *Layers           `json:"layers"`
-	Official         bool              `json:"official"`
 }
 
 // look checks the layers and gives them with the style older games draw.
@@ -477,27 +518,47 @@ func (b *titleBody) text() ([]byte, bool) {
 	return translations, valid
 }
 
-// saveTitle is PUT /api/admin/titles/{id}: create or change a title of the catalog. A
-// player's title keeps its maker; making it official frees their place for another.
+// The longest of the texts that go with a title's review, in characters: how the title is
+// obtained, what its maker asks for, what the manager replies.
+const titleNoteLimit = 500
+
+// note is such a text without the space around it, and whether it is short enough.
+func note(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	return text, utf8.RuneCountInString(text) <= titleNoteLimit
+}
+
+// saveTitle is PUT /api/admin/titles/{id} {name, nameTranslations, description, obtain, layers}:
+// a title manager makes a title of the site's own (public, without a maker), or changes a public
+// title, whoever made it. A private title is its maker's to change: the managers may only remove
+// one (deleteTitle).
 func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.admin(w, r); !ok {
 		return
 	}
 	id := r.PathValue("id")
-	var body titleBody
+	var body struct {
+		titleBody
+		Obtain string `json:"obtain"`
+	}
 	if !decode(w, r, &body) {
 		return
 	}
 	translations, valid := body.text()
 	layers, style, looks := body.look()
-	if !valid || !looks || !titleID.MatchString(id) {
+	obtain, fits := note(body.Obtain)
+	if !valid || !looks || !fits || !titleID.MatchString(id) {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
 		return
 	}
-	t, err := scanTitle(s.DB.QueryRow(r.Context(), `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,official) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
- ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_translations=EXCLUDED.name_translations,description=EXCLUDED.description,
- style=EXCLUDED.style,band_item=EXCLUDED.band_item,effect_item=EXCLUDED.effect_item,icon_item=EXCLUDED.icon_item,official=EXCLUDED.official
- RETURNING `+titleColumns, id, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon, body.Official))
+	t, err := scanTitle(s.DB.QueryRow(r.Context(), `INSERT INTO titles AS t(id,name,name_translations,description,obtain,style,band_item,effect_item,icon_item,visibility) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'public')
+ ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_translations=EXCLUDED.name_translations,description=EXCLUDED.description,obtain=EXCLUDED.obtain,
+ style=EXCLUDED.style,band_item=EXCLUDED.band_item,effect_item=EXCLUDED.effect_item,icon_item=EXCLUDED.icon_item
+ WHERE t.visibility='public' RETURNING `+titleColumns, id, body.Name, translations, body.Description, obtain, style, layers.Band, layers.Effect, layers.Icon))
+	if errors.Is(err, pgx.ErrNoRows) {
+		problem(w, 409, "TITLE_PRIVATE", "私有称号只有它的创建者可以修改")
+		return
+	}
 	if err != nil {
 		internal(w, err)
 		return
@@ -505,24 +566,41 @@ func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, t)
 }
 
+// deleteTitle is DELETE /api/admin/titles/{id}: a title manager removes a title, private or
+// public. The players who hold it lose it, a nameplate wearing it wears none, and its maker, if
+// it is another player's, is told in 称号中心.
 func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.admin(w, r); !ok {
+	v, ok := s.admin(w, r)
+	if !ok {
 		return
 	}
-	tag, err := s.DB.Exec(r.Context(), `DELETE FROM titles WHERE id=$1`, r.PathValue("id"))
+	ctx := r.Context()
+	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	if tag.RowsAffected() == 0 {
+	defer tx.Rollback(ctx)
+	t, err := scanTitle(tx.QueryRow(ctx, `DELETE FROM titles t WHERE t.id=$1 RETURNING `+titleColumns, r.PathValue("id")))
+	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
+		return
+	}
+	if err == nil && t.OwnerID != nil && *t.OwnerID != v.User.ID {
+		err = tellOfTitle(ctx, tx, []string{*t.OwnerID}, "title_removed", map[string]any{"title": t})
+	}
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
+	if err != nil {
+		internal(w, err)
 		return
 	}
 	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
-// createOwnTitle is POST /api/me/titles {name, nameTranslations, description, layers}: a
-// community title the player can give in their own 段位 courses. Its id is made here.
+// createOwnTitle is POST /api/me/titles {name, nameTranslations, description, layers}: the
+// player makes a title. It is private and they hold it at once. Its id is made here.
 func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
 	if !ok {
@@ -551,29 +629,43 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var count int
-	if err = tx.QueryRow(ctx, `SELECT count(*) FROM titles WHERE owner_id=$1 AND NOT official`, v.User.ID).Scan(&count); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM titles WHERE owner_id=$1 AND visibility='private'`, v.User.ID).Scan(&count); err != nil {
 		internal(w, err)
 		return
 	}
 	if count >= playerTitleLimit {
-		problem(w, 409, "TITLE_LIMIT_REACHED", "每人最多 5 个社区称号")
+		problem(w, 409, "TITLE_LIMIT_REACHED", "每人最多 5 个私有称号")
 		return
 	}
-	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,official,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,false,$9)
+	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,visibility,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'private',$9)
  RETURNING `+titleColumns, web.NewID(), body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon, v.User.ID))
-	if err != nil {
-		internal(w, err)
-		return
+	if err == nil {
+		_, err = tx.Exec(ctx, `INSERT INTO user_titles(user_id,title_id) VALUES($1,$2)`, v.User.ID, t.ID)
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
+	if err != nil {
 		internal(w, err)
 		return
 	}
 	web.Respond(w, 201, t)
 }
 
-// saveOwnTitle is PUT /api/me/titles/{id}, the same body: the maker changes a community
-// title. Of an official one they change the look only; the rest is ignored.
+// lockOwnTitle reads the title id that maker made in order to change it, holding its row so that
+// a change and a request for its review take turns. pending is whether a review of it is pending.
+// pgx.ErrNoRows: the player made no such title.
+func lockOwnTitle(ctx context.Context, tx pgx.Tx, id, maker string) (t Title, pending bool, err error) {
+	if t, err = scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+` FROM titles t WHERE t.id=$1 AND t.owner_id=$2 FOR UPDATE`, id, maker)); err != nil {
+		return t, false, err
+	}
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM title_reviews WHERE title_id=$1 AND status='pending')`, id).Scan(&pending)
+	return t, pending, err
+}
+
+// saveOwnTitle is PUT /api/me/titles/{id}, with the body of createOwnTitle: the maker changes a
+// private title, as often as they like, but not while a review of it is pending. A public one
+// changes by a review of the change (requestReview).
 func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
 	if !ok {
@@ -584,38 +676,37 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	var official bool
-	err := s.DB.QueryRow(ctx, `SELECT official FROM titles WHERE id=$1 AND owner_id=$2`, r.PathValue("id"), v.User.ID).Scan(&official)
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
-		return
-	}
+	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	var t Title
-	layers, style, looks := body.look()
-	if official {
-		if !looks {
-			problem(w, 422, "TITLE_INVALID", "称号信息无效")
-			return
-		}
-		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET style=$3,band_item=$4,effect_item=$5,icon_item=$6 WHERE id=$1 AND owner_id=$2 RETURNING `+titleColumns,
-			r.PathValue("id"), v.User.ID, style, layers.Band, layers.Effect, layers.Icon))
-	} else {
-		translations, valid := body.text()
-		if !valid || !looks {
-			problem(w, 422, "TITLE_INVALID", "称号信息无效")
-			return
-		}
-		// official stays false: an administrator may have made it official in the meantime.
-		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET name=$3,name_translations=$4,description=$5,style=$6,band_item=$7,effect_item=$8,icon_item=$9 WHERE id=$1 AND owner_id=$2 AND NOT official RETURNING `+titleColumns,
-			r.PathValue("id"), v.User.ID, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon))
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		problem(w, 409, "TITLE_CHANGED", "称号刚被管理员修改，请刷新后重试")
+	defer tx.Rollback(ctx)
+	t, pending, err := lockOwnTitle(ctx, tx, r.PathValue("id"), v.User.ID)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
 		return
+	case err != nil:
+		internal(w, err)
+		return
+	case t.Visibility == public:
+		problem(w, 409, "TITLE_PUBLIC", "公开称号要提交更改申请，由称号管理员审核")
+		return
+	case pending:
+		problem(w, 409, "TITLE_REVIEW_PENDING", "称号正在审核，撤回申请后才能修改")
+		return
+	}
+	translations, valid := body.text()
+	layers, style, looks := body.look()
+	if !valid || !looks {
+		problem(w, 422, "TITLE_INVALID", "称号信息无效")
+		return
+	}
+	t, err = scanTitle(tx.QueryRow(ctx, `UPDATE titles t SET name=$2,name_translations=$3,description=$4,style=$5,band_item=$6,effect_item=$7,icon_item=$8 WHERE t.id=$1 RETURNING `+titleColumns,
+		t.ID, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon))
+	if err == nil {
+		err = tx.Commit(ctx)
 	}
 	if err != nil {
 		internal(w, err)
@@ -624,33 +715,86 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, t)
 }
 
-// deleteOwnTitle is DELETE /api/me/titles/{id}: the maker removes a community title. The
-// players who earned it lose it, and a nameplate wearing it wears none.
+// deleteOwnTitle is DELETE /api/me/titles/{id}: the maker removes a private title, and with it
+// a pending request for its review. A public title, which other players may hold, only a title
+// manager removes.
 func (s *Server) deleteOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
 	if !ok {
 		return
 	}
 	ctx := r.Context()
-	tag, err := s.DB.Exec(ctx, `DELETE FROM titles WHERE id=$1 AND owner_id=$2 AND NOT official`, r.PathValue("id"), v.User.ID)
+	tag, err := s.DB.Exec(ctx, `DELETE FROM titles WHERE id=$1 AND owner_id=$2 AND visibility='private'`, r.PathValue("id"), v.User.ID)
 	if err != nil {
 		internal(w, err)
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		var official bool
-		err = s.DB.QueryRow(ctx, `SELECT official FROM titles WHERE id=$1 AND owner_id=$2`, r.PathValue("id"), v.User.ID).Scan(&official)
-		switch {
-		case err == nil:
-			problem(w, 403, "TITLE_OFFICIAL", "官方称号只有管理员可以删除")
-		case errors.Is(err, pgx.ErrNoRows):
-			problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
-		default:
+		var made bool
+		if err = s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM titles WHERE id=$1 AND owner_id=$2)`, r.PathValue("id"), v.User.ID).Scan(&made); err != nil {
 			internal(w, err)
+		} else if made {
+			problem(w, 403, "TITLE_PUBLIC", "公开称号只有称号管理员可以删除")
+		} else {
+			problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
 		}
 		return
 	}
 	web.Respond(w, 200, map[string]bool{"ok": true})
+}
+
+// OwnTitle is a title the player made, with the latest request for its review, if there was one.
+type OwnTitle struct {
+	ListedTitle
+	Review *Review `json:"review"`
+}
+
+// myTitles is GET /api/me/titles: the titles the player made, newest first, each with its latest
+// review, and how many of their places for private titles are taken (used of limit).
+func (s *Server) myTitles(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.required(w, r, false)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	listed, err := listTitles(ctx, tx, listedTitles+` WHERE t.owner_id=$1 ORDER BY t.created_at DESC,t.id`, v.User.ID)
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (r.title_id) `+reviewColumns+` FROM title_reviews r WHERE r.user_id=$1 ORDER BY r.title_id,r.created_at DESC,r.id`, v.User.ID)
+	if err != nil {
+		internal(w, err)
+		return
+	}
+	defer rows.Close()
+	latest := map[string]*Review{}
+	for rows.Next() {
+		review, err := scanReview(rows)
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		latest[review.TitleID] = &review
+	}
+	if err = rows.Err(); err != nil {
+		internal(w, err)
+		return
+	}
+	titles, used := []OwnTitle{}, 0
+	for _, t := range listed {
+		if t.Visibility == private {
+			used++
+		}
+		titles = append(titles, OwnTitle{ListedTitle: t, Review: latest[t.ID]})
+	}
+	web.Respond(w, 200, map[string]any{"titles": titles, "limit": playerTitleLimit, "used": used})
 }
 
 type grantBody struct {
@@ -658,8 +802,8 @@ type grantBody struct {
 	TitleID string `json:"titleId"`
 }
 
-// grantTitle is POST /api/admin/grants {userId, titleId}: an administrator gives a title
-// (events, tests). It is recorded as an award of the service "admin".
+// grantTitle is POST /api/admin/grants {userId, titleId}: a title manager gives a public title
+// by hand (events, tests). It is recorded as an award of the service "admin".
 func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.admin(w, r)
 	if !ok {
@@ -679,13 +823,17 @@ func (s *Server) grantTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var exists bool
-	if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM titles WHERE id=$1)`, body.TitleID).Scan(&exists); err != nil {
+	var visibility string
+	err = tx.QueryRow(r.Context(), `SELECT visibility FROM titles WHERE id=$1 FOR SHARE`, body.TitleID).Scan(&visibility)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
+		return
+	case err != nil:
 		internal(w, err)
 		return
-	}
-	if !exists {
-		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
+	case visibility != public:
+		problem(w, 422, "TITLE_PRIVATE", "私有称号不能发放给其他玩家")
 		return
 	}
 	granted, _ := json.Marshal(map[string]any{"titles": []string{body.TitleID}, "by": v.User.ID})

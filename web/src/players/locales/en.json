@@ -154,21 +154,69 @@
     "catalog": "Title catalog",
     "catalogEmpty": "No titles yet.",
     "mine": "My titles",
-    "quota": "Community titles: {{used}} / {{limit}}",
-    "changeBand": "Change look",
+    "quota": "Private titles: {{used}} / {{limit}}",
     "edit": "Edit",
     "delete": "Delete",
-    "confirmDelete": "Delete the title “{{name}}”? Players who earned it lose it too.",
-    "deleted": "Deleted.",
-    "saved": "Saved.",
+    "confirmDelete": "Delete the title “{{name}}”? This cannot be undone.",
     "create": "New title",
     "editing": "Edit title",
-    "officialBandOnly": "This title is official now; you can only change its look.",
-    "limitReached": "You have reached the limit of {{limit}} community titles. Delete one, or ask an administrator to make one official, to create another.",
+    "limitReached": "You have reached the limit of {{limit}} private titles. Delete one, or have one made public by review, to create another.",
     "save": "Save",
     "createButton": "Create",
     "cancel": "Cancel",
-    "byRule": "Earned by meeting its condition"
+    "byRule": "Earned by meeting its condition",
+    "byMe": "Own creation",
+    "have": "Yours",
+    "holders": "Held by {{count}}",
+    "madeBy": "Made by",
+    "total": "{{total}} titles",
+    "totalHeld": "{{total}} titles, {{held}} yours",
+    "search": "Search titles",
+    "searchPlaceholder": "Name, description or maker",
+    "show": {
+      "label": "Show",
+      "all": "All",
+      "held": "Yours",
+      "missing": "Not yours"
+    },
+    "makeYourOwn": "Want a title of your own? Make one in My titles and wear it at once; once a review makes it public, other players can earn it too.",
+    "noMatch": "No title matches.",
+    "visibility": {
+      "private": "Private",
+      "public": "Public"
+    },
+    "plateHint": "Your nameplate is shown on your page, on leaderboards and in the game.",
+    "made": "Titles I made",
+    "madeHint": "A new title is private: yours alone, and you can change it any time. Once a review makes it public it no longer takes a place, and changing it needs a change request.",
+    "noneMade": "You have not made a title yet.",
+    "privateHint": "A private title is yours alone to hold and wear, and you can change it any time.",
+    "review": {
+      "pending": "In review",
+      "ask": "Ask to make public",
+      "askChange": "Request a change",
+      "withdraw": "Withdraw request",
+      "send": "Send request",
+      "sent": "Request sent. The result will arrive in Title Center, among your messages.",
+      "publishHint": "The title is reviewed as it is now, and cannot be changed while it is in review. Once approved it is public: it appears in the title catalog, and other players can get it by the conditions the title managers set.",
+      "changeHint": "A change to a public title is reviewed by the title managers. Once approved, everyone who holds it sees the new look.",
+      "publishRequest": "How it should be obtained",
+      "changeRequest": "About this change",
+      "requestHint": "For the title managers: how you would like players to get this title, or why you are changing it. The actual conditions are set by the managers.",
+      "asked": "Request: ",
+      "replied": "Reply: ",
+      "publish": {
+        "pending": "Request to make public is in review",
+        "approved": "Request to make public was approved",
+        "returned": "Request to make public was returned",
+        "withdrawn": "Request to make public was withdrawn"
+      },
+      "change": {
+        "pending": "Change request is in review",
+        "approved": "Change request was approved",
+        "returned": "Change request was returned",
+        "withdrawn": "Change request was withdrawn"
+      }
+    }
   },
   "dans": {
     "badges": "Dan badges",
@@ -189,27 +237,23 @@
     }
   },
   "admin": {
-    "editTitle": "Create or change a title",
+    "editTitle": "Change a title",
     "id": "ID",
     "name": "Name",
     "nameIn": "Name ({{language}})",
     "description": "Description",
-    "official": "Official title (community courses cannot give it)",
     "save": "Save",
-    "saved": "Saved.",
     "catalog": "All titles",
     "edit": "Edit",
     "delete": "Delete",
-    "confirmDelete": "Delete the title {{id}}? Players who hold it lose it too.",
-    "deleted": "Deleted.",
-    "grant": "Grant a title by hand",
+    "confirmDelete": "Delete the title “{{name}}”? The {{count}} players who hold it lose it too. This cannot be undone.",
+    "grant": "Give a title by hand",
     "userId": "User ID",
     "title": "Title",
     "grantButton": "Grant",
     "revokeButton": "Take back",
     "granted": "Granted.",
     "revoked": "Taken back.",
-    "madeBy": "Made by",
     "look": "Look",
     "layers": {
       "preset": "Start from title",
@@ -221,7 +265,29 @@
       "loading": "Reading the nameplate parts…",
       "unavailable": "The nameplate parts cannot be read right now.",
       "inTitles": "Used in {{titles}}"
-    }
+    },
+    "newTitle": "New title",
+    "tabs": {
+      "reviews": "Reviews",
+      "titles": "Titles",
+      "grants": "Giving",
+      "don": "Don parts"
+    },
+    "searchPlaceholder": "Name, ID or maker",
+    "show": {
+      "label": "Show",
+      "all": "All",
+      "public": "Public",
+      "private": "Private"
+    },
+    "idHint": "Lowercase letters, digits and hyphens. It cannot be changed later.",
+    "idInvalid": "An ID is lowercase letters, digits and hyphens.",
+    "idTaken": "This ID is taken.",
+    "obtain": "How to get it",
+    "obtainHint": "Shown in the title catalog: how players get this title. Conditions that give it automatically are set under Giving.",
+    "grantPlayer": "Choose a player",
+    "grantHint": "Only public titles can be given. Giving and taking back take effect at once.",
+    "noPlayer": "No player chosen yet"
   },
   "languages": {
     "en": "English",
@@ -241,13 +307,18 @@
     "GRANT_NOT_FOUND": "This user does not hold that title.",
     "FORBIDDEN": "Administrators only.",
     "QUERY_INVALID": "Invalid query.",
-    "TITLE_LIMIT_REACHED": "You can keep at most 5 community titles.",
-    "TITLE_OFFICIAL": "Only administrators can delete an official title.",
-    "TITLE_CHANGED": "An administrator just changed this title. Reload the page and try again.",
+    "TITLE_LIMIT_REACHED": "You can keep at most 5 private titles.",
     "FEATURED_INVALID": "The list cannot be saved: too many playlists, a line too long, or a playlist that is none.",
     "FEATURED_PLAYLIST_UNAVAILABLE": "A playlist is gone or no longer public. Remove it and save again.",
     "ANNOUNCEMENT_INVALID": "The announcement cannot be kept: a title of 1 to 80 characters on one line, and a text of at most 4000 characters.",
-    "ANNOUNCEMENT_NOT_FOUND": "That announcement no longer exists."
+    "ANNOUNCEMENT_NOT_FOUND": "That announcement no longer exists.",
+    "TITLE_PUBLIC": "A public title cannot be changed or deleted directly: send a change request, or ask a title manager to delete it.",
+    "TITLE_PRIVATE": "A private title belongs to its maker alone: it cannot be given, and only its maker can change it.",
+    "TITLE_REVIEW_PENDING": "A request for this title is in review. Withdraw it before changing the title or asking again.",
+    "REVIEW_INVALID": "The request is not valid: each text may be at most 500 characters.",
+    "REVIEW_NOT_FOUND": "No such request.",
+    "REVIEW_DECIDED": "This request has already been decided.",
+    "RULE_TITLE_PRIVATE": "A private title cannot be given by a rule."
   },
   "visits": {
     "heading": "Visits",
@@ -412,7 +483,6 @@
     "added": "Added, and given to {{n}} players who met it already.",
     "delete": "Delete",
     "confirmDelete": "Delete this condition? Titles it already gave stay.",
-    "deleted": "Deleted.",
     "chartGone": " (song no longer available)",
     "kinds": {
       "chart_clear": "Clear a song",
@@ -476,5 +546,32 @@
     "unlockedDone": "Unlocked; anyone can wear it.",
     "lockedList": "Locked parts",
     "noneLocked": "Nothing is locked; every part can be worn."
+  },
+  "reviews": {
+    "waiting": "Waiting for review",
+    "hint": "Players ask for a review of titles they made. An approved title becomes public and shows the words you settle for how to get it; set what gives it under Giving. When returning a request, say why.",
+    "none": "Nothing is waiting for review.",
+    "decided": "Decided",
+    "noneDecided": "No request has been decided yet.",
+    "kind": {
+      "publish": "Make public",
+      "change": "Change"
+    },
+    "status": {
+      "pending": "Waiting",
+      "approved": "Approved",
+      "returned": "Returned",
+      "withdrawn": "Withdrawn"
+    },
+    "becomes": "becomes",
+    "now": "Now",
+    "asked": "Asked for",
+    "request": "Request",
+    "obtainHint": "Shown in public once approved. Rewrite it from the request as needed.",
+    "reply": "Message to the maker",
+    "replyHint": "Optional either way. It is sent to their Title Center.",
+    "approve": "Approve",
+    "return": "Return",
+    "by": "by {{name}}"
   }
 }

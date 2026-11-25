@@ -754,7 +754,7 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 	if status := call(admin, "POST", "/api/v1/sources/official/charts", "{}", nil); status != 403 {
 		t.Fatal("the administrator uploaded an official chart without the group:", status)
 	}
-	if status := call(admin, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, nil); status != 403 {
+	if status := call(admin, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, nil); status != 403 {
 		t.Fatal("the administrator kept the title catalog without the group:", status)
 	}
 	// A player is nobody special and cannot use the manage panel.
@@ -823,7 +823,7 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 	if got := manages(someone); got != "/api/v1/sources/fanmade/me,/api/v1/me" {
 		t.Fatal("FANMADE_MANAGER and TITLE_MANAGER manage", got)
 	}
-	if status := call(someone, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, nil); status == 403 {
+	if status := call(someone, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, nil); status == 403 {
 		t.Fatal("a title manager may not keep the catalog")
 	}
 	call(admin, "PUT", give, `{"groups":[]}`, nil)
