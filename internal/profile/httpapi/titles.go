@@ -291,8 +291,9 @@ func listTitles(ctx context.Context, db queryer, query string, args ...any) ([]L
 }
 
 // titleCatalog is GET /api/titles: every public title, the managers' own first, readable from any
-// website, and the rules that give titles by themselves (title_rules.go). A private title is not
-// in it: it is seen on its maker's nameplate and in their own list (myTitles).
+// website; the rules that give titles and parts of the Don by themselves (package rules); and
+// each source's category IDs, what a rule of a category names. A private title is not in it: it
+// is seen on its maker's nameplate and in their own list (myTitles).
 func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	titles, err := listTitles(r.Context(), s.DB, listedTitles+` WHERE t.visibility='public' ORDER BY t.owner_id IS NOT NULL,t.created_at,t.id`)
@@ -300,12 +301,12 @@ func (s *Server) titleCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	rules, err := s.titleRules(r.Context())
+	listed, err := s.rules.List(r.Context(), "")
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	web.Respond(w, 200, map[string]any{"titles": titles, "rules": rules})
+	web.Respond(w, 200, map[string]any{"titles": titles, "rules": listed, "categories": s.rules.Categories()})
 }
 
 // adminTitles is GET /api/admin/titles: every title there is, private ones too (a private title

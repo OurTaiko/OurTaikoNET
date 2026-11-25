@@ -489,7 +489,7 @@
       "category_clear": "ジャンルの曲をクリア",
       "site_login": "サイトにログイン",
       "game_login": "ゲームにログイン",
-      "charts_uploaded": "譜面の投稿数"
+      "charts_uploaded": "参加した譜面数"
     },
     "clears": {
       "1": "クリア",
@@ -503,7 +503,7 @@
       "chart_clear": "{{source}}の「{{title}}」を{{clear}}{{course}}",
       "category_all": "{{source}}の「{{category}}」の全曲を{{clear}}{{course}}",
       "category_count": "{{source}}の「{{category}}」を {{count}} 曲{{clear}}{{course}}",
-      "charts_uploaded": "{{source}}に譜面を {{count}} 個投稿"
+      "charts_uploaded": "{{count}} 個の譜面の制作に参加"
     },
     "categories": {
       "fanmade": {
@@ -531,7 +531,12 @@
       "don": "どんちゃんの着せ替え"
     },
     "donPart": "部位",
-    "donItem": "番号"
+    "donItem": "番号",
+    "edit": "編集",
+    "save": "変更を保存",
+    "cancel": "キャンセル",
+    "editing": "条件 {{id}} を編集中。付与するものは変更できません。",
+    "updated": "保存し、達成済みの {{n}} 人に付与しました。"
   },
   "donItems": {
     "heading": "獲得が必要な着せ替え",

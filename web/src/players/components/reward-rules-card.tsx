@@ -1,27 +1,27 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Title, TitleRule } from '@players/api/types'
+import type { RewardRule, RuleCategories, Title } from '@players/api/types'
 import type { DonPartKind } from '@sitekit/don3d'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { titleName } from '@players/dan'
 import {
   categoryName,
   chartIdOf,
-  ruleCategories,
   ruleCourses,
   ruleKinds,
   ruleSources,
   ruleText,
-} from '@players/title-rules'
+} from '@players/reward-rules'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
 
-type Kind = TitleRule['kind']
+type Kind = RewardRule['kind']
 type SourceId = (typeof ruleSources)[number]
-/** A rule as the backend takes it (POST /api/v2/admin/titles/{id}/rules). */
+/** A rule's conditions as the backend takes them (POST /api/v2/admin/titles/{id}/rules, PUT
+ * /api/v2/admin/rules/{id}). */
 export type RuleDraft = {
   kind: Kind
   source?: SourceId
@@ -37,62 +37,98 @@ export type RuleTarget = { title: string } | { donPart: DonPartKind; donItem: nu
 
 const donParts: DonPartKind[] = ['cos', 'head', 'body', 'puchi', 'paint']
 
-// What gives an item by itself: the rules there are, and a form for one more. The item is a title
-// (a public one: a private title is its maker's alone) or a part of the Don.
-export function TitleRulesCard({
+const blank = {
+  target: 'title' as 'title' | 'don',
+  titleId: '',
+  donPart: 'cos' as DonPartKind,
+  donItem: '',
+  kind: 'chart_clear' as Kind,
+  source: 'fanmade' as SourceId,
+  chart: '',
+  // '': the source's first category.
+  category: '',
+  course: '',
+  clear: '1',
+  count: '',
+}
+
+/** The form filled in with a rule, to change it. */
+const filled = (rule: RewardRule): typeof blank => ({
+  target: rule.item === 'title' ? 'title' : 'don',
+  titleId: rule.titleId ?? '',
+  donPart: rule.donPart ?? 'cos',
+  donItem: rule.donItem === null ? '' : String(rule.donItem),
+  kind: rule.kind,
+  source: rule.source ?? 'fanmade',
+  chart: rule.chartId ?? '',
+  category: rule.category ?? '',
+  course: rule.course ?? '',
+  clear: String(rule.clear ?? 1),
+  count: rule.count === null ? '' : String(rule.count),
+})
+
+// What gives an item by itself: the rules there are, each to change or delete, and a form for
+// one more. The item is a title (a public one: a private title is its maker's alone) or a part of
+// the Don; a rule's item does not change. The categories are the backend's (GET /api/v2/titles).
+// onAdd and onUpdate answer '' once done, else what went wrong.
+export function RewardRulesCard({
   titles,
   rules,
+  categories,
   donName,
   onAdd,
+  onUpdate,
   onDelete,
 }: {
   titles: Title[]
-  rules: TitleRule[]
+  rules: RewardRule[]
+  categories: RuleCategories
   // A Don part's name, from the catalog.
   donName: (part: DonPartKind, id: number) => string
-  onAdd: (target: RuleTarget, rule: RuleDraft) => void
-  onDelete: (rule: TitleRule) => void
+  onAdd: (target: RuleTarget, rule: RuleDraft) => Promise<string>
+  onUpdate: (rule: RewardRule, draft: RuleDraft) => Promise<string>
+  onDelete: (rule: RewardRule) => void
 }) {
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
-  const [form, setForm] = useState({
-    target: 'title' as 'title' | 'don',
-    titleId: '',
-    donPart: 'cos' as DonPartKind,
-    donItem: '',
-    kind: 'chart_clear' as Kind,
-    source: 'fanmade' as SourceId,
-    chart: '',
-    category: ruleCategories.fanmade[0],
-    course: '',
-    clear: '1',
-    count: '',
-  })
+  const [form, setForm] = useState(blank)
+  const [editing, setEditing] = useState<RewardRule | null>(null)
+  const sourceCategories = categories[form.source] ?? []
+  const category = form.category || sourceCategories[0] || ''
   const eligible = titles.filter((title) => title.visibility === 'public')
   const plays = form.kind === 'chart_clear' || form.kind === 'category_clear'
-  const sourced = plays || form.kind === 'charts_uploaded'
   const counted = form.kind === 'category_clear' || form.kind === 'charts_uploaded'
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const rule: RuleDraft = { kind: form.kind }
-    if (sourced) rule.source = form.source
+    // An upload rule names no source: players upload to the fanmade one alone.
+    if (plays) rule.source = form.source
     if (form.kind === 'chart_clear') rule.chartId = chartIdOf(form.chart)
-    if (form.kind === 'category_clear') rule.category = form.category
+    if (form.kind === 'category_clear') rule.category = category
     if (plays) {
       rule.clear = Number(form.clear)
       if (form.course) rule.course = form.course
     }
     if (counted && form.count.trim()) rule.count = Number(form.count)
-    onAdd(
-      form.target === 'title'
-        ? { title: form.titleId }
-        : { donPart: form.donPart, donItem: Number(form.donItem) },
-      rule,
-    )
+    const sent = editing
+      ? onUpdate(editing, rule)
+      : onAdd(
+          form.target === 'title'
+            ? { title: form.titleId }
+            : { donPart: form.donPart, donItem: Number(form.donItem) },
+          rule,
+        )
+    void sent.then((failure) => {
+      if (!failure && editing) stop()
+    })
+  }
+  const stop = () => {
+    setEditing(null)
+    setForm(blank)
   }
   // What a rule gives, by name, and its key.
-  const item = (rule: TitleRule): [string, string] => {
-    if (rule.donPart && rule.donItem !== null)
+  const item = (rule: RewardRule): [string, string] => {
+    if (rule.item === 'don_item' && rule.donPart && rule.donItem !== null)
       return [
         `${t(`don.kinds.${rule.donPart}`)} · ${donName(rule.donPart, rule.donItem)}`,
         `${rule.donPart}:${rule.donItem}`,
@@ -101,9 +137,10 @@ export function TitleRulesCard({
     return [title ? titleName(title, language) : (rule.titleId ?? ''), rule.titleId ?? '']
   }
   const ready =
-    form.target === 'title'
+    (form.target === 'title'
       ? form.titleId !== ''
-      : Number.isInteger(Number(form.donItem)) && Number(form.donItem) > 0
+      : Number.isInteger(Number(form.donItem)) && Number(form.donItem) > 0) &&
+    (form.kind !== 'category_clear' || category !== '')
   return (
     <Card className="rounded-3xl">
       <CardHeader>
@@ -122,6 +159,16 @@ export function TitleRulesCard({
                 <Button
                   className="ml-auto"
                   size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(rule)
+                    setForm(filled(rule))
+                  }}
+                >
+                  {t('rules.edit')}
+                </Button>
+                <Button
+                  size="sm"
                   variant="destructive"
                   onClick={() => {
                     if (window.confirm(t('rules.confirmDelete'))) onDelete(rule)
@@ -134,10 +181,16 @@ export function TitleRulesCard({
           </ul>
         )}
         <form className="flex flex-wrap items-end gap-3 rounded-2xl border p-4" onSubmit={submit}>
+          {editing && (
+            <p className="w-full text-sm text-muted-foreground" data-testid="rule-editing">
+              {t('rules.editing', { id: editing.id })}
+            </p>
+          )}
           <div className="space-y-2">
             <Label>{t('rules.target')}</Label>
             <ChoiceSelect
               label={t('rules.target')}
+              disabled={editing !== null}
               value={form.target}
               onValueChange={(target) => setForm({ ...form, target: target as 'title' | 'don' })}
               items={[
@@ -151,6 +204,7 @@ export function TitleRulesCard({
               <Label>{t('rules.title')}</Label>
               <ChoiceSelect
                 label={t('rules.title')}
+                disabled={editing !== null}
                 value={form.titleId}
                 onValueChange={(titleId) => setForm({ ...form, titleId })}
                 items={eligible.map((title) => ({
@@ -165,6 +219,7 @@ export function TitleRulesCard({
                 <Label>{t('rules.donPart')}</Label>
                 <ChoiceSelect
                   label={t('rules.donPart')}
+                  disabled={editing !== null}
                   value={form.donPart}
                   onValueChange={(donPart) => setForm({ ...form, donPart: donPart as DonPartKind })}
                   items={donParts.map((part) => ({ value: part, label: t(`don.kinds.${part}`) }))}
@@ -177,6 +232,7 @@ export function TitleRulesCard({
                   className="w-28"
                   type="number"
                   min={1}
+                  disabled={editing !== null}
                   value={form.donItem}
                   onChange={(e) => setForm({ ...form, donItem: e.target.value })}
                   required
@@ -198,18 +254,14 @@ export function TitleRulesCard({
               items={ruleKinds.map((kind) => ({ value: kind, label: t(`rules.kinds.${kind}`) }))}
             />
           </div>
-          {sourced && (
+          {plays && (
             <div className="space-y-2">
               <Label>{t('rules.source')}</Label>
               <ChoiceSelect
                 label={t('rules.source')}
                 value={form.source}
                 onValueChange={(source) =>
-                  setForm({
-                    ...form,
-                    source: source as SourceId,
-                    category: ruleCategories[source as SourceId][0],
-                  })
+                  setForm({ ...form, source: source as SourceId, category: '' })
                 }
                 items={ruleSources.map((source) => ({
                   value: source,
@@ -235,9 +287,9 @@ export function TitleRulesCard({
               <Label>{t('rules.category')}</Label>
               <ChoiceSelect
                 label={t('rules.category')}
-                value={form.category}
+                value={category}
                 onValueChange={(category) => setForm({ ...form, category })}
-                items={ruleCategories[form.source].map((category) => ({
+                items={sourceCategories.map((category) => ({
                   value: category,
                   label: categoryName(t, form.source, category),
                 }))}
@@ -294,8 +346,13 @@ export function TitleRulesCard({
             </div>
           )}
           <Button type="submit" disabled={!ready}>
-            {t('rules.add')}
+            {editing ? t('rules.save') : t('rules.add')}
           </Button>
+          {editing && (
+            <Button type="button" variant="outline" onClick={stop}>
+              {t('rules.cancel')}
+            </Button>
+          )}
         </form>
       </CardContent>
     </Card>

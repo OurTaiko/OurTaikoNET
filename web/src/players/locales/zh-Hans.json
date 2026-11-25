@@ -482,14 +482,14 @@
     "add": "添加条件",
     "added": "已添加，并发给了 {{n}} 位已达成的玩家。",
     "delete": "删除",
-    "confirmDelete": "删除这条条件？已经发出的称号不会收回。",
+    "confirmDelete": "删除这条条件？已经发出的东西不会收回。",
     "chartGone": "（歌曲已下架）",
     "kinds": {
       "chart_clear": "打完某首歌",
       "category_clear": "打完某个分类的歌",
       "site_login": "登录网站",
       "game_login": "登录游戏",
-      "charts_uploaded": "上传谱面数"
+      "charts_uploaded": "参与谱面数"
     },
     "clears": {
       "1": "通关",
@@ -503,7 +503,7 @@
       "chart_clear": "{{clear}}{{source}}曲源的《{{title}}》{{course}}",
       "category_all": "{{clear}}{{source}}曲源「{{category}}」分类的全部歌曲{{course}}",
       "category_count": "{{clear}}{{source}}曲源「{{category}}」分类的 {{count}} 首歌曲{{course}}",
-      "charts_uploaded": "在{{source}}曲源上传 {{count}} 张谱面"
+      "charts_uploaded": "参与制作 {{count}} 张谱面"
     },
     "categories": {
       "fanmade": {
@@ -531,7 +531,12 @@
       "don": "咚酱装扮"
     },
     "donPart": "部位",
-    "donItem": "编号"
+    "donItem": "编号",
+    "edit": "修改",
+    "save": "保存修改",
+    "cancel": "取消",
+    "editing": "正在修改第 {{id}} 条条件，发放的东西不能改。",
+    "updated": "已修改，并发给了 {{n}} 位已达成的玩家。"
   },
   "donItems": {
     "heading": "需要获得的咚酱装扮",

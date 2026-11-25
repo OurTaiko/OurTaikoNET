@@ -8,7 +8,7 @@ A title is private or public (2026-11-25, migration `0023_title_review`; the REA
 
 1. **A 段位 course** made official names it as a reward (`internal/profile/httpapi/awards.go`, `grant`). A course that is not official gives no title.
 2. **A title manager** gives it by hand (`POST /api/v1/admin/grants`).
-3. **A rule** gives it by itself (`internal/titlerules`, table `net.title_rules`): clearing a chart, clearing charts of a category, being seen signed in on the website or in the game, having uploaded a number of charts.
+3. **A rule** gives it by itself (`internal/rewards/rules`, table `net.reward_rules`, called `net.title_rules` before migration `0025`): clearing a chart, clearing charts of a category, being seen signed in on the website or in the game, having uploaded a number of charts.
 
 Every title given is a row of `net.user_titles` pointing at the row of `net.awards` that says why (a maker's own title has none). A player wears one of the titles they hold on their nameplate.
 
@@ -19,7 +19,7 @@ Decisions the rules were built on, all open to change:
 - A new rule gives its title at once to everyone who meets it already.
 - Only public titles take rules, and only TITLE_MANAGER makes them.
 - A rule gives a player its title once. After an administrator takes it back, that rule does not give it again.
-- Only scores that still stand (`is_latest`) count. Uploads are counted for a chart's first owner.
+- Only scores that still stand (`is_latest`) count. Uploads are counted for every owner of a fanmade chart, collaborators included (until 2026-11-25, only the first owner, of either source).
 
 ## Stage 1: players notice
 
@@ -57,15 +57,15 @@ A per-player ownership table for the Don's parts, the way titles have one; rules
 
 ## Stage 2: more to give titles for
 
-Each new kind is one query for "who meets it" in `titlerules.met`, a value in the table's `kind` check, and its fields in the form.
+Each new kind is one query for "who meets it" in `rules.met` (`internal/rewards/rules`), a value in the table's `kind` check, and its fields in the form.
 
 | # | What | Notes |
 |---|---|---|
-| 2.1 | **Rules with a start and an end** | `starts_at`, `ends_at` on `net.title_rules`. A score counts when it was submitted inside the window; the sign-in rules only give inside it. Event titles |
-| 2.2 | **Signed in on N days** | Needs something kept: `net.user_days (user_id, day, site, game)`, written where the activity is written now (at most once a minute per player). Gives `site_login` and `game_login` a `count`, and makes their backfill exact from then on |
+| 2.1 | **Rules with a start and an end** | `starts_at`, `ends_at` on `net.reward_rules`. A score counts when it was submitted inside the window; the sign-in rules only give inside it. Event titles |
+| 2.2 | **Signed in on N days** | Needs something kept: `net.user_days (user_id, day, site, game)`, written where the activity is written now (at most once a minute per player). Gives `site_login` and `game_login` a `count`. (Where a player was last seen is kept since 2026-11-25, `users.seen_on_site_at` and `seen_in_game_at`, which made the sign-in rules' backfill exact) |
 | 2.3 | **More kinds** | Reaching a 段位 (`net.user_dans`), a number of plays, likes received on one's charts. To be chosen as they are wanted, not all at once |
 | 2.4 | **Hidden titles** | `hidden` on the rule (or the title): the rule is left out of the public catalog until the player holds the title. The administrator's view shows all |
-| 2.5 | **Change a rule** | Today a rule is deleted and made again, which also gives the title again to players it was taken back from. Let count, course and crown be changed in place, and judge everyone again when the change makes the rule easier |
+| 2.5 | **Change a rule** | Done (2026-11-25): `PUT /api/v1/admin/rules/{id}` changes the conditions in place (not the item) and judges everyone again; what the rule gave once it does not give again |
 
 ## Stage 3: trust
 
@@ -85,7 +85,7 @@ Neither stops a determined forger. Checking a replay against the chart on the se
 | 4.1 | **Split the catalog page** | Done (2026-11-25): `/titles` is the public titles, with a search; a player's own are at `/me/titles`. By page once there are many |
 | 4.2 | **How many hold each title** | Done (2026-11-25): `holders` in the catalog and in the managers' list |
 | 4.3 | **Rules whose chart is gone** | They stay and nobody can meet them. Mark them in `/manage/titles` so they get cleaned up |
-| 4.4 | **Categories from the backend** | The website keeps its own list of each source's category IDs for the rule form, and their names in four languages (`web/src/players/title-rules.ts`, `rules.categories.*`). Read them from the sources' own routes instead, so that a new category is added in one place |
+| 4.4 | **Categories from the backend** | Done (2026-11-25): `GET /api/v1/titles` gives `categories`, and the rule form takes its IDs from there. Their names in four languages are still the website's (`rules.categories.*`); an ID without one shows as it is |
 
 ## Stage 5: what the old Profile service left behind
 

@@ -111,6 +111,12 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) (session, bool) {
 	return v, ok
 }
 
+// ruleManager is admin() as the rules ask it (package rules): the player's ID.
+func (s *Server) ruleManager(w http.ResponseWriter, r *http.Request) (string, bool) {
+	v, ok := s.admin(w, r)
+	return v.User.ID, ok
+}
+
 // siteAdmin is required() for the site's administrator.
 func (s *Server) siteAdmin(w http.ResponseWriter, r *http.Request) (session, bool) {
 	v, ok := s.required(w, r, r.Method != "GET")

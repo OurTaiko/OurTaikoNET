@@ -1,7 +1,7 @@
-// The rules that give a title by themselves (the backend's internal/titlerules), in words.
+// The rules that give an item by themselves (the backend's internal/rewards/rules), in words.
 import type { TFunction } from 'i18next'
 import { chartText } from '@sitekit/chart-language'
-import type { Course, TitleRule } from '@players/api/types'
+import type { Course, RewardRule } from '@players/api/types'
 
 export const ruleKinds = [
   'chart_clear',
@@ -12,11 +12,6 @@ export const ruleKinds = [
 ] as const
 export const ruleSources = ['fanmade', 'official'] as const
 export const ruleCourses: Course[] = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit']
-// Each source's categories, as its backend names them (songs.Fanmade, songs.Official).
-export const ruleCategories: Record<(typeof ruleSources)[number], string[]> = {
-  fanmade: ['game', 'virtual-singer', 'pop', 'classic', 'variety', 'anime'],
-  official: ['namco', 'pop', 'game', 'anime', 'vocaloid', 'variety', 'kids', 'classics'],
-}
 
 /** A pasted chart page address or a bare ID: the chart's ID. */
 export const chartIdOf = (text: string) =>
@@ -32,11 +27,12 @@ export type RuleClear = 1 | 2 | 3
 const clearOf = (clear: number | null): RuleClear => (clear === 2 || clear === 3 ? clear : 1)
 
 /** What a player has to do to meet the rule. */
-export function ruleText(rule: TitleRule, t: TFunction, language: string): string {
+export function ruleText(rule: RewardRule, t: TFunction, language: string): string {
   if (rule.kind === 'site_login' || rule.kind === 'game_login') return t(`rules.text.${rule.kind}`)
-  const source = rule.source ? t(`shell.${rule.source}`) : ''
+  // Of the fanmade source, the only one players upload to; it names none.
   if (rule.kind === 'charts_uploaded')
-    return t('rules.text.charts_uploaded', { source, count: rule.count ?? 0 })
+    return t('rules.text.charts_uploaded', { count: rule.count ?? 0 })
+  const source = rule.source ? t(`shell.${rule.source}`) : ''
   const words = {
     source,
     clear: t(`rules.clears.${clearOf(rule.clear)}`),

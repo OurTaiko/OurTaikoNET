@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircleIcon, TagIcon, UsersIcon } from '@phosphor-icons/react'
-import type { ListedTitle, TitleRule } from '@players/api/types'
+import type { ListedTitle, RewardRule, RuleCategories } from '@players/api/types'
 import { ChoiceSelect } from '@players/components/choice-select'
 import { TitleBand } from '@players/components/nameplate'
 import { Notice } from '@players/notice'
 import { playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
-import { ruleText } from '@players/title-rules'
+import { ruleText } from '@players/reward-rules'
 import { EmptyState } from '@sitekit/components/empty-state'
 import { PlayerLink } from '@sitekit/components/player-link'
 import { SearchInput } from '@sitekit/components/search-input'
@@ -17,17 +17,19 @@ import { buttonVariants } from '@sitekit/components/ui/button'
 import { Skeleton } from '@sitekit/components/ui/skeleton'
 import { cn } from '@sitekit/lib/utils'
 
-const noRules: TitleRule[] = []
+const noRules: RewardRule[] = []
+const noCategories: RuleCategories = {}
 
 /** The page of the signed-in player's own titles. */
 export const myTitlesPage = '/me/titles'
 
-/** The public titles and the rules that give them. */
+/** The public titles, the rules that give them, and the categories a rule may name. */
 export function useTitles() {
   const { data, error } = useQuery(playerQueries.titles())
   return {
     titles: data?.titles ?? null,
     rules: data?.rules ?? noRules,
+    categories: data?.categories ?? noCategories,
     // What was read before stays on show when reading it again fails.
     error: data ? '' : (error?.message ?? ''),
   }
@@ -39,7 +41,7 @@ const grid = 'grid grid-cols-[repeat(auto-fill,minmax(min(19rem,100%),1fr))] gap
 type Held = 'all' | 'held' | 'missing'
 
 /** How a title is obtained: the managers' words for it, and the rules that give it by themselves. */
-export function HowToGet({ title, rules }: { title: ListedTitle; rules: TitleRule[] }) {
+export function HowToGet({ title, rules }: { title: ListedTitle; rules: RewardRule[] }) {
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const own = rules.filter((rule) => rule.titleId === title.id)
@@ -65,7 +67,7 @@ function TitleCard({
   held,
 }: {
   title: ListedTitle
-  rules: TitleRule[]
+  rules: RewardRule[]
   held: boolean
 }) {
   const { t } = useTranslation()

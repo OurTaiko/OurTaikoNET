@@ -4,7 +4,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { api } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { TitleRule } from '@players/api/types'
+import type { RewardRule } from '@players/api/types'
 import { playerKeys } from '@players/queries'
 import type { DonPartKind } from '@sitekit/don3d'
 
@@ -14,11 +14,11 @@ export const donItemKey = (part: string, id: number) => `${part}:${id}`
 export type DonItems = {
   locked: Set<string>
   owned: Set<string>
-  rules: TitleRule[]
+  rules: RewardRule[]
   /** A locked part the player does not own (none and taken-off never are). */
   barred: (part: DonPartKind, id: number) => boolean
   /** The rules that give a part. */
-  rulesFor: (part: DonPartKind, id: number) => TitleRule[]
+  rulesFor: (part: DonPartKind, id: number) => RewardRule[]
 }
 
 type Known = Pick<DonItems, 'locked' | 'owned' | 'rules'>
@@ -28,7 +28,7 @@ type Known = Pick<DonItems, 'locked' | 'owned' | 'rules'>
 export async function readDonItems(mine: boolean, signal?: AbortSignal): Promise<Known> {
   try {
     const [items, owned] = await Promise.all([
-      api<{ locked: DonItem[]; rules: TitleRule[] }>(endpoints.donItems, { signal }),
+      api<{ locked: DonItem[]; rules: RewardRule[] }>(endpoints.donItems, { signal }),
       mine
         ? api<{ owned: DonItem[] }>(endpoints.myDonItems, { signal })
         : Promise.resolve({ owned: [] as DonItem[] }),

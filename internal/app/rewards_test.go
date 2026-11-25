@@ -47,7 +47,7 @@ INSERT INTO fanmade.charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,aud
 INSERT INTO fanmade.chart_difficulties(chart_id,course,side,level,content_hash,good_points,ok_points,long_hit_points,kiwami_threshold,scoring_version)
  VALUES (repeat('f',32),'Oni','single',8,'v2:'||repeat('0',64),1000,500,100,1000000,1);
 INSERT INTO net.titles(id,name,style,visibility) VALUES ('cleared','クリア','wood','public');
-INSERT INTO net.title_rules(title_id,kind,source,chart_id,clear) VALUES ('cleared','chart_clear','fanmade',repeat('f',32),1)`); err != nil {
+INSERT INTO net.reward_rules(item,title_id,kind,source,chart_id,clear) VALUES ('title','cleared','chart_clear','fanmade',repeat('f',32),1)`); err != nil {
 		t.Fatal(err)
 	}
 	var slot int64

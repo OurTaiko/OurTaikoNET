@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ourtaiko.dev/net/internal/rewards/rules"
 )
 
 // The parts of the Don that must be earned: an administrator locks one (whoever wears it keeps
@@ -107,7 +109,7 @@ func TestLockedPartsOfTheDonAreEarned(t *testing.T) {
 
 	// A rule gives a part: here to whoever has signed in on the website, the player at once.
 	var made struct {
-		Rule    TitleRule
+		Rule    rules.Listed
 		Granted int
 	}
 	c.json("POST", "/api/admin/don/items/paint/2/rules", `{"kind":"site_login"}`, 201, &made)
@@ -117,7 +119,7 @@ func TestLockedPartsOfTheDonAreEarned(t *testing.T) {
 	c.json("POST", "/api/admin/don/items/paint/9/rules", `{"kind":"site_login"}`, 404, nil)
 	c.json("PUT", "/api/me/don", `{"costume":true,"cos":30,"head":0,"body":0,"puchi":1,"paint":2}`, 200, nil)
 	guest.json("GET", "/api/don/items", "", 200, &struct{}{})
-	var listed struct{ Rules []TitleRule }
+	var listed struct{ Rules []rules.Listed }
 	guest.json("GET", "/api/don/items", "", 200, &listed)
 	if len(listed.Rules) != 1 || *listed.Rules[0].DonItem != 2 {
 		t.Fatal(listed)

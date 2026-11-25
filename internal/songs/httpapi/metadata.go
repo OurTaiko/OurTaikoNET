@@ -74,6 +74,7 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	flags, _ := s.source().encodeCategories(c.CategoryIDs)
+	flagsBefore := flags
 	if len(patch.CategoryIDs) > 0 {
 		ids, e := s.source().categorySelection(patch.CategoryIDs)
 		if e != nil {
@@ -231,6 +232,9 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	if e = s.releaseFiles(r.Context(), retired); e != nil {
 		log.Printf("replaced TJA cleanup pending: %v", e)
+	}
+	if flags != flagsBefore {
+		s.rulesAfterChartChange(r.Context())
 	}
 	if demoStart != c.DemoStart || demoEnd != c.DemoEnd {
 		s.previewAfter(r.Context(), c.ID, "")

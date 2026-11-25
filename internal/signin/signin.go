@@ -22,7 +22,7 @@ import (
 	"golang.org/x/oauth2"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/requester"
-	"ourtaiko.dev/net/internal/titlerules"
+	"ourtaiko.dev/net/internal/rewards/rules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -119,7 +119,7 @@ func (s *Sessions) Current(r *http.Request) (Session, error) {
 		}
 		v.User = u
 	}
-	if e = RecordActivity(r.Context(), s.DB, v.User.ID, false, titlerules.SiteLogin); e != nil {
+	if e = RecordActivity(r.Context(), s.DB, v.User.ID, false, rules.SiteLogin); e != nil {
 		return Session{}, e
 	}
 	return v, nil
@@ -127,37 +127,56 @@ func (s *Sessions) Current(r *http.Request) (Session, error) {
 
 type activityWriter interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
-	Query(context.Context, string, ...any) (pgx.Rows, error)
+	Begin(context.Context) (pgx.Tx, error)
 }
 
 // RecordActivity notes that a player was just seen, and with login that they signed in, and
 // tells the request who it is from (requester.Note): every authenticated request comes here. A
 // player not known to the site yet becomes known. Call only after authentication. Writes at
-// most once a minute for a player.
+// most once a minute for a player, and whenever the player is seen somewhere for the first time.
 //
-// seen says where they were seen, titlerules.SiteLogin or titlerules.GameLogin, and gives them
-// the titles there are for that (as often as this writes, and at every sign-in); "" gives
-// none. Failing to give a title is logged and does not fail the request, so do not pass seen
-// with a transaction: an error would spoil it.
+// seen says where they were seen, rules.SiteLogin or rules.GameLogin, which their row keeps
+// (users.seen_on_site_at, seen_in_game_at), and gives them the items the rules give for that
+// (as often as this writes, and at every sign-in); "" records and gives nothing. The rules are
+// judged in a transaction of their own (a savepoint when db is one): failing to give is logged
+// and spoils neither the request nor db's transaction.
 func RecordActivity(ctx context.Context, db activityWriter, id string, login bool, seen string) error {
 	// Whatever runs around the handlers may want to know (package requester).
 	requester.Note(ctx, id)
-	tag, err := db.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at)
- VALUES($1,CASE WHEN $2 THEN now() ELSE NULL END,now())
+	tag, err := db.Exec(ctx, `INSERT INTO users(id,first_login_at,last_active_at,seen_on_site_at,seen_in_game_at)
+ VALUES($1,CASE WHEN $2 THEN now() ELSE NULL END,now(),
+  CASE WHEN $3='`+rules.SiteLogin+`' THEN now() END,CASE WHEN $3='`+rules.GameLogin+`' THEN now() END)
  ON CONFLICT(id) DO UPDATE SET
  first_login_at=COALESCE(users.first_login_at,EXCLUDED.first_login_at),
- last_active_at=GREATEST(users.last_active_at,EXCLUDED.last_active_at)
+ last_active_at=GREATEST(users.last_active_at,EXCLUDED.last_active_at),
+ seen_on_site_at=COALESCE(EXCLUDED.seen_on_site_at,users.seen_on_site_at),
+ seen_in_game_at=COALESCE(EXCLUDED.seen_in_game_at,users.seen_in_game_at)
  WHERE users.last_active_at IS NULL OR users.last_active_at < now()-interval '1 minute'
- OR (users.first_login_at IS NULL AND EXCLUDED.first_login_at IS NOT NULL)`, id, login)
+ OR (users.first_login_at IS NULL AND EXCLUDED.first_login_at IS NOT NULL)
+ OR (users.seen_on_site_at IS NULL AND EXCLUDED.seen_on_site_at IS NOT NULL)
+ OR (users.seen_in_game_at IS NULL AND EXCLUDED.seen_in_game_at IS NOT NULL)`, id, login, seen)
 	if err != nil {
 		return err
 	}
 	if seen != "" && (login || tag.RowsAffected() > 0) {
-		if _, e := titlerules.Seen(ctx, db, seen, id); e != nil {
-			log.Printf("title rules for a player seen (%s): %v", seen, e)
+		if e := judgeSeen(ctx, db, seen, id); e != nil {
+			log.Printf("rules for a player seen (%s): %v", seen, e)
 		}
 	}
 	return nil
+}
+
+// judgeSeen gives a player just seen the items for being seen there, in a transaction of its own.
+func judgeSeen(ctx context.Context, db activityWriter, seen, id string) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = rules.Seen(ctx, tx, seen, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // SafeReturn is where signing in returns to: the local path asked for, or DefaultReturn when
@@ -187,7 +206,7 @@ func (s *Sessions) Open(ctx context.Context, user, access, refresh string, acces
 		return "", expires, e
 	}
 	defer tx.Rollback(ctx)
-	if e = RecordActivity(ctx, tx, user, true, ""); e != nil {
+	if e = RecordActivity(ctx, tx, user, true, rules.SiteLogin); e != nil {
 		return "", expires, e
 	}
 	if s.SSO == nil {
@@ -201,10 +220,6 @@ func (s *Sessions) Open(ctx context.Context, user, access, refresh string, acces
 	}
 	if e = tx.Commit(ctx); e != nil {
 		return "", expires, e
-	}
-	// The titles for signing in on the website, once the session stands.
-	if _, e = titlerules.Seen(ctx, s.DB, titlerules.SiteLogin, user); e != nil {
-		log.Printf("title rules for a sign-in: %v", e)
 	}
 	return rawSession, expires, nil
 }

@@ -574,7 +574,11 @@ func (s *Server) deleteChart(ctx context.Context, id string) ([]int64, error) {
 			ids = append(ids, *file)
 		}
 	}
-	return ids, tx.Commit(ctx)
+	if e = tx.Commit(ctx); e != nil {
+		return nil, e
+	}
+	s.rulesAfterChartChange(ctx)
+	return ids, nil
 }
 
 // playlistCharts reads published charts in the order of ids.

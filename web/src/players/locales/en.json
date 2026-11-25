@@ -489,7 +489,7 @@
       "category_clear": "Clear songs of a category",
       "site_login": "Sign in on the website",
       "game_login": "Sign in in the game",
-      "charts_uploaded": "Number of charts uploaded"
+      "charts_uploaded": "Charts authored"
     },
     "clears": {
       "1": "Clear",
@@ -503,7 +503,7 @@
       "chart_clear": "{{clear}}: “{{title}}” ({{source}}{{course}})",
       "category_all": "{{clear}}: every song in {{category}} ({{source}}{{course}})",
       "category_count": "{{clear}}: {{count}} songs in {{category}} ({{source}}{{course}})",
-      "charts_uploaded": "Upload {{count}} charts ({{source}})"
+      "charts_uploaded": "Be an author of {{count}} charts"
     },
     "categories": {
       "fanmade": {
@@ -531,7 +531,12 @@
       "don": "A Don part"
     },
     "donPart": "Part",
-    "donItem": "Number"
+    "donItem": "Number",
+    "edit": "Edit",
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "editing": "Editing rule {{id}}; what it gives cannot change.",
+    "updated": "Saved, and given to {{n}} players who meet it."
   },
   "donItems": {
     "heading": "Don parts to earn",

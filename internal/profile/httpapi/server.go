@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/chat"
+	"ourtaiko.dev/net/internal/rewards/rules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -74,6 +75,8 @@ type Server struct {
 	visitLimits map[string]window
 	// Who waits for news of their chats (chats.go).
 	chats *chat.Hub
+	// The rules that give titles and parts of the Don by themselves (package rules).
+	rules *rules.API
 }
 type window struct {
 	since time.Time
@@ -81,7 +84,12 @@ type window struct {
 }
 
 func New(pool *pgxpool.Pool, cfg Config) *Server {
-	return &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
+	s := &Server{DB: pool, Config: cfg, limits: map[string]window{}, visitLimits: map[string]window{}, visits: map[string]keptVisits{}, chats: &chat.Hub{}}
+	s.rules = &rules.API{DB: pool, Manager: s.ruleManager, DonItem: s.donItemExists}
+	for _, source := range cfg.Sources {
+		s.rules.Sources = append(s.rules.Sources, rules.Source{ID: source.ID, Categories: source.Categories})
+	}
+	return s
 }
 
 func (s *Server) sessionCookie() string {
@@ -171,12 +179,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/title-reviews/{id}", s.decideReview)
 	mux.HandleFunc("PUT /api/admin/titles/{id}", s.saveTitle)
 	mux.HandleFunc("DELETE /api/admin/titles/{id}", s.deleteTitle)
-	mux.HandleFunc("POST /api/admin/titles/{id}/rules", s.createTitleRule)
-	mux.HandleFunc("POST /api/admin/don/items/{part}/{id}/rules", s.createDonItemRule)
 	mux.HandleFunc("PUT /api/admin/don/locks/{part}/{id}", s.lockDonItem)
 	mux.HandleFunc("POST /api/admin/don/grants", s.grantDonItem)
 	mux.HandleFunc("DELETE /api/admin/don/grants", s.revokeDonItem)
-	mux.HandleFunc("DELETE /api/admin/rules/{id}", s.deleteTitleRule)
+	s.rules.Routes(mux)
 	mux.HandleFunc("POST /api/admin/grants", s.grantTitle)
 	mux.HandleFunc("DELETE /api/admin/grants", s.revokeTitle)
 	mux.HandleFunc("GET /api/admin/groups", s.groupCatalog)
