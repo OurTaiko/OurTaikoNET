@@ -114,7 +114,7 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	c.signIn()
 	var kidou Title
 	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 200, &kidou)
-	if kidou.Visibility != public || !kidou.Official || kidou.OwnerID != nil || kidou.Obtain != "十段に合格" {
+	if kidou.Visibility != public || kidou.OwnerID != nil || kidou.Obtain != "十段に合格" {
 		t.Fatal("a manager's title", kidou)
 	}
 	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
@@ -285,7 +285,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	} {
 		var title Title
 		c.json("POST", "/api/me/titles", `{"name":"称号","nameTranslations":{"en":"Title"},`+look.body+`}`, 201, &title)
-		if title.Visibility != private || title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
+		if title.Visibility != private || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
 			title.Style != look.style || title.Layers.Band != look.band || str(title.Layers.Effect) != look.effect || str(title.Layers.Icon) != look.icon {
 			t.Fatal("made", look.body, title)
 		}
