@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -9,6 +10,20 @@ import {
 import { cn } from '../lib/utils'
 
 import { loadNameplateArt } from '../nameplate-art-source'
+import {
+  loadItem,
+  loadLumen,
+  plateSpecs,
+  plateState,
+  rankPicture,
+  textLift,
+  titleSpecs,
+  type LayerSpec,
+  type Lumen,
+  type PlateRow,
+  type TitleLayers,
+} from '../nameplate-layers'
+import { usePlateCanvas, type DrawLayer, type PlateFrame } from '../nameplate-renderer'
 
 type ArtKey =
   | 'shadow'
@@ -52,16 +67,6 @@ export function useNameplateArt(): Art | null {
     }
   }, [value])
   return value
-}
-
-export type TitleStyle = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
-// frame_top's rows 0..4 (PlayerInfo.titleBackground); rainbow is frame_top_rainbow.
-const bandRows: Record<Exclude<TitleStyle, 'rainbow'>, number> = {
-  wood: 0,
-  teal: 1,
-  wood2: 2,
-  purple: 3,
-  gold: 4,
 }
 
 // A piece of a sprite sheet stretched over its element: the sheet is sheetW x sheetH, the piece
@@ -167,40 +172,124 @@ export function DanEmblem({
   )
 }
 
-// The band's opaque part in each 408x56 row (measured: x 46..362, y 14..48).
-const BAND = { x: 46, y: 14, w: 316, h: 34 }
+// What the layered plate is drawn from (lib nameplate-layers): the catalog once, and each item's
+// file and picture once, whoever asks.
+let lumenLoaded: Lumen | null = null
+/** The layered nameplate set (nameplate/lumen.json), null until it is read. */
+export function useNameplateSet(): Lumen | null {
+  const [value, setValue] = useState(lumenLoaded)
+  useEffect(() => {
+    if (value) return
+    let current = true
+    loadLumen()
+      .then((set) => {
+        lumenLoaded = set
+        if (current) setValue(set)
+      })
+      .catch(() => {})
+    return () => {
+      current = false
+    }
+  }, [value])
+  return value
+}
 
-/** A title on its band alone, cut from the game's band art: the strip a nameplate wears. */
-export function TitleBandArt({
+/** The pictures of `specs`, read; null until they are. One that cannot be read is left out. */
+function useLayers(set: Lumen | null, specs: LayerSpec[]): DrawLayer[] | null {
+  const key = JSON.stringify(specs)
+  const [layers, setLayers] = useState<{ key: string; layers: DrawLayer[] } | null>(null)
+  useEffect(() => {
+    if (!set) return
+    let current = true
+    const wanted = JSON.parse(key) as LayerSpec[]
+    void Promise.all(
+      wanted.map((spec) =>
+        loadItem(set, spec.id).then(
+          (item): DrawLayer | null => {
+            const clip =
+              item.file.clips.find((c) => c.name === (spec.clip ?? 'idle')) ??
+              (spec.clip ? undefined : item.file.clips[0])
+            return clip ? { ...item, clip, mask: spec.mask, cut: spec.cut } : null
+          },
+          (): DrawLayer | null => null,
+        ),
+      ),
+    ).then((read) => {
+      if (current) setLayers({ key, layers: read.filter((l): l is DrawLayer => l !== null) })
+    })
+    return () => {
+      current = false
+    }
+  }, [set, key])
+  return layers?.key === key ? layers.layers : null
+}
+
+/** A canvas drawing `layers` over `frame` of the plate, placed by `style`. */
+function PlateLayers({
+  layers,
+  frame,
   style,
+}: {
+  layers: DrawLayer[] | null
+  frame: PlateFrame
+  style: CSSProperties
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null)
+  usePlateCanvas(canvas, layers, frame)
+  return <canvas ref={canvas} aria-hidden className="pointer-events-none absolute" style={style} />
+}
+
+// Room around the plate for what stands out of it (an icon, a burst of sparkles), in plate pixels.
+const OVER = 24
+
+// The band in the 408x96 plate (the plain wood band's extent).
+const BAND = { x: 44, y: 8, w: 320, h: 40 }
+
+/**
+ * A title on its band alone: the strip a nameplate wears, its band, effect and icon as the game
+ * draws them (the icon may stand out of it), and the title's name over it.
+ */
+export function TitleBandArt({
+  layers,
   name,
   className,
 }: {
-  style: TitleStyle
+  layers: TitleLayers
   name: string
   className?: string
 }) {
-  const a = useNameplateArt()
-  const rainbow = style === 'rainbow'
-  const row = rainbow ? 0 : (bandRows[style] ?? 0)
+  const set = useNameplateSet()
+  const specs = useMemo(() => {
+    if (!set) return []
+    const title = titleSpecs(set.catalog, layers)
+    return title.icon ? [...title.band, title.icon] : title.band
+  }, [set, layers])
+  const drawn = useLayers(set, specs)
+  const frame: PlateFrame = [
+    BAND.x - OVER,
+    BAND.y - OVER,
+    BAND.x + BAND.w + OVER,
+    BAND.y + BAND.h + OVER,
+  ]
   return (
     <span
       className={cn(
-        '@container relative inline-block aspect-[316/34] h-7 max-w-full align-middle',
+        '@container relative inline-block aspect-[320/40] h-7 max-w-full align-middle',
         className,
-      )}
-      style={sprite(
-        rainbow ? a?.rainbow : a?.bands,
-        408,
-        rainbow ? 336 : 280,
-        BAND.x,
-        row * 56 + BAND.y,
-        BAND.w,
-        BAND.h,
       )}
       title={name}
     >
-      {/* The game's title: 22 canvas pixels on a band 34 high (316 wide), black. */}
+      <PlateLayers
+        layers={drawn}
+        frame={frame}
+        style={{
+          left: `${(-OVER / BAND.w) * 100}%`,
+          top: `${(-OVER / BAND.h) * 100}%`,
+          width: `${((BAND.w + 2 * OVER) / BAND.w) * 100}%`,
+          height: `${((BAND.h + 2 * OVER) / BAND.h) * 100}%`,
+        }}
+      />
+      {/* The game's title: 22 canvas pixels on a band 40 high (320 wide), black. */}
       <Squeezed
         className="font-bold text-black leading-none"
         style={{ inset: '0 8%', fontSize: `${(22 / BAND.w) * 100}cqw` }}
@@ -211,7 +300,7 @@ export function TitleBandArt({
   )
 }
 
-// The part of the 408x96 canvas the plate's art covers (shadow / outline: x 42..371, y 10..91).
+// The part of the 408x96 canvas the plate covers (x 42..371, y 10..91).
 const VIEW = { x: 42, y: 10, w: 329, h: 81 }
 const place = (x: number, y: number, w: number, h: number): CSSProperties => ({
   left: `${((x - VIEW.x) / VIEW.w) * 100}%`,
@@ -221,16 +310,10 @@ const place = (x: number, y: number, w: number, h: number): CSSProperties => ({
 })
 // Font sizes in canvas pixels, scaled with the plate (its width is VIEW.w canvas pixels).
 const px = (n: number) => `${(n / VIEW.w) * 100}cqw`
-// A text box centred at (cx, cy), w wide.
-const box = (cx: number, cy: number, w: number, fontSize: number): CSSProperties => ({
-  ...place(cx - w / 2, cy - fontSize, w, fontSize * 2),
-  fontSize: px(fontSize),
-  letterSpacing: px(2),
-})
 
 export type NameplateArtProps = {
   name: string
-  title: { name: string; style: TitleStyle } | null
+  title: { name: string; layers: TitleLayers } | null
   dan: { index: number; gold: boolean; combo: number; label: string } | null
   /** 1 or 2: the 1P or 2P badge. */
   side?: 1 | 2
@@ -238,128 +321,69 @@ export type NameplateArtProps = {
 }
 
 /**
- * The nameplate as the game draws it (NameplateView): plate, title band, band outline, 段位 chip
- * (its plate, ring, then rank), 1P/2P badge, title, name. Without title or 段位 it is the coin
- * plate: plate, badge and a larger name. Scales with its width.
+ * The nameplate as the game draws it (PlateComposition): the layout a player's plate takes (with
+ * or without a title and a 段位), its pictures in the layout's order with the title's band,
+ * effect and icon among them, and the title and name in the layout's text boxes. Without title or
+ * 段位 it is the coin plate. Scales with its width.
  */
 export function NameplateArt({ name, title, dan, side = 1, className }: NameplateArtProps) {
-  const a = useNameplateArt()
-  const coin = !title && !dan
-  const rainbow = title?.style === 'rainbow'
-  const row = title && !rainbow ? (bandRows[title.style as Exclude<TitleStyle, 'rainbow'>] ?? 0) : 0
-  const nameBox = coin
-    ? box(226, 46, 190, 30)
-    : dan
-      ? box(261, 64.5, 190, 24)
-      : box(226, 64.5, 190, 24)
-  const layer = 'absolute pointer-events-none'
+  const set = useNameplateSet()
+  const state = plateState(!!title, !!dan, side)
+  const rows = set?.catalog.states[state] ?? null
+  const look = title?.layers ?? null
+  const specs = useMemo(() => {
+    if (!set || !rows) return []
+    const rank = dan ? rankPicture(dan.index, dan.gold, dan.combo) : null
+    return plateSpecs(set.catalog, rows, look, side === 2 ? '2p' : '1p', rank)
+  }, [set, rows, look, side, dan])
+  const drawn = useLayers(set, specs)
+  // Before the catalog is read the text still goes where the plate puts it.
+  const text = (role: 'text_title' | 'text_name') =>
+    rows?.find((row) => row.role === role) ??
+    (role === 'text_title'
+      ? { role, x: 226.5, y: 34.5, width: 215, size: 22, stroke: 0 }
+      : !title && !dan
+        ? { role, x: 226, y: 53, width: 190, size: 30, stroke: 3 }
+        : { role, x: dan ? 261 : 226, y: 67.5, width: 190, size: 24, stroke: 3 })
+  const box = (row: PlateRow): CSSProperties => {
+    const size = row.size ?? 24
+    const y = (row.y ?? 0) - textLift(size)
+    const width = row.width ?? 190
+    return {
+      ...place((row.x ?? 0) - width / 2, y - size, width, size * 2),
+      fontSize: px(size),
+      letterSpacing: px(2),
+    }
+  }
+  const titleRow = text('text_title')
+  const nameRow = text('text_name')
   return (
     <div
       className={cn('@container relative aspect-[329/81] w-full max-w-md select-none', className)}
       data-testid="nameplate"
     >
-      {a && (
-        <>
-          <span
-            className={layer}
-            style={{ ...place(0, 0, 408, 96), ...sprite(a.shadow, 408, 96, 0, 0, 408, 96) }}
-          />
-          {!coin && (
-            <>
-              {rainbow ? (
-                <>
-                  <span
-                    className={cn(layer, 'nameplate-rainbow-under')}
-                    style={{
-                      ...place(0, 0, 408, 56),
-                      ...sprite(a.rainbow, 408, 336, 0, 0, 408, 56),
-                    }}
-                  />
-                  <span
-                    className={cn(layer, 'nameplate-rainbow')}
-                    style={{
-                      ...place(0, 0, 408, 56),
-                      ...sprite(a.rainbow, 408, 336, 0, 0, 408, 56),
-                    }}
-                  />
-                </>
-              ) : (
-                <span
-                  className={layer}
-                  style={{
-                    ...place(0, 0, 408, 56),
-                    ...sprite(a.bands, 408, 280, 0, row * 56, 408, 56),
-                  }}
-                />
-              )}
-              <span
-                className={layer}
-                style={{ ...place(0, 0, 408, 96), ...sprite(a.outline, 408, 96, 0, 0, 408, 96) }}
-              />
-            </>
-          )}
-          {dan && !coin && (
-            <>
-              <span
-                className={layer}
-                style={{
-                  ...place(44, 44, 160, 48),
-                  ...sprite(a.danBackground, 160, 48, 0, 0, 160, 48),
-                }}
-              />
-              <span
-                className={layer}
-                style={{
-                  ...place(106, 44, 72, 40),
-                  ...sprite(
-                    [a.danRingSilver, a.danRingGold, a.danRingRainbow][dan.combo] ??
-                      a.danRingSilver,
-                    72,
-                    40,
-                    0,
-                    0,
-                    72,
-                    40,
-                  ),
-                }}
-              />
-              <span
-                role="img"
-                aria-label={dan.label}
-                title={dan.label}
-                className="absolute"
-                style={{
-                  ...place(106, 44, 72, 40),
-                  ...sprite(
-                    dan.gold ? a.danTextGold : a.danText,
-                    360,
-                    200,
-                    (dan.index % 5) * 72,
-                    Math.floor(dan.index / 5) * 40,
-                    72,
-                    40,
-                  ),
-                }}
-              />
-            </>
-          )}
-          <span
-            className={layer}
-            style={{
-              ...place(36, 4, 88, 88),
-              ...sprite(side === 2 ? a.badge2p : a.badge1p, 88, 88, 0, 0, 88, 88),
-            }}
-          />
-        </>
+      <PlateLayers
+        layers={drawn}
+        frame={[0, -OVER, 408, 96 + OVER]}
+        style={place(0, -OVER, 408, 96 + 2 * OVER)}
+      />
+      {dan && (
+        <span
+          role="img"
+          aria-label={dan.label}
+          title={dan.label}
+          className="absolute"
+          style={place(106, 44, 72, 40)}
+        />
       )}
       {title && (
-        <Squeezed className="font-bold text-black leading-none" style={box(226.5, 32, 215, 22)}>
+        <Squeezed className="font-bold text-black leading-none" style={box(titleRow)}>
           {title.name}
         </Squeezed>
       )}
       <Squeezed
         className="font-bold text-white leading-none [paint-order:stroke_fill]"
-        style={{ ...nameBox, WebkitTextStroke: `${px(6)} #000` }}
+        style={{ ...box(nameRow), WebkitTextStroke: `${px(2 * (nameRow.stroke ?? 3))} #000` }}
       >
         {name}
       </Squeezed>

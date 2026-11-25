@@ -107,12 +107,13 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
 
 	// An administrator (the development user is one) keeps the catalog.
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 401, nil)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, 401, nil)
 	c.signIn()
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"style":"gold","official":true}`, 200, nil)
-	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","style":"wood","official":false}`, 200, nil)
-	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x","style":"wood"}`, 422, nil)
-	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","style":"neon"}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"},"official":true}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","layers":{"band":"band/lumen-title-wood"},"official":false}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","layers":{"band":"gold"}}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","style":"gold"}`, 400, nil)
 	var catalog struct{ Titles []Title }
 	c.json("GET", "/api/titles", "", 200, &catalog)
 	if len(catalog.Titles) != 2 || catalog.Titles[0].ID != "kidou" || string(catalog.Titles[0].NameTranslations) != `{"en":"Taiko Master"}` {
@@ -183,7 +184,8 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	c.json("PUT", "/api/me/nameplate", `{"titleId":"nope","showDan":true}`, 422, nil)
 	var worn Nameplate
 	c.json("PUT", "/api/me/nameplate", `{"titleId":"kidou","showDan":true}`, 200, &worn)
-	if worn.Title == nil || worn.Title.Style != "gold" || worn.Dan == nil || worn.Dan.Index != 21 {
+	if worn.Title == nil || worn.Title.Style != "gold" || worn.Dan == nil || worn.Dan.Index != 21 ||
+		worn.Title.Layers.Band != "band/lumen-title-gold" || worn.Title.Layers.Effect == nil || *worn.Title.Layers.Effect != "effect/lumen-title-gold" || worn.Title.Layers.Icon != nil {
 		t.Fatal("worn", worn)
 	}
 	public := &client{t: t, handler: app.Handler()}
@@ -243,23 +245,39 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
-	c.json("POST", "/api/me/titles", `{"name":"x","style":"wood"}`, 401, nil)
+	c.json("POST", "/api/me/titles", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 401, nil)
 	c.signIn()
 
-	// Up to five community titles, not in the bands kept for official ones.
-	c.json("POST", "/api/me/titles", `{"name":"虹","style":"rainbow"}`, 422, nil)
-	c.json("POST", "/api/me/titles", `{"name":"紫","style":"purple"}`, 422, nil)
-	c.json("POST", "/api/me/titles", `{"name":" ","style":"wood"}`, 422, nil)
+	// Up to five community titles, looking any way their maker likes: each layer an item of its
+	// own slot. The old style alone is not a look.
+	for _, body := range []string{
+		`{"name":" ","layers":{"band":"band/lumen-title-wood"}}`,
+		`{"name":"x"}`,
+		`{"name":"x","layers":{"band":"icon/lumen-title-crown_gold"}}`,
+		`{"name":"x","layers":{"band":"band/Lumen Title"}}`,
+		`{"name":"x","layers":{"band":"band/lumen-title-wood","icon":"band/lumen-title-wood"}}`,
+		`{"name":"x","layers":{"band":"band/lumen-title-wood","effect":"effect/../x"}}`,
+	} {
+		c.json("POST", "/api/me/titles", body, 422, nil)
+	}
+	c.json("POST", "/api/me/titles", `{"name":"x","style":"gold"}`, 400, nil)
 	made := []Title{}
-	for _, style := range []string{"wood", "teal", "wood2", "gold", "wood"} {
+	for _, look := range []struct{ body, style, band, effect, icon string }{
+		{`"layers":{"band":"band/lumen-title-rainbow"}`, "rainbow", "band/lumen-title-rainbow", "", ""},
+		{`"layers":{"band":"band/lumen-title-toho_y22","effect":"effect/lumen-title-gold","icon":"icon/lumen-title-crown_gold"}`, "wood", "band/lumen-title-toho_y22", "effect/lumen-title-gold", "icon/lumen-title-crown_gold"},
+		{`"layers":{"band":"band/lumen-title-wood","icon":"icon/lumen-title-wec"}`, "wood", "band/lumen-title-wood", "", "icon/lumen-title-wec"},
+		{`"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}`, "gold", "band/lumen-title-gold", "effect/lumen-title-gold", ""},
+		{`"layers":{"band":"band/lumen-title-purple","effect":"","icon":null}`, "purple", "band/lumen-title-purple", "", ""},
+	} {
 		var title Title
-		c.json("POST", "/api/me/titles", `{"name":"称号 `+style+`","nameTranslations":{"en":"Title"},"style":"`+style+`"}`, 201, &title)
-		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) {
-			t.Fatal("made", title)
+		c.json("POST", "/api/me/titles", `{"name":"称号","nameTranslations":{"en":"Title"},`+look.body+`}`, 201, &title)
+		if title.Official || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
+			title.Style != look.style || title.Layers.Band != look.band || str(title.Layers.Effect) != look.effect || str(title.Layers.Icon) != look.icon {
+			t.Fatal("made", look.body, title)
 		}
 		made = append(made, title)
 	}
-	c.json("POST", "/api/me/titles", `{"name":"六","style":"wood"}`, 409, nil)
+	c.json("POST", "/api/me/titles", `{"name":"六","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
 	w := c.do("GET", "/api/titles", "", nil)
 	var catalog struct{ Titles []Title }
 	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Titles) != 5 || *catalog.Titles[0].OwnerID != player {
@@ -268,32 +286,36 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 
 	// The maker changes their community title; another player's is not theirs to change.
 	var changed Title
-	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","style":"teal"}`, 200, &changed)
-	if changed.Name != "改名" || changed.Style != "teal" || changed.Description != "说明" || string(changed.NameTranslations) != `{}` {
+	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","layers":{"band":"band/lumen-title-purple","effect":"effect/lumen-title-purple"}}`, 200, &changed)
+	if changed.Name != "改名" || changed.Style != "purple" || changed.Description != "说明" || string(changed.NameTranslations) != `{}` || str(changed.Layers.Effect) != "effect/lumen-title-purple" {
 		t.Fatal("changed", changed)
 	}
-	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","style":"rainbow"}`, 422, nil)
+	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","layers":{"band":"band/"}}`, 422, nil)
 	if _, err = pool.Exec(ctx, `INSERT INTO titles(id,name,style,official,owner_id) VALUES('theirs','他人','wood',false,$1)`, other); err != nil {
 		t.Fatal(err)
 	}
-	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","style":"wood"}`, 404, nil)
+	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 404, nil)
 	c.json("DELETE", "/api/me/titles/theirs", "", 404, nil)
 
-	// An administrator makes one official: it keeps its maker, who may now change its band only,
+	// An administrator makes one official: it keeps its maker, who may now change its look only,
 	// and it no longer takes one of their five places.
 	var official Title
-	c.json("PUT", "/api/admin/titles/"+made[1].ID, `{"name":"公认","style":"teal","official":true}`, 200, &official)
+	c.json("PUT", "/api/admin/titles/"+made[1].ID, `{"name":"公认","layers":{"band":"band/lumen-title-wood"},"official":true}`, 200, &official)
 	if !official.Official || official.OwnerID == nil || *official.OwnerID != player {
 		t.Fatal("official", official)
 	}
-	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","style":"rainbow"}`, 200, &official)
-	if official.Style != "rainbow" || official.Name != "公认" {
-		t.Fatal("an official title's maker changes its band only", official)
+	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","layers":{"band":"band/lumen-title-rainbow"}}`, 200, &official)
+	if official.Style != "rainbow" || official.Name != "公认" || official.Layers.Band != "band/lumen-title-rainbow" {
+		t.Fatal("an official title's maker changes its look only", official)
+	}
+	c.json("PUT", "/api/me/titles/"+made[1].ID, `{"name":"偷改","layers":{"band":"band/lumen-title-gold","icon":"icon/lumen-title-crown_gold"}}`, 200, &official)
+	if official.Style != "gold" || official.Name != "公认" || official.Layers.Band != "band/lumen-title-gold" || official.Layers.Effect != nil || str(official.Layers.Icon) != "icon/lumen-title-crown_gold" {
+		t.Fatal("an official title's maker changes its layers", official)
 	}
 	c.json("DELETE", "/api/me/titles/"+made[1].ID, "", 403, nil)
 	var sixth Title
-	c.json("POST", "/api/me/titles", `{"name":"六","style":"wood"}`, 201, &sixth)
-	c.json("POST", "/api/me/titles", `{"name":"七","style":"wood"}`, 409, nil)
+	c.json("POST", "/api/me/titles", `{"name":"六","layers":{"band":"band/lumen-title-wood"}}`, 201, &sixth)
+	c.json("POST", "/api/me/titles", `{"name":"七","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
 
 	// A community title comes from its maker's courses only; an official one from official
 	// courses, whoever made them.
@@ -328,7 +350,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	if plate.Title != nil {
 		t.Fatal("still worn", plate)
 	}
-	c.json("POST", "/api/me/titles", `{"name":"七","style":"wood"}`, 201, nil)
+	c.json("POST", "/api/me/titles", `{"name":"七","layers":{"band":"band/lumen-title-wood"}}`, 201, nil)
 }
 
 func TestScoresOfEveryServiceInOneList(t *testing.T) {
@@ -455,4 +477,12 @@ func TestTheWebsiteIsServedWithItsPageRoutes(t *testing.T) {
 	if w = c.do("GET", "/api/nothing", "", nil); w.Code != 404 || !strings.Contains(w.Body.String(), "NOT_FOUND") {
 		t.Fatal("unknown API path", w.Code)
 	}
+}
+
+// str is an optional layer as written in a test: "" for none.
+func str(item *string) string {
+	if item == nil {
+		return ""
+	}
+	return *item
 }

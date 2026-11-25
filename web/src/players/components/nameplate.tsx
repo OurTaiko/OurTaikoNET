@@ -2,8 +2,9 @@ import { useTranslation } from 'react-i18next'
 import type { Nameplate as Plate } from '@players/api/types'
 import { danName, titleName } from '@players/dan'
 import { NameplateArt, TitleBandArt } from '@sitekit/components/nameplate-art'
+import { layersOf } from '@sitekit/nameplate-layers'
 
-/** A title as its band alone: the strip a nameplate wears over the name, in the game's art. */
+/** A title as its band alone: the strip a nameplate wears, its layers as the game draws them. */
 export function TitleBand({
   title,
   className,
@@ -14,7 +15,7 @@ export function TitleBand({
   const { i18n } = useTranslation()
   return (
     <TitleBandArt
-      style={title.style}
+      layers={layersOf(title)}
       name={titleName(title, i18n.resolvedLanguage ?? 'zh-Hans')}
       className={className}
     />
@@ -32,7 +33,7 @@ export function Nameplate({ plate, className }: { plate: Plate; className?: stri
         plate.title
           ? {
               name: titleName(plate.title, i18n.resolvedLanguage ?? 'zh-Hans'),
-              style: plate.title.style,
+              layers: layersOf(plate.title),
             }
           : null
       }

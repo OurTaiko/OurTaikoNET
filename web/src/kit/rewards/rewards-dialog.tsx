@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { DanEmblem, TitleBandArt, type TitleStyle } from '../components/nameplate-art'
+import { DanEmblem, TitleBandArt } from '../components/nameplate-art'
+import { layersOf } from '../nameplate-layers'
 import { danNames } from '../components/profile-plate'
 import { catalogItem, donImage, donItemName, donSource, type DonPartKind } from '../don3d'
 import { readDonCatalog, type ServedDonCatalog } from '../don3d/catalog-request'
@@ -46,7 +47,7 @@ function useViews(catalog: ServedDonCatalog | null): Record<string, View> {
         node: (
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="text-xs text-muted-foreground">{t('rewards.title')}</span>
-            <TitleBandArt style={title.style as TitleStyle} name={name} className="h-9" />
+            <TitleBandArt layers={layersOf(title)} name={name} className="h-9" />
             {title.description && <p>{title.description}</p>}
             {from && <p className="text-xs text-muted-foreground">{from}</p>}
           </div>

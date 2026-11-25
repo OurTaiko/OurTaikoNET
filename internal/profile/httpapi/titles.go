@@ -17,16 +17,27 @@ import (
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Title is one title of the catalog. Style names the game's title band. OwnerID is the player
-// who made it (null for the titles administrators keep).
+// Title is one title of the catalog. Layers is how a nameplate wearing it looks; Style is the band
+// of the six that game versions released before the layers draw (legacyStyle). OwnerID is the
+// player who made it (null for the titles administrators keep).
 type Title struct {
 	ID               string          `json:"id"`
 	Name             string          `json:"name"`
 	NameTranslations json.RawMessage `json:"nameTranslations"`
 	Description      string          `json:"description"`
 	Style            string          `json:"style"`
+	Layers           Layers          `json:"layers"`
 	Official         bool            `json:"official"`
 	OwnerID          *string         `json:"ownerId"`
+}
+
+// Layers are the band, the effect over it and the icon on its end that a nameplate wears for a
+// title (OurTaikoPlay's NameplateLayers): items of the public nameplate catalog
+// (nameplate/lumen.json), "<slot>/<name>". A title has a band; Effect and Icon may be none.
+type Layers struct {
+	Band   string  `json:"band"`
+	Effect *string `json:"effect"`
+	Icon   *string `json:"icon"`
 }
 
 // DanBadge is a player's best result of one 段位 (五級 6 .. 24 達人; 0–5 are not offered). The
@@ -60,23 +71,40 @@ type Nameplate struct {
 	ShowDan    bool      `json:"showDan"`
 }
 
-var titleStyles = map[string]bool{"wood": true, "teal": true, "wood2": true, "purple": true, "gold": true, "rainbow": true}
 var titleID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
-// Players make community titles for their own 段位 courses: at most five each, in any band but
-// the rainbow and purple ones, which are kept for official titles.
+// An item of the nameplate catalog, as the database allows it in each slot.
+var layerItem = map[string]*regexp.Regexp{}
+
+func init() {
+	for _, slot := range []string{"band", "effect", "icon"} {
+		layerItem[slot] = regexp.MustCompile(`^` + slot + `/[a-z0-9][a-z0-9_.-]{0,63}$`)
+	}
+}
+
+// legacyStyle is the band of the six that game versions released before the layers know (wood,
+// teal, wood2, purple, gold, rainbow) nearest a title's own: what such a game draws for it.
+func legacyStyle(band string) string {
+	for _, style := range []string{"gold", "purple", "rainbow"} {
+		if band == "band/lumen-title-"+style {
+			return style
+		}
+	}
+	return "wood"
+}
+
+// Players make community titles for their own 段位 courses: at most five each, looking any way
+// they like.
 const playerTitleLimit = 5
 
-var communityStyles = map[string]bool{"wood": true, "teal": true, "wood2": true, "gold": true}
-
-const titleColumns = `t.id,t.name,t.name_translations,t.description,t.style,t.official,t.owner_id`
+const titleColumns = `t.id,t.name,t.name_translations,t.description,t.style,t.band_item,t.effect_item,t.icon_item,t.official,t.owner_id`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanTitle(row rowScanner, extra ...any) (Title, error) {
 	var t Title
 	var translations []byte
-	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Style, &t.Official, &t.OwnerID}, extra...)...)
+	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Style, &t.Layers.Band, &t.Layers.Effect, &t.Layers.Icon, &t.Official, &t.OwnerID}, extra...)...)
 	t.NameTranslations = translations
 	return t, err
 }
@@ -403,8 +431,33 @@ type titleBody struct {
 	Name             string            `json:"name"`
 	NameTranslations map[string]string `json:"nameTranslations"`
 	Description      string            `json:"description"`
-	Style            string            `json:"style"`
+	Layers           *Layers           `json:"layers"`
 	Official         bool              `json:"official"`
+}
+
+// look checks the layers and gives them with the style older games draw.
+func (b *titleBody) look() (Layers, string, bool) {
+	if b.Layers == nil {
+		return Layers{}, "", false
+	}
+	l := *b.Layers
+	for slot, item := range map[string]*string{"effect": l.Effect, "icon": l.Icon} {
+		if item != nil && *item == "" {
+			item = nil
+		}
+		if slot == "effect" {
+			l.Effect = item
+		} else {
+			l.Icon = item
+		}
+		if item != nil && !layerItem[slot].MatchString(*item) {
+			return Layers{}, "", false
+		}
+	}
+	if !layerItem["band"].MatchString(l.Band) {
+		return Layers{}, "", false
+	}
+	return l, legacyStyle(l.Band), true
 }
 
 // text checks the name, its translations and the description, and gives the translations as
@@ -436,13 +489,15 @@ func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	translations, valid := body.text()
-	if !valid || !titleID.MatchString(id) || !titleStyles[body.Style] {
+	layers, style, looks := body.look()
+	if !valid || !looks || !titleID.MatchString(id) {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
 		return
 	}
-	t, err := scanTitle(s.DB.QueryRow(r.Context(), `INSERT INTO titles AS t(id,name,name_translations,description,style,official) VALUES($1,$2,$3,$4,$5,$6)
- ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_translations=EXCLUDED.name_translations,description=EXCLUDED.description,style=EXCLUDED.style,official=EXCLUDED.official
- RETURNING `+titleColumns, id, body.Name, translations, body.Description, body.Style, body.Official))
+	t, err := scanTitle(s.DB.QueryRow(r.Context(), `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,official) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+ ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_translations=EXCLUDED.name_translations,description=EXCLUDED.description,
+ style=EXCLUDED.style,band_item=EXCLUDED.band_item,effect_item=EXCLUDED.effect_item,icon_item=EXCLUDED.icon_item,official=EXCLUDED.official
+ RETURNING `+titleColumns, id, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon, body.Official))
 	if err != nil {
 		internal(w, err)
 		return
@@ -466,7 +521,7 @@ func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, map[string]bool{"ok": true})
 }
 
-// createOwnTitle is POST /api/me/titles {name, nameTranslations, description, style}: a
+// createOwnTitle is POST /api/me/titles {name, nameTranslations, description, layers}: a
 // community title the player can give in their own 段位 courses. Its id is made here.
 func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
@@ -478,7 +533,8 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	translations, valid := body.text()
-	if !valid || !communityStyles[body.Style] {
+	layers, style, looks := body.look()
+	if !valid || !looks {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
 		return
 	}
@@ -503,8 +559,8 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "TITLE_LIMIT_REACHED", "每人最多 5 个社区称号")
 		return
 	}
-	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,official,owner_id) VALUES($1,$2,$3,$4,$5,false,$6)
- RETURNING `+titleColumns, web.NewID(), body.Name, translations, body.Description, body.Style, v.User.ID))
+	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,official,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,false,$9)
+ RETURNING `+titleColumns, web.NewID(), body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon, v.User.ID))
 	if err != nil {
 		internal(w, err)
 		return
@@ -517,7 +573,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveOwnTitle is PUT /api/me/titles/{id}, the same body: the maker changes a community
-// title. Of an official one they change the band only (any band); the rest is ignored.
+// title. Of an official one they change the look only; the rest is ignored.
 func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.required(w, r, true)
 	if !ok {
@@ -539,21 +595,23 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var t Title
+	layers, style, looks := body.look()
 	if official {
-		if !titleStyles[body.Style] {
+		if !looks {
 			problem(w, 422, "TITLE_INVALID", "称号信息无效")
 			return
 		}
-		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET style=$3 WHERE id=$1 AND owner_id=$2 RETURNING `+titleColumns, r.PathValue("id"), v.User.ID, body.Style))
+		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET style=$3,band_item=$4,effect_item=$5,icon_item=$6 WHERE id=$1 AND owner_id=$2 RETURNING `+titleColumns,
+			r.PathValue("id"), v.User.ID, style, layers.Band, layers.Effect, layers.Icon))
 	} else {
 		translations, valid := body.text()
-		if !valid || !communityStyles[body.Style] {
+		if !valid || !looks {
 			problem(w, 422, "TITLE_INVALID", "称号信息无效")
 			return
 		}
 		// official stays false: an administrator may have made it official in the meantime.
-		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET name=$3,name_translations=$4,description=$5,style=$6 WHERE id=$1 AND owner_id=$2 AND NOT official RETURNING `+titleColumns,
-			r.PathValue("id"), v.User.ID, body.Name, translations, body.Description, body.Style))
+		t, err = scanTitle(s.DB.QueryRow(ctx, `UPDATE titles t SET name=$3,name_translations=$4,description=$5,style=$6,band_item=$7,effect_item=$8,icon_item=$9 WHERE id=$1 AND owner_id=$2 AND NOT official RETURNING `+titleColumns,
+			r.PathValue("id"), v.User.ID, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon))
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 409, "TITLE_CHANGED", "称号刚被管理员修改，请刷新后重试")

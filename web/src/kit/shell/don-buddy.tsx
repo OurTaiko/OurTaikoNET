@@ -15,6 +15,7 @@ import { api } from '../api/client'
 import { SITE_API_ROOT } from '../api/config'
 import { danNames, usePlate } from '../components/profile-plate'
 import { NameplateArt } from '../components/nameplate-art'
+import { layersOf } from '../nameplate-layers'
 import { DonPreview, type DonLook, type DonMotionName } from '../don3d'
 import { readDonCatalog, type ServedDonCatalog } from '../don3d/catalog-request'
 import { cn } from '../lib/utils'
@@ -222,7 +223,7 @@ export default function DonBuddy({
   const title = plate?.title
     ? {
         name: plate.title.nameTranslations?.[language] || plate.title.name,
-        style: plate.title.style,
+        layers: layersOf(plate.title),
       }
     : null
   const dan = plate?.dan

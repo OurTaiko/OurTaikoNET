@@ -1,3 +1,4 @@
+import type { TitleLayers } from '@sitekit/nameplate-layers'
 import type { PlayerTotals } from '@sitekit/api/types'
 
 export type { PlayerTotals }
@@ -29,13 +30,15 @@ export type GroupMember = {
 }
 export type Session = { user: User | null; csrfToken: string }
 
-export type TitleStyle = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
 export type Title = {
   id: string
   name: string
   nameTranslations: Record<string, string>
   description: string
-  style: TitleStyle
+  // The band of six that game versions released before the layers draw.
+  style: string
+  // How a nameplate wearing it looks: items of the public nameplate set.
+  layers: TitleLayers
   official: boolean
   // The player who made it; null for the titles administrators keep.
   ownerId: string | null

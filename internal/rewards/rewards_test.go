@@ -27,7 +27,7 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 		}
 	}
 	exec(`INSERT INTO net.users(id) VALUES ($1),($2)`, player, other)
-	exec(`INSERT INTO net.titles(id,name,style,name_translations) VALUES ('hello','はじめまして','gold','{"en":"Hello"}'),('gone','x','wood','{}')`)
+	exec(`INSERT INTO net.titles(id,name,style,band_item,effect_item,name_translations) VALUES ('hello','はじめまして','gold','band/lumen-title-gold','effect/lumen-title-gold','{"en":"Hello"}'),('gone','x','wood',DEFAULT,NULL,'{}')`)
 	exec(`INSERT INTO net.awards(service,request_key,user_id,course_title) VALUES ('fanmade','attempt-1',$1,'十段')`, player)
 	// A title of a 段位 course, one an administrator gives and takes back before it was seen,
 	// and a badge that gets better, then not.
@@ -98,11 +98,14 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 		Title struct {
 			ID, Name, Style  string
 			NameTranslations map[string]string
+			Layers           struct{ Band, Effect, Icon *string }
 		}
 		Service, CourseTitle string
 	}
 	json.Unmarshal(got.Rewards[0].Data, &title)
-	if got.Rewards[0].Kind != "title" || title.Title.ID != "hello" || title.Title.Style != "gold" || title.Title.NameTranslations["en"] != "Hello" || title.Service != "fanmade" || title.CourseTitle != "十段" {
+	layers := title.Title.Layers
+	if got.Rewards[0].Kind != "title" || title.Title.ID != "hello" || title.Title.Style != "gold" || title.Title.NameTranslations["en"] != "Hello" || title.Service != "fanmade" || title.CourseTitle != "十段" ||
+		layers.Band == nil || *layers.Band != "band/lumen-title-gold" || layers.Effect == nil || *layers.Effect != "effect/lumen-title-gold" || layers.Icon != nil {
 		t.Fatal(string(got.Rewards[0].Data))
 	}
 	var dan struct {

@@ -155,7 +155,7 @@
     "catalogEmpty": "还没有称号。",
     "mine": "我的称号",
     "quota": "社区称号已用 {{used}} / {{limit}} 个",
-    "changeBand": "改颜色",
+    "changeBand": "改外观",
     "edit": "修改",
     "delete": "删除",
     "confirmDelete": "删除称号「{{name}}」？已经获得它的玩家也会失去它。",
@@ -163,9 +163,8 @@
     "saved": "已保存。",
     "create": "新建称号",
     "editing": "修改称号",
-    "officialBandOnly": "这个称号已被设为官方，你只能修改它的颜色。",
+    "officialBandOnly": "这个称号已被设为官方，你只能修改它的外观。",
     "limitReached": "社区称号已达 {{limit}} 个上限。删除一个，或请管理员把其中一个设为官方后再新建。",
-    "keptStyles": "彩虹和紫色留给官方称号。",
     "save": "保存",
     "createButton": "创建",
     "cancel": "取消",
@@ -195,7 +194,6 @@
     "name": "名称",
     "nameIn": "名称（{{language}}）",
     "description": "说明",
-    "style": "样式",
     "official": "官方称号（社区段位不能授予）",
     "save": "保存",
     "saved": "已保存。",
@@ -211,15 +209,19 @@
     "revokeButton": "收回",
     "granted": "已授予。",
     "revoked": "已收回。",
-    "styles": {
-      "wood": "木纹",
-      "teal": "青绿",
-      "wood2": "浅木纹",
-      "purple": "紫色",
-      "gold": "金色",
-      "rainbow": "彩虹"
-    },
-    "madeBy": "创建者"
+    "madeBy": "创建者",
+    "look": "外观",
+    "layers": {
+      "preset": "从称号套用",
+      "custom": "自定义",
+      "band": "底条",
+      "effect": "特效",
+      "icon": "角标",
+      "none": "无",
+      "loading": "正在读取名牌素材…",
+      "unavailable": "名牌素材暂时读不到。",
+      "inTitles": "用于 {{titles}}"
+    }
   },
   "languages": {
     "en": "English",

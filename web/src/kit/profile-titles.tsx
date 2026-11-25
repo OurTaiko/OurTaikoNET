@@ -1,19 +1,21 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { PLAYERS_API } from './components/profile-plate'
 import { normalizeLanguage } from './i18n'
-import { TitleBandArt, type TitleStyle } from './components/nameplate-art'
+import { TitleBandArt } from './components/nameplate-art'
+import { layersOf, type TitleLayers } from './nameplate-layers'
 
 // The title catalog of OurTaikoProfile (profile.ourtaiko.org), which 段位 courses give titles
 // from. A course may give official titles (once it is official itself), its maker's own
 // community titles, and the community titles Profile's administrators keep (no maker).
 
-export type { TitleStyle }
 export type ProfileTitle = {
   id: string
   name: string
   nameTranslations: Record<string, string>
   description: string
-  style: TitleStyle
+  style: string
+  // Absent in a reward given before titles had layers: its style stands for them.
+  layers?: TitleLayers
   official: boolean
   ownerId: string | null
 }
@@ -55,7 +57,7 @@ export function titleText(title: ProfileTitle, language?: string) {
   return title.nameTranslations?.[normalizeLanguage(language)] || title.name
 }
 
-// The title on its band, cut from the game's own band art (the public bucket's nameplate/).
+// The title on its band, its layers drawn as the game draws them (the public bucket's nameplate/).
 export function TitleBand({
   title,
   language,
@@ -66,6 +68,10 @@ export function TitleBand({
   className?: string
 }) {
   return (
-    <TitleBandArt style={title.style} name={titleText(title, language)} className={className} />
+    <TitleBandArt
+      layers={layersOf(title)}
+      name={titleText(title, language)}
+      className={className}
+    />
   )
 }

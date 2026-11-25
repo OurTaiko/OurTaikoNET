@@ -5,7 +5,6 @@ import { Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { TitleStyle } from '@players/api/types'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Checkbox } from '@sitekit/components/ui/checkbox'
@@ -21,8 +20,10 @@ import { Notice } from '@players/notice'
 import { donCatalogQuery, invalidatePlayers } from '@players/queries'
 import { useSession } from '@players/session'
 import { useTitles } from './titles'
+import { TitleLayersPicker } from '@players/components/title-layers-picker'
+import { TitleBand } from '@players/components/nameplate'
+import { plainLook } from '@sitekit/nameplate-layers'
 
-const styles: TitleStyle[] = ['wood', 'teal', 'wood2', 'purple', 'gold', 'rainbow']
 const languages = ['en', 'ja', 'ko'] as const
 
 // Administrators of the Profile application keep the title catalog and grant titles by hand.
@@ -34,7 +35,7 @@ export function AdminPage() {
     id: '',
     name: '',
     description: '',
-    style: 'wood' as TitleStyle,
+    layers: plainLook,
     official: true,
     en: '',
     ja: '',
@@ -73,7 +74,7 @@ export function AdminPage() {
               name: form.name,
               nameTranslations,
               description: form.description,
-              style: form.style,
+              layers: form.layers,
               official: form.official,
             },
             session.csrfToken,
@@ -142,13 +143,14 @@ export function AdminPage() {
                 maxLength={500}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
-              <ChoiceSelect
-                label={t('admin.style')}
-                value={form.style}
-                onValueChange={(value) => setForm({ ...form, style: value as TitleStyle })}
-                items={styles.map((s) => ({ value: s, label: t(`admin.styles.${s}`) }))}
+            <div className="sm:col-span-2">
+              <TitleLayersPicker
+                value={form.layers}
+                onChange={(layers) => setForm({ ...form, layers })}
+                name={form.name || '—'}
               />
+            </div>
+            <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={form.official}
@@ -170,7 +172,8 @@ export function AdminPage() {
                     name: form.name || '—',
                     nameTranslations: {},
                     description: '',
-                    style: form.style,
+                    style: 'wood',
+                    layers: form.layers,
                     official: form.official,
                     ownerId: null,
                   },
@@ -193,9 +196,7 @@ export function AdminPage() {
               <li key={title.id} className="flex flex-wrap items-center gap-3 py-3">
                 <code className="text-xs">{title.id}</code>
                 <span className="font-medium">{title.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t(`admin.styles.${title.style}`)}
-                </span>
+                <TitleBand title={title} className="h-5" />
                 <span className="text-xs text-muted-foreground">
                   {title.official ? t('titles.official') : t('titles.community')}
                 </span>
@@ -213,7 +214,7 @@ export function AdminPage() {
                         id: title.id,
                         name: title.name,
                         description: title.description,
-                        style: title.style,
+                        layers: title.layers,
                         official: title.official,
                         en: title.nameTranslations.en ?? '',
                         ja: title.nameTranslations.ja ?? '',

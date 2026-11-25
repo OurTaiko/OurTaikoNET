@@ -155,7 +155,7 @@
     "catalogEmpty": "まだ称号がありません。",
     "mine": "自分の称号",
     "quota": "コミュニティ称号：{{used}} / {{limit}}",
-    "changeBand": "色を変更",
+    "changeBand": "見た目を変更",
     "edit": "編集",
     "delete": "削除",
     "confirmDelete": "称号「{{name}}」を削除しますか？獲得済みのプレイヤーからも失われます。",
@@ -163,9 +163,8 @@
     "saved": "保存しました。",
     "create": "新しい称号",
     "editing": "称号を編集",
-    "officialBandOnly": "この称号は公式になりました。変更できるのは色だけです。",
+    "officialBandOnly": "この称号は公式になりました。変更できるのは見た目だけです。",
     "limitReached": "コミュニティ称号が上限の {{limit}} 個に達しています。新しく作るには、どれかを削除するか、管理者に公式にしてもらってください。",
-    "keptStyles": "虹色と紫は公式称号用です。",
     "save": "保存",
     "createButton": "作成",
     "cancel": "キャンセル",
@@ -195,7 +194,6 @@
     "name": "名前",
     "nameIn": "名前（{{language}}）",
     "description": "説明",
-    "style": "スタイル",
     "official": "公式称号（コミュニティ段位では付与不可）",
     "save": "保存",
     "saved": "保存しました。",
@@ -211,15 +209,19 @@
     "revokeButton": "取り消す",
     "granted": "付与しました。",
     "revoked": "取り消しました。",
-    "styles": {
-      "wood": "木目",
-      "teal": "青緑",
-      "wood2": "明るい木目",
-      "purple": "紫",
-      "gold": "金",
-      "rainbow": "虹"
-    },
-    "madeBy": "作成者"
+    "madeBy": "作成者",
+    "look": "見た目",
+    "layers": {
+      "preset": "称号から選ぶ",
+      "custom": "カスタム",
+      "band": "帯",
+      "effect": "エフェクト",
+      "icon": "アイコン",
+      "none": "なし",
+      "loading": "ネームプレートの素材を読み込み中…",
+      "unavailable": "ネームプレートの素材を読み込めません。",
+      "inTitles": "{{titles}} で使用"
+    }
   },
   "languages": {
     "en": "English",
