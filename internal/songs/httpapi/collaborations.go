@@ -415,6 +415,7 @@ func (s *Server) respondCollaboration(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "INVITATION_RESOLVED", "邀请已经处理")
 		return
 	}
+	joined := false
 	if status == "pending" {
 		if *req.Accept {
 			if !slices.Contains(owners, inviter) {
@@ -423,6 +424,7 @@ func (s *Server) respondCollaboration(w http.ResponseWriter, r *http.Request) {
 			}
 			if !slices.Contains(owners, u.User.ID) {
 				_, e = tx.Exec(ctx, `UPDATE charts SET owner_ids=array_append(owner_ids,$2::text) WHERE id=$1`, chartID, u.User.ID)
+				joined = true
 			}
 		}
 		if e == nil {
@@ -438,6 +440,10 @@ func (s *Server) respondCollaboration(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		internal(w, e)
 		return
+	}
+	// The chart counts as an upload of each of its owners: one more now.
+	if joined {
+		s.rulesAfterChartChange(ctx)
 	}
 	web.Respond(w, 200, map[string]string{"status": desired})
 }

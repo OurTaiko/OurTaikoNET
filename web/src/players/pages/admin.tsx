@@ -11,7 +11,7 @@ import { DonItemsCard } from '@players/components/don-items-card'
 import { TitleBand } from '@players/components/nameplate'
 import { NoteField, TitleFields, VisibilityMark } from '@players/components/title-form'
 import { TitleReviews } from '@players/components/title-reviews'
-import { TitleRulesCard } from '@players/components/title-rules-card'
+import { RewardRulesCard } from '@players/components/reward-rules-card'
 import { titleName } from '@players/dan'
 import { useDonItems } from '@players/don-items'
 import { Notice } from '@players/notice'
@@ -381,7 +381,7 @@ function Grants() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const { busy, run } = useRun()
-  const { titles, rules, error } = useTitles()
+  const { titles, rules, categories, error } = useTitles()
   const catalog = useQuery(donCatalogQuery).data ?? null
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const [player, setPlayer] = useState<PublicUser | null>(null)
@@ -398,14 +398,15 @@ function Grants() {
   return (
     <div className="space-y-6">
       {error && <Notice>{error}</Notice>}
-      <TitleRulesCard
+      <RewardRulesCard
         titles={titles ?? []}
         rules={rules}
+        categories={categories}
         donName={(part, id) =>
           donItemName(catalog ? catalogItem(catalog, part, id) : undefined, language, id)
         }
         onAdd={(target, rule) =>
-          void run(
+          run(
             () =>
               api<{ granted: number }>(
                 'title' in target
@@ -414,6 +415,16 @@ function Grants() {
                 jsonRequest('POST', rule, session.csrfToken),
               ),
             (result) => t('rules.added', { n: result.granted }),
+          )
+        }
+        onUpdate={(rule, draft) =>
+          run(
+            () =>
+              api<{ granted: number }>(
+                endpoints.adminRule(rule.id),
+                jsonRequest('PUT', draft, session.csrfToken),
+              ),
+            (result) => t('rules.updated', { n: result.granted }),
           )
         }
         onDelete={(rule) =>

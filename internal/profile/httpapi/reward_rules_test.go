@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ourtaiko.dev/net/internal/account"
+	"ourtaiko.dev/net/internal/rewards/rules"
 )
 
 // The administrators of the titles say what gives a title by itself; everyone can read it.
@@ -22,13 +23,15 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 
 	// A rule gives its title at once to those who meet it: the administrator is signed in.
 	var made struct {
-		Rule    TitleRule
+		Rule    rules.Listed
 		Granted int
 	}
 	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"site_login"}`, 201, &made)
-	if made.Granted != 1 || made.Rule.ID == 0 || made.Rule.Kind != "site_login" || *made.Rule.TitleID != "first" {
+	if made.Granted != 1 || made.Rule.ID == 0 || made.Rule.Kind != "site_login" || made.Rule.Item != rules.ItemTitle || *made.Rule.TitleID != "first" {
 		t.Fatal(made)
 	}
+	// The same rule again is the one there is.
+	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"site_login"}`, 409, nil)
 	var held struct{ Titles []HeldTitle }
 	c.json("GET", "/api/users/"+player+"/titles", "", 200, &held)
 	if len(held.Titles) != 1 || held.Titles[0].Title.ID != "first" || held.Titles[0].Service != "rule" {
@@ -53,8 +56,10 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 		`{"kind":"category_clear","source":"fanmade","category":"namco","clear":1}`,
 		`{"kind":"category_clear","source":"fanmade","category":"game","clear":1,"course":"Ura"}`,
 		`{"kind":"category_clear","source":"fanmade","category":"game","clear":1,"count":0}`,
-		`{"kind":"charts_uploaded","source":"fanmade"}`,
-		`{"kind":"charts_uploaded","source":"fanmade","count":3,"clear":1}`,
+		`{"kind":"charts_uploaded"}`,
+		`{"kind":"charts_uploaded","count":3,"clear":1}`,
+		// Players upload to the fanmade source alone: an upload rule names no source.
+		`{"kind":"charts_uploaded","source":"fanmade","count":3}`,
 	} {
 		c.json("POST", "/api/admin/titles/first/rules", body, 422, nil)
 	}
@@ -76,8 +81,20 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	if made.Rule.Category == nil || *made.Rule.Category != "pop" || *made.Rule.Count != 10 {
 		t.Fatal(made)
 	}
+	// A rule's conditions change; its item does not.
+	category := made.Rule.ID
+	path := fmt.Sprintf("/api/admin/rules/%d", category)
+	guestEdit := &client{t: t, handler: app.Handler()}
+	guestEdit.json("PUT", path, `{"kind":"category_clear","source":"fanmade","category":"pop","clear":1,"count":5}`, 401, nil)
+	c.json("PUT", path, `{"kind":"category_clear","source":"fanmade","category":"pop","clear":1,"count":0}`, 422, nil)
+	c.json("PUT", "/api/admin/rules/999999", `{"kind":"site_login"}`, 404, nil)
+	c.json("PUT", path, `{"kind":"site_login"}`, 409, nil)
+	c.json("PUT", path, `{"kind":"category_clear","source":"fanmade","category":"game","clear":2,"count":5}`, 200, &made)
+	if made.Rule.ID != category || *made.Rule.Category != "game" || *made.Rule.Count != 5 || *made.Rule.Clear != 2 || *made.Rule.TitleID != "first" {
+		t.Fatal(made)
+	}
 	// The player has one chart there already.
-	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","source":"fanmade","count":1}`, 201, &made)
+	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","count":1}`, 201, &made)
 	if made.Granted != 0 {
 		t.Fatal("the title was held already", made)
 	}
@@ -91,10 +108,15 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	// Anyone reads the rules with the catalog.
 	guest := &client{t: t, handler: app.Handler()}
 	var catalog struct {
-		Titles []Title
-		Rules  []TitleRule
+		Titles     []Title
+		Rules      []rules.Listed
+		Categories map[string][]string
 	}
 	guest.json("GET", "/api/titles", "", 200, &catalog)
+	// With the categories a rule may name, in the order of their bits.
+	if fmt.Sprint(catalog.Categories) != "map[fanmade:[game pop] official:[namco]]" {
+		t.Fatal(catalog.Categories)
+	}
 	if len(catalog.Rules) != 4 || catalog.Rules[1].Chart.ID != chart || !strings.Contains(string(catalog.Rules[1].Chart.TitleTranslations), "Saitama 2000") {
 		t.Fatal(catalog.Rules)
 	}
@@ -115,23 +137,24 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	}
 }
 
-// The built-in account owns the official charts but has uploaded nothing: no rule gives it a title.
+// The built-in account owns the charts the site imported but has uploaded nothing: no rule gives
+// it a title.
 func TestTheBuiltInAccountEarnsNoUploadTitles(t *testing.T) {
 	pool := testDB(t)
 	ctx := context.Background()
-	app := New(pool, Config{Origin: origin, DevUserID: player, Sources: []Source{{ID: "official", Categories: map[string]int{"namco": 1}}}})
+	app := New(pool, Config{Origin: origin, DevUserID: player, Sources: []Source{{ID: "fanmade", Categories: map[string]int{"game": 1}}}})
 	c := &client{t: t, handler: app.Handler()}
 	c.signIn()
-	if _, err := pool.Exec(ctx, `INSERT INTO official.chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES(repeat('a',64)||'.tja','a.tja',repeat('a',64),1,'tja'),(repeat('b',64)||'.ogg','a.ogg',repeat('b',64),1,'ogg')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO fanmade.chart_resources(storage_key,original_filename,sha256,byte_size,extension) VALUES(repeat('a',64)||'.tja','a.tja',repeat('a',64),1,'tja'),(repeat('b',64)||'.ogg','a.ogg',repeat('b',64),1,'ogg')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO official.charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,audio_file,category_flags)
- SELECT repeat('c',32),ARRAY[$1::text],'Song',120,10,10,(SELECT id FROM official.chart_resources WHERE extension='tja'),(SELECT id FROM official.chart_resources WHERE extension='ogg'),1`, account.SystemUserID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO fanmade.charts(id,owner_ids,title,bpm,duration,demo_end,tja_file,audio_file,category_flags)
+ SELECT repeat('c',32),ARRAY[$1::text],'Song',120,10,10,(SELECT id FROM fanmade.chart_resources WHERE extension='tja'),(SELECT id FROM fanmade.chart_resources WHERE extension='ogg'),1`, account.SystemUserID); err != nil {
 		t.Fatal(err)
 	}
 	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
 	var made struct{ Granted int }
-	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","source":"official","count":1}`, 201, &made)
+	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","count":1}`, 201, &made)
 	if made.Granted != 0 {
 		t.Fatal(made)
 	}

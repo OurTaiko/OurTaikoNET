@@ -25,7 +25,8 @@ import type {
   ScoreSort,
   ScoreView,
   ReviewPage,
-  TitleRule,
+  RewardRule,
+  RuleCategories,
   VisitReport,
 } from '@players/api/types'
 import { sourceApi } from '@players/components/song-tile'
@@ -134,7 +135,10 @@ export const playerQueries = {
     queryOptions({
       queryKey: playerKeys.titles(),
       queryFn: ({ signal }) =>
-        api<{ titles: ListedTitle[]; rules?: TitleRule[] }>(endpoints.titles, { signal }),
+        api<{ titles: ListedTitle[]; rules?: RewardRule[]; categories?: RuleCategories }>(
+          endpoints.titles,
+          { signal },
+        ),
     }),
   /** The titles the signed-in player made, with each one's latest review. */
   myTitles: () =>

@@ -157,11 +157,12 @@ export type ScorePage = {
   sort: ScoreSort
   sources: (Source & { count: number; truncated: boolean; error?: string })[]
 }
-// A rule that gives a title by itself. Which fields are set goes by kind; a category rule
-// without a count asks for every song of the category.
-export type TitleRule = {
+// A rule that gives an item by itself (the backend's internal/rewards/rules). Which fields are
+// set goes by kind; a category rule without a count asks for every song of the category.
+export type RewardRule = {
   id: number
-  // The item it gives: a title, or a part of the Don and its number (one or the other).
+  // The item it gives: a title (titleId), or a part of the Don and its number.
+  item: 'title' | 'don_item'
   titleId: string | null
   donPart: 'cos' | 'head' | 'body' | 'puchi' | 'paint' | null
   donItem: number | null
@@ -180,6 +181,8 @@ export type TitleRule = {
   clear: number | null
   count: number | null
 }
+// Each source's category IDs, in the order of their bits: what a category rule may name.
+export type RuleCategories = Record<string, string[]>
 export type HeldTitle = { title: Title; grantedAt: string; service: string; courseTitle: string }
 export type AwardRecord = {
   service: string

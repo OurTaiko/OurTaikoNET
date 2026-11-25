@@ -26,12 +26,13 @@ func TestSSOMigrationGuardAndLiveProfile(t *testing.T) {
 	app := testServer(t, pool, Config{Origin: "http://localhost"})
 	handler := app.Handler()
 	token := seedWebSession(t, app, id)
-	// A player's row is their id, when they first signed in and were last active, their user
-	// groups, and a copy of what the account center publishes about them (nickname, avatar,
-	// when it was last asked): no username, email, password or administrator flag.
+	// A player's row is their id, when they first signed in and were last active, where they
+	// were last seen signed in (the website, the game), their user groups, and a copy of what
+	// the account center publishes about them (nickname, avatar, when it was last asked): no
+	// username, email, password or administrator flag.
 	var columns string
 	if e = pool.QueryRow(ctx, `SELECT string_agg(column_name::text, ',' ORDER BY column_name) FROM information_schema.columns WHERE table_schema='net' AND table_name='users'`).Scan(&columns); e != nil ||
-		columns != "avatar_url,first_login_at,groups,id,last_active_at,nickname,profile_checked_at" {
+		columns != "avatar_url,first_login_at,groups,id,last_active_at,nickname,profile_checked_at,seen_in_game_at,seen_on_site_at" {
 		t.Fatal("unexpected identity/activity columns", columns, e)
 	}
 	call := func(method, path, csrf string) *httptest.ResponseRecorder {

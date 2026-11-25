@@ -489,7 +489,7 @@
       "category_clear": "분류의 곡 클리어",
       "site_login": "웹사이트 로그인",
       "game_login": "게임 로그인",
-      "charts_uploaded": "업로드한 채보 수"
+      "charts_uploaded": "참여한 채보 수"
     },
     "clears": {
       "1": "클리어",
@@ -503,7 +503,7 @@
       "chart_clear": "{{source}}의 「{{title}}」 {{clear}}{{course}}",
       "category_all": "{{source}} 「{{category}}」의 모든 곡 {{clear}}{{course}}",
       "category_count": "{{source}} 「{{category}}」 {{count}}곡 {{clear}}{{course}}",
-      "charts_uploaded": "{{source}}에 채보 {{count}}개 업로드"
+      "charts_uploaded": "채보 {{count}}개 제작에 참여"
     },
     "categories": {
       "fanmade": {
@@ -531,7 +531,12 @@
       "don": "동짱 꾸미기"
     },
     "donPart": "부위",
-    "donItem": "번호"
+    "donItem": "번호",
+    "edit": "수정",
+    "save": "변경 저장",
+    "cancel": "취소",
+    "editing": "조건 {{id}}을(를) 수정 중입니다. 지급하는 항목은 바꿀 수 없습니다.",
+    "updated": "저장했으며 이미 달성한 {{n}}명에게 지급했습니다."
   },
   "donItems": {
     "heading": "획득이 필요한 꾸미기",

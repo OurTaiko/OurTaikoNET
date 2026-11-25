@@ -28,7 +28,7 @@ type Source struct {
 	Name string `json:"name"`
 	Site string `json:"site"`
 	// Categories are the source's categories, each ID with its bit in charts.category_flags:
-	// what a title rule of a category is written with (title_rules.go).
+	// what a rule of a category is written with (package rules).
 	Categories map[string]int `json:"-"`
 }
 

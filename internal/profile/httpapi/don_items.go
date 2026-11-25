@@ -8,6 +8,7 @@ import (
 
 	"ourtaiko.dev/net/internal/account"
 	"ourtaiko.dev/net/internal/donitems"
+	"ourtaiko.dev/net/internal/rewards/rules"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -25,19 +26,17 @@ func (l DonLook) worn() []donitems.Item {
 	return append(items, donitems.Item{Part: "head", ID: l.Head}, donitems.Item{Part: "body", ID: l.Body})
 }
 
-// donRules are the rules that give parts of the Don.
-func (s *Server) donRules(ctx context.Context) ([]TitleRule, error) {
-	all, err := s.titleRules(ctx)
+// donItemExists says whether the catalog has a part of the Don, for a rule that gives it
+// (package rules): a problem to answer when not.
+func (s *Server) donItemExists(ctx context.Context, part string, id int) (int, string, string, error) {
+	c, err := s.donCatalog(ctx)
 	if err != nil {
-		return nil, err
+		return 503, "DON_CATALOG_UNAVAILABLE", "服装目录暂时读不到，请稍后再试", nil
 	}
-	rules := []TitleRule{}
-	for _, r := range all {
-		if r.DonPart != nil {
-			rules = append(rules, r)
-		}
+	if _, ok := c.item(part, id); !ok {
+		return 404, "DON_ITEM_NOT_FOUND", "没有这件咚酱装扮", nil
 	}
-	return rules, nil
+	return 0, "", "", nil
 }
 
 // donItems is GET /api/don/items, public: {locked: [{part, id}], rules: [rule…]}, the parts that
@@ -48,7 +47,7 @@ func (s *Server) donItems(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	rules, err := s.donRules(r.Context())
+	rules, err := s.rules.List(r.Context(), rules.ItemDonItem)
 	if err != nil {
 		internal(w, err)
 		return

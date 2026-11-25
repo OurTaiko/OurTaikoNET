@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"ourtaiko.dev/net/internal/titlerules"
+	"ourtaiko.dev/net/internal/rewards/rules"
 	"ourtaiko.dev/net/internal/web"
 )
 
-// Titles given by rule (package titlerules): for a chart, a category, the number of uploads,
+// Titles given by rule (package rules): for a chart, a category, the number of uploads,
 // and for being seen on the website and in the game.
 func TestRulesGiveTitles(t *testing.T) {
 	pool := testDB(t, Fanmade)
@@ -34,10 +34,10 @@ func TestRulesGiveTitles(t *testing.T) {
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) SELECT id,id,'wood','public' FROM unnest(ARRAY['song','genre','genre-oni','site','game','uploader','mine']) id;
  UPDATE net.titles SET owner_id='`+owner+`',visibility='private' WHERE id='mine';
- INSERT INTO net.title_rules(title_id,kind) VALUES('site','site_login'),('game','game_login');
- INSERT INTO net.title_rules(title_id,kind,source,chart_id,course,clear) VALUES('song','chart_clear','fanmade','`+a+`','Oni',2);
- INSERT INTO net.title_rules(title_id,kind,source,category_flag,clear,count) VALUES('genre','category_clear','fanmade',1,1,NULL),('genre-oni','category_clear','fanmade',1,1,1);
- UPDATE net.title_rules SET course='Oni' WHERE title_id='genre-oni'`); err != nil {
+ INSERT INTO net.reward_rules(item,title_id,kind) VALUES('title','site','site_login'),('title','game','game_login');
+ INSERT INTO net.reward_rules(item,title_id,kind,source,chart_id,course,clear) VALUES('title','song','chart_clear','fanmade','`+a+`','Oni',2);
+ INSERT INTO net.reward_rules(item,title_id,kind,source,category_flag,clear,count) VALUES('title','genre','category_clear','fanmade',1,1,NULL),('title','genre-oni','category_clear','fanmade',1,1,1);
+ UPDATE net.reward_rules SET course='Oni' WHERE title_id='genre-oni'`); err != nil {
 		t.Fatal(err)
 	}
 	holds := func(user string) []string {
@@ -112,20 +112,20 @@ func TestRulesGiveTitles(t *testing.T) {
 	expect(bob, "game", "genre", "genre-oni")
 
 	// A new rule gives its title at once to those who meet it already.
-	var rule titlerules.Rule
-	insert := func(sql string) titlerules.Rule {
+	var rule rules.Rule
+	insert := func(sql string) rules.Rule {
 		t.Helper()
-		r, err := titlerules.Scan(pool.QueryRow(ctx, sql+` RETURNING id,title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count`))
+		r, err := rules.Scan(pool.QueryRow(ctx, sql+` RETURNING id,item,title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count`))
 		if err != nil {
 			t.Fatal(err)
 		}
 		return r
 	}
-	rule = insert(`INSERT INTO net.title_rules(title_id,kind,source,count) VALUES('uploader','charts_uploaded','fanmade',3)`)
-	if n, err := titlerules.Backfill(ctx, pool, rule); err != nil || n != 1 {
+	rule = insert(`INSERT INTO net.reward_rules(item,title_id,kind,count) VALUES('title','uploader','charts_uploaded',3)`)
+	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 1 {
 		t.Fatal(n, err)
 	}
-	if n, err := titlerules.Backfill(ctx, pool, rule); err != nil || n != 0 {
+	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 0 {
 		t.Fatal("given twice", n, err)
 	}
 	expect(owner, "uploader")
@@ -133,12 +133,48 @@ func TestRulesGiveTitles(t *testing.T) {
 	if _, err := pool.Exec(ctx, `DELETE FROM net.user_titles WHERE title_id='uploader'; DELETE FROM net.awards WHERE service='rule' AND user_id='`+owner+`'`); err != nil {
 		t.Fatal(err)
 	}
-	s.titlesAfterUpload(ctx, a)
+	s.rulesAfterChartChange(ctx)
 	expect(owner, "uploader")
 	// A rule for the game, made later, finds those who have played.
-	rule = insert(`INSERT INTO net.title_rules(title_id,kind) VALUES('uploader','game_login')`)
-	if n, err := titlerules.Backfill(ctx, pool, rule); err != nil || n != 1 {
+	rule = insert(`INSERT INTO net.reward_rules(item,title_id,kind) VALUES('title','uploader','game_login')`)
+	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 1 {
 		t.Fatal(n, err)
 	}
 	expect(bob, "game", "genre", "genre-oni", "uploader")
+
+	// A chart put in another category is judged at once for everyone: bob has cleared the
+	// "pop" chart, now the only chart of "classic" (8).
+	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) VALUES('classic','classic','wood','public')`); err != nil {
+		t.Fatal(err)
+	}
+	rule = insert(`INSERT INTO net.reward_rules(item,title_id,kind,source,category_flag,clear) VALUES('title','classic','category_clear','fanmade',8,1)`)
+	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 0 {
+		t.Fatal(n, err)
+	}
+	if code := c.do("owner", "PATCH", "/api/charts/"+cc, `{"categoryIds":["classic"]}`, nil); code != 200 {
+		t.Fatal(code)
+	}
+	expect(bob, "classic", "game", "genre", "genre-oni", "uploader")
+
+	// Every owner of a chart counts it as an upload, not only the first: bob joining one of the
+	// owner's charts as a collaborator gets a title for one chart at once (and, seen on the
+	// website for the first time, the website's).
+	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) VALUES('collab','collab','wood','public')`); err != nil {
+		t.Fatal(err)
+	}
+	rule = insert(`INSERT INTO net.reward_rules(item,title_id,kind,count) VALUES('title','collab','charts_uploaded',1)`)
+	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 1 {
+		t.Fatal("the owner has charts", n, err)
+	}
+	if code := c.do("owner", "POST", "/api/charts/"+a+"/collaborations", fmt.Sprintf(`{"userId":%q}`, bob), nil); code != 201 {
+		t.Fatal(code)
+	}
+	var notices NotificationPage
+	if code := c.do("bob", "GET", "/api/me/notifications", "", &notices); code != 200 || len(notices.Items) != 1 {
+		t.Fatal(code, notices)
+	}
+	if code := c.do("bob", "POST", "/api/me/notifications/"+notices.Items[0].ID+"/respond", `{"accept":true}`, nil); code != 200 {
+		t.Fatal(code)
+	}
+	expect(bob, "classic", "collab", "game", "genre", "genre-oni", "site", "uploader")
 }
