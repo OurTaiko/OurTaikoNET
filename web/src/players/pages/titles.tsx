@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api, jsonRequest } from '@players/api/client'
 import { endpoints } from '@players/api/endpoints'
-import type { Title, TitleRule, TitleStyle } from '@players/api/types'
-import { ChoiceSelect } from '@players/components/choice-select'
+import type { Title, TitleRule } from '@players/api/types'
 import { Nameplate } from '@players/components/nameplate'
+import { TitleLayersPicker } from '@players/components/title-layers-picker'
+import { plainLook, type TitleLayers } from '@sitekit/nameplate-layers'
 import { Badge } from '@sitekit/components/ui/badge'
 import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
@@ -19,9 +20,6 @@ import { useSession } from '@players/session'
 import { titleName } from '@players/dan'
 import { ruleText } from '@players/title-rules'
 
-export const titleStyles: TitleStyle[] = ['wood', 'teal', 'wood2', 'purple', 'gold', 'rainbow']
-// Rainbow and purple are kept for official titles.
-const communityStyles: TitleStyle[] = ['wood', 'teal', 'wood2', 'gold']
 // A player keeps at most this many community titles (official ones do not count).
 const titleLimit = 5
 const languages = ['en', 'ja', 'ko'] as const
@@ -42,7 +40,7 @@ type Draft = {
   official: boolean
   name: string
   description: string
-  style: TitleStyle
+  layers: TitleLayers
   en: string
   ja: string
   ko: string
@@ -52,14 +50,14 @@ const emptyDraft: Draft = {
   official: false,
   name: '',
   description: '',
-  style: 'wood',
+  layers: plainLook,
   en: '',
   ja: '',
   ko: '',
 }
 
 // The titles the player made for their own 段位 courses: up to five community ones, which they
-// change or delete; of the ones an administrator made official they change the band only.
+// change or delete; of the ones an administrator made official they change the look only.
 function MyTitles({ titles }: { titles: Title[] }) {
   const { t } = useTranslation()
   const session = useSession()
@@ -93,7 +91,7 @@ function MyTitles({ titles }: { titles: Title[] }) {
       name: draft.name,
       nameTranslations,
       description: draft.description,
-      style: draft.style,
+      layers: draft.layers,
     }
     void run(
       () =>
@@ -106,7 +104,6 @@ function MyTitles({ titles }: { titles: Title[] }) {
   }
   const editing = draft.id !== null
   const full = !editing && community >= titleLimit
-  const styles = draft.official ? titleStyles : communityStyles
   return (
     <Card className="rounded-3xl">
       <CardHeader>
@@ -147,7 +144,7 @@ function MyTitles({ titles }: { titles: Title[] }) {
                         official: title.official,
                         name: title.name,
                         description: title.description,
-                        style: title.style,
+                        layers: title.layers,
                         en: title.nameTranslations.en ?? '',
                         ja: title.nameTranslations.ja ?? '',
                         ko: title.nameTranslations.ko ?? '',
@@ -229,17 +226,13 @@ function MyTitles({ titles }: { titles: Title[] }) {
               disabled={draft.official || full}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-            <ChoiceSelect
-              label={t('admin.style')}
-              value={draft.style}
-              onValueChange={(value) => setDraft({ ...draft, style: value as TitleStyle })}
-              items={styles.map((s) => ({ value: s, label: t(`admin.styles.${s}`) }))}
+          <div className="sm:col-span-2">
+            <TitleLayersPicker
+              value={draft.layers}
+              onChange={(layers) => setDraft({ ...draft, layers })}
+              name={draft.name || '—'}
               disabled={full}
             />
-            {!draft.official && (
-              <span className="text-xs text-muted-foreground">{t('titles.keptStyles')}</span>
-            )}
           </div>
           <div className="sm:col-span-2">
             <Nameplate
@@ -254,7 +247,8 @@ function MyTitles({ titles }: { titles: Title[] }) {
                   name: draft.name || '—',
                   nameTranslations: {},
                   description: '',
-                  style: draft.style,
+                  style: 'wood',
+                  layers: draft.layers,
                   official: draft.official,
                   ownerId: user.id,
                 },

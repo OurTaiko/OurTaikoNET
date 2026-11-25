@@ -4,6 +4,7 @@ import { PLAYERS_BASE } from '../source'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { DanEmblem, TitleBandArt } from './nameplate-art'
+import { layersOf, type TitleLayers } from '../nameplate-layers'
 
 // The title and 段位 a player wears (the players' pages keep them), drawn next to
 // their name. Lookups for the names on a page are gathered into one request.
@@ -12,9 +13,13 @@ export const PROFILE_URL = PLAYERS_BASE
 export const PLAYERS_API = SITE_API_ROOT
 export const profilePage = (id: string) => `${PROFILE_URL}/${encodeURIComponent(id)}`
 
-type Style = 'wood' | 'teal' | 'wood2' | 'purple' | 'gold' | 'rainbow'
 export type Plate = {
-  title: { name: string; nameTranslations?: Record<string, string>; style: Style } | null
+  title: {
+    name: string
+    nameTranslations?: Record<string, string>
+    style: string
+    layers?: TitleLayers
+  } | null
   dan: { index: number; gold: boolean; combo?: 0 | 1 | 2 } | null
 }
 
@@ -109,7 +114,7 @@ export function ProfilePlate({ userId, className }: { userId: string; className?
       )}
       {plate.title && (
         <TitleBandArt
-          style={plate.title.style}
+          layers={layersOf(plate.title)}
           name={plate.title.nameTranslations?.[language] || plate.title.name}
           className="h-5"
         />

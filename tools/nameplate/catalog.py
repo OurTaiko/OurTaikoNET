@@ -18,6 +18,9 @@ Every file is listed with its path (relative to the catalog), size and SHA-256. 
 is never replaced: clients and the mirror keep it by its path alone, so changed art gets a new
 file name.
 
+Released game versions read this catalog; the layered set newer ones and the website draw is
+published beside it by lumen.py (lumen.json and lumen/).
+
 Usage: catalog.py <folder>   (writes <folder>/catalog.json)
 """
 import hashlib

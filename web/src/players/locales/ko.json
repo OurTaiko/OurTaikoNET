@@ -155,7 +155,7 @@
     "catalogEmpty": "아직 칭호가 없습니다.",
     "mine": "내 칭호",
     "quota": "커뮤니티 칭호: {{used}} / {{limit}}",
-    "changeBand": "색상 변경",
+    "changeBand": "외형 변경",
     "edit": "수정",
     "delete": "삭제",
     "confirmDelete": "칭호 「{{name}}」을(를) 삭제할까요? 이미 획득한 플레이어도 잃게 됩니다.",
@@ -163,9 +163,8 @@
     "saved": "저장했습니다.",
     "create": "새 칭호",
     "editing": "칭호 수정",
-    "officialBandOnly": "이 칭호는 공식이 되었습니다. 색상만 바꿀 수 있습니다.",
+    "officialBandOnly": "이 칭호는 공식이 되었습니다. 외형만 바꿀 수 있습니다.",
     "limitReached": "커뮤니티 칭호가 최대 {{limit}}개에 도달했습니다. 새로 만들려면 하나를 삭제하거나 관리자에게 공식 지정을 요청하세요.",
-    "keptStyles": "무지개색과 보라색은 공식 칭호용입니다.",
     "save": "저장",
     "createButton": "만들기",
     "cancel": "취소",
@@ -195,7 +194,6 @@
     "name": "이름",
     "nameIn": "이름 ({{language}})",
     "description": "설명",
-    "style": "스타일",
     "official": "공식 칭호 (커뮤니티 단위는 지급 불가)",
     "save": "저장",
     "saved": "저장했습니다.",
@@ -211,15 +209,19 @@
     "revokeButton": "회수",
     "granted": "지급했습니다.",
     "revoked": "회수했습니다.",
-    "styles": {
-      "wood": "나뭇결",
-      "teal": "청록",
-      "wood2": "밝은 나뭇결",
-      "purple": "보라",
-      "gold": "금색",
-      "rainbow": "무지개"
-    },
-    "madeBy": "만든 사람"
+    "madeBy": "만든 사람",
+    "look": "외형",
+    "layers": {
+      "preset": "칭호에서 가져오기",
+      "custom": "사용자 지정",
+      "band": "띠",
+      "effect": "효과",
+      "icon": "아이콘",
+      "none": "없음",
+      "loading": "이름표 소재를 읽는 중…",
+      "unavailable": "이름표 소재를 지금 읽을 수 없습니다.",
+      "inTitles": "{{titles}}에 사용"
+    }
   },
   "languages": {
     "en": "English",
