@@ -254,6 +254,19 @@ export function Frame({ children }: { children: ReactNode }) {
               },
             ]
           : []),
+        // Tag managers, and each source's managers for theirs (players' page /manage/tags).
+        ...(['TAG_MANAGER', 'FANMADE_MANAGER', 'OFFICIAL_MANAGER'].some((group) =>
+          roles.groups.includes(group),
+        )
+          ? [
+              {
+                key: 'tagAdmin',
+                href: '/manage/tags',
+                label: t('shell.tagAdmin'),
+                icon: TagIcon,
+              },
+            ]
+          : []),
         ...(roles.siteAdmin
           ? [
               {

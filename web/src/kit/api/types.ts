@@ -17,6 +17,27 @@ export type Session<U extends UserBase = UserBase> = { user: U | null; csrfToken
 export type Category = { id: string; title: string; genre: string; chartCount: number }
 /** GET /categories: the catalog and the published charts in all. */
 export type CategoryList = { items: Category[]; chartCount: number }
+/**
+ * A tag: what a song is beside its categories (東方Project, BMS…), the same for both sources.
+ * names has the tag's name in each of the site's languages, en always; chartCount is how many
+ * published charts of the source have it.
+ */
+export type Tag = { id: string; names: Record<string, string>; chartCount: number }
+/** GET /tags: the catalog in its order. */
+export type TagList = { items: Tag[] }
+export type TagSuggestionStatus = 'pending' | 'accepted' | 'rejected'
+/** One of the viewer's suggestions on a chart. */
+export type MyTagSuggestion = { tag: string; status: TagSuggestionStatus }
+/**
+ * GET /charts/{id}/tags: the chart's tags, whether the viewer sets them (a tag manager or the
+ * source's manager) or decides suggestions (a tag manager), and what they have suggested.
+ */
+export type ChartTagState = {
+  tags: string[]
+  canEdit: boolean
+  canReview: boolean
+  suggestions: MyTagSuggestion[]
+}
 
 export type Side = 'single' | 'p1' | 'p2'
 /**
@@ -75,6 +96,8 @@ export type ChartBase = {
   wave: string
   difficulties: Difficulty[]
   categoryIds: string[]
+  /** The chart's tags (Tag ids), in the catalog's order. */
+  tags?: string[]
   ownerIds?: string[]
   owners?: { id: string; nickname: string; avatarPath?: string }[]
   /** Original uploader; use ownerIds for ownership. */

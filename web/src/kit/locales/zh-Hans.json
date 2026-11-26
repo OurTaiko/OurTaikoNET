@@ -1020,7 +1020,8 @@
     "featured": "首页推荐",
     "announcements": "公告管理",
     "editor": "OurTaikoEdit",
-    "myTitles": "我的称号"
+    "myTitles": "我的称号",
+    "tagAdmin": "TAG 管理"
   },
   "chat": {
     "title": "消息",
@@ -1105,5 +1106,25 @@
     "toReviews": "去审核",
     "toMine": "查看我的称号",
     "readOnly": "称号中心只能查看，不能回复。"
+  },
+  "tags": {
+    "heading": "标签",
+    "filter": "标签",
+    "anyTag": "全部标签",
+    "add": "添加标签",
+    "manage": "标签",
+    "editTitle": "编辑标签",
+    "suggestTitle": "建议标签",
+    "editHint": "勾选这首歌的标签，保存后立即生效。",
+    "suggestHint": "觉得这首歌还应该有哪个标签，可以提交建议，由标签管理员处理。",
+    "loading": "正在读取标签…",
+    "save": "保存",
+    "close": "关闭",
+    "suggest": "建议",
+    "withdraw": "撤回",
+    "onChart": "已有",
+    "pending": "待处理",
+    "accepted": "已采纳",
+    "rejected": "已拒绝"
   }
 }

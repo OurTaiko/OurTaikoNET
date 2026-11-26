@@ -780,7 +780,7 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 			Bit  int    `json:"bit"`
 		} `json:"groups"`
 	}
-	if status := call(admin, "GET", "/api/v1/admin/groups", "", &catalog); status != 200 || len(catalog.Groups) != 3 || catalog.Groups[0].Name != "OFFICIAL_MANAGER" || catalog.Groups[0].Bit != 1 {
+	if status := call(admin, "GET", "/api/v1/admin/groups", "", &catalog); status != 200 || len(catalog.Groups) != 4 || catalog.Groups[0].Name != "OFFICIAL_MANAGER" || catalog.Groups[0].Bit != 1 {
 		t.Fatalf("group catalog: %d %+v", status, catalog)
 	}
 	give := "/api/v1/admin/users/" + player + "/groups"
@@ -818,6 +818,20 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 		t.Fatalf("members: %d %+v", status, listed)
 	}
 
+	// A source's managers decide the tags players suggest on that source; TAG_MANAGER on both.
+	if status := call(someone, "GET", "/api/v1/sources/official/tag-suggestions", "", nil); status != 200 {
+		t.Fatal("an official manager could not read the official tag suggestions:", status)
+	}
+	if status := call(someone, "GET", "/api/v1/sources/fanmade/tag-suggestions", "", nil); status != 403 {
+		t.Fatal("an official manager read the fanmade tag suggestions:", status)
+	}
+	call(admin, "PUT", give, `{"groups":["TAG_MANAGER"]}`, nil)
+	for _, source := range []string{"fanmade", "official"} {
+		if status := call(someone, "GET", "/api/v1/sources/"+source+"/tag-suggestions", "", nil); status != 200 {
+			t.Fatal("a tag manager could not read the tag suggestions of", source, status)
+		}
+	}
+
 	// The other two groups, then none.
 	call(admin, "PUT", give, `{"groups":["FANMADE_MANAGER","TITLE_MANAGER"]}`, nil)
 	if got := manages(someone); got != "/api/v1/sources/fanmade/me,/api/v1/me" {
@@ -831,7 +845,7 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 		t.Fatal("after the groups were taken the player still manages", got)
 	}
 	var changes int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.group_changes WHERE user_id=$1 AND changed_by=$2`, player, boss).Scan(&changes); err != nil || changes != 3 {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM net.group_changes WHERE user_id=$1 AND changed_by=$2`, player, boss).Scan(&changes); err != nil || changes != 4 {
 		t.Fatal("recorded changes:", changes, err)
 	}
 }

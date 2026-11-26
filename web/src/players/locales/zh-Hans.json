@@ -578,5 +578,31 @@
     "approve": "通过",
     "return": "退回",
     "by": "由 {{name}} 处理"
+  },
+  "tagAdmin": {
+    "heading": "TAG 管理",
+    "intro": "玩家提交的标签建议，由标签管理员和该曲库的管理员处理。采纳或拒绝后，同一首歌同一个标签的其他建议（包括以后再提交的）都会按这个结果处理。",
+    "source": "曲库",
+    "sources": {
+      "fanmade": "自制",
+      "official": "官方"
+    },
+    "status": "状态",
+    "statuses": {
+      "pending": "待处理",
+      "accepted": "已采纳",
+      "rejected": "已拒绝"
+    },
+    "empty": "这里没有建议。",
+    "unknownChart": "（谱面已不可见）",
+    "suggestedBy_one": "{{count}} 人建议",
+    "suggestedBy_other": "{{count}} 人建议",
+    "current": "现有标签：{{tags}}",
+    "since": "最早建议于 {{at}}",
+    "decided": "{{by}} 于 {{at}} 处理",
+    "earlier": "先前的决定",
+    "accept": "采纳",
+    "reject": "拒绝",
+    "pages": "翻页"
   }
 }

@@ -578,5 +578,31 @@
     "approve": "승인",
     "return": "반려",
     "by": "{{name}} 처리"
+  },
+  "tagAdmin": {
+    "heading": "태그 관리",
+    "intro": "플레이어가 제안한 태그로, 태그 관리자와 해당 소스의 관리자가 처리합니다. 채택하거나 거절하면 같은 곡의 같은 태그에 대한 제안(이후 제안 포함)이 모두 그 결과로 처리됩니다.",
+    "source": "소스",
+    "sources": {
+      "fanmade": "창작",
+      "official": "공식"
+    },
+    "status": "상태",
+    "statuses": {
+      "pending": "대기 중",
+      "accepted": "채택됨",
+      "rejected": "거절됨"
+    },
+    "empty": "제안이 없습니다.",
+    "unknownChart": "(볼 수 없는 채보)",
+    "suggestedBy_one": "{{count}}명이 제안",
+    "suggestedBy_other": "{{count}}명이 제안",
+    "current": "현재 태그: {{tags}}",
+    "since": "첫 제안 {{at}}",
+    "decided": "{{by}}, {{at}} 처리",
+    "earlier": "이전 결정",
+    "accept": "채택",
+    "reject": "거절",
+    "pages": "페이지"
   }
 }

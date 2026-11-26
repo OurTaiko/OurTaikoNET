@@ -578,5 +578,31 @@
     "approve": "承認",
     "return": "差し戻す",
     "by": "{{name}} が処理"
+  },
+  "tagAdmin": {
+    "heading": "タグ管理",
+    "intro": "プレイヤーが提案したタグです。タグ管理者とそのソースの管理者が決定します。採用・不採用を決めると、同じ曲の同じタグへの提案（今後のものも含む）はすべてその結果になります。",
+    "source": "ソース",
+    "sources": {
+      "fanmade": "創作",
+      "official": "公式"
+    },
+    "status": "状態",
+    "statuses": {
+      "pending": "確認待ち",
+      "accepted": "採用",
+      "rejected": "不採用"
+    },
+    "empty": "提案はありません。",
+    "unknownChart": "（譜面は表示できません）",
+    "suggestedBy_one": "{{count}} 人が提案",
+    "suggestedBy_other": "{{count}} 人が提案",
+    "current": "現在のタグ：{{tags}}",
+    "since": "最初の提案 {{at}}",
+    "decided": "{{by}} が {{at}} に決定",
+    "earlier": "以前の決定",
+    "accept": "採用",
+    "reject": "不採用",
+    "pages": "ページ"
   }
 }
