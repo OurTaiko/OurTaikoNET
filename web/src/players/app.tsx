@@ -24,6 +24,7 @@ import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
 import { MyTitlesPage } from './pages/my-titles'
 import { VisitsPage } from './pages/visits'
+import { TagsPage } from './pages/tags'
 import '../styles.css'
 
 function NotFound() {
@@ -138,6 +139,14 @@ function App() {
                   element={
                     <Private title={t('shell.titleAdmin')}>
                       <AdminPage />
+                    </Private>
+                  }
+                />
+                <Route
+                  path="tags"
+                  element={
+                    <Private title={t('tagAdmin.heading')}>
+                      <TagsPage />
                     </Private>
                   }
                 />

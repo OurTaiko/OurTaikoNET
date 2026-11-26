@@ -33,6 +33,9 @@ const (
 	FanmadeManager
 	// TitleManager keeps the title catalog and gives or takes titles by hand.
 	TitleManager
+	// TagManager sets the tags of any chart of either source and decides the tags players
+	// suggest.
+	TagManager
 )
 
 // Group describes one group for the manage panel.
@@ -46,6 +49,7 @@ var all = []Group{
 	{"OFFICIAL_MANAGER", OfficialManager, "Adds, replaces, edits and removes charts of the official source, keeps its dan courses and playlists, and moderates its comments."},
 	{"FANMADE_MANAGER", FanmadeManager, "Edits or removes any chart, dan course or playlist of the fanmade source, marks its dan courses official, and moderates its comments."},
 	{"TITLE_MANAGER", TitleManager, "Keeps the title catalog and gives or takes titles by hand."},
+	{"TAG_MANAGER", TagManager, "Sets the tags of any chart of either source and accepts or rejects the tags players suggest (the managers of a source do both on theirs)."},
 }
 
 // All lists the groups in the order of their bits.

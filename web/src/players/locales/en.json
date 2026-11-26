@@ -578,5 +578,31 @@
     "approve": "Approve",
     "return": "Return",
     "by": "by {{name}}"
+  },
+  "tagAdmin": {
+    "heading": "Manage tags",
+    "intro": "Tags players suggest, decided by tag managers and the source's managers. Accepting or rejecting one settles every suggestion of that tag for that song, including later ones.",
+    "source": "Source",
+    "sources": {
+      "fanmade": "Fanmade",
+      "official": "Official"
+    },
+    "status": "Status",
+    "statuses": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    },
+    "empty": "No suggestions here.",
+    "unknownChart": "(chart no longer visible)",
+    "suggestedBy_one": "suggested by {{count}} player",
+    "suggestedBy_other": "suggested by {{count}} players",
+    "current": "Current tags: {{tags}}",
+    "since": "First suggested {{at}}",
+    "decided": "Decided by {{by}}, {{at}}",
+    "earlier": "an earlier decision",
+    "accept": "Accept",
+    "reject": "Reject",
+    "pages": "Pages"
   }
 }

@@ -1031,7 +1031,8 @@
     "featured": "Home picks",
     "announcements": "Announcements",
     "editor": "OurTaikoEdit",
-    "myTitles": "My titles"
+    "myTitles": "My titles",
+    "tagAdmin": "Manage tags"
   },
   "chat": {
     "title": "Messages",
@@ -1117,5 +1118,25 @@
     "toReviews": "Review it",
     "toMine": "See my titles",
     "readOnly": "Title Center is read-only: you cannot reply here."
+  },
+  "tags": {
+    "heading": "Tags",
+    "filter": "Tag",
+    "anyTag": "All tags",
+    "add": "Add tags",
+    "manage": "Tags",
+    "editTitle": "Edit tags",
+    "suggestTitle": "Suggest tags",
+    "editHint": "Tick this song's tags. Saving applies them at once.",
+    "suggestHint": "If this song should have another tag, suggest it and a tag manager will review it.",
+    "loading": "Loading tags…",
+    "save": "Save",
+    "close": "Close",
+    "suggest": "Suggest",
+    "withdraw": "Withdraw",
+    "onChart": "Added",
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "rejected": "Rejected"
   }
 }

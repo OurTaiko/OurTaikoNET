@@ -47,6 +47,10 @@ type Config struct {
 	// against it. The account center's own administrator flag is then not used. OurTaikoNet
 	// sets it to membership of a user group.
 	Manager func(ctx context.Context, userID string) (bool, error)
+	// TagManager, when set, says who decides the tags players suggest and sets any chart's tags
+	// (tags.go); whoever Manager names does both too, on this source, and a chart's owners set
+	// its tags.
+	TagManager func(ctx context.Context, userID string) (bool, error)
 	// SessionCookie names the cookie a website session is kept in; empty is this site's own
 	// name. OurTaikoNet gives every part the same name: one sign-in for the whole site.
 	SessionCookie string
@@ -120,6 +124,9 @@ func (s *Server) Handler() http.Handler {
 			"movieOutput": map[string]any{"codec": "h264", "extension": "." + video.Extension, "maxWidth": video.MaxWidth, "maxHeight": video.MaxHeight, "maxFps": video.MaxFPS, "maxKbps": video.MaxKbps, "audio": false}})
 	})
 	mux.HandleFunc("GET /api/categories", s.categories)
+	mux.HandleFunc("GET /api/tags", s.tags)
+	mux.HandleFunc("GET /api/tag-suggestions", s.tagSuggestions)
+	mux.HandleFunc("POST /api/tag-suggestions/decision", s.decideSuggestion)
 	mux.HandleFunc("GET /api/auth/sso/login", func(w http.ResponseWriter, r *http.Request) { s.sessions().Login(w, r) })
 	mux.HandleFunc("GET /api/auth/sso/callback", func(w http.ResponseWriter, r *http.Request) { s.sessions().Callback(w, r) })
 	mux.HandleFunc("GET /api/auth/account/{page}", func(w http.ResponseWriter, r *http.Request) { s.sessions().AccountRedirect(w, r) })
@@ -158,6 +165,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/charts/{id}/collaborations", s.inviteCollaborator)
 	mux.HandleFunc("DELETE /api/charts/{id}/collaborations/{invitation}", s.revokeCollaboration)
 	mux.HandleFunc("DELETE /api/charts/{id}/owners/me", s.leaveChart)
+	mux.HandleFunc("GET /api/charts/{id}/tags", s.chartTags)
+	mux.HandleFunc("PUT /api/charts/{id}/tags", s.setChartTags)
+	mux.HandleFunc("POST /api/charts/{id}/tag-suggestions", s.suggestTag)
+	mux.HandleFunc("DELETE /api/charts/{id}/tag-suggestions/{tag}", s.withdrawSuggestion)
 	mux.HandleFunc("PUT /api/dans/{id}/vote", s.voteDan)
 	mux.HandleFunc("GET /api/dans/{id}/comments", s.comments().List(threadOf(danSubject)))
 	mux.HandleFunc("POST /api/dans/{id}/comments", s.comments().Create(threadOf(danSubject)))
