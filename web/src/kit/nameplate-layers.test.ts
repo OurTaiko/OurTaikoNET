@@ -153,15 +153,18 @@ it('picks the layout and the 段位 picture as the game does', () => {
 })
 
 it('cuts an effect that stays inside the band to its shape, and lets a burst run outside it', () => {
-  expect(titleSpecs(catalog, catalog.titles.ai_3).band).toEqual([
-    { id: 'band/lumen-title-ai_3' },
-    { id: 'band/lumen-title-wood', mask: true },
-    { id: 'effect/lumen-title-ai_3', cut: true },
-  ])
-  expect(titleSpecs(catalog, catalog.titles.gold).band).toEqual([
-    { id: 'band/lumen-title-gold' },
+  expect(titleSpecs(catalog, catalog.titles.ai_3)).toEqual({
+    band: [{ id: 'band/lumen-title-ai_3' }],
+    effect: [
+      { id: 'band/lumen-title-wood', mask: true },
+      { id: 'effect/lumen-title-ai_3', cut: true },
+    ],
+    icon: null,
+  })
+  expect(titleSpecs(catalog, catalog.titles.gold).effect).toEqual([
     { id: 'effect/lumen-title-gold' },
   ])
+  expect(titleSpecs(catalog, catalog.titles.wood).effect).toEqual([])
 })
 
 it('draws a plate in its layout’s order, the icon over the outline and under the badge', () => {
@@ -172,21 +175,50 @@ it('draws a plate in its layout’s order, the icon over the outline and under t
     '1p',
     rankPicture(10, false, 1),
   )
-  expect(specs).toEqual([
-    { id: 'composition/plates', clip: '1p_shougou_dani/3' },
-    { id: 'band/lumen-title-toho_y22' },
-    { id: 'composition/plates', clip: '1p_shougou_dani/8' },
-    { id: 'icon/lumen-title-toho_y22_qr' },
-    { id: 'composition/badges', clip: '1p' },
-    { id: 'composition/dan-full', clip: '1kyuu_red' },
-    { id: 'composition/blank', clip: 'off' },
-  ])
+  // The title's name goes between the two: on the band, under the rest.
+  expect(specs).toEqual({
+    under: [
+      { id: 'composition/plates', clip: '1p_shougou_dani/3' },
+      { id: 'band/lumen-title-toho_y22' },
+    ],
+    over: [
+      { id: 'composition/plates', clip: '1p_shougou_dani/8' },
+      { id: 'icon/lumen-title-toho_y22_qr' },
+      { id: 'composition/badges', clip: '1p' },
+      { id: 'composition/dan-full', clip: '1kyuu_red' },
+      { id: 'composition/blank', clip: 'off' },
+    ],
+  })
   // A layout without a badge puts the icon right after the band.
   expect(
     plateSpecs(catalog, catalog.states.newentry_shougou, catalog.titles.toho_y22_2, '1p', null),
-  ).toEqual([
-    { id: 'composition/plates', clip: 'newentry_shougou/3' },
-    { id: 'band/lumen-title-toho_y22' },
-    { id: 'icon/lumen-title-toho_y22_2' },
+  ).toEqual({
+    under: [
+      { id: 'composition/plates', clip: 'newentry_shougou/3' },
+      { id: 'band/lumen-title-toho_y22' },
+    ],
+    over: [{ id: 'icon/lumen-title-toho_y22_2' }],
+  })
+})
+
+it('puts the title’s effect over its name and the rest of the plate over the effect', () => {
+  const { under, over } = plateSpecs(
+    catalog,
+    catalog.states['1p_shougou_dani'],
+    catalog.titles.ai_3,
+    '1p',
+    null,
+  )
+  expect(under.at(-1)).toEqual({ id: 'band/lumen-title-ai_3' })
+  expect(over.slice(0, 3)).toEqual([
+    { id: 'band/lumen-title-wood', mask: true },
+    { id: 'effect/lumen-title-ai_3', cut: true },
+    { id: 'composition/plates', clip: '1p_shougou_dani/8' },
   ])
+  // Without a title there is no name to put anything over.
+  const plain = plateSpecs(catalog, catalog.states.newentry_shougou, null, '1p', null)
+  expect(plain).toEqual({
+    under: [{ id: 'composition/plates', clip: 'newentry_shougou/3' }],
+    over: [],
+  })
 })
