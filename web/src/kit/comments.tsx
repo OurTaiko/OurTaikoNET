@@ -1,6 +1,6 @@
 import { isChartOwner } from './chart-owners'
 import { PlayerLink } from './components/player-link'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { Suspense, createContext, lazy, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
@@ -168,8 +168,22 @@ export function RelativeTime({ value }: { value: string }) {
   )
 }
 
-// Plain text with web links. Text is never interpreted as HTML or Markdown.
+const Markdown = lazy(() => import('./markdown'))
+
+/**
+ * A comment's text, which its writer may write in Markdown as an announcement is written; HTML in
+ * it is never run. Until the parser has arrived it is shown as
+ * written, with its web addresses as links.
+ */
 export function CommentBody({ text }: { text: string }) {
+  return (
+    <Suspense fallback={<PlainCommentBody text={text} />}>
+      <Markdown text={text} by="member" className="max-w-[70ch]" />
+    </Suspense>
+  )
+}
+
+function PlainCommentBody({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]}，。！？）】])/g)
   return (
     <p className="max-w-[70ch] whitespace-pre-wrap text-sm leading-6 wrap-anywhere">
@@ -250,16 +264,16 @@ function Composer({
         }}
       />
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {length > maxCommentLength * 0.9 && (
-          <span
-            className={cn(
-              'mr-auto text-xs tabular-nums text-muted-foreground',
-              length > maxCommentLength && 'text-destructive',
-            )}
-          >
-            {t('interactions.characterCount', { count: length, max: maxCommentLength })}
-          </span>
-        )}
+        <span
+          className={cn(
+            'mr-auto text-xs tabular-nums text-muted-foreground',
+            length > maxCommentLength && 'text-destructive',
+          )}
+        >
+          {length > maxCommentLength * 0.9
+            ? t('interactions.characterCount', { count: length, max: maxCommentLength })
+            : t('interactions.markdownHint')}
+        </span>
         {onCancel && (
           <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
             {t('messages.cancel')}

@@ -35,3 +35,26 @@ describe('Markdown', () => {
     expect(html).not.toContain('javascript:')
   })
 })
+
+describe('Markdown by a member', () => {
+  const byMember = (text: string) =>
+    renderToStaticMarkup(createElement(Markdown, { text, by: 'member' }))
+
+  it('marks links as the writer’s', () => {
+    expect(byMember('See https://net.ourtaiko.org/ now')).toContain(
+      'rel="noopener noreferrer nofollow ugc"',
+    )
+  })
+
+  it('shows a picture, fetched without saying where it is shown', () => {
+    const html = byMember('![a drum](https://example.com/drum.png)')
+    expect(html).toContain('<img src="https://example.com/drum.png" alt="a drum"')
+    expect(html).toContain('referrerPolicy="no-referrer"')
+  })
+
+  it('never takes HTML or script addresses from the text', () => {
+    const html = byMember('<img src=x onerror="x()">\n\n[x](javascript:alert(1))')
+    expect(html).not.toContain('onerror="')
+    expect(html).not.toContain('javascript:')
+  })
+})
