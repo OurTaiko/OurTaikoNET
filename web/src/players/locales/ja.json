@@ -487,6 +487,7 @@
     "kinds": {
       "chart_clear": "特定の曲をクリア",
       "category_clear": "ジャンルの曲をクリア",
+      "dan_clear": "段位に合格",
       "site_login": "サイトにログイン",
       "game_login": "ゲームにログイン",
       "charts_uploaded": "参加した譜面数"
@@ -503,7 +504,8 @@
       "chart_clear": "{{source}}の「{{title}}」を{{clear}}{{course}}",
       "category_all": "{{source}}の「{{category}}」の全曲を{{clear}}{{course}}",
       "category_count": "{{source}}の「{{category}}」を {{count}} 曲{{clear}}{{course}}",
-      "charts_uploaded": "{{count}} 個の譜面の制作に参加"
+      "charts_uploaded": "{{count}} 個の譜面の制作に参加",
+      "dan_clear": "{{source}}の段位「{{title}}」で{{verdict}}"
     },
     "categories": {
       "fanmade": {
@@ -544,7 +546,20 @@
     "save": "変更を保存",
     "cancel": "キャンセル",
     "editing": "条件 {{id}} を編集中。付与するものは変更できません。",
-    "updated": "保存し、達成済みの {{n}} 人に付与しました。"
+    "updated": "保存し、達成済みの {{n}} 人に付与しました。",
+    "danGone": "（段位は削除済み）",
+    "danNotFixed": "（段位の固定が解除されたため、現在は付与しません）",
+    "dan": "段位 ID または段位ページのアドレス",
+    "danHint": "曲目を固定した段位だけを指定でき、固定後の挑戦だけが数えられます。",
+    "verdict": "条件",
+    "verdicts": {
+      "1": "赤合格以上",
+      "2": "赤合格・フルコンボ以上",
+      "3": "赤合格・全良以上",
+      "4": "金合格以上",
+      "5": "金合格・フルコンボ以上",
+      "6": "金合格・全良"
+    }
   },
   "donItems": {
     "heading": "獲得が必要な着せ替え",
@@ -607,5 +622,16 @@
     "accept": "採用",
     "reject": "不採用",
     "pages": "ページ"
+  },
+  "danAdmin": {
+    "heading": "段位の審査",
+    "intro": "曲目を固定した段位の曲目や合格条件を変えるには申請が必要で、その楽曲ライブラリの管理者が処理します。承認すると申請どおりの曲目と条件になり、その時点から改めて固定されます（それ以前の挑戦は付与条件に数えられません）。差し戻しには返信が必要です。作成者には通知が届きます。",
+    "empty": "審査待ちの申請はありません。",
+    "asked": "{{owner}} が {{at}} に申請",
+    "now": "現在",
+    "asked_for": "申請内容",
+    "reply": "返信（差し戻す場合は必須）",
+    "approve": "承認",
+    "return": "差し戻す"
   }
 }

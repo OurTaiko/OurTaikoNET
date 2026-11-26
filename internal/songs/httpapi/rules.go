@@ -34,6 +34,26 @@ func (s *Server) rulesAfterScore(ctx context.Context, tx pgx.Tx, user string, re
 	}
 }
 
+// rulesAfterDanAttempt judges, inside the attempt's transaction, the rules of the course a new
+// attempt that passed it can have met.
+func (s *Server) rulesAfterDanAttempt(ctx context.Context, tx pgx.Tx, user string, a DanAttempt) {
+	if a.Verdict < 1 {
+		return
+	}
+	inner, err := tx.Begin(ctx)
+	if err != nil {
+		log.Printf("rules after a dan attempt: %v", err)
+		return
+	}
+	defer inner.Rollback(ctx)
+	if _, err = rules.DanAttempted(ctx, inner, s.source().schema(), user, a.CourseID); err == nil {
+		err = inner.Commit(ctx)
+	}
+	if err != nil {
+		log.Printf("rules after a dan attempt: %v", err)
+	}
+}
+
 // rulesAfterChartChange judges, once it is saved, the rules that go by the source's charts as a
 // whole (rules.ChartsChanged): after a chart is published or uploaded again, deleted, put in
 // other categories, or joined by a collaborator.

@@ -115,7 +115,7 @@ func TestRulesGiveTitles(t *testing.T) {
 	var rule rules.Rule
 	insert := func(sql string) rules.Rule {
 		t.Helper()
-		r, err := rules.Scan(pool.QueryRow(ctx, sql+` RETURNING id,item,title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count`))
+		r, err := rules.Scan(pool.QueryRow(ctx, sql+` RETURNING id,item,title_id,don_part,don_item,kind,source,chart_id,dan_id,category_flag,course,clear,count`))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -345,13 +345,13 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 		}
 	}
 	grant(pool, true, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4})
 	})
 	grant(official1, true, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Official.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Official.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-o", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4})
 	})
 	grant(pool, false, func(tx pgx.Tx) (json.RawMessage, error) {
-		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-undone", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4, Titles: []string{}})
+		return a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-undone", UserID: player, CourseID: strings.Repeat("c", 32), CourseTitle: "Course", Verdict: 4})
 	})
 	var recorded string
 	if err = pool.QueryRow(ctx, `SELECT string_agg(service||':'||request_key, ',' ORDER BY service) FROM net.awards`).Scan(&recorded); err != nil || recorded != "fanmade:attempt-f,official:attempt-o" {
@@ -363,7 +363,7 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), Verdict: 4, Titles: []string{}})
+	_, err = a.Fanmade.Config.Awards.Grant(ctx, tx, songs.AwardRequest{Key: "attempt-f", UserID: strings.Repeat("b", 32), CourseID: strings.Repeat("c", 32), Verdict: 4})
 	var refused *songs.ProfileRejection
 	if !errors.As(err, &refused) || refused.Code != "AWARD_CONFLICT" {
 		t.Fatal("an attempt of another player:", err)
@@ -376,10 +376,6 @@ INSERT INTO net.scores(source,id,user_id,good,ok,bad,score,drumroll,max_combo,pa
 	var known bool
 	if err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM net.users WHERE id=repeat('b',32))`).Scan(&known); err != nil || !known {
 		t.Fatal("the awarded player is not in net.users", err)
-	}
-	// The sources still read the title catalog from the players' part.
-	if titles, err := a.Fanmade.Config.Profile.Titles(ctx, true); err != nil || titles == nil {
-		t.Fatal("title catalog:", titles, err)
 	}
 
 	// Nameplates are public; asking for awards is not possible from outside.

@@ -166,7 +166,8 @@ export type RewardRule = {
   titleId: string | null
   donPart: 'cos' | 'head' | 'body' | 'puchi' | 'paint' | null
   donItem: number | null
-  kind: 'chart_clear' | 'category_clear' | 'site_login' | 'game_login' | 'charts_uploaded'
+  kind:
+    'chart_clear' | 'category_clear' | 'dan_clear' | 'site_login' | 'game_login' | 'charts_uploaded'
   source: 'fanmade' | 'official' | null
   chartId: string | null
   chart: {
@@ -175,9 +176,19 @@ export type RewardRule = {
     titleTranslations: Record<string, string>
     gone: boolean
   } | null
+  /** A dan_clear rule's 段位 course. It is met only while the course is there and fixed. */
+  danId: string | null
+  dan: {
+    id: string
+    title: Record<string, string>
+    code: string
+    fixed: boolean
+    gone: boolean
+  } | null
   category: string | null
   course: Course | null
-  // The lowest crown that counts: 1 cleared, 2 full combo, 3 all good.
+  // The lowest crown that counts: 1 cleared, 2 full combo, 3 all good. For dan_clear, the lowest
+  // verdict: 1–3 red, 4–6 gold, each a pass, with full combo, with all good.
   clear: number | null
   count: number | null
 }

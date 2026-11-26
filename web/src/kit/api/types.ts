@@ -174,6 +174,7 @@ export type NotificationKind =
   | 'dan_upvotes'
   | 'comment_upvotes'
   | 'comment_removed'
+  | 'dan_change_result'
 export type AppNotification = {
   id: string
   // Unknown future kinds still render with a generic message.
@@ -194,6 +195,9 @@ export type AppNotification = {
     failedFiles?: { file: string; code: string }[]
     /** playlist_removed: the deleted playlist's name. */
     name?: string
+    /** dan_change_result: whether the change was approved, and the manager's reply. */
+    approved?: boolean
+    reply?: string
   } & Record<string, unknown>
 }
 /** An invitation as the chart's owners see it, kept after it is answered. */
@@ -340,10 +344,6 @@ export type DanExam = {
   // [red] or [red, gold] for the course, or one such (or null) per song.
   value: number[] | (number[] | null)[]
 }
-export type DanRewardTitle = {
-  id: string
-  on: 'red' | 'red1' | 'red2' | 'red3' | 'gold' | 'gold4' | 'gold5' | 'gold6'
-}
 export type DanSong = {
   /** The block the course plays: a chart, a course and a side. */
   chart: {
@@ -375,7 +375,14 @@ export type Dan = {
   official: boolean
   songs: DanSong[]
   exams: DanExam[]
-  rewards: { dan?: number; titles?: DanRewardTitle[] }
+  /** The 段位 an official course stands for. What passing it gives besides is given by rule. */
+  rewards: { dan?: number }
+  /**
+   * When the course was last fixed: its songs and conditions then change only by a request a
+   * manager of the source approves (DanChange). Null: not fixed. Only a fixed course is named by
+   * a rule that gives items for passing it.
+   */
+  fixedAt: string | null
   ownerId: string
   owner: string
   createdAt: string
@@ -394,5 +401,22 @@ export type DanInput = {
   code?: string
   songs: { chartId: string; course: string; side: string; hidden: boolean }[]
   exams: DanExam[]
-  rewards: { dan?: number; titles?: DanRewardTitle[] }
+  rewards: { dan?: number }
 }
+/** A request to change a fixed course's songs and conditions (POST /dans/{id}/changes). */
+export type DanChange = {
+  id: string
+  courseId: string
+  userId: string
+  /** The songs as asked for, named as the charts are now. */
+  songs: DanSong[]
+  exams: DanExam[]
+  request: string
+  status: 'pending' | 'approved' | 'returned' | 'withdrawn'
+  reviewerId: string | null
+  reply: string
+  createdAt: string
+  decidedAt: string | null
+}
+/** A request in the managers' queue, with its course as it is now. */
+export type DanChangeReview = DanChange & { course: Dan }

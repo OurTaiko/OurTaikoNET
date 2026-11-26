@@ -4,9 +4,9 @@ import { normalizeLanguage } from './i18n'
 import { TitleBandArt } from './components/nameplate-art'
 import { layersOf, type TitleLayers } from './nameplate-layers'
 
-// The title catalog, which 段位 courses give titles from: the public titles (a private one is
-// its maker's alone). A course names any of them, and gives them once the site's managers have
-// made it official.
+// The title catalog: the public titles (a private one is its maker's alone), and the rules that
+// give titles and parts of the Don by themselves, among them those for passing a fixed 段位 course
+// (dan_clear).
 
 export type ProfileTitle = {
   id: string
@@ -21,12 +21,30 @@ export type ProfileTitle = {
   ownerId: string | null
 }
 
+/** A rule of the catalog, as far as a song source's pages read it: what passing a 段位 course
+ * gives (kind dan_clear). The players' pages have the whole rule (RewardRule). */
+export type CatalogRule = {
+  id: number
+  item: 'title' | 'don_item'
+  titleId: string | null
+  donPart: string | null
+  donItem: number | null
+  kind: string
+  source: string | null
+  danId: string | null
+  /** For dan_clear, the verdict it takes: 1–3 red, 4–6 gold (pass, full combo, all good). */
+  clear: number | null
+}
+
 export const profileTitlesPage = '/titles'
 
-async function readCatalog(): Promise<ProfileTitle[]> {
+type Catalog = { titles: ProfileTitle[]; rules: CatalogRule[] }
+
+async function readCatalog(): Promise<Catalog> {
   const response = await fetch(`${PLAYERS_API}/titles`)
   if (!response.ok) throw new Error(String(response.status))
-  return ((await response.json()) as { titles: ProfileTitle[] }).titles
+  const catalog = (await response.json()) as Partial<Catalog>
+  return { titles: catalog.titles ?? [], rules: catalog.rules ?? [] }
 }
 
 // The catalog is the same whichever song source is shown.
@@ -42,7 +60,8 @@ const catalogQuery = queryOptions({
 export function useProfileTitles() {
   const catalog = useQuery(catalogQuery)
   return {
-    titles: catalog.data ?? null,
+    titles: catalog.data?.titles ?? null,
+    rules: catalog.data?.rules ?? null,
     failed: catalog.isError,
     reload: () => void catalog.refetch(),
   }

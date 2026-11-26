@@ -487,6 +487,7 @@
     "kinds": {
       "chart_clear": "打完某首歌",
       "category_clear": "打完某个分类的歌",
+      "dan_clear": "通过某个段位",
       "site_login": "登录网站",
       "game_login": "登录游戏",
       "charts_uploaded": "参与谱面数"
@@ -503,7 +504,8 @@
       "chart_clear": "{{clear}}{{source}}曲源的《{{title}}》{{course}}",
       "category_all": "{{clear}}{{source}}曲源「{{category}}」分类的全部歌曲{{course}}",
       "category_count": "{{clear}}{{source}}曲源「{{category}}」分类的 {{count}} 首歌曲{{course}}",
-      "charts_uploaded": "参与制作 {{count}} 张谱面"
+      "charts_uploaded": "参与制作 {{count}} 张谱面",
+      "dan_clear": "在{{source}}曲源的段位《{{title}}》取得{{verdict}}"
     },
     "categories": {
       "fanmade": {
@@ -544,7 +546,20 @@
     "save": "保存修改",
     "cancel": "取消",
     "editing": "正在修改第 {{id}} 条条件，发放的东西不能改。",
-    "updated": "已修改，并发给了 {{n}} 位已达成的玩家。"
+    "updated": "已修改，并发给了 {{n}} 位已达成的玩家。",
+    "danGone": "（段位已删除）",
+    "danNotFixed": "（段位已取消固定，暂不发放）",
+    "dan": "段位 ID 或段位页地址",
+    "danHint": "只能选择固定了曲目的段位，只计算固定之后的挑战。",
+    "verdict": "要求",
+    "verdicts": {
+      "1": "赤合格以上",
+      "2": "赤合格・全连以上",
+      "3": "赤合格・全良以上",
+      "4": "金合格以上",
+      "5": "金合格・全连以上",
+      "6": "金合格・全良"
+    }
   },
   "donItems": {
     "heading": "需要获得的咚酱装扮",
@@ -607,5 +622,16 @@
     "accept": "采纳",
     "reject": "拒绝",
     "pages": "翻页"
+  },
+  "danAdmin": {
+    "heading": "段位审核",
+    "intro": "已固定曲目的段位，修改曲目或合格条件需要提交申请，由该曲库的管理员处理。通过后段位改为申请的曲目和条件，并从此刻重新固定（之前的挑战不再计入发放条件）；退回需要写回复。创建者会收到通知。",
+    "empty": "没有等待审核的申请。",
+    "asked": "{{owner}} 于 {{at}} 申请",
+    "now": "现在",
+    "asked_for": "申请改为",
+    "reply": "回复（退回时必填）",
+    "approve": "通过",
+    "return": "退回"
   }
 }

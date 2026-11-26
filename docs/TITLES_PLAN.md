@@ -4,11 +4,10 @@ What the title system does today, and what is planned for it. Written 2026-11-16
 
 ## Where it stands
 
-A title is private or public (2026-11-25, migration `0023_title_review`; the README's "Titles: private and public" says how). A player makes private titles, theirs alone to hold and wear; a review by the title managers makes one public, and only a public title is given to others. It comes to a player in three ways, all of them set by the title managers:
+A title is private or public (2026-11-25, migration `0023_title_review`; the README's "Titles: private and public" says how). A player makes private titles, theirs alone to hold and wear; a review by the title managers makes one public, and only a public title is given to others. It comes to a player in two ways, both set by the title managers:
 
-1. **A 段位 course** made official names it as a reward (`internal/profile/httpapi/awards.go`, `grant`). A course that is not official gives no title.
-2. **A title manager** gives it by hand (`POST /api/v1/admin/grants`).
-3. **A rule** gives it by itself (`internal/rewards/rules`, table `net.reward_rules`, called `net.title_rules` before migration `0025`): clearing a chart, clearing charts of a category, being seen signed in on the website or in the game, having uploaded a number of charts.
+1. **A title manager** gives it by hand (`POST /api/v1/admin/grants`).
+2. **A rule** gives it by itself (`internal/rewards/rules`, table `net.reward_rules`, called `net.title_rules` before migration `0025`): clearing a chart, clearing charts of a category, passing a fixed 段位 course (`dan_clear`, since 2026-11-26, migration `0028_dan_lock`; before, an official course named its titles itself and the migration made those into rules), being seen signed in on the website or in the game, having uploaded a number of charts.
 
 Every title given is a row of `net.user_titles` pointing at the row of `net.awards` that says why (a maker's own title has none). A player wears one of the titles they hold on their nameplate.
 
@@ -93,9 +92,9 @@ No behaviour changes; goes with any release of the backend.
 
 | # | What | Notes |
 |---|---|---|
-| 5.1 | **Read the title catalog directly** | The sources still read it over HTTP inside the program (`internal/inproc`, `awards.Client.Titles`). Make it a call, as awards already are |
+| 5.1 | **Read the title catalog directly** | Done (2026-11-26): the sources no longer read it at all; a course's titles are rules (`dan_clear`) |
 | 5.2 | **Remove the service interface** | `POST /internal/v1/awards`, `RegisterService`, the `services` table's keys and `awards.Client.Award` have no caller left |
-| 5.3 | **"OurTaiko Profile" in the website's words** | About twenty strings still name the old site (`dans.titleCatalog`, `dans.titleMissing`, `dans.titlesUnavailable`, `ourtaikoProfile.view`, and others) |
+| 5.3 | **"OurTaiko Profile" in the website's words** | About twenty strings still name the old site (`dans.titleCatalog`, `ourtaikoProfile.view`, and others) |
 
 ## Releasing `feat/titles`
 

@@ -141,22 +141,22 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 		Nameplate Nameplate
 	}
 	var first reply
-	award(`{"key":"attempt-1","userId":"`+player+`","courseId":"10","courseTitle":"十段","official":true,"verdict":2,"dan":20,"titles":["kidou"]}`, 200, &first, auth)
-	if first.Granted.Dan == nil || !first.Granted.Dan.Upgraded || first.Granted.Dan.Previous != nil || len(first.Granted.Titles) != 1 || !first.Granted.Titles[0].New {
+	award(`{"key":"attempt-1","userId":"`+player+`","courseId":"10","courseTitle":"十段","official":true,"verdict":2,"dan":20}`, 200, &first, auth)
+	if first.Granted.Dan == nil || !first.Granted.Dan.Upgraded || first.Granted.Dan.Previous != nil || first.Granted.Titles == nil || len(first.Granted.Titles) != 0 {
 		t.Fatalf("first pass %+v", first.Granted)
 	}
 	if first.Nameplate.Dan == nil || first.Nameplate.Dan.Index != 20 || first.Nameplate.Dan.Gold || first.Nameplate.Title != nil {
 		t.Fatalf("plate after first pass %+v", first.Nameplate)
 	}
 	var again reply
-	award(`{"key":"attempt-1","userId":"`+player+`","courseId":"10","courseTitle":"十段","official":true,"verdict":2,"dan":20,"titles":["kidou"]}`, 200, &again, auth)
-	if !again.Granted.Titles[0].New || !again.Granted.Dan.Upgraded {
+	award(`{"key":"attempt-1","userId":"`+player+`","courseId":"10","courseTitle":"十段","official":true,"verdict":2,"dan":20}`, 200, &again, auth)
+	if !again.Granted.Dan.Upgraded {
 		t.Fatal("the same attempt answers what it granted the first time", again.Granted)
 	}
 	award(`{"key":"attempt-1","userId":"`+other+`","verdict":2}`, 409, nil, auth)
 	var lower reply
-	award(`{"key":"attempt-2","userId":"`+player+`","official":true,"verdict":1,"dan":20,"titles":["kidou"]}`, 200, &lower, auth)
-	if lower.Granted.Dan.Upgraded || lower.Granted.Dan.Verdict != 2 || *lower.Granted.Dan.Previous != 2 || lower.Granted.Titles[0].New {
+	award(`{"key":"attempt-2","userId":"`+player+`","official":true,"verdict":1,"dan":20}`, 200, &lower, auth)
+	if lower.Granted.Dan.Upgraded || lower.Granted.Dan.Verdict != 2 || *lower.Granted.Dan.Previous != 2 {
 		t.Fatalf("a badge only goes up %+v", lower.Granted)
 	}
 	var gold reply
@@ -165,28 +165,28 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 		t.Fatalf("gold full combo %+v", gold)
 	}
 	var failed reply
-	award(`{"key":"attempt-4","userId":"`+player+`","official":true,"verdict":0,"dan":24,"titles":["kidou"]}`, 200, &failed, auth)
-	if failed.Granted.Dan != nil || len(failed.Granted.Titles) != 0 || failed.Nameplate.Dan.Index != 20 {
+	award(`{"key":"attempt-4","userId":"`+player+`","official":true,"verdict":0,"dan":24}`, 200, &failed, auth)
+	if failed.Granted.Dan != nil || failed.Nameplate.Dan.Index != 20 {
 		t.Fatalf("a failed attempt gives nothing %+v", failed)
 	}
-	// Only a course the managers made official gives titles; one it cannot give is skipped.
-	var skipped reply
-	award(`{"key":"attempt-5","userId":"`+player+`","official":false,"verdict":3,"titles":["kidou","missing"]}`, 200, &skipped, auth)
-	if len(skipped.Granted.Titles) != 0 || len(skipped.Granted.Skipped) != 2 || skipped.Granted.Skipped[0] != (SkippedTitle{"kidou", "official_only"}) || skipped.Granted.Skipped[1] != (SkippedTitle{"missing", "not_found"}) {
-		t.Fatalf("skipped %+v", skipped.Granted)
+	// A course that is not official gives no badge, and is recorded all the same.
+	var unofficial reply
+	award(`{"key":"attempt-5","userId":"`+player+`","official":false,"verdict":3}`, 200, &unofficial, auth)
+	if unofficial.Granted.Dan != nil {
+		t.Fatalf("unofficial %+v", unofficial.Granted)
 	}
 	award(`{"key":"attempt-6","userId":"`+player+`","official":false,"verdict":3,"dan":8}`, 422, nil, auth)
 	award(`{"key":"attempt-6b","userId":"`+player+`","official":true,"verdict":3,"dan":5}`, 422, nil, auth)
-	var partly reply
-	award(`{"key":"attempt-7","userId":"`+player+`","official":true,"verdict":4,"dan":21,"titles":["missing","kidou"]}`, 200, &partly, auth)
-	if partly.Granted.Dan == nil || !partly.Granted.Dan.Upgraded || len(partly.Granted.Titles) != 1 || partly.Granted.Titles[0].ID != "kidou" || len(partly.Granted.Skipped) != 1 {
-		t.Fatalf("a missing title does not stop the rest %+v", partly.Granted)
+	var higher reply
+	award(`{"key":"attempt-7","userId":"`+player+`","official":true,"verdict":4,"dan":21}`, 200, &higher, auth)
+	if higher.Granted.Dan == nil || !higher.Granted.Dan.Upgraded {
+		t.Fatalf("another badge %+v", higher.Granted)
 	}
-	var second reply
-	award(`{"key":"attempt-8","userId":"`+player+`","courseTitle":"みんなの段位","official":true,"verdict":3,"titles":["fan"]}`, 200, &second, auth)
-	if len(second.Granted.Titles) != 1 || second.Granted.Titles[0].Visibility != public {
-		t.Fatal("an official course gives any public title", second.Granted)
-	}
+	award(`{"key":"attempt-8","userId":"`+player+`","courseTitle":"みんなの段位","official":true,"verdict":3}`, 200, nil, auth)
+	// Titles are not an award's: a course gives them by rule (reward_rules_test.go), a manager by
+	// hand.
+	c.json("POST", "/api/admin/grants", `{"userId":"`+player+`","titleId":"kidou"}`, 200, nil)
+	c.json("POST", "/api/admin/grants", `{"userId":"`+player+`","titleId":"fan"}`, 200, nil)
 
 	// The player wears one of their titles; the plate is public.
 	c.json("PUT", "/api/me/nameplate", `{"titleId":"nope","showDan":true}`, 422, nil)
@@ -216,7 +216,7 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 	}
 	var held struct{ Titles []HeldTitle }
 	public.json("GET", "/api/users/"+player+"/titles", "", 200, &held)
-	if len(held.Titles) != 2 || held.Titles[0].Title.ID != "fan" || held.Titles[0].CourseTitle != "みんなの段位" || held.Titles[1].Service != "fanmade" {
+	if len(held.Titles) != 2 || held.Titles[0].Title.ID != "fan" || held.Titles[1].Service != "admin" {
 		t.Fatal("held titles", held)
 	}
 	var dans struct {
@@ -253,11 +253,6 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	ctx := context.Background()
 	app := New(pool, Config{Origin: origin, DevUserID: player})
 	c := &client{t: t, handler: app.Handler()}
-	key, err := RegisterService(ctx, pool, "fanmade", "OurTaiko Fanmade")
-	if err != nil {
-		t.Fatal(err)
-	}
-	auth := map[string]string{"X-Service-ID": "fanmade", "X-Service-Key": key}
 	c.json("POST", "/api/me/titles", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 401, nil)
 	c.json("GET", "/api/me/titles", "", 401, nil)
 	c.signIn()
@@ -310,7 +305,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 		t.Fatal("a maker holds what they made", held)
 	}
 	var rewards int
-	if err = pool.QueryRow(ctx, `SELECT count(*) FROM rewards WHERE user_id=$1`, player).Scan(&rewards); err != nil || rewards != 0 {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM rewards WHERE user_id=$1`, player).Scan(&rewards); err != nil || rewards != 0 {
 		t.Fatal("making a title is no reward", rewards, err)
 	}
 	var plate Nameplate
@@ -323,12 +318,6 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != "*" || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Titles) != 0 {
 		t.Fatal("catalog", w.Code, w.Body.String())
 	}
-	type reply struct{ Granted Granted }
-	var byCourse reply
-	c.json("POST", "/internal/v1/awards", `{"key":"a1","userId":"`+other+`","official":true,"verdict":1,"titles":["`+made[2].ID+`"]}`, 200, &byCourse, auth)
-	if len(byCourse.Granted.Titles) != 0 || byCourse.Granted.Skipped[0] != (SkippedTitle{made[2].ID, "private"}) {
-		t.Fatalf("a private title from a course %+v", byCourse.Granted)
-	}
 	c.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"`+made[2].ID+`"}`, 422, nil)
 	c.json("POST", "/api/admin/titles/"+made[2].ID+"/rules", `{"kind":"site_login"}`, 422, nil)
 	c.json("PUT", "/api/admin/titles/"+made[2].ID, `{"name":"管理员改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
@@ -340,7 +329,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 		t.Fatal("changed", changed)
 	}
 	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","layers":{"band":"band/"}}`, 422, nil)
-	if _, err = pool.Exec(ctx, `INSERT INTO titles(id,name,style,visibility,owner_id) VALUES('theirs','他人','wood','private',$1)`, other); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO titles(id,name,style,visibility,owner_id) VALUES('theirs','他人','wood','private',$1)`, other); err != nil {
 		t.Fatal(err)
 	}
 	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 404, nil)

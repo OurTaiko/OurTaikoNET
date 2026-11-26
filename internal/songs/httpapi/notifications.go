@@ -33,8 +33,9 @@ var notificationKinds = []string{
 // Kinds about the recipient's own content. They are not listed in the
 // settings and cannot be muted: the notice is the only report of the outcome.
 var systemNotificationKinds = []string{
-	"upload_result",    // an upload the recipient did not wait for was published or failed
-	"playlist_removed", // an administrator deleted the recipient's public playlist
+	"upload_result",     // an upload the recipient did not wait for was published or failed
+	"playlist_removed",  // an administrator deleted the recipient's public playlist
+	"dan_change_result", // a manager approved or returned a change the recipient's fixed 段位 course was asked
 }
 
 // Upvote counts that notify the author, as Reddit does, instead of every vote.

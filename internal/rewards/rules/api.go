@@ -42,12 +42,23 @@ type API struct {
 	DonItem func(ctx context.Context, part string, id int) (status int, code, message string, err error)
 }
 
-// Listed is a rule as the website has it: the category by its ID in the rule's source, and the
-// chart with its name.
+// Listed is a rule as the website has it: the category by its ID in the rule's source, the
+// chart with its name, and the 段位 course with its.
 type Listed struct {
 	Rule
 	Category *string `json:"category"`
 	Chart    *Chart  `json:"chart"`
+	Dan      *Dan    `json:"dan"`
+}
+
+// Dan names the course of a dan_clear rule. Gone is a course that was deleted, Fixed false one no
+// longer fixed: nobody meets the rule while either holds.
+type Dan struct {
+	ID    string          `json:"id"`
+	Title json.RawMessage `json:"title"`
+	Code  string          `json:"code"`
+	Fixed bool            `json:"fixed"`
+	Gone  bool            `json:"gone"`
 }
 
 // Chart names the chart of a chart_clear rule. Gone is a chart that is no longer published:
@@ -95,15 +106,20 @@ func (a *API) categoryID(source string, flag int) *string {
 	return nil
 }
 
-const listedSelect = `SELECT ` + Columns + `,COALESCE(fc.title,oc.title),COALESCE(fc.title_translations,oc.title_translations),COALESCE(fc.status,oc.status,'')
+const listedSelect = `SELECT ` + Columns + `,COALESCE(fc.title,oc.title),COALESCE(fc.title_translations,oc.title_translations),COALESCE(fc.status,oc.status,''),
+ COALESCE(fd.title,od.title),COALESCE(fd.code,od.code,''),COALESCE(fd.status,od.status,''),COALESCE(fd.fixed_at,od.fixed_at) IS NOT NULL
  FROM net.reward_rules r
  LEFT JOIN fanmade.charts fc ON r.source='fanmade' AND fc.id=r.chart_id
- LEFT JOIN official.charts oc ON r.source='official' AND oc.id=r.chart_id`
+ LEFT JOIN official.charts oc ON r.source='official' AND oc.id=r.chart_id
+ LEFT JOIN fanmade.dan_courses fd ON r.source='fanmade' AND fd.id=r.dan_id
+ LEFT JOIN official.dan_courses od ON r.source='official' AND od.id=r.dan_id`
 
 func (a *API) scanListed(row interface{ Scan(...any) error }) (Listed, error) {
 	var title, status *string
-	var translations []byte
-	r, err := Scan(row, &title, &translations, &status)
+	var translations, danTitle []byte
+	var danCode, danStatus string
+	var danFixed bool
+	r, err := Scan(row, &title, &translations, &status, &danTitle, &danCode, &danStatus, &danFixed)
 	out := Listed{Rule: r}
 	if err != nil {
 		return out, err
@@ -115,6 +131,12 @@ func (a *API) scanListed(row interface{ Scan(...any) error }) (Listed, error) {
 		out.Chart = &Chart{ID: *r.ChartID, TitleTranslations: json.RawMessage(`{}`), Gone: title == nil || *status != "published"}
 		if title != nil {
 			out.Chart.Title, out.Chart.TitleTranslations = *title, translations
+		}
+	}
+	if r.DanID != nil {
+		out.Dan = &Dan{ID: *r.DanID, Title: json.RawMessage(`{}`), Code: danCode, Fixed: danFixed, Gone: danStatus != "published"}
+		if danTitle != nil {
+			out.Dan.Title = danTitle
 		}
 	}
 	return out, nil
@@ -145,7 +167,7 @@ func (a *API) List(ctx context.Context, item string) ([]Listed, error) {
 //	PUT    /api/admin/rules/{id}                   the conditions of a rule changed (not its item)
 //	DELETE /api/admin/rules/{id}
 //
-// The first three take {kind, source, chartId, category, course, clear, count} and answer
+// The first three take {kind, source, chartId, danId, category, course, clear, count} and answer
 // {rule, granted}: the rule and how many players got its item at once.
 func (a *API) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/admin/titles/{id}/rules", a.createTitleRule)
@@ -158,6 +180,7 @@ type body struct {
 	Kind     string  `json:"kind"`
 	Source   *string `json:"source"`
 	ChartID  *string `json:"chartId"`
+	DanID    *string `json:"danId"`
 	Category *string `json:"category"`
 	Course   *string `json:"course"`
 	Clear    *int    `json:"clear"`
@@ -216,7 +239,7 @@ func (a *API) conditions(w http.ResponseWriter, r *http.Request, item Rule) (Rul
 		return item, false
 	}
 	rule := Rule{ID: item.ID, Item: item.Item, TitleID: item.TitleID, DonPart: item.DonPart, DonItem: item.DonItem,
-		Kind: b.Kind, Source: b.Source, ChartID: b.ChartID, Course: b.Course, Clear: b.Clear, Count: b.Count}
+		Kind: b.Kind, Source: b.Source, ChartID: b.ChartID, DanID: b.DanID, Course: b.Course, Clear: b.Clear, Count: b.Count}
 	if b.Category != nil {
 		var flag int
 		known := false
@@ -251,9 +274,9 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, item Rule, check it
 	}
 	a.save(w, r, 201, check, func(ctx context.Context, tx pgx.Tx) (int64, error) {
 		var id int64
-		err := tx.QueryRow(ctx, `INSERT INTO net.reward_rules(item,title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count,created_by)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-			rule.Item, rule.TitleID, rule.DonPart, rule.DonItem, rule.Kind, rule.Source, rule.ChartID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count, user).Scan(&id)
+		err := tx.QueryRow(ctx, `INSERT INTO net.reward_rules(item,title_id,don_part,don_item,kind,source,chart_id,dan_id,category_flag,course,clear,count,created_by)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+			rule.Item, rule.TitleID, rule.DonPart, rule.DonItem, rule.Kind, rule.Source, rule.ChartID, rule.DanID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count, user).Scan(&id)
 		return id, err
 	}, rule)
 }
@@ -284,8 +307,8 @@ func (a *API) updateRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.save(w, r, 200, nil, func(ctx context.Context, tx pgx.Tx) (int64, error) {
-		tag, err := tx.Exec(ctx, `UPDATE net.reward_rules SET kind=$2,source=$3,chart_id=$4,category_flag=$5,course=$6,clear=$7,count=$8 WHERE id=$1`,
-			id, rule.Kind, rule.Source, rule.ChartID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count)
+		tag, err := tx.Exec(ctx, `UPDATE net.reward_rules SET kind=$2,source=$3,chart_id=$4,dan_id=$5,category_flag=$6,course=$7,clear=$8,count=$9 WHERE id=$1`,
+			id, rule.Kind, rule.Source, rule.ChartID, rule.DanID, rule.CategoryFlag, rule.Course, rule.Clear, rule.Count)
 		if err == nil && tag.RowsAffected() == 0 {
 			err = pgx.ErrNoRows
 		}
@@ -294,8 +317,8 @@ func (a *API) updateRule(w http.ResponseWriter, r *http.Request) {
 }
 
 // save writes a rule in a transaction (write, which returns its id) once check, when there is
-// one, has allowed its item and its chart is published, gives its item to those who meet it,
-// and answers {rule, granted}.
+// one, has allowed its item, its chart is published and its 段位 course is published and fixed,
+// gives its item to those who meet it, and answers {rule, granted}.
 func (a *API) save(w http.ResponseWriter, r *http.Request, status int, check itemCheck, write func(context.Context, pgx.Tx) (int64, error), rule Rule) {
 	ctx := r.Context()
 	tx, err := a.DB.Begin(ctx)
@@ -324,6 +347,23 @@ func (a *API) save(w http.ResponseWriter, r *http.Request, status int, check ite
 		}
 		if !published {
 			answers.Problem(w, 422, "RULE_CHART_NOT_FOUND", "该曲源没有这首歌曲")
+			return
+		}
+	}
+	if rule.DanID != nil {
+		var fixed *bool
+		// The source is one of the two (Valid). The course is kept fixed while the rule is saved.
+		err = tx.QueryRow(ctx, `SELECT fixed_at IS NOT NULL FROM `+*rule.Source+`.dan_courses WHERE id=$1 AND status='published' FOR SHARE`, *rule.DanID).Scan(&fixed)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			answers.Internal(w, err)
+			return
+		}
+		if fixed == nil {
+			answers.Problem(w, 422, "RULE_DAN_NOT_FOUND", "该曲源没有这个段位")
+			return
+		}
+		if !*fixed {
+			answers.Problem(w, 422, "RULE_DAN_NOT_FIXED", "只有固定了曲目的段位才能发放奖励")
 			return
 		}
 	}

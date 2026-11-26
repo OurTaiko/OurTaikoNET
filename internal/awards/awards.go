@@ -1,5 +1,6 @@
-// Package awards is what a song source needs of the part that keeps players' titles and 段位
-// badges: the title catalog, and what a 段位 attempt earns.
+// Package awards is what a song source needs of the part that keeps players' 段位 badges: what a
+// 段位 attempt earns. The titles and other items passing a course gives are given by rule
+// (package rewards/rules).
 package awards
 
 import (
@@ -12,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,20 +20,16 @@ import (
 )
 
 // Config is how this service asks OurTaikoProfile (profile.ourtaiko.org) for the
-// titles and 段位 badges a 段位 attempt earns: its address and this service's key there
+// 段位 badge a 段位 attempt earns: its address and this service's key there
 // (registered with ourtaiko-profile -register-service).
 type Config struct {
 	URL, ServiceID, ServiceKey string
 }
 
-// Client calls POST /internal/v1/awards and reads the title catalog.
+// Client calls POST /internal/v1/awards.
 type Client struct {
 	config Config
 	http   *http.Client
-
-	mu       sync.Mutex
-	titles   map[string]Title
-	titlesAt time.Time
 }
 
 func New(cfg Config) (*Client, error) {
@@ -65,14 +61,13 @@ type Awarder interface {
 
 // Request is one 段位 attempt as Profile records it.
 type Request struct {
-	Key         string   `json:"key"`
-	UserID      string   `json:"userId"`
-	CourseID    string   `json:"courseId"`
-	CourseTitle string   `json:"courseTitle"`
-	Official    bool     `json:"official"`
-	Verdict     int      `json:"verdict"`
-	Dan         *int     `json:"dan"`
-	Titles      []string `json:"titles"`
+	Key         string `json:"key"`
+	UserID      string `json:"userId"`
+	CourseID    string `json:"courseId"`
+	CourseTitle string `json:"courseTitle"`
+	Official    bool   `json:"official"`
+	Verdict     int    `json:"verdict"`
+	Dan         *int   `json:"dan"`
 }
 
 // Award asks Profile for what an attempt earns: its reply (granted and the new nameplate).
@@ -121,41 +116,4 @@ type Rejection struct {
 
 func (e *Rejection) Error() string {
 	return fmt.Sprintf("OurTaikoProfile rejected the award: HTTP %d %s", e.Status, e.Code)
-}
-
-// Title is what a course needs to know of a title of Profile's catalog: that it is there. The
-// catalog is the public titles, the only ones a course can give.
-type Title struct {
-	ID string `json:"id"`
-}
-
-// Titles is Profile's title catalog (GET /api/titles) by id, kept for a minute; fresh reads
-// it again.
-func (c *Client) Titles(ctx context.Context, fresh bool) (map[string]Title, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !fresh && c.titles != nil && time.Since(c.titlesAt) < time.Minute {
-		return c.titles, nil
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", c.config.URL+"/api/titles", nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.http.Do(req)
-	if err != nil {
-		return nil, errors.New("OurTaikoProfile unreachable")
-	}
-	defer res.Body.Close()
-	var catalog struct {
-		Titles []Title `json:"titles"`
-	}
-	if res.StatusCode != 200 || json.NewDecoder(io.LimitReader(res.Body, 4<<20)).Decode(&catalog) != nil {
-		return nil, fmt.Errorf("OurTaikoProfile answered HTTP %d", res.StatusCode)
-	}
-	titles := make(map[string]Title, len(catalog.Titles))
-	for _, title := range catalog.Titles {
-		titles[title.ID] = title
-	}
-	c.titles, c.titlesAt = titles, time.Now()
-	return titles, nil
 }

@@ -31,6 +31,10 @@ const build = () =>
     dan: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}`,
     danOfficial: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/official`,
     danVote: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/vote`,
+    danFix: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/fix`,
+    danChanges: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/changes`,
+    danChange: (id: string, change: string) =>
+      `${API_ROOT}/dans/${encodeURIComponent(id)}/changes/${encodeURIComponent(change)}`,
     categories: `${API_ROOT}/categories`,
     uploadRules: `${API_ROOT}/upload-rules`,
     // The site has one sign-in, outside any source. It returns to a page of this source.

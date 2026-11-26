@@ -218,6 +218,17 @@ func TestValidIsWhatTheTableTakes(t *testing.T) {
 		{Kind: ChartsUploaded},
 		{Kind: ChartsUploaded, Count: num(1), Clear: num(1)},
 		{Kind: ChartsUploaded, Source: str("fanmade"), Count: num(1)},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32)), Clear: num(1)},
+		{Kind: DanClear, Source: str("official"), DanID: str(strings.Repeat("d", 32)), Clear: num(6)},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32)), Clear: num(7)},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32))},
+		{Kind: DanClear, Source: str("fanmade"), Clear: num(1)},
+		{Kind: DanClear, DanID: str(strings.Repeat("d", 32)), Clear: num(1)},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32)), Clear: num(1), Course: str("Oni")},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32)), Clear: num(1), Count: num(1)},
+		{Kind: DanClear, Source: str("fanmade"), DanID: str(strings.Repeat("d", 32)), ChartID: str(strings.Repeat("1", 32)), Clear: num(1)},
+		{Kind: ChartClear, Source: str("fanmade"), ChartID: str(strings.Repeat("1", 32)), DanID: str(strings.Repeat("d", 32)), Clear: num(1)},
+		{Kind: SiteLogin, DanID: str(strings.Repeat("d", 32))},
 	}
 	items := []Rule{title, part,
 		{Item: ItemTitle, DonPart: str("paint"), DonItem: num(2)},
@@ -232,8 +243,8 @@ func TestValidIsWhatTheTableTakes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = tx.Exec(ctx, `INSERT INTO net.reward_rules(item,title_id,don_part,don_item,kind,source,chart_id,category_flag,course,clear,count)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, r.Item, r.TitleID, r.DonPart, r.DonItem, r.Kind, r.Source, r.ChartID, r.CategoryFlag, r.Course, r.Clear, r.Count)
+			_, err = tx.Exec(ctx, `INSERT INTO net.reward_rules(item,title_id,don_part,don_item,kind,source,chart_id,dan_id,category_flag,course,clear,count)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, r.Item, r.TitleID, r.DonPart, r.DonItem, r.Kind, r.Source, r.ChartID, r.DanID, r.CategoryFlag, r.Course, r.Clear, r.Count)
 			tx.Rollback(ctx)
 			if taken := err == nil; taken != r.Valid() {
 				t.Errorf("item %d, conditions %d: table takes it %v, Valid %v (%v)", i, j, taken, r.Valid(), err)

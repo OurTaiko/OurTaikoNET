@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -19,8 +18,9 @@ import (
 
 // 段位 courses in the format of OurTaikoPlay's .otdan.json (OurTaikoLogs DanDojo.md): one to
 // three chart blocks with conditions. The website keeps them, the game reads them from
-// GET /api/game/dans and reports attempts to POST /api/game/dan-attempts, which asks
-// OurTaikoProfile for the titles and 段位 badge they earn.
+// GET /api/game/dans and reports attempts to POST /api/game/dan-results, which records the 段位
+// badge an official course earns and judges the rules that name the course (package rules:
+// titles and other items are given by rule, and only of a fixed course, dan_changes.go).
 
 const danMaxSongs = 3
 
@@ -35,10 +35,6 @@ const danCommunityLimit = 10
 var danLanguages = map[string]bool{"ja": true, "en": true, "zh": true, "zh_tw": true, "ko": true}
 var danExamTypes = map[string]bool{"gauge": true, "good": true, "ok": true, "bad": true, "hits": true, "score": true, "combo": true, "rolls": true}
 var danCourses = map[string]bool{"Easy": true, "Normal": true, "Hard": true, "Oni": true, "Edit": true}
-var profileTitleID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
-
-// A reward title is given at this verdict or better: red 1, gold 4, or one of red1..gold6.
-var danRewardLevels = map[string]int{"red": 1, "gold": 4, "red1": 1, "red2": 2, "red3": 3, "gold4": 4, "gold5": 5, "gold6": 6}
 
 // DanSongChart names the block a course song plays: a chart, a course and a side.
 type DanSongChart struct {
@@ -85,14 +81,15 @@ type DanCourse struct {
 	Downvotes    int `json:"downvotes"`
 	CommentCount int `json:"commentCount"`
 	MyVote       int `json:"myVote"`
+	// FixedAt is when the course was last fixed (dan_changes.go): its songs and conditions then
+	// change only by an approved request. Null: not fixed.
+	FixedAt *time.Time `json:"fixedAt"`
 }
 
+// danRewards is what a course gives by itself: the 段位 it stands for, when official. The items
+// given for passing it are rules' (package rules).
 type danRewards struct {
-	Dan    *int `json:"dan,omitempty"`
-	Titles []struct {
-		ID string `json:"id"`
-		On string `json:"on"`
-	} `json:"titles,omitempty"`
+	Dan *int `json:"dan,omitempty"`
 }
 
 // danInput is what the website sends to create or change a course.
@@ -100,14 +97,8 @@ type danInput struct {
 	Title map[string]string `json:"title"`
 	Color int               `json:"color"`
 	// Optional on creation; ignored on an update.
-	Code  string `json:"code"`
-	Songs []struct {
-		ChartID string `json:"chartId"`
-		Course  string `json:"course"`
-		// The block's side (single, p1, p2): the maker picks one of those the course has.
-		Side   string `json:"side"`
-		Hidden bool   `json:"hidden"`
-	} `json:"songs"`
+	Code    string          `json:"code"`
+	Songs   []danSongInput  `json:"songs"`
 	Exams   json.RawMessage `json:"exams"`
 	Rewards json.RawMessage `json:"rewards"`
 }
@@ -193,13 +184,8 @@ func cleanDanRewards(raw json.RawMessage) (json.RawMessage, bool) {
 		return json.RawMessage(`{}`), true
 	}
 	var rewards danRewards
-	if json.Unmarshal(raw, &rewards) != nil || (rewards.Dan != nil && (*rewards.Dan < danFirst || *rewards.Dan > danLast)) || len(rewards.Titles) > 10 {
+	if json.Unmarshal(raw, &rewards) != nil || (rewards.Dan != nil && (*rewards.Dan < danFirst || *rewards.Dan > danLast)) {
 		return nil, false
-	}
-	for _, title := range rewards.Titles {
-		if !profileTitleID.MatchString(title.ID) || danRewardLevels[title.On] == 0 {
-			return nil, false
-		}
 	}
 	clean, _ := json.Marshal(rewards)
 	return clean, true
@@ -213,15 +199,29 @@ type danSongRow struct {
 
 var danSides = map[string]bool{"single": true, "p1": true, "p2": true}
 
-// checkDan validates a course from the website: each song names a block the chart has now, by
-// course and side.
+// checkDan validates a course from the website: its name and look (checkDanLook), and its songs
+// and conditions (checkDanSongs).
 func (s *Server) checkDan(ctx context.Context, w http.ResponseWriter, in danInput) (map[string]string, []danSongRow, json.RawMessage, json.RawMessage, bool) {
+	title, rewards, ok := checkDanLook(w, in)
+	if !ok {
+		return nil, nil, nil, nil, false
+	}
+	songs, exams, ok := s.checkDanSongs(ctx, w, in.Songs, in.Exams)
+	if !ok {
+		return nil, nil, nil, nil, false
+	}
+	return title, songs, exams, rewards, true
+}
+
+// checkDanLook validates what a course's maker changes even when it is fixed: its name, colour
+// and rewards, and that it has 1–3 songs.
+func checkDanLook(w http.ResponseWriter, in danInput) (map[string]string, json.RawMessage, bool) {
 	title := map[string]string{}
 	for language, text := range in.Title {
 		text = strings.TrimSpace(text)
 		if !danLanguages[language] || utf8.RuneCountInString(text) > 40 {
 			problem(w, 422, "DAN_INVALID", "段位名称无效")
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		if text != "" {
 			title[language] = text
@@ -230,89 +230,69 @@ func (s *Server) checkDan(ctx context.Context, w http.ResponseWriter, in danInpu
 	// color 0–6 is the Nijiiro skin's dan box; its 1 is the same wood as 0, so it is not offered.
 	if len(title) == 0 || in.Color < 0 || in.Color > 6 || in.Color == 1 || len(in.Songs) == 0 || len(in.Songs) > danMaxSongs {
 		problem(w, 422, "DAN_INVALID", "段位需要名称和 1–3 首歌曲")
-		return nil, nil, nil, nil, false
-	}
-	exams, ok := cleanDanExams(in.Exams, len(in.Songs))
-	if !ok {
-		problem(w, 422, "DAN_EXAMS_INVALID", "合格条件无效")
-		return nil, nil, nil, nil, false
+		return nil, nil, false
 	}
 	rewards, ok := cleanDanRewards(in.Rewards)
 	if !ok {
 		problem(w, 422, "DAN_REWARDS_INVALID", "奖励设置无效")
-		return nil, nil, nil, nil, false
+		return nil, nil, false
 	}
-	if !s.checkDanTitles(ctx, w, rewards) {
-		return nil, nil, nil, nil, false
+	return title, rewards, true
+}
+
+// danSongInput is a song of a course as the website sends it.
+type danSongInput struct {
+	ChartID string `json:"chartId"`
+	Course  string `json:"course"`
+	// The block's side (single, p1, p2): the maker picks one of those the course has.
+	Side   string `json:"side"`
+	Hidden bool   `json:"hidden"`
+}
+
+// checkDanSongs validates a course's songs and conditions: 1–3 songs, each a block the chart
+// has now, by course and side, and conditions the game reads.
+func (s *Server) checkDanSongs(ctx context.Context, w http.ResponseWriter, in []danSongInput, rawExams json.RawMessage) ([]danSongRow, json.RawMessage, bool) {
+	if len(in) == 0 || len(in) > danMaxSongs {
+		problem(w, 422, "DAN_INVALID", "段位需要名称和 1–3 首歌曲")
+		return nil, nil, false
+	}
+	exams, ok := cleanDanExams(rawExams, len(in))
+	if !ok {
+		problem(w, 422, "DAN_EXAMS_INVALID", "合格条件无效")
+		return nil, nil, false
 	}
 	songs := []danSongRow{}
-	for _, song := range in.Songs {
+	for _, song := range in {
 		chart := song.ChartID
 		if !danCourses[song.Course] || !validID(chart) {
 			problem(w, 422, "DAN_INVALID", "歌曲或难度无效")
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		if !danSides[song.Side] {
 			problem(w, 422, "DAN_SIDE_REQUIRED", "请为每首歌选择要挑战的谱面块（单人／1P／2P）")
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		var hashed bool
 		err := s.DB.QueryRow(ctx, `SELECT d.content_hash IS NOT NULL FROM charts c JOIN chart_difficulties d ON d.chart_id=c.id
  WHERE c.id=$1 AND `+publishedChart+` AND d.course=$2 AND d.side=$3`, chart, song.Course, song.Side).Scan(&hashed)
 		if errors.Is(err, pgx.ErrNoRows) {
 			problem(w, 422, "DAN_SONG_NOT_FOUND", "找不到歌曲或该难度的这个谱面块："+song.ChartID)
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		if err != nil {
 			internal(w, err)
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		if !hashed {
 			problem(w, 422, "DAN_SONG_NOT_FOUND", "这个谱面块还没有内容哈希，请稍后再试："+song.ChartID)
-			return nil, nil, nil, nil, false
+			return nil, nil, false
 		}
 		songs = append(songs, danSongRow{chartID: chart, course: song.Course, side: song.Side, hidden: song.Hidden})
 	}
-	return title, songs, exams, rewards, true
+	return songs, exams, true
 }
 
-// checkDanTitles makes sure each reward title is one a course can give: a public title of
-// OurTaikoProfile's catalog. A course that is not official yet may name them: Profile gives them
-// once it is, and never from a course that is not. Without Profile, or while it does not answer,
-// titles are not checked; Profile skips the ones it cannot give.
-func (s *Server) checkDanTitles(ctx context.Context, w http.ResponseWriter, rewards json.RawMessage) bool {
-	var r danRewards
-	json.Unmarshal(rewards, &r)
-	if s.Config.Profile == nil || len(r.Titles) == 0 {
-		return true
-	}
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	// A title made a moment ago may not be in the kept catalog yet: one more look before saying no.
-	for _, fresh := range []bool{false, true} {
-		titles, err := s.Config.Profile.Titles(ctx, fresh)
-		if err != nil {
-			log.Printf("dan reward titles not checked: %v", err)
-			return true
-		}
-		code, message, id := "", "", ""
-		for _, reward := range r.Titles {
-			if _, found := titles[reward.ID]; !found {
-				code, message, id = "DAN_TITLE_NOT_FOUND", "称号不存在或未公开：", reward.ID
-				break
-			}
-		}
-		if code == "" {
-			return true
-		}
-		if fresh {
-			problem(w, 422, code, message+id)
-		}
-	}
-	return false
-}
-
-const danColumns = `d.id,d.owner_id,d.title,d.color,d.official,d.exams,d.rewards,d.created_at,d.updated_at,d.code,d.upvotes,d.downvotes,d.comment_count`
+const danColumns = `d.id,d.owner_id,d.title,d.color,d.official,d.exams,d.rewards,d.created_at,d.updated_at,d.code,d.upvotes,d.downvotes,d.comment_count,d.fixed_at`
 
 // loadDans reads courses (where: a condition on dan_courses d) with their songs as they are now.
 func (s *Server) loadDans(ctx context.Context, where string, args ...any) ([]DanCourse, error) {
@@ -325,7 +305,7 @@ func (s *Server) loadDans(ctx context.Context, where string, args ...any) ([]Dan
 	for rows.Next() {
 		var c DanCourse
 		var title, exams, rewards []byte
-		if err = rows.Scan(&c.ID, &c.OwnerID, &title, &c.Color, &c.Official, &exams, &rewards, &c.CreatedAt, &c.UpdatedAt, &c.Code, &c.Upvotes, &c.Downvotes, &c.CommentCount); err != nil {
+		if err = rows.Scan(&c.ID, &c.OwnerID, &title, &c.Color, &c.Official, &exams, &rewards, &c.CreatedAt, &c.UpdatedAt, &c.Code, &c.Upvotes, &c.Downvotes, &c.CommentCount, &c.FixedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -545,6 +525,9 @@ func (s *Server) ownDan(w http.ResponseWriter, r *http.Request) (session, string
 	return u, id, true
 }
 
+// updateDan is PUT /api/dans/{id}: the course as its maker or a manager edits it. A fixed course
+// takes its name, colour, rewards and which songs are hidden; its songs and conditions must be
+// sent as they are (a change of them is a request, dan_changes.go).
 func (s *Server) updateDan(w http.ResponseWriter, r *http.Request) {
 	_, id, ok := s.ownDan(w, r)
 	if !ok {
@@ -554,11 +537,6 @@ func (s *Server) updateDan(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	title, songs, exams, rewards, ok := s.checkDan(r.Context(), w, in)
-	if !ok {
-		return
-	}
-	titleJSON, _ := json.Marshal(title)
 	ctx := r.Context()
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
@@ -566,11 +544,46 @@ func (s *Server) updateDan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `UPDATE dan_courses SET title=$2,color=$3,exams=$4,rewards=$5,updated_at=now() WHERE id=$1`, id, titleJSON, in.Color, exams, rewards); err != nil {
+	var fixed bool
+	var stored []byte
+	// The row is held so that a change approved meanwhile is not undone.
+	if err = tx.QueryRow(ctx, `SELECT fixed_at IS NOT NULL,exams FROM dan_courses WHERE id=$1 FOR UPDATE`, id).Scan(&fixed, &stored); err != nil {
 		internal(w, err)
 		return
 	}
-	if err = s.saveDanSongs(ctx, tx, id, songs); err != nil {
+	var title map[string]string
+	var songs []danSongRow
+	var exams, rewards json.RawMessage
+	if fixed {
+		if title, rewards, ok = checkDanLook(w, in); !ok {
+			return
+		}
+		same, err := sameDanSongs(ctx, tx, id, stored, in)
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		if !same {
+			problem(w, 409, "DAN_FIXED", "段位已固定曲目，修改曲目或合格条件需要提交申请")
+			return
+		}
+		_, err = tx.Exec(ctx, `UPDATE dan_course_songs s SET hidden=COALESCE((($2::jsonb)->(s.position::int)->>'hidden')::boolean,false) WHERE s.course_id=$1`, id, danSongsJSON(in.Songs))
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		exams = stored
+	} else {
+		if title, songs, exams, rewards, ok = s.checkDan(ctx, w, in); !ok {
+			return
+		}
+		if err = s.saveDanSongs(ctx, tx, id, songs); err != nil {
+			internal(w, err)
+			return
+		}
+	}
+	titleJSON, _ := json.Marshal(title)
+	if _, err = tx.Exec(ctx, `UPDATE dan_courses SET title=$2,color=$3,exams=$4,rewards=$5,updated_at=now() WHERE id=$1`, id, titleJSON, in.Color, exams, rewards); err != nil {
 		internal(w, err)
 		return
 	}
@@ -586,13 +599,15 @@ func (s *Server) updateDan(w http.ResponseWriter, r *http.Request) {
 	web.Respond(w, 200, courses[0])
 }
 
-// deleteDan takes a course off the lists; its attempts stay recorded.
+// deleteDan takes a course off the lists; its attempts stay recorded. A request to change it
+// that was waiting is withdrawn, and the rules that name it give nothing any more.
 func (s *Server) deleteDan(w http.ResponseWriter, r *http.Request) {
 	_, id, ok := s.ownDan(w, r)
 	if !ok {
 		return
 	}
-	if _, err := s.DB.Exec(r.Context(), `UPDATE dan_courses SET status='deleted',updated_at=now() WHERE id=$1`, id); err != nil {
+	if _, err := s.DB.Exec(r.Context(), `WITH d AS (UPDATE dan_courses SET status='deleted',updated_at=now() WHERE id=$1 RETURNING id)
+ UPDATE dan_changes SET status='withdrawn',decided_at=now() WHERE course_id IN (SELECT id FROM d) AND status='pending'`, id); err != nil {
 		internal(w, err)
 		return
 	}
@@ -861,7 +876,8 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 		problem(w, 409, "IDEMPOTENCY_CONFLICT", "同一个 Idempotency-Key 对应了不同的成绩")
 		return
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	fresh := errors.Is(err, pgx.ErrNoRows)
+	if fresh {
 		// A new attempt. The scores first; the attempt takes their ids.
 		ids := make([]*string, played)
 		for i, score := range body.Scores {
@@ -921,6 +937,9 @@ func (s *Server) saveDanAttempt(w http.ResponseWriter, r *http.Request, together
 			internal(w, err)
 			return
 		}
+	}
+	if fresh {
+		s.rulesAfterDanAttempt(ctx, tx, u.User.ID, a)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		internal(w, err)
@@ -984,11 +1003,10 @@ func (s *Server) saveDanAttemptScore(ctx context.Context, tx pgx.Tx, user, key s
 	return &id, nil
 }
 
-// danAward is what Profile is asked to give for an attempt: the course's 段位 (official
-// courses only) and the reward titles whose level the verdict reached. Profile gives a
-// player's community title only for that player's courses, so it is told who made the course.
+// danAward is what Profile is asked to record for an attempt: the course's 段位 (official
+// courses only). What else passing it gives is given by rule (rulesAfterDanAttempt).
 func danAward(c DanCourse, a DanAttempt, user string) AwardRequest {
-	request := AwardRequest{Key: a.ID, UserID: user, CourseID: c.ID, Official: c.Official, Verdict: a.Verdict, Titles: []string{}}
+	request := AwardRequest{Key: a.ID, UserID: user, CourseID: c.ID, Official: c.Official, Verdict: a.Verdict}
 	for _, language := range []string{"ja", "zh", "en", "ko", "zh_tw"} {
 		if title := c.Title[language]; title != "" {
 			request.CourseTitle = title
@@ -999,11 +1017,6 @@ func danAward(c DanCourse, a DanAttempt, user string) AwardRequest {
 	json.Unmarshal(c.Rewards, &rewards)
 	if c.Official && rewards.Dan != nil {
 		request.Dan = rewards.Dan
-	}
-	for _, title := range rewards.Titles {
-		if level := danRewardLevels[title.On]; level > 0 && a.Verdict >= level {
-			request.Titles = append(request.Titles, title.ID)
-		}
 	}
 	return request
 }
