@@ -89,6 +89,7 @@
     "unsavedChanges": "未保存の変更があります",
     "makeChangesToSave": "変更後に保存できます",
     "cancel": "キャンセル",
+    "confirmTitle": "確認してください",
     "saving2": "保存中…",
     "saveChanges": "変更を保存",
     "pageNotFound": "ページが見つかりません",

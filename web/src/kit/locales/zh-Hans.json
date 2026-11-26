@@ -89,6 +89,7 @@
     "unsavedChanges": "有尚未保存的修改",
     "makeChangesToSave": "修改后即可保存",
     "cancel": "取消",
+    "confirmTitle": "请确认",
     "saving2": "保存中…",
     "saveChanges": "保存修改",
     "pageNotFound": "页面不存在",

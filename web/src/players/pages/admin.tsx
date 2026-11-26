@@ -145,6 +145,7 @@ function AllTitles() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const { busy, run } = useRun()
+  const { confirm } = useNotification()
   const read = useQuery(playerQueries.adminTitles())
   const titles = read.data?.titles
   const error = titles ? '' : (read.error?.message ?? '')
@@ -165,9 +166,13 @@ function AllTitles() {
           )),
     )
   }, [titles, query, show])
-  const remove = (title: ListedTitle) => {
-    if (!window.confirm(t('admin.confirmDelete', { name: title.name, count: title.holders })))
-      return
+  const remove = async (title: ListedTitle) => {
+    const yes = await confirm({
+      message: t('admin.confirmDelete', { name: title.name, count: title.holders }),
+      confirmLabel: t('admin.delete'),
+      destructive: true,
+    })
+    if (!yes) return
     void run(() =>
       api(endpoints.adminTitle(title.id), jsonRequest('DELETE', {}, session.csrfToken)),
     )
@@ -258,7 +263,7 @@ function AllTitles() {
                     size="sm"
                     variant="destructive"
                     disabled={busy}
-                    onClick={() => remove(title)}
+                    onClick={() => void remove(title)}
                   >
                     <TrashIcon aria-hidden="true" />
                     {t('admin.delete')}

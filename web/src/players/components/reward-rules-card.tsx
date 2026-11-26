@@ -18,6 +18,7 @@ import { Button } from '@sitekit/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@sitekit/components/ui/card'
 import { Input } from '@sitekit/components/ui/input'
 import { Label } from '@sitekit/components/ui/label'
+import { useNotification } from '@sitekit/notification-context'
 
 type Kind = RewardRule['kind']
 type SourceId = (typeof ruleSources)[number]
@@ -94,6 +95,7 @@ export function RewardRulesCard({
   onDelete: (rule: RewardRule) => void
 }) {
   const { t, i18n } = useTranslation()
+  const { confirm } = useNotification()
   const language = i18n.resolvedLanguage ?? 'zh-Hans'
   const [form, setForm] = useState(blank)
   const [editing, setEditing] = useState<RewardRule | null>(null)
@@ -181,8 +183,13 @@ export function RewardRulesCard({
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => {
-                    if (window.confirm(t('rules.confirmDelete'))) onDelete(rule)
+                  onClick={async () => {
+                    const yes = await confirm({
+                      message: t('rules.confirmDelete'),
+                      confirmLabel: t('rules.delete'),
+                      destructive: true,
+                    })
+                    if (yes) onDelete(rule)
                   }}
                 >
                   {t('rules.delete')}
