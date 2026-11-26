@@ -32,27 +32,13 @@ func TestDanCourses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A stand-in OurTaikoProfile: its title catalog, and each award request recorded and answered
-	// with what it granted.
+	// A stand-in OurTaikoProfile: each award request recorded and answered with what it granted.
 	var mu sync.Mutex
 	asked := []AwardRequest{}
 	var down, reject atomic.Bool
-	var catalogReads atomic.Int32
-	titles := []map[string]any{
-		{"id": "ten-dan", "visibility": "public", "ownerId": alice},
-		{"id": "ten-dan-gold", "visibility": "public", "ownerId": nil},
-		{"id": "carols", "visibility": "public", "ownerId": carol},
-	}
 	profile := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if down.Load() {
 			w.WriteHeader(503)
-			return
-		}
-		if r.Method == "GET" && r.URL.Path == "/api/titles" {
-			catalogReads.Add(1)
-			mu.Lock()
-			defer mu.Unlock()
-			web.Respond(w, 200, map[string]any{"titles": titles})
 			return
 		}
 		if r.URL.Path != "/internal/v1/awards" || r.Header.Get("X-Service-ID") != "fanmade" || r.Header.Get("X-Service-Key") != strings.Repeat("k", 64) {
@@ -68,7 +54,7 @@ func TestDanCourses(t *testing.T) {
 		mu.Lock()
 		asked = append(asked, request)
 		mu.Unlock()
-		web.Respond(w, 200, map[string]any{"granted": map[string]any{"titles": request.Titles, "dan": request.Dan}, "nameplate": map[string]any{"userId": request.UserID}})
+		web.Respond(w, 200, map[string]any{"granted": map[string]any{"titles": []any{}, "dan": request.Dan}, "nameplate": map[string]any{"userId": request.UserID}})
 	}))
 	defer profile.Close()
 	client, err := NewProfile(ProfileConfig{URL: profile.URL, ServiceID: "fanmade", ServiceKey: strings.Repeat("k", 64)})
@@ -125,7 +111,7 @@ func TestDanCourses(t *testing.T) {
 	}
 	course := `{"title":{"ja":"十段","en":" 10th Dan "},"color":3,"songs":[{"chartId":"` + songA + `","course":"Oni","side":"single"},{"chartId":"` + songB + `","course":"Oni","side":"single","hidden":true}],
  "exams":[{"type":"gauge","range":"more","value":[100]},{"type":"bad","range":"less","value":[[10,5],null]}],
- "rewards":{"dan":20,"titles":[{"id":"ten-dan","on":"red"},{"id":"ten-dan-gold","on":"gold"}]}}`
+ "rewards":{"dan":20}}`
 
 	// Anyone signed in publishes; what the game needs is checked.
 	expect(call("POST", "/api/dans", course, ""), 401, nil)
@@ -134,7 +120,6 @@ func TestDanCourses(t *testing.T) {
 		strings.Replace(course, `"value":[[10,5],null]`, `"value":[[0],null]`, 1),
 		strings.Replace(course, `"value":[[10,5],null]`, `"value":[[10]]`, 1),
 		strings.Replace(course, `"type":"bad"`, `"type":"misses"`, 1),
-		strings.Replace(course, `"on":"red"`, `"on":"blue"`, 1),
 		strings.Replace(course, `"dan":20`, `"dan":25`, 1),
 		strings.Replace(course, `"dan":20`, `"dan":5`, 1),
 		strings.Replace(course, `"title":{"ja":"十段","en":" 10th Dan "}`, `"title":{"fr":"x"}`, 1),
@@ -146,25 +131,7 @@ func TestDanCourses(t *testing.T) {
 	}
 	expect(call("POST", "/api/dans", strings.Replace(course, `"course":"Oni","side":"single","hidden"`, `"course":"Edit","side":"single","hidden"`, 1), alice), 422, nil)
 
-	// Reward titles are of Profile's catalog, the public titles (a private one is not in it):
-	// whoever made them, since only a course made official gives them.
 	var problemBody struct{ Code string }
-	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 422, &problemBody)
-	if problemBody.Code != "DAN_TITLE_NOT_FOUND" {
-		t.Fatal(problemBody)
-	}
-	reads := catalogReads.Load()
-	var withShared DanCourse
-	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"carols"`, 1), alice), 201, &withShared)
-	if catalogReads.Load() != reads {
-		t.Fatal("the catalog is kept for a minute")
-	}
-	// A title made a moment ago is found by reading the catalog again.
-	mu.Lock()
-	titles = append(titles, map[string]any{"id": "brand-new", "visibility": "public", "ownerId": alice})
-	mu.Unlock()
-	expect(call("PUT", "/api/dans/"+withShared.ID, strings.Replace(course, `"ten-dan-gold"`, `"brand-new"`, 1), alice), 200, nil)
-	expect(call("DELETE", "/api/dans/"+withShared.ID, "", alice), 200, nil)
 	var created DanCourse
 	expect(call("POST", "/api/dans", course, alice), 201, &created)
 	if created.Official || created.Owner != "Alice" || created.Title["en"] != "10th Dan" || len(created.Songs) != 2 || !created.Songs[1].Hidden ||
@@ -258,9 +225,9 @@ func TestDanCourses(t *testing.T) {
 	}
 	expect(call("GET", "/api/dans/999", "", ""), 404, nil)
 
-	// Not official yet: the titles come, no 段位.
+	// Not official yet: no 段位.
 	reply := attempt("attempt-key-0001", `{"courseId":"`+created.ID+`","verdict":5,"songsPlayed":2}`, 200)
-	if len(asked) != 1 || asked[0].Official || asked[0].Dan != nil || strings.Join(asked[0].Titles, ",") != "ten-dan,ten-dan-gold" || asked[0].CourseTitle != "十段" || asked[0].UserID != carol {
+	if len(asked) != 1 || asked[0].Official || asked[0].Dan != nil || asked[0].CourseTitle != "十段" || asked[0].UserID != carol {
 		t.Fatalf("award request %+v", asked)
 	}
 	if !strings.Contains(string(reply["profile"]), `"granted"`) {
@@ -275,7 +242,7 @@ func TestDanCourses(t *testing.T) {
 		t.Fatalf("game list once official %+v", list)
 	}
 	attempt("attempt-key-0002", `{"courseId":"`+created.ID+`","verdict":2,"songsPlayed":2}`, 200)
-	if len(asked) != 2 || !asked[1].Official || asked[1].Dan == nil || *asked[1].Dan != 20 || strings.Join(asked[1].Titles, ",") != "ten-dan" {
+	if len(asked) != 2 || !asked[1].Official || asked[1].Dan == nil || *asked[1].Dan != 20 {
 		t.Fatalf("official award %+v", asked[1])
 	}
 	// The same attempt again is answered from what Profile granted; a different body conflicts.
@@ -293,7 +260,7 @@ func TestDanCourses(t *testing.T) {
 	}
 	down.Store(false)
 	retried := attempt("attempt-key-0003", `{"courseId":"`+created.ID+`","verdict":0,"songsPlayed":1}`, 200)
-	if len(asked) != 3 || asked[2].Verdict != 0 || len(asked[2].Titles) != 0 || string(retried["profile"]) == "null" {
+	if len(asked) != 3 || asked[2].Verdict != 0 || string(retried["profile"]) == "null" {
 		t.Fatal("retried award", asked, retried)
 	}
 	// When Profile turns the request down for good, the game is told to stop sending it.
@@ -506,14 +473,9 @@ func TestDanCourses(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 
-	// While Profile does not answer, titles are not checked (Profile skips what it cannot give).
-	down.Store(true)
-	expect(call("POST", "/api/dans", strings.Replace(course, `"ten-dan-gold"`, `"missing"`, 1), alice), 201, nil)
-	down.Store(false)
-
 	// At most ten courses that are not official each; an official one frees its place.
 	resetRateLimit(s)
-	plain := strings.Replace(course, `,"titles":[{"id":"ten-dan","on":"red"},{"id":"ten-dan-gold","on":"gold"}]`, ``, 1)
+	plain := course
 	var first DanCourse
 	expect(call("POST", "/api/dans", plain, carol), 201, &first)
 	for i := 1; i < danCommunityLimit; i++ {

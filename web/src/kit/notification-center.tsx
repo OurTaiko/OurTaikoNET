@@ -92,6 +92,14 @@ export function useNotificationText(n: Sourced): string | null {
         return t('notificationCenter.text.comment_removed', { chart })
       case 'playlist_removed':
         return t('notificationCenter.text.playlist_removed', { name: n.data.name ?? '' })
+      case 'dan_change_result':
+        return n.data.approved
+          ? t('notificationCenter.text.dan_change_approved', { actor, chart })
+          : t('notificationCenter.text.dan_change_returned', {
+              actor,
+              chart,
+              reply: n.data.reply ?? '',
+            })
       case 'upload_result': {
         const title = n.data.title || chart
         if (n.data.status === 'failed')
@@ -147,6 +155,7 @@ const kindIcons: Record<string, ReactNode> = {
   comment_removed: <ShieldWarningIcon className="text-destructive" />,
   upload_result: <UploadSimpleIcon />,
   playlist_removed: <ShieldWarningIcon className="text-destructive" />,
+  dan_change_result: <ShieldWarningIcon />,
 }
 
 export function NotificationIcon({ n }: { n: AppNotification }) {

@@ -592,7 +592,9 @@
       "upload_failed": "Uploading \"{{title}}\" failed and nothing was saved: {{reason}}",
       "upload_skipped_file": "{{file}} ({{reason}})",
       "unknown": "You have a new notification",
-      "playlist_removed": "An administrator deleted your playlist \"{{name}}\""
+      "playlist_removed": "An administrator deleted your playlist \"{{name}}\"",
+      "dan_change_approved": "{{actor}} approved the change you asked for your course \"{{chart}}\"",
+      "dan_change_returned": "{{actor}} returned the change you asked for your course \"{{chart}}\": {{reply}}"
     },
     "file": {
       "cover": "Cover",
@@ -811,21 +813,7 @@
     "noRewards": "No rewards.",
     "rewardDanLabel": "Dan badge",
     "noDan": "None",
-    "titleId": "Title ID",
-    "rewardLevel": "Given at",
-    "addReward": "Add a title",
-    "removeReward": "Remove the title",
     "titleCatalog": "See the title catalog",
-    "levels": {
-      "red": "Red pass or better",
-      "red1": "Red pass or better",
-      "red2": "Red pass with full combo or better",
-      "red3": "Red pass with all good or better",
-      "gold": "Gold pass or better",
-      "gold4": "Gold pass or better",
-      "gold5": "Gold pass with full combo or better",
-      "gold6": "Gold pass with all good"
-    },
     "basics": "Basics",
     "titleIn": "Name ({{language}})",
     "languages": {
@@ -856,12 +844,38 @@
     "save": "Save",
     "cancel": "Cancel",
     "signInToEdit": "Please sign in first.",
-    "rewardTitleLabel": "Title",
-    "titleMissing": "(No such public title in the catalog; it will not be given)",
-    "officialTitleLater": "Titles are given only once the course is marked official",
-    "titlesUnavailable": "OurTaiko Profile's titles cannot be read right now. Enter title IDs, or reload later.",
-    "reloadTitles": "Reload titles",
-    "noUsableTitles": "There are no public titles in the catalog yet."
+    "fixed": "Songs fixed",
+    "fixedExplained": "Changing the songs and conditions takes a request that the library managers review",
+    "fix": "Fix songs",
+    "confirmFix": "Once fixed, changing the songs and conditions takes a request that the library managers approve; the name, colour and hidden song names can still be changed directly. Only a course with fixed songs can be given title and other rewards by the title managers. Fix it?",
+    "unfix": "Unfix songs",
+    "confirmUnfix": "Once unfixed, the maker can change the songs directly, the rules that name this course give nothing until it is fixed again, and a request waiting for review is withdrawn. Unfix it?",
+    "fixedNotice": "This course's songs are fixed. Changes to the songs or conditions are sent as a request and take effect once the library managers approve it; the name, colour, hidden song names and Dan badge are saved directly.",
+    "changeReason": "Reason for the change",
+    "changeReasonHint": "Say why the songs or conditions should change (1–500 characters); the managers see it when they review",
+    "changeReasonRequired": "Changing the songs or conditions of a fixed course needs a reason.",
+    "saveAndRequest": "Save and request the change",
+    "changes": "Change requests",
+    "noChanges": "No change requests yet.",
+    "changeStatuses": {
+      "pending": "In review",
+      "approved": "Approved",
+      "returned": "Returned",
+      "withdrawn": "Withdrawn"
+    },
+    "reply": "Manager's reply: {{reply}}",
+    "withdraw": "Withdraw",
+    "rewardDonItem": "Don outfit",
+    "rewardsByRule": "Titles and other rewards are set by the title managers as rules in the title catalog. A rule can only name a course with fixed songs, and counts only attempts made since it was fixed.",
+    "rewardsNeedFixed": "Once the songs are fixed, the title managers can give titles and other rewards for this course.",
+    "verdicts": {
+      "1": "Red pass or better",
+      "2": "Red pass with full combo or better",
+      "3": "Red pass with all good or better",
+      "4": "Gold pass or better",
+      "5": "Gold pass with full combo or better",
+      "6": "Gold pass with all good"
+    }
   },
   "ourtaikoProfile": {
     "view": "All scores, titles and dan on OurTaiko Profile",
@@ -1032,7 +1046,8 @@
     "announcements": "Announcements",
     "editor": "OurTaikoEdit",
     "myTitles": "My titles",
-    "songAdmin": "Manage songs"
+    "songAdmin": "Manage songs",
+    "danAdmin": "Review Dan courses"
   },
   "chat": {
     "title": "Messages",

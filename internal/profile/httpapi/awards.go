@@ -62,33 +62,19 @@ type GrantedDan struct {
 	Upgraded bool `json:"upgraded"`
 }
 
-// GrantedTitle is a title an award asked for; New is false when the player already had it.
-type GrantedTitle struct {
-	Title
-	New bool `json:"new"`
-}
-
-// SkippedTitle is a title an award asked for and could not give: no such title (not_found), a
-// private title, which is its maker's alone (private), or a course that is not official
-// (official_only).
-type SkippedTitle struct {
-	ID     string `json:"id"`
-	Reason string `json:"reason"`
-}
-
+// Granted is what an award did. Titles is always empty: what passing a course gives besides its
+// badge is given by rule (package rewards/rules, dan_clear), and the field stays for the clients
+// that read it.
 type Granted struct {
-	Dan     *GrantedDan    `json:"dan"`
-	Titles  []GrantedTitle `json:"titles"`
-	Skipped []SkippedTitle `json:"skipped"`
+	Dan    *GrantedDan `json:"dan"`
+	Titles []struct{}  `json:"titles"`
 }
 
 // award is POST /internal/v1/awards, for services that ran a 段位 course: the attempt (key,
-// unique per service), the player, the course and its maker, whether it is official, the
-// verdict (0 failed, 1–3 red, 4–6 gold), the 段位 the course stands for (official courses only; 五級 6 .. 達人 24)
-// and the titles it gives on a pass. A failed attempt is recorded and gives nothing. A badge
-// only goes up. A title the course may not give is skipped and the rest are given: only public
-// titles are given, and only by official courses, the ones the site's managers answer for.
-// Asking again with the same key returns what was granted the first time.
+// unique per service), the player, the course, whether it is official, the verdict (0 failed,
+// 1–3 red, 4–6 gold) and the 段位 the course stands for (official courses only; 五級 6 .. 達人 24).
+// A failed attempt is recorded and gives nothing. A badge only goes up. Asking again with the
+// same key returns what was granted the first time.
 func (s *Server) award(w http.ResponseWriter, r *http.Request) {
 	service, ok := s.service(w, r)
 	if !ok {
@@ -151,7 +137,7 @@ func (s *Server) Grant(ctx context.Context, tx pgx.Tx, service string, request A
 // grant does the work of award in tx and returns what was granted, as awards.granted keeps it.
 func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body AwardRequest) ([]byte, error) {
 	if len(body.Key) < 1 || len(body.Key) > 100 || !account.ValidSubject(body.UserID) || len(body.CourseID) > 100 || len(body.CourseTitle) > 200 ||
-		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || len(body.Titles) > 10 || (body.Dan != nil && !body.Official) {
+		body.Verdict < 0 || body.Verdict > 6 || (body.Dan != nil && (*body.Dan < danFirst || *body.Dan > 24)) || (body.Dan != nil && !body.Official) {
 		return nil, &AwardRejection{Status: 422, Code: "AWARD_INVALID", Message: "奖励请求无效"}
 	}
 	// The player's awards one at a time, so two attempts cannot both "upgrade" a badge.
@@ -175,31 +161,8 @@ func (s *Server) grant(ctx context.Context, tx pgx.Tx, service string, body Awar
 	if err != nil {
 		return nil, err
 	}
-	granted := Granted{Titles: []GrantedTitle{}, Skipped: []SkippedTitle{}}
+	granted := Granted{Titles: []struct{}{}}
 	if body.Verdict >= 1 {
-		for _, id := range body.Titles {
-			t, err := scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+` FROM titles t WHERE t.id=$1`, id))
-			reason := ""
-			switch {
-			case errors.Is(err, pgx.ErrNoRows):
-				reason = "not_found"
-			case err != nil:
-				return nil, err
-			case t.Visibility != public:
-				reason = "private"
-			case !body.Official:
-				reason = "official_only"
-			}
-			if reason != "" {
-				granted.Skipped = append(granted.Skipped, SkippedTitle{ID: id, Reason: reason})
-				continue
-			}
-			tag, err := tx.Exec(ctx, `INSERT INTO user_titles(user_id,title_id,award_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, body.UserID, id, award)
-			if err != nil {
-				return nil, err
-			}
-			granted.Titles = append(granted.Titles, GrantedTitle{Title: t, New: tag.RowsAffected() == 1})
-		}
 		if body.Dan != nil {
 			d := GrantedDan{Index: *body.Dan, Verdict: body.Verdict}
 			var previous int

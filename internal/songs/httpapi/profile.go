@@ -8,7 +8,6 @@ type (
 	ProfileClient    = awards.Client
 	ProfileConfig    = awards.Config
 	ProfileRejection = awards.Rejection
-	ProfileTitle     = awards.Title
 	AwardRequest     = awards.Request
 	Awarder          = awards.Awarder
 )

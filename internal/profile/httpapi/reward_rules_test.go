@@ -159,3 +159,43 @@ func TestTheBuiltInAccountEarnsNoUploadTitles(t *testing.T) {
 		t.Fatal(made)
 	}
 }
+
+// A 段位 course is named only once it is fixed: what passing it means cannot change behind the
+// rule's back. Its verdict goes up to 6 (gold, all good).
+func TestARuleNamesAFixedDanCourse(t *testing.T) {
+	pool := testDB(t)
+	ctx := context.Background()
+	app := New(pool, Config{Origin: origin, DevUserID: player, Sources: []Source{{ID: "fanmade"}, {ID: "official"}}})
+	c := &client{t: t, handler: app.Handler()}
+	c.signIn()
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
+	var made struct {
+		Rule    rules.Listed
+		Granted int
+	}
+	const dan = "dddddddddddddddddddddddddddddddd"
+	if _, err := pool.Exec(ctx, `INSERT INTO fanmade.dan_courses(id,owner_id,title,exams,code) VALUES($1,$2,'{"ja":"十段"}','[]','DAN001')`, dan, player); err != nil {
+		t.Fatal(err)
+	}
+	danRule := func(clear int) string {
+		return fmt.Sprintf(`{"kind":"dan_clear","source":"fanmade","danId":%q,"clear":%d}`, dan, clear)
+	}
+	var problemBody struct{ Code string }
+	c.json("POST", "/api/admin/titles/first/rules", danRule(4), 422, &problemBody)
+	if problemBody.Code != "RULE_DAN_NOT_FIXED" {
+		t.Fatal(problemBody)
+	}
+	c.json("POST", "/api/admin/titles/first/rules", fmt.Sprintf(`{"kind":"dan_clear","source":"official","danId":%q,"clear":4}`, dan), 422, &problemBody)
+	if problemBody.Code != "RULE_DAN_NOT_FOUND" {
+		t.Fatal(problemBody)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE fanmade.dan_courses SET fixed_at=now() WHERE id=$1`, dan); err != nil {
+		t.Fatal(err)
+	}
+	c.json("POST", "/api/admin/titles/first/rules", danRule(7), 422, nil)
+	c.json("POST", "/api/admin/titles/first/rules", fmt.Sprintf(`{"kind":"dan_clear","source":"fanmade","danId":%q,"clear":4,"course":"Oni"}`, dan), 422, nil)
+	c.json("POST", "/api/admin/titles/first/rules", danRule(6), 201, &made)
+	if made.Rule.Dan == nil || made.Rule.Dan.Code != "DAN001" || !made.Rule.Dan.Fixed || made.Rule.Dan.Gone || !strings.Contains(string(made.Rule.Dan.Title), "十段") || *made.Rule.Clear != 6 {
+		t.Fatal(made)
+	}
+}

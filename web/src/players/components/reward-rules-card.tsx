@@ -8,6 +8,7 @@ import { titleName } from '@players/dan'
 import {
   categoryName,
   chartIdOf,
+  danVerdicts,
   ruleCourses,
   ruleKinds,
   ruleSources,
@@ -26,6 +27,7 @@ export type RuleDraft = {
   kind: Kind
   source?: SourceId
   chartId?: string
+  danId?: string
   category?: string
   course?: string
   clear?: number
@@ -45,6 +47,7 @@ const blank = {
   kind: 'chart_clear' as Kind,
   source: 'fanmade' as SourceId,
   chart: '',
+  dan: '',
   // '': the source's first category.
   category: '',
   course: '',
@@ -61,6 +64,7 @@ const filled = (rule: RewardRule): typeof blank => ({
   kind: rule.kind,
   source: rule.source ?? 'fanmade',
   chart: rule.chartId ?? '',
+  dan: rule.danId ?? '',
   category: rule.category ?? '',
   course: rule.course ?? '',
   clear: String(rule.clear ?? 1),
@@ -97,16 +101,23 @@ export function RewardRulesCard({
   const category = form.category || sourceCategories[0] || ''
   const eligible = titles.filter((title) => title.visibility === 'public')
   const plays = form.kind === 'chart_clear' || form.kind === 'category_clear'
+  // What names a source: plays, and passing a 段位 course of it.
+  const sourced = plays || form.kind === 'dan_clear'
   const counted = form.kind === 'category_clear' || form.kind === 'charts_uploaded'
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const rule: RuleDraft = { kind: form.kind }
     // An upload rule names no source: players upload to the fanmade one alone.
-    if (plays) rule.source = form.source
+    if (sourced) rule.source = form.source
     if (form.kind === 'chart_clear') rule.chartId = chartIdOf(form.chart)
+    if (form.kind === 'dan_clear') {
+      rule.danId = chartIdOf(form.dan)
+      rule.clear = Number(form.clear)
+    }
     if (form.kind === 'category_clear') rule.category = category
     if (plays) {
-      rule.clear = Number(form.clear)
+      // A crown, 1–3: what a 段位 verdict left in the form counts as a clear.
+      rule.clear = Math.min(Number(form.clear), 3)
       if (form.course) rule.course = form.course
     }
     if (counted && form.count.trim()) rule.count = Number(form.count)
@@ -254,7 +265,7 @@ export function RewardRulesCard({
               items={ruleKinds.map((kind) => ({ value: kind, label: t(`rules.kinds.${kind}`) }))}
             />
           </div>
-          {plays && (
+          {sourced && (
             <div className="space-y-2">
               <Label>{t('rules.source')}</Label>
               <ChoiceSelect
@@ -281,6 +292,33 @@ export function RewardRulesCard({
                 required
               />
             </div>
+          )}
+          {form.kind === 'dan_clear' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="rule-dan">{t('rules.dan')}</Label>
+                <Input
+                  id="rule-dan"
+                  className="w-80 font-mono"
+                  value={form.dan}
+                  onChange={(e) => setForm({ ...form, dan: e.target.value })}
+                  required
+                />
+                <p className="max-w-80 text-xs text-muted-foreground">{t('rules.danHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('rules.verdict')}</Label>
+                <ChoiceSelect
+                  label={t('rules.verdict')}
+                  value={danVerdicts.find((v) => v === form.clear) ?? '1'}
+                  onValueChange={(clear) => setForm({ ...form, clear })}
+                  items={danVerdicts.map((verdict) => ({
+                    value: verdict,
+                    label: t(`rules.verdicts.${verdict}`),
+                  }))}
+                />
+              </div>
+            </>
           )}
           {form.kind === 'category_clear' && (
             <div className="space-y-2">
@@ -319,7 +357,7 @@ export function RewardRulesCard({
                 <Label>{t('rules.clear')}</Label>
                 <ChoiceSelect
                   label={t('rules.clear')}
-                  value={form.clear}
+                  value={['1', '2', '3'].includes(form.clear) ? form.clear : '1'}
                   onValueChange={(clear) => setForm({ ...form, clear })}
                   items={(['1', '2', '3'] as const).map((clear) => ({
                     value: clear,

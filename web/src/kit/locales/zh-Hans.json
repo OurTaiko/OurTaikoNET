@@ -583,7 +583,9 @@
       "upload_failed": "《{{title}}》上传失败，没有保存任何文件：{{reason}}",
       "upload_skipped_file": "{{file}}（{{reason}}）",
       "unknown": "你有一条新通知",
-      "playlist_removed": "你的歌单“{{name}}”已被管理员删除"
+      "playlist_removed": "你的歌单“{{name}}”已被管理员删除",
+      "dan_change_approved": "{{actor}} 通过了你的段位《{{chart}}》的修改申请",
+      "dan_change_returned": "{{actor}} 退回了你的段位《{{chart}}》的修改申请：{{reply}}"
     },
     "file": {
       "cover": "封面",
@@ -800,21 +802,7 @@
     "noRewards": "没有奖励。",
     "rewardDanLabel": "段位徽章",
     "noDan": "无",
-    "titleId": "称号 ID",
-    "rewardLevel": "授予条件",
-    "addReward": "添加称号",
-    "removeReward": "移除称号",
     "titleCatalog": "查看称号目录",
-    "levels": {
-      "red": "赤合格以上",
-      "red1": "赤合格以上",
-      "red2": "赤合格・全连以上",
-      "red3": "赤合格・全良以上",
-      "gold": "金合格以上",
-      "gold4": "金合格以上",
-      "gold5": "金合格・全连以上",
-      "gold6": "金合格・全良"
-    },
     "basics": "基本信息",
     "titleIn": "名称（{{language}}）",
     "languages": {
@@ -845,12 +833,38 @@
     "save": "保存",
     "cancel": "取消",
     "signInToEdit": "请先登录。",
-    "rewardTitleLabel": "称号",
-    "titleMissing": "（称号目录里没有这个公开称号，不会授予）",
-    "officialTitleLater": "段位被标记为官方后才会发放称号",
-    "titlesUnavailable": "暂时读不到 OurTaiko Profile 的称号，请直接填写称号 ID，或稍后刷新。",
-    "reloadTitles": "重新读取称号",
-    "noUsableTitles": "称号目录里还没有公开称号。"
+    "fixed": "曲目已固定",
+    "fixedExplained": "修改曲目和合格条件需要提交申请，由曲库管理员审核",
+    "fix": "固定曲目",
+    "confirmFix": "固定后，修改曲目和合格条件需要提交申请，由曲库管理员审核通过后生效；名称、颜色和隐藏曲名仍可直接修改。只有固定了曲目的段位，称号管理员才能为它设置称号等奖励。确定固定？",
+    "unfix": "取消固定",
+    "confirmUnfix": "取消固定后，创建者可以直接修改曲目，指向这个段位的发放条件在重新固定前不会再发放奖励，等待审核的申请会被撤回。确定取消？",
+    "fixedNotice": "这个段位已固定曲目。修改曲目或合格条件会作为申请提交，由曲库管理员审核通过后生效；名称、颜色、隐藏曲名和段位徽章直接保存。",
+    "changeReason": "修改理由",
+    "changeReasonHint": "说明为什么要修改曲目或合格条件（1–500 字），管理员审核时会看到",
+    "changeReasonRequired": "修改已固定段位的曲目或合格条件需要填写理由。",
+    "saveAndRequest": "保存并提交修改申请",
+    "changes": "修改申请",
+    "noChanges": "还没有修改申请。",
+    "changeStatuses": {
+      "pending": "审核中",
+      "approved": "已通过",
+      "returned": "已退回",
+      "withdrawn": "已撤回"
+    },
+    "reply": "管理员回复：{{reply}}",
+    "withdraw": "撤回申请",
+    "rewardDonItem": "咚酱装扮",
+    "rewardsByRule": "称号等奖励由称号管理员在称号目录里按发放条件设置，只能指向固定了曲目的段位，且只计算固定之后的挑战。",
+    "rewardsNeedFixed": "固定曲目后，称号管理员才能为这个段位设置称号等奖励。",
+    "verdicts": {
+      "1": "赤合格以上",
+      "2": "赤合格・全连以上",
+      "3": "赤合格・全良以上",
+      "4": "金合格以上",
+      "5": "金合格・全连以上",
+      "6": "金合格・全良"
+    }
   },
   "ourtaikoProfile": {
     "view": "在 OurTaiko Profile 查看全部成绩、称号与段位",
@@ -1021,7 +1035,8 @@
     "announcements": "公告管理",
     "editor": "OurTaikoEdit",
     "myTitles": "我的称号",
-    "songAdmin": "乐曲管理"
+    "songAdmin": "乐曲管理",
+    "danAdmin": "段位审核"
   },
   "chat": {
     "title": "消息",

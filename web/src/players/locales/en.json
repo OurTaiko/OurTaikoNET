@@ -487,6 +487,7 @@
     "kinds": {
       "chart_clear": "Clear a song",
       "category_clear": "Clear songs of a category",
+      "dan_clear": "Pass a Dan course",
       "site_login": "Sign in on the website",
       "game_login": "Sign in in the game",
       "charts_uploaded": "Charts authored"
@@ -503,7 +504,8 @@
       "chart_clear": "{{clear}}: “{{title}}” ({{source}}{{course}})",
       "category_all": "{{clear}}: every song in {{category}} ({{source}}{{course}})",
       "category_count": "{{clear}}: {{count}} songs in {{category}} ({{source}}{{course}})",
-      "charts_uploaded": "Be an author of {{count}} charts"
+      "charts_uploaded": "Be an author of {{count}} charts",
+      "dan_clear": "Reach {{verdict}} in the {{source}} Dan course \"{{title}}\""
     },
     "categories": {
       "fanmade": {
@@ -544,7 +546,20 @@
     "save": "Save changes",
     "cancel": "Cancel",
     "editing": "Editing rule {{id}}; what it gives cannot change.",
-    "updated": "Saved, and given to {{n}} players who meet it."
+    "updated": "Saved, and given to {{n}} players who meet it.",
+    "danGone": " (course deleted)",
+    "danNotFixed": " (course no longer fixed: gives nothing for now)",
+    "dan": "Course ID or course page address",
+    "danHint": "Only a course with fixed songs, and only the attempts made since it was fixed, count.",
+    "verdict": "Needs",
+    "verdicts": {
+      "1": "red pass or better",
+      "2": "red pass with full combo or better",
+      "3": "red pass with all good or better",
+      "4": "gold pass or better",
+      "5": "gold pass with full combo or better",
+      "6": "gold pass with all good"
+    }
   },
   "donItems": {
     "heading": "Don parts to earn",
@@ -607,5 +622,16 @@
     "accept": "Accept",
     "reject": "Reject",
     "pages": "Pages"
+  },
+  "danAdmin": {
+    "heading": "Review Dan courses",
+    "intro": "Changing the songs or conditions of a course with fixed songs takes a request, which the managers of its library decide. Approving gives the course what was asked; it stays fixed from when it was, and earlier attempts still count for rules. Returning needs a reply. The maker is notified either way.",
+    "empty": "No requests waiting.",
+    "asked": "Asked by {{owner}} on {{at}}",
+    "now": "Now",
+    "asked_for": "Asked for",
+    "reply": "Reply (required to return)",
+    "approve": "Approve",
+    "return": "Return"
   }
 }

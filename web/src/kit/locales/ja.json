@@ -583,7 +583,9 @@
       "upload_failed": "「{{title}}」のアップロードに失敗し、何も保存されませんでした：{{reason}}",
       "upload_skipped_file": "{{file}}（{{reason}}）",
       "unknown": "新しい通知があります",
-      "playlist_removed": "あなたのプレイリスト「{{name}}」は管理者によって削除されました"
+      "playlist_removed": "あなたのプレイリスト「{{name}}」は管理者によって削除されました",
+      "dan_change_approved": "{{actor}} があなたの段位「{{chart}}」の変更申請を承認しました",
+      "dan_change_returned": "{{actor}} があなたの段位「{{chart}}」の変更申請を差し戻しました：{{reply}}"
     },
     "file": {
       "cover": "カバー",
@@ -800,21 +802,7 @@
     "noRewards": "報酬はありません。",
     "rewardDanLabel": "段位バッジ",
     "noDan": "なし",
-    "titleId": "称号 ID",
-    "rewardLevel": "付与条件",
-    "addReward": "称号を追加",
-    "removeReward": "称号を外す",
     "titleCatalog": "称号一覧を見る",
-    "levels": {
-      "red": "赤合格以上",
-      "red1": "赤合格以上",
-      "red2": "赤合格・フルコンボ以上",
-      "red3": "赤合格・全良以上",
-      "gold": "金合格以上",
-      "gold4": "金合格以上",
-      "gold5": "金合格・フルコンボ以上",
-      "gold6": "金合格・全良"
-    },
     "basics": "基本情報",
     "titleIn": "名前（{{language}}）",
     "languages": {
@@ -845,12 +833,38 @@
     "save": "保存",
     "cancel": "キャンセル",
     "signInToEdit": "ログインしてください。",
-    "rewardTitleLabel": "称号",
-    "titleMissing": "（称号一覧にこの公開称号がないため、付与されません）",
-    "officialTitleLater": "称号は段位が公式に設定されてから付与されます",
-    "titlesUnavailable": "OurTaiko Profile の称号を読み込めません。称号 ID を直接入力するか、後で再読み込みしてください。",
-    "reloadTitles": "称号を再読み込み",
-    "noUsableTitles": "称号一覧にまだ公開称号がありません。"
+    "fixed": "曲目固定",
+    "fixedExplained": "曲目と合格条件の変更は申請し、楽曲管理者の審査を受けます",
+    "fix": "曲目を固定",
+    "confirmFix": "固定すると、曲目と合格条件の変更は申請して楽曲管理者の承認を受ける必要があります。名前・色・曲名の非表示はこれまでどおり直接変更できます。曲目を固定した段位にだけ、称号管理者が称号などの報酬を設定できます。固定しますか？",
+    "unfix": "固定を解除",
+    "confirmUnfix": "解除すると、作成者が曲目を直接変更できるようになり、この段位を指す付与条件は再び固定されるまで報酬を付与しません。審査待ちの申請は取り下げられます。解除しますか？",
+    "fixedNotice": "この段位は曲目が固定されています。曲目や合格条件の変更は申請として送られ、楽曲管理者の承認後に反映されます。名前・色・曲名の非表示・段位バッジはそのまま保存されます。",
+    "changeReason": "変更の理由",
+    "changeReasonHint": "曲目や合格条件を変える理由（1〜500 文字）。審査のときに管理者が読みます",
+    "changeReasonRequired": "固定された段位の曲目や合格条件を変えるには理由が必要です。",
+    "saveAndRequest": "保存して変更を申請",
+    "changes": "変更申請",
+    "noChanges": "変更申請はまだありません。",
+    "changeStatuses": {
+      "pending": "審査中",
+      "approved": "承認済み",
+      "returned": "差し戻し",
+      "withdrawn": "取り下げ"
+    },
+    "reply": "管理者の返信：{{reply}}",
+    "withdraw": "申請を取り下げる",
+    "rewardDonItem": "どんちゃんの着せ替え",
+    "rewardsByRule": "称号などの報酬は、称号管理者が称号一覧で付与条件として設定します。指せるのは曲目を固定した段位だけで、固定後の挑戦だけが数えられます。",
+    "rewardsNeedFixed": "曲目を固定すると、称号管理者がこの段位に称号などの報酬を設定できるようになります。",
+    "verdicts": {
+      "1": "赤合格以上",
+      "2": "赤合格・フルコンボ以上",
+      "3": "赤合格・全良以上",
+      "4": "金合格以上",
+      "5": "金合格・フルコンボ以上",
+      "6": "金合格・全良"
+    }
   },
   "ourtaikoProfile": {
     "view": "OurTaiko Profile ですべてのスコア・称号・段位を見る",
@@ -1021,7 +1035,8 @@
     "announcements": "お知らせ管理",
     "editor": "OurTaikoEdit",
     "myTitles": "マイ称号",
-    "songAdmin": "楽曲管理"
+    "songAdmin": "楽曲管理",
+    "danAdmin": "段位の審査"
   },
   "chat": {
     "title": "メッセージ",

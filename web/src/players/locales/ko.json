@@ -487,6 +487,7 @@
     "kinds": {
       "chart_clear": "특정 곡 클리어",
       "category_clear": "분류의 곡 클리어",
+      "dan_clear": "단위 합격",
       "site_login": "웹사이트 로그인",
       "game_login": "게임 로그인",
       "charts_uploaded": "참여한 채보 수"
@@ -503,7 +504,8 @@
       "chart_clear": "{{source}}의 「{{title}}」 {{clear}}{{course}}",
       "category_all": "{{source}} 「{{category}}」의 모든 곡 {{clear}}{{course}}",
       "category_count": "{{source}} 「{{category}}」 {{count}}곡 {{clear}}{{course}}",
-      "charts_uploaded": "채보 {{count}}개 제작에 참여"
+      "charts_uploaded": "채보 {{count}}개 제작에 참여",
+      "dan_clear": "{{source}} 단위 \"{{title}}\"에서 {{verdict}}"
     },
     "categories": {
       "fanmade": {
@@ -544,7 +546,20 @@
     "save": "변경 저장",
     "cancel": "취소",
     "editing": "조건 {{id}}을(를) 수정 중입니다. 지급하는 항목은 바꿀 수 없습니다.",
-    "updated": "저장했으며 이미 달성한 {{n}}명에게 지급했습니다."
+    "updated": "저장했으며 이미 달성한 {{n}}명에게 지급했습니다.",
+    "danGone": " (단위 삭제됨)",
+    "danNotFixed": " (단위 고정이 해제되어 지금은 지급하지 않음)",
+    "dan": "단위 ID 또는 단위 페이지 주소",
+    "danHint": "곡을 고정한 단위만 지정할 수 있으며, 고정 이후의 도전만 셉니다.",
+    "verdict": "조건",
+    "verdicts": {
+      "1": "적합격 이상",
+      "2": "적합격・풀콤보 이상",
+      "3": "적합격・전량 이상",
+      "4": "금합격 이상",
+      "5": "금합격・풀콤보 이상",
+      "6": "금합격・전량"
+    }
   },
   "donItems": {
     "heading": "획득이 필요한 꾸미기",
@@ -607,5 +622,16 @@
     "accept": "채택",
     "reject": "거절",
     "pages": "페이지"
+  },
+  "danAdmin": {
+    "heading": "단위 심사",
+    "intro": "곡을 고정한 단위의 곡이나 합격 조건을 바꾸려면 신청이 필요하며, 해당 곡 라이브러리의 관리자가 처리합니다. 승인하면 신청한 곡과 조건으로 바뀌며, 고정 시점은 그대로이고 이전 도전도 지급 조건에 계속 셉니다. 반려하려면 답변이 필요합니다. 제작자에게 알림이 갑니다.",
+    "empty": "심사 대기 중인 신청이 없습니다.",
+    "asked": "{{owner}} 님이 {{at}}에 신청",
+    "now": "현재",
+    "asked_for": "신청 내용",
+    "reply": "답변(반려 시 필수)",
+    "approve": "승인",
+    "return": "반려"
   }
 }

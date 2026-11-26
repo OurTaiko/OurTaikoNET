@@ -26,6 +26,8 @@ const rule = (fields: Partial<RewardRule>): RewardRule => ({
   source: null,
   chartId: null,
   chart: null,
+  danId: null,
+  dan: null,
   category: null,
   course: null,
   clear: null,
@@ -75,6 +77,25 @@ describe('reward rules in words', () => {
       '参与制作 5 张谱面',
     )
   })
+  it('names a 段位 course and the verdict it takes, and says when it gives nothing', () => {
+    const dan = (fixed: boolean, gone: boolean) =>
+      rule({
+        kind: 'dan_clear',
+        source: 'fanmade',
+        danId: 'd',
+        dan: { id: 'd', title: { ja: '十段', zh: '十段位' }, code: 'ABC123', fixed, gone },
+        clear: 5,
+      })
+    expect(ruleText(dan(true, false), t, 'zh-Hans')).toBe(
+      '在自制曲源的段位《十段位》取得金合格・全连以上',
+    )
+    expect(ruleText(dan(false, false), t, 'zh-Hans')).toBe(
+      '在自制曲源的段位《十段位》取得金合格・全连以上（段位已取消固定，暂不发放）',
+    )
+    expect(ruleText(dan(true, true), t, 'zh-Hans')).toBe(
+      '在自制曲源的段位《十段位》取得金合格・全连以上（段位已删除）',
+    )
+  })
   it('marks a chart that is gone, and keeps a category it has no word for', () => {
     const gone = rule({
       kind: 'chart_clear',
@@ -95,6 +116,8 @@ describe('reward rules in words', () => {
   it('has every word in every language', () => {
     for (const words of [zh, en, ja, ko]) {
       for (const kind of ruleKinds) expect(words.rules.kinds[kind]).toBeTruthy()
+      for (const verdict of ['1', '2', '3', '4', '5', '6'] as const)
+        expect(words.rules.verdicts[verdict]).toBeTruthy()
       // The categories are the backend's; every language names the same ones.
       for (const source of ['fanmade', 'official'] as const)
         expect(Object.keys(words.rules.categories[source]).sort()).toEqual(

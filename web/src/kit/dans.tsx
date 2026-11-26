@@ -10,7 +10,8 @@ export { danTitle }
 import { VoteControl, VoteCounts } from './components/vote-control'
 import {
   ChatCircleIcon,
-  ArrowClockwiseIcon,
+  LockSimpleIcon,
+  LockSimpleOpenIcon,
   MedalIcon,
   PencilSimpleIcon,
   PlusIcon,
@@ -21,15 +22,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, jsonRequest } from './api/client'
 import { endpoints } from './api/endpoints'
-import type {
-  ChartBase,
-  Dan,
-  DanExam,
-  DanInput,
-  DanRewardTitle,
-  Vote,
-  VoteResult,
-} from './api/types'
+import type { ChartBase, Dan, DanChange, DanExam, DanInput, Vote, VoteResult } from './api/types'
 import { chartText } from './chart-language'
 import { ChoiceSelect } from './components/choice-select'
 import { SearchInput } from './components/search-input'
@@ -40,7 +33,8 @@ import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Modal, Notice } from './notifications'
-import { TitleBand, profileTitlesPage, titleText, useProfileTitles } from './profile-titles'
+import { TitleBand, profileTitlesPage, useProfileTitles } from './profile-titles'
+import { Textarea } from './components/ui/textarea'
 import { useSession } from './session'
 import { cn } from './lib/utils'
 import { SourceTag } from './components/source-tag'
@@ -52,7 +46,10 @@ import { danKeys, danQueries, invalidateDanList, invalidateDans } from './querie
 import { queryClient } from './query/client'
 
 // 段位 courses as OurTaikoPlay plays them (one to three songs with conditions). The game reads
-// them from this server; passing an official one gives a 段位 badge on OurTaikoProfile.
+// them from this server; passing an official one gives a 段位 badge. A course's maker may fix it:
+// its songs and conditions then change only by a request its source's managers approve, and only
+// then may the title managers give titles and other items for passing it (rules of kind
+// dan_clear, kept with the title catalog).
 
 export const danNames = [
   '初級',
@@ -83,7 +80,6 @@ export const danNames = [
 ] as const
 const titleLanguages = ['ja', 'en', 'zh', 'ko'] as const
 const examTypes = ['gauge', 'good', 'ok', 'bad', 'hits', 'score', 'combo', 'rolls'] as const
-const rewardLevels = ['red', 'red2', 'red3', 'gold', 'gold5', 'gold6'] as const
 const courses = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit'] as const
 // The dan box colours of the Nijiiro skin's dan_select/box/folder, which the game draws the
 // course's box, its yellow board and its loading plaque with. The skin's 1 is the same wood
@@ -126,7 +122,8 @@ function Line({ value }: { value: number[] | null }) {
   )
 }
 
-function ExamTable({ dan }: { dan: Dan }) {
+/** The conditions of a course, a row each, with their lines for the course or each song. */
+export function ExamTable({ dan }: { dan: Pick<Dan, 'songs' | 'exams'> }) {
   const { t } = useTranslation()
   return (
     <table className="w-full text-sm">
@@ -332,7 +329,7 @@ function DanView({ id }: { id: string }) {
   const [actionError, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [deleted, setDeleted] = useState(false)
-  const { titles: profileTitles } = useProfileTitles()
+  const { titles: profileTitles, rules: catalogRules } = useProfileTitles()
   const read = useQuery({ ...danQueries.detail(id), enabled: !deleted })
   const dan = read.data ?? null
   // What was read before stays on show when reading it again fails.
@@ -359,6 +356,10 @@ function DanView({ id }: { id: string }) {
   if (!dan) return <p role="status">{t('dans.loading')}</p>
   const canEdit = session.user && (session.user.id === dan.ownerId || session.user.isAdmin)
   const isOwner = session.user?.id === dan.ownerId
+  // What passing it gives by rule: the catalog's rules that name this course.
+  const given = (catalogRules ?? []).filter(
+    (rule) => rule.kind === 'dan_clear' && rule.source === SOURCE && rule.danId === dan.id,
+  )
   const run = async (work: () => Promise<void>) => {
     setBusy(true)
     setError('')
@@ -382,6 +383,12 @@ function DanView({ id }: { id: string }) {
             </Badge>
           ) : (
             <Badge variant="secondary">{t('dans.community')}</Badge>
+          )}
+          {dan.fixedAt && (
+            <Badge variant="outline" title={t('dans.fixedExplained')}>
+              <LockSimpleIcon aria-hidden="true" />
+              {t('dans.fixed')}
+            </Badge>
           )}
         </div>
         <h1 className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl">
@@ -496,31 +503,39 @@ function DanView({ id }: { id: string }) {
                   )}
                 </li>
               )}
-              {(dan.rewards.titles ?? []).map((reward) => {
-                const title = profileTitles?.find((p) => p.id === reward.id)
+              {given.map((rule) => {
+                const title =
+                  rule.item === 'title'
+                    ? profileTitles?.find((p) => p.id === rule.titleId)
+                    : undefined
                 return (
-                  <li key={reward.id + reward.on} className="flex flex-wrap items-center gap-2">
+                  <li key={rule.id} className="flex flex-wrap items-center gap-2">
                     {title ? (
                       <TitleBand title={title} language={i18n.resolvedLanguage} />
+                    ) : rule.item === 'title' ? (
+                      <code className="text-xs">{rule.titleId}</code>
                     ) : (
-                      <code className="text-xs">{reward.id}</code>
+                      <span>{t('dans.rewardDonItem')}</span>
                     )}
-                    <span>{t(`dans.levels.${reward.on}`)}</span>
-                    {title && !dan.official && (
-                      <span className="text-muted-foreground">
-                        {t('dans.rewardDanNeedsOfficial')}
-                      </span>
-                    )}
-                    {profileTitles && !title && (
-                      <span className="text-destructive">{t('dans.titleMissing')}</span>
-                    )}
+                    <span>{t(`dans.verdicts.${verdictOf(rule.clear)}`)}</span>
                   </li>
                 )
               })}
-              {dan.rewards.dan === undefined && !dan.rewards.titles?.length && (
+              {dan.rewards.dan === undefined && given.length === 0 && (
                 <li className="text-muted-foreground">{t('dans.noRewards')}</li>
               )}
             </ul>
+            <p className="text-xs text-muted-foreground">
+              {dan.fixedAt ? t('dans.rewardsByRule') : t('dans.rewardsNeedFixed')}{' '}
+              <a
+                href={profileTitlesPage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {t('dans.titleCatalog')}
+              </a>
+            </p>
           </section>
           {(canEdit || session.user?.isAdmin) && (
             <section
@@ -558,6 +573,44 @@ function DanView({ id }: { id: string }) {
                     {dan.official ? t('dans.unmarkOfficial') : t('dans.markOfficial')}
                   </Button>
                 )}
+                {canEdit && !dan.fixedAt && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!window.confirm(t('dans.confirmFix'))) return
+                      void run(async () => {
+                        const fixed = await api<Dan>(
+                          endpoints.danFix(dan.id),
+                          jsonRequest('POST', {}, session.csrfToken),
+                        )
+                        setDan((current) => ({ ...fixed, myVote: current.myVote }))
+                      })
+                    }}
+                  >
+                    <LockSimpleIcon aria-hidden="true" />
+                    {t('dans.fix')}
+                  </Button>
+                )}
+                {session.user?.isAdmin && dan.fixedAt && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!window.confirm(t('dans.confirmUnfix'))) return
+                      void run(async () => {
+                        const unfixed = await api<Dan>(
+                          endpoints.danFix(dan.id),
+                          jsonRequest('DELETE', {}, session.csrfToken),
+                        )
+                        setDan((current) => ({ ...unfixed, myVote: current.myVote }))
+                      })
+                    }}
+                  >
+                    <LockSimpleOpenIcon aria-hidden="true" />
+                    {t('dans.unfix')}
+                  </Button>
+                )}
                 {canEdit && (
                   <Button
                     variant="destructive"
@@ -583,6 +636,7 @@ function DanView({ id }: { id: string }) {
               </div>
             </section>
           )}
+          {canEdit && dan.fixedAt && <DanChanges dan={dan} />}
         </aside>
       </div>
       <CommentSection
@@ -600,6 +654,86 @@ function DanView({ id }: { id: string }) {
 }
 
 const panelClassName = 'rounded-[28px] bg-card p-6 shadow-elev-1'
+
+/** A verdict a rule takes, 1–6, as the locale names it. */
+const verdictOf = (clear: number | null) =>
+  String(clear !== null && clear >= 1 && clear <= 6 ? clear : 1) as
+    '1' | '2' | '3' | '4' | '5' | '6'
+
+/** The requests to change a fixed course, for its maker and the managers: each with how it was
+ * decided, and the one waiting to withdraw. */
+function DanChanges({ dan }: { dan: Dan }) {
+  const { t, i18n } = useTranslation()
+  const session = useSession()
+  const [error, setError] = useState('')
+  const key = ['dan-changes', SOURCE, dan.id] as const
+  const read = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) =>
+      api<{ changes: DanChange[] }>(endpoints.danChanges(dan.id), { signal }).then(
+        (answer) => answer.changes,
+      ),
+  })
+  const changes = read.data ?? []
+  const when = (at: string) =>
+    new Date(at).toLocaleString(i18n.resolvedLanguage, { dateStyle: 'medium', timeStyle: 'short' })
+  return (
+    <section className={cn(panelClassName, 'space-y-3')} aria-labelledby="dan-changes-heading">
+      <h2 id="dan-changes-heading" className="text-lg font-extrabold">
+        {t('dans.changes')}
+      </h2>
+      {(error || read.error) && <Notice>{error || read.error?.message}</Notice>}
+      {read.isSuccess && changes.length === 0 && (
+        <p className="text-sm text-muted-foreground">{t('dans.noChanges')}</p>
+      )}
+      <ul className="space-y-3 text-sm">
+        {changes.map((change) => (
+          <li key={change.id} className="space-y-1.5 rounded-[18px] bg-muted p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={change.status === 'returned' ? 'destructive' : 'secondary'}>
+                {t(`dans.changeStatuses.${change.status}`)}
+              </Badge>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {when(change.createdAt)}
+              </span>
+            </div>
+            <ol className="list-inside list-decimal text-xs">
+              {change.songs.map((song, i) => (
+                <li key={i}>
+                  {chartText(song, i18n.resolvedLanguage).title || song.chart.id} ·{' '}
+                  {t(`dans.courses.${song.chart.course}`)} ★{song.level}
+                </li>
+              ))}
+            </ol>
+            <p className="wrap-anywhere whitespace-pre-wrap">{change.request}</p>
+            {change.reply && (
+              <p className="wrap-anywhere whitespace-pre-wrap text-muted-foreground">
+                {t('dans.reply', { reply: change.reply })}
+              </p>
+            )}
+            {change.status === 'pending' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setError('')
+                  api(
+                    endpoints.danChange(dan.id, change.id),
+                    jsonRequest('DELETE', {}, session.csrfToken),
+                  )
+                    .then(() => queryClient.invalidateQueries({ queryKey: key }))
+                    .catch((e: Error) => setError(e.message))
+                }}
+              >
+                {t('dans.withdraw')}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 /** The heading of one part of the course form, with its place in the order. */
 function StepTitle({ number, children }: { number: number; children: ReactNode }) {
@@ -740,13 +874,13 @@ function DanEditor({ id }: { id?: string }) {
     { type: 'gauge', range: 'more', perSong: false, values: [['100', '']] },
   ])
   const [rewardDan, setRewardDan] = useState('none')
-  const [rewardTitles, setRewardTitles] = useState<DanRewardTitle[]>([])
-  // Whether the course being changed is official: only then does it give its titles.
-  const [made, setMade] = useState<{ official: boolean } | null>(null)
+  // A fixed course as it was read: its songs and conditions change only by a request, sent with
+  // a reason, while the rest is saved as usual.
+  const [fixed, setFixed] = useState<{ songs: DanInput['songs']; exams: DanExam[] } | null>(null)
+  const [reason, setReason] = useState('')
   const [picking, setPicking] = useState<number | null>(null)
   const [saveError, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const profile = useProfileTitles()
   usePageMeta({ title: t(id ? 'dans.editHeading' : 'dans.createHeading'), noindex: true })
   // The form starts from what the server holds now, not from what an earlier page remembers, and
   // once filled it is the maker's: nothing read later is written over it.
@@ -768,13 +902,22 @@ function DanEditor({ id }: { id?: string }) {
   })
   if (dan && !seeded && charts.every((chart) => !chart.isPending)) {
     setSeeded(true)
-    setMade({ official: dan.official })
+    if (dan.fixedAt)
+      setFixed({
+        songs: dan.songs.map((s) => ({
+          chartId: String(s.chart.id),
+          course: s.chart.course,
+          side: s.chart.side,
+          hidden: s.hidden,
+        })),
+        // As the form gives them back, so that an untouched form changes nothing.
+        exams: fromExamRows(toExamRows(dan.exams, dan.songs.length), dan.songs.length),
+      })
     setTitles(dan.title)
     setColor(dan.color)
     setCode(dan.code)
     setExams(toExamRows(dan.exams, dan.songs.length))
     setRewardDan(dan.rewards.dan === undefined ? 'none' : String(dan.rewards.dan))
-    setRewardTitles(dan.rewards.titles ?? [])
     setSongs(
       dan.songs.map((s, i) => {
         const chart = charts[i].data
@@ -794,19 +937,19 @@ function DanEditor({ id }: { id?: string }) {
   const error = saveError || (seeded ? '' : (read.error?.message ?? ''))
   if (session.loading) return null
   if (!session.user) return <Notice>{t('dans.signInToEdit')}</Notice>
-  const official = made?.official ?? false
-  // The titles a course may give, the public ones, and any this course already names that is
-  // not among them (kept so that saving shows why).
-  const usable = profile.titles ?? []
-  const titleItems = (current: string) => {
-    const items = usable.map((title) => ({
-      value: title.id,
-      label: titleText(title, i18n.resolvedLanguage),
-    }))
-    return current && !usable.some((title) => title.id === current)
-      ? [{ value: current, label: current }, ...items]
-      : items
-  }
+  const asked = songs.map((s) => ({
+    chartId: s.chartId,
+    course: s.course,
+    side: s.side,
+    hidden: s.hidden,
+  }))
+  const askedExams = fromExamRows(exams, songs.length)
+  // Whether the songs (by block, in order) or the conditions of a fixed course were changed.
+  const changed =
+    !!fixed &&
+    (JSON.stringify(asked.map(({ chartId, course, side }) => [chartId, course, side])) !==
+      JSON.stringify(fixed.songs.map(({ chartId, course, side }) => [chartId, course, side])) ||
+      JSON.stringify(askedExams) !== JSON.stringify(fixed.exams))
   const setSongCount = (next: SongSlot[]) => {
     setSongs(next)
     setExams((rows) =>
@@ -824,29 +967,38 @@ function DanEditor({ id }: { id?: string }) {
       setError(t('dans.sideRequired'))
       return
     }
+    if (changed && !reason.trim()) {
+      setError(t('dans.changeReasonRequired'))
+      return
+    }
     setBusy(true)
     setError('')
     const body: DanInput = {
       title: Object.fromEntries(Object.entries(titles).filter(([, v]) => v.trim())),
       color,
       ...(!id && code.trim() ? { code: code.trim().toUpperCase() } : {}),
-      songs: songs.map((s) => ({
-        chartId: s.chartId,
-        course: s.course,
-        side: s.side,
-        hidden: s.hidden,
-      })),
-      exams: fromExamRows(exams, songs.length),
-      rewards: {
-        ...(rewardDan === 'none' ? {} : { dan: Number(rewardDan) }),
-        titles: rewardTitles.filter((r) => r.id.trim()),
-      },
+      // A fixed course whose songs or conditions are asked to change keeps them as they are, with
+      // the hidden songs as they were, until the request is approved.
+      songs: changed && fixed ? fixed.songs : asked,
+      exams: changed && fixed ? fixed.exams : askedExams,
+      rewards: rewardDan === 'none' ? {} : { dan: Number(rewardDan) },
     }
     try {
       const saved = await api<Dan>(
         id ? endpoints.dan(id) : endpoints.dans,
         jsonRequest(id ? 'PUT' : 'POST', body, session.csrfToken),
       )
+      if (changed && id) {
+        await api<DanChange>(
+          endpoints.danChanges(id),
+          jsonRequest(
+            'POST',
+            { songs: asked, exams: askedExams, request: reason.trim() },
+            session.csrfToken,
+          ),
+        )
+        void queryClient.invalidateQueries({ queryKey: ['dan-changes', SOURCE, id] })
+      }
       queryClient.setQueryData(danKeys.detail(saved.id), saved)
       void invalidateDans()
       navigate(`/dans/${saved.id}`)
@@ -864,6 +1016,12 @@ function DanEditor({ id }: { id?: string }) {
         </h1>
       </div>
       {error && <Notice>{error}</Notice>}
+      {fixed && (
+        <p className="flex items-start gap-2 rounded-[20px] bg-muted p-4 text-sm">
+          <LockSimpleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {t('dans.fixedNotice')}
+        </p>
+      )}
       <Card className="rounded-[28px]">
         <CardHeader>
           <StepTitle number={1}>{t('dans.basics')}</StepTitle>
@@ -1128,92 +1286,8 @@ function DanEditor({ id }: { id?: string }) {
               ...danNames.map((name, i) => ({ value: String(i), label: name })).slice(danFirst),
             ]}
           />
-          {rewardTitles.map((reward, i) => {
-            const title = profile.titles?.find((p) => p.id === reward.id)
-            return (
-              <div key={i} className="flex flex-wrap items-center gap-3">
-                {profile.titles ? (
-                  <ChoiceSelect
-                    label={t('dans.rewardTitleLabel')}
-                    value={reward.id}
-                    onValueChange={(v) =>
-                      setRewardTitles(rewardTitles.map((r, j) => (j === i ? { ...r, id: v } : r)))
-                    }
-                    items={titleItems(reward.id)}
-                  />
-                ) : (
-                  <Input
-                    className="w-64 font-mono"
-                    aria-label={t('dans.titleId')}
-                    placeholder="taiko-master"
-                    value={reward.id}
-                    onChange={(e) =>
-                      setRewardTitles(
-                        rewardTitles.map((r, j) =>
-                          j === i ? { ...r, id: e.target.value.trim() } : r,
-                        ),
-                      )
-                    }
-                  />
-                )}
-                <ChoiceSelect
-                  label={t('dans.rewardLevel')}
-                  value={reward.on}
-                  onValueChange={(v) =>
-                    setRewardTitles(
-                      rewardTitles.map((r, j) =>
-                        j === i ? { ...r, on: v as DanRewardTitle['on'] } : r,
-                      ),
-                    )
-                  }
-                  items={rewardLevels.map((level) => ({
-                    value: level,
-                    label: t(`dans.levels.${level}`),
-                  }))}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('dans.removeReward')}
-                  onClick={() => setRewardTitles(rewardTitles.filter((_, j) => j !== i))}
-                >
-                  <XIcon aria-hidden="true" />
-                </Button>
-                {title && <TitleBand title={title} language={i18n.resolvedLanguage} />}
-                {title && !official && (
-                  <span className="text-xs text-muted-foreground">
-                    {t('dans.officialTitleLater')}
-                  </span>
-                )}
-                {profile.titles && reward.id && !title && (
-                  <span className="text-xs text-destructive">{t('dans.titleMissing')}</span>
-                )}
-              </div>
-            )
-          })}
-          {profile.failed && <Notice>{t('dans.titlesUnavailable')}</Notice>}
-          <div className="flex flex-wrap items-center gap-3">
-            {rewardTitles.length < 10 && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!!profile.titles && usable.length === 0}
-                onClick={() =>
-                  setRewardTitles([...rewardTitles, { id: usable[0]?.id ?? '', on: 'red' }])
-                }
-              >
-                <PlusIcon aria-hidden="true" />
-                {t('dans.addReward')}
-              </Button>
-            )}
-            <Button type="button" variant="ghost" onClick={profile.reload}>
-              <ArrowClockwiseIcon aria-hidden="true" />
-              {t('dans.reloadTitles')}
-            </Button>
-          </div>
           <p className="text-xs text-muted-foreground">
-            {profile.titles && usable.length === 0 && `${t('dans.noUsableTitles')} `}
+            {t('dans.rewardsByRule')}{' '}
             <a
               href={profileTitlesPage}
               target="_blank"
@@ -1225,10 +1299,26 @@ function DanEditor({ id }: { id?: string }) {
           </p>
         </CardContent>
       </Card>
+      {changed && (
+        <Card className="rounded-[28px]">
+          <CardHeader>
+            <StepTitle number={5}>{t('dans.changeReason')}</StepTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="dan-change-reason">{t('dans.changeReasonHint')}</Label>
+            <Textarea
+              id="dan-change-reason"
+              maxLength={500}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </CardContent>
+        </Card>
+      )}
       {/* Stays in reach while the form scrolls; on a phone it sits above the bottom bar. */}
       <div className="sticky bottom-24 z-10 flex w-fit gap-2 rounded-full bg-card p-2 shadow-elev-2 lg:bottom-4">
         <Button type="submit" disabled={busy || songs.length === 0}>
-          {t('dans.save')}
+          {changed ? t('dans.saveAndRequest') : t('dans.save')}
         </Button>
         <Link className={buttonVariants({ variant: 'ghost' })} to={id ? `/dans/${id}` : '/dans'}>
           {t('dans.cancel')}

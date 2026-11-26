@@ -27,6 +27,7 @@ import {
   MagnifyingGlassIcon,
   MedalIcon,
   MegaphoneIcon,
+  LockSimpleIcon,
   MusicNotesIcon,
   PencilRulerIcon,
   PlaylistIcon,
@@ -263,6 +264,17 @@ export function Frame({ children }: { children: ReactNode }) {
                 href: '/manage/songs',
                 label: t('shell.songAdmin'),
                 icon: MusicNotesIcon,
+              },
+            ]
+          : []),
+        // Each source's managers decide the changes asked for its fixed 段位 courses (段位审核).
+        ...(roles.groups.includes('FANMADE_MANAGER') || roles.groups.includes('OFFICIAL_MANAGER')
+          ? [
+              {
+                key: 'danAdmin',
+                href: '/manage/dans',
+                label: t('shell.danAdmin'),
+                icon: LockSimpleIcon,
               },
             ]
           : []),
