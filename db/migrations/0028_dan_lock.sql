@@ -2,13 +2,13 @@
 --
 -- A course's maker fixes it (dan_courses.fixed_at): from then on its songs and its conditions
 -- change only by a request (dan_changes) that a manager of the source approves, or returns with
--- a reply. Its name and colour stay the maker's to change. An approved request fixes the course
--- again from that moment. A fixed course is what a rule may name: what a clear of it means
--- cannot change behind the rule's back.
+-- a reply. Its name and colour stay the maker's to change. An approved request is the managers'
+-- own change: the course stays fixed from when it was fixed. A fixed course is what a rule may
+-- name: what a clear of it means cannot change behind the rule's back.
 --
 -- The titles a course gave on a pass (rewards.titles, given only by official courses) become
 -- rules of the kind dan_clear (internal/rewards/rules): a player whose attempt at a fixed course,
--- made since it was last fixed, reached a verdict (1–3 red, 4–6 gold, with full combo or all good
+-- made since it was fixed, reached a verdict (1–3 red, 4–6 gold, with full combo or all good
 -- above each) gets the rule's item. Rules belong to the title managers, and any fixed course,
 -- official or not, may be named by one. A course's rewards keep only its 段位 (rewards.dan).
 
@@ -19,7 +19,7 @@ BEGIN
   FOREACH src IN ARRAY ARRAY['fanmade', 'official'] LOOP
     EXECUTE format($sql$
       ALTER TABLE %1$I.dan_courses ADD COLUMN IF NOT EXISTS fixed_at timestamptz;
-      COMMENT ON COLUMN %1$I.dan_courses.fixed_at IS 'When the course was last fixed: by its maker, or by an approved dan_changes request. NULL: not fixed, its maker changes it freely. Once fixed its songs and exams change only by an approved request, and a dan_clear rule counts only the attempts made since.';
+      COMMENT ON COLUMN %1$I.dan_courses.fixed_at IS 'When the course was fixed, by its maker or a manager. NULL: not fixed, its maker changes it freely. Once fixed its songs and exams change only by an approved dan_changes request, which leaves fixed_at as it is; a dan_clear rule counts the attempts made since.';
 
       CREATE TABLE IF NOT EXISTS %1$I.dan_changes (
           id text PRIMARY KEY CONSTRAINT dan_changes_id CHECK (id ~ '^[0-9a-f]{32}$'),
@@ -39,7 +39,7 @@ BEGIN
       CREATE UNIQUE INDEX IF NOT EXISTS dan_changes_pending ON %1$I.dan_changes (course_id) WHERE status = 'pending';
       CREATE INDEX IF NOT EXISTS dan_changes_queue ON %1$I.dan_changes (status, created_at, id);
       CREATE INDEX IF NOT EXISTS dan_changes_course ON %1$I.dan_changes (course_id, created_at DESC);
-      COMMENT ON TABLE %1$I.dan_changes IS 'A request to change the songs and exams of a fixed 段位 course, as they are asked to be (songs: [{chartId, course, side, hidden}]). A manager of the source approves it, which copies them onto the course and fixes it again, or returns it with a reply. One pending request per course.';
+      COMMENT ON TABLE %1$I.dan_changes IS 'A request to change the songs and exams of a fixed 段位 course, as they are asked to be (songs: [{chartId, course, side, hidden}]). A manager of the source approves it, which copies them onto the course (it stays fixed from when it was), or returns it with a reply. One pending request per course.';
     $sql$, src);
   END LOOP;
 END $$;

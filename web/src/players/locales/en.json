@@ -625,7 +625,7 @@
   },
   "danAdmin": {
     "heading": "Review Dan courses",
-    "intro": "Changing the songs or conditions of a course with fixed songs takes a request, which the managers of its library decide. Approving gives the course what was asked and fixes it again from now (earlier attempts no longer count for rules); returning needs a reply. The maker is notified either way.",
+    "intro": "Changing the songs or conditions of a course with fixed songs takes a request, which the managers of its library decide. Approving gives the course what was asked; it stays fixed from when it was, and earlier attempts still count for rules. Returning needs a reply. The maker is notified either way.",
     "empty": "No requests waiting.",
     "asked": "Asked by {{owner}} on {{at}}",
     "now": "Now",

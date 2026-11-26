@@ -378,8 +378,8 @@ export type Dan = {
   /** The 段位 an official course stands for. What passing it gives besides is given by rule. */
   rewards: { dan?: number }
   /**
-   * When the course was last fixed: its songs and conditions then change only by a request a
-   * manager of the source approves (DanChange). Null: not fixed. Only a fixed course is named by
+   * When the course was fixed: its songs and conditions then change only by a request a manager
+   * of the source approves (DanChange), which leaves this as it is. Null: not fixed. Only a fixed course is named by
    * a rule that gives items for passing it.
    */
   fixedAt: string | null

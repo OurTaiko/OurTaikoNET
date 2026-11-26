@@ -212,7 +212,8 @@ func (r Rule) lowestCourse() int {
 // met is a query for the players who meet r, one column user_id: all of them when $1 is ”,
 // else that player or nobody. A score counts while it stands (is_latest) on a published chart.
 // An attempt at a 段位 course counts while the course is published and fixed, if it was made
-// since the course was last fixed: before, it may have been other songs. The sign-in rules go by
+// since the course was fixed: before, its maker could change its songs at will. A change the
+// managers approved since leaves the time of fixing, and the attempts before it, as they are. The sign-in rules go by
 // where a player was seen (net.users, signin.RecordActivity).
 func (r Rule) met() (string, []any, error) {
 	if !r.Valid() {

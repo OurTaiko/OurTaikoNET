@@ -81,8 +81,8 @@ type DanCourse struct {
 	Downvotes    int `json:"downvotes"`
 	CommentCount int `json:"commentCount"`
 	MyVote       int `json:"myVote"`
-	// FixedAt is when the course was last fixed (dan_changes.go): its songs and conditions then
-	// change only by an approved request. Null: not fixed.
+	// FixedAt is when the course was fixed (dan_changes.go): its songs and conditions then change
+	// only by an approved request, which leaves FixedAt as it is. Null: not fixed.
 	FixedAt *time.Time `json:"fixedAt"`
 }
 

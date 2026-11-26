@@ -24,7 +24,7 @@ const managerOf: Record<SourceId, string> = {
 const queueKey = (source: SourceId) => ['dan-changes', 'queue', source] as const
 
 // 段位审核: the requests to change the songs and conditions of fixed 段位 courses, for the managers
-// of each source to approve, which gives the course what was asked and fixes it again, or to
+// of each source to approve, which gives the course what was asked (it stays fixed), or to
 // return with a reply. The course's maker is told either way.
 export function DanChangesPage() {
   const { t } = useTranslation()

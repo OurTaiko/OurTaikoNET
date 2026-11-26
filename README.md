@@ -132,7 +132,7 @@ Besides an administrator's hand, a title is given by rule; a 段位 course gives
 |---|---|---|
 | `chart_clear` | a score on one chart of a source | `source`, `chartId`, `clear`, `course`? |
 | `category_clear` | scores on `count` charts of a category of a source; without `count`, on every chart of it that has a course high enough | `source`, `category` (the source's category ID), `clear`, `course`?, `count`? |
-| `dan_clear` | an attempt at a fixed 段位 course of a source (see "Fixed 段位 courses"), made since it was last fixed, whose verdict is at least `clear` | `source`, `danId`, `clear` (1–6) |
+| `dan_clear` | an attempt at a fixed 段位 course of a source (see "Fixed 段位 courses"), made since it was fixed, whose verdict is at least `clear` | `source`, `danId`, `clear` (1–6) |
 | `charts_uploaded` | being an owner of `count` fanmade charts, the only source players upload to: the uploader and every collaborator who joined a chart count it alike (the built-in account never). It names no source; migration `0025` dropped the ones that named the official source, whose charts are all the built-in account's | `count` |
 | `site_login` | being seen signed in on the website | |
 | `game_login` | being seen signed in in the game | |
@@ -151,14 +151,14 @@ The website shows each title's rules in the catalog (`/titles`) and makes, chang
 
 ## Fixed 段位 courses
 
-A 段位 course's maker may fix it (migration `0028_dan_lock`; `internal/songs/httpapi/dan_changes.go`): from then on its songs and conditions change only by a request that a manager of its source approves (FANMADE_MANAGER, OFFICIAL_MANAGER), and only a fixed course may be named by a rule that gives items for passing it (`dan_clear`), which counts only the attempts made since the course was last fixed. What a pass of it means cannot change behind the rule's back. Its name, colour, 段位 badge and which songs are hidden stay the maker's to change. A course's `rewards` holds only `dan`, the 段位 an official course stands for.
+A 段位 course's maker may fix it (migration `0028_dan_lock`; `internal/songs/httpapi/dan_changes.go`): from then on its songs and conditions change only by a request that a manager of its source approves (FANMADE_MANAGER, OFFICIAL_MANAGER), and only a fixed course may be named by a rule that gives items for passing it (`dan_clear`), which counts only the attempts made since the course was fixed. A change the managers approve is their own: the course stays fixed from when it was, and the attempts before the change still count. What a pass of it means cannot change behind the rule's back. Its name, colour, 段位 badge and which songs are hidden stay the maker's to change. A course's `rewards` holds only `dan`, the 段位 an official course stands for.
 
 Each source has the routes, under `/api/v1/sources/<source>/` (and `/api/v2/sources/<source>/`):
 
 - `POST …/dans/{id}/fix` (its maker or a manager; every song must be playable, 422 `DAN_NOT_PLAYABLE`; 409 `DAN_FIXED`, `DAN_CHANGED`) → the course, with `fixedAt`. `DELETE …/dans/{id}/fix` (a manager): no longer fixed; a request waiting is withdrawn, and its rules give nothing until it is fixed again.
 - `PUT …/dans/{id}` on a fixed course takes the songs and conditions only as they are (409 `DAN_FIXED`).
 - `POST …/dans/{id}/changes {songs, exams, request}` (its maker or a manager): the songs and conditions it should have, and why (1–500 characters). One waits at a time (409 `DAN_CHANGE_PENDING`); 409 `DAN_NOT_FIXED`, 422 `DAN_CHANGE_EMPTY`. `GET …/dans/{id}/changes` lists them, newest first; `DELETE …/dans/{id}/changes/{change}` withdraws the one waiting.
-- `GET …/dan-changes` (a manager): the requests waiting, oldest first, each with its `course` as it is now. `POST …/dan-changes/{change}/decision {approve, reply}`: approving gives the course the songs (which must still be blocks the charts have) and conditions asked for and fixes it again from now; returning needs a reply. The maker is sent `dan_change_result` (`{approved, reply}`), which cannot be muted.
+- `GET …/dan-changes` (a manager): the requests waiting, oldest first, each with its `course` as it is now. `POST …/dan-changes/{change}/decision {approve, reply}`: approving gives the course the songs (which must still be blocks the charts have) and conditions asked for (`fixedAt` stays as it is); returning needs a reply. The maker is sent `dan_change_result` (`{approved, reply}`), which cannot be muted.
 - Table `dan_changes` in each source (`songs` as `[{chartId, course, side, hidden}]`, `exams`, `request`, `status` pending/approved/returned/withdrawn, `reviewer_id`, `reply`); `dan_courses.fixed_at`.
 - Website: the course page shows whether it is fixed, fixes or unfixes it, lists the requests, and shows what passing it gives by rule (from the title catalog). The editor of a fixed course sends a change of songs or conditions as a request, with a reason, and saves the rest. Managers decide at `/manage/dans` (`web/src/players/pages/dan-changes.tsx`), each source's managers its own.
 

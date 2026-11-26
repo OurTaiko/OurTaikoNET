@@ -95,6 +95,7 @@ func TestFixedDanCourses(t *testing.T) {
 	if code := c.do("owner", "POST", "/api/dans/"+dan.ID+"/fix", "", &dan); code != 200 || dan.FixedAt == nil {
 		t.Fatal(code, dan)
 	}
+	before := *dan.FixedAt
 	if code := c.do("owner", "POST", "/api/dans/"+dan.ID+"/fix", "", nil); code != 409 {
 		t.Fatal("fixed twice", code)
 	}
@@ -181,14 +182,13 @@ func TestFixedDanCourses(t *testing.T) {
 	if code := c.do("owner", "DELETE", "/api/dans/"+dan.ID+"/changes/"+change.ID, "", &change); code != 200 || change.Status != danChangeWithdrawn {
 		t.Fatal(code, change)
 	}
-	// Approved: the course takes the songs, keeps which are hidden as asked, and is fixed again
-	// from now, so the attempts before count no more.
-	before := *dan.FixedAt
+	// Approved: the course takes the songs and keeps which are hidden as asked. The change is the
+	// managers' own: the course stays fixed from when it was, and the attempts before still count.
 	_, change = ask("owner", other, `"again"`)
 	if code := c.do("admin", "POST", "/api/dan-changes/"+change.ID+"/decision", `{"approve":true}`, &change); code != 200 || change.Status != danChangeApproved {
 		t.Fatal(code, change)
 	}
-	if code := c.do("owner", "GET", "/api/dans/"+dan.ID, "", &dan); code != 200 || dan.Songs[1].Chart.Course != "Hard" || dan.Songs[1].Hidden || dan.FixedAt == nil || !dan.FixedAt.After(before) {
+	if code := c.do("owner", "GET", "/api/dans/"+dan.ID, "", &dan); code != 200 || dan.Songs[1].Chart.Course != "Hard" || dan.Songs[1].Hidden || dan.FixedAt == nil || !dan.FixedAt.Equal(before) {
 		t.Fatal(code, dan)
 	}
 	if _, err := pool.Exec(ctx, `DELETE FROM net.user_titles WHERE user_id=$1`, bob); err != nil {
@@ -197,8 +197,8 @@ func TestFixedDanCourses(t *testing.T) {
 	if _, err := pool.Exec(ctx, `DELETE FROM net.awards WHERE service='rule'`); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := rules.Backfill(ctx, pool, ruleOf(t, pool, dan.ID)); err != nil || n != 0 {
-		t.Fatal("an attempt at the songs before", n, err)
+	if n, err := rules.Backfill(ctx, pool, ruleOf(t, pool, dan.ID)); err != nil || n != 1 || !holds(bob) {
+		t.Fatal("an attempt at the songs before an approved change counts", n, err)
 	}
 
 	// A manager undoes the fixing: the rule gives nothing, and the maker changes it freely.

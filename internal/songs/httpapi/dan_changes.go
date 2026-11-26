@@ -16,12 +16,13 @@ import (
 )
 
 // Fixed 段位 courses (migration 0028_dan_lock). A course's maker fixes it; from then on its songs
-// and conditions change only by a request (dan_changes) that a manager of the source approves,
-// which fixes it again from that moment, or returns with a reply. Its name, colour and rewards,
-// and which of its songs are hidden, stay the maker's to change (updateDan). A manager may undo
-// the fixing. Only a fixed course is named by a rule that gives items for passing it (package
-// rules, dan_clear), and only the attempts made since it was last fixed count: what a clear of it
-// means cannot change behind the rule's back.
+// and conditions change only by a request (dan_changes) that a manager of the source approves or
+// returns with a reply. An approved change is the managers' own: the course stays fixed from when
+// it was fixed, and the attempts made before the change still count. Its name, colour and
+// rewards, and which of its songs are hidden, stay the maker's to change (updateDan). A manager
+// may undo the fixing; fixing it again starts anew. Only a fixed course is named by a rule that
+// gives items for passing it (package rules, dan_clear), and only the attempts made since it was
+// fixed count: what a clear of it means cannot change behind the rule's back.
 
 // The states of a request.
 const (
@@ -401,7 +402,8 @@ func (s *Server) danChangeQueue(w http.ResponseWriter, r *http.Request) {
 
 // decideDanChange is POST /api/dan-changes/{change}/decision {approve, reply}, by a manager.
 // Approving it gives the course the songs and conditions asked for, which must still be blocks
-// the charts have, and fixes it again from now; returning it needs a reply. Either way the
+// the charts have; the course stays fixed from when it was (fixed_at does not move), so the
+// attempts before still count for its rules. Returning it needs a reply. Either way the
 // course's maker is told.
 func (s *Server) decideDanChange(w http.ResponseWriter, r *http.Request) {
 	v, ok := s.danReviewer(w, r, true)
@@ -454,7 +456,7 @@ func (s *Server) decideDanChange(w http.ResponseWriter, r *http.Request) {
 			internal(w, err)
 			return
 		}
-		if _, err = tx.Exec(ctx, `UPDATE dan_courses SET exams=$2,fixed_at=now(),updated_at=now() WHERE id=$1`, change.CourseID, exams); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE dan_courses SET exams=$2,updated_at=now() WHERE id=$1`, change.CourseID, exams); err != nil {
 			internal(w, err)
 			return
 		}
