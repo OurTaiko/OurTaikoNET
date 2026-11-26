@@ -12,7 +12,7 @@ import type {
   ScoreSort,
   ScoreView,
 } from '@players/api/types'
-import { Nameplate } from '@players/components/nameplate'
+import { Nameplate, TitleBand } from '@players/components/nameplate'
 import { VisibilityMark } from '@players/components/title-form'
 import { Crown } from '@players/components/crown'
 import { ChoiceSelect } from '@players/components/choice-select'
@@ -481,10 +481,9 @@ function TitlesTab({
                     worn && 'border-primary ring-2 ring-primary/30',
                   )}
                 >
-                  <Nameplate
-                    plate={{ ...plate, title: h.title, dan: null }}
-                    className="h-16 [&_.text-2xl]:text-base"
-                  />
+                  <div className="flex justify-center rounded-xl bg-muted/60 px-3 py-5">
+                    <TitleBand title={h.title} className="h-7" />
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {h.title.visibility === 'private' && <VisibilityMark title={h.title} />}
                     <span>{titleName(h.title, language)}</span>
