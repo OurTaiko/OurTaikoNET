@@ -1022,6 +1022,7 @@
       "contact": "문의 및 피드백",
       "bilibili": "Bilibili",
       "qqGroup": "QQ 그룹",
+      "discord": "Discord 서버",
       "feedback": "피드백 보내기 / 문제 신고",
       "nonProfit": "비영리 커뮤니티 프로젝트",
       "visits": "누적 조회 {{total}}회 · 오늘 조회 {{today}}회, 방문자 {{visitors}}명",

@@ -15,8 +15,10 @@ import { cn } from '../lib/utils'
 import type { SourceId } from '../source'
 import {
   BilibiliMark,
+  DiscordMark,
   QQMark,
   bilibiliAddress,
+  discordAddress,
   qqGroupAddress,
   sourceCodeAddress,
 } from './community'
@@ -71,7 +73,6 @@ export function FrameFooter({ source }: { source: SourceId }) {
     { href: `/${source}/`, label: t('shell.browse') },
     { href: `/${source}/playlists`, label: t('shell.playlists') },
     { href: `/${source}/dans`, label: t('shell.dans') },
-    { href: '/players', label: t('shell.directory') },
     { href: '/titles', label: t('shell.titles') },
   ]
   return (
@@ -104,6 +105,10 @@ export function FrameFooter({ source }: { source: SourceId }) {
               <QQMark className="size-[18px]" />
               {t('shell.footer.qqGroup')}
             </Away>
+            <Away href={discordAddress} className={cn(badgeClass, 'text-[#5865f2]')}>
+              <DiscordMark className="size-[18px]" />
+              Discord
+            </Away>
           </div>
         </div>
 
@@ -129,6 +134,11 @@ export function FrameFooter({ source }: { source: SourceId }) {
             <li>
               <Away href={qqGroupAddress} className={linkClass}>
                 {t('shell.footer.qqGroup')}
+              </Away>
+            </li>
+            <li>
+              <Away href={discordAddress} className={linkClass}>
+                {t('shell.footer.discord')}
               </Away>
             </li>
           </Column>
