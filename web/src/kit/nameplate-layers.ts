@@ -214,23 +214,31 @@ export type LayerSpec = { id: string; clip?: string; mask?: boolean; cut?: boole
 // NameplateLayers stencil).
 export const bandShape = 'band/lumen-title-wood'
 
-/** A title's band and effect, back to front, and its icon, which the plate draws later. */
+/**
+ * A title's band; its effect (with the band's shape it is cut to, if it stays inside the band),
+ * which goes over the title's text printed on the band; and its icon, which the plate draws later.
+ */
 export function titleSpecs(
   catalog: LumenCatalog,
   look: TitleLayers,
-): { band: LayerSpec[]; icon: LayerSpec | null } {
-  const band: LayerSpec[] = [{ id: look.band }]
-  if (look.effect) {
-    if (catalog.unclipped.includes(look.effect)) band.push({ id: look.effect })
-    else band.push({ id: bandShape, mask: true }, { id: look.effect, cut: true })
-  }
-  return { band, icon: look.icon ? { id: look.icon } : null }
+): { band: LayerSpec[]; effect: LayerSpec[]; icon: LayerSpec | null } {
+  const effect: LayerSpec[] = !look.effect
+    ? []
+    : catalog.unclipped.includes(look.effect)
+      ? [{ id: look.effect }]
+      : [
+          { id: bandShape, mask: true },
+          { id: look.effect, cut: true },
+        ]
+  return { band: [{ id: look.band }], effect, icon: look.icon ? { id: look.icon } : null }
 }
 
 /**
- * A plate's pictures back to front, as the game's PlateComposition draws a layout's rows: the
- * title's band and effect in its row, its icon over the outline (with the badge's row, or right
- * after the band on a layout without one), the badge, the 段位 emblem.
+ * A plate's pictures back to front, as the game's PlateComposition draws a layout's rows, in two
+ * parts with the title's text between them: `under`, up to the title's band, and `over`, the
+ * title's effect (which sparkles over the text), then its icon over the outline (with the badge's
+ * row, or right after the effect on a layout without one), the badge, the 段位 emblem. A plate
+ * without a title has all its pictures under.
  */
 export function plateSpecs(
   catalog: LumenCatalog,
@@ -238,10 +246,12 @@ export function plateSpecs(
   look: TitleLayers | null,
   badge: '1p' | '2p',
   rank: { id: string; clip: string } | null,
-): LayerSpec[] {
+): { under: LayerSpec[]; over: LayerSpec[] } {
   const title = look ? titleSpecs(catalog, look) : null
   const hasBadge = rows.some((row) => row.role === 'plate_player_no')
-  const specs: LayerSpec[] = []
+  const under: LayerSpec[] = []
+  const over: LayerSpec[] = []
+  let specs = under
   for (const row of rows) {
     switch (row.role) {
       case 'base':
@@ -251,6 +261,8 @@ export function plateSpecs(
       case 'ai_title_instance':
         if (!title) break
         specs.push(...title.band)
+        specs = over
+        specs.push(...title.effect)
         if (!hasBadge && title.icon) specs.push(title.icon)
         break
       case 'plate_player_no':
@@ -265,5 +277,5 @@ export function plateSpecs(
         break
     }
   }
-  return specs
+  return { under, over }
 }

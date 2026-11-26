@@ -194,28 +194,33 @@ export function useNameplateSet(): Lumen | null {
   return value
 }
 
-/** The pictures of `specs`, read; null until they are. One that cannot be read is left out. */
-function useLayers(set: Lumen | null, specs: LayerSpec[]): DrawLayer[] | null {
-  const key = JSON.stringify(specs)
-  const [layers, setLayers] = useState<{ key: string; layers: DrawLayer[] } | null>(null)
+/**
+ * The pictures of each part of `parts`, read together, so that the canvases drawing them start
+ * at once; null until they are. One that cannot be read is left out.
+ */
+function useLayers(set: Lumen | null, parts: LayerSpec[][]): DrawLayer[][] | null {
+  const key = JSON.stringify(parts)
+  const [layers, setLayers] = useState<{ key: string; layers: DrawLayer[][] } | null>(null)
   useEffect(() => {
     if (!set) return
     let current = true
-    const wanted = JSON.parse(key) as LayerSpec[]
-    void Promise.all(
-      wanted.map((spec) =>
-        loadItem(set, spec.id).then(
-          (item): DrawLayer | null => {
-            const clip =
-              item.file.clips.find((c) => c.name === (spec.clip ?? 'idle')) ??
-              (spec.clip ? undefined : item.file.clips[0])
-            return clip ? { ...item, clip, mask: spec.mask, cut: spec.cut } : null
-          },
-          (): DrawLayer | null => null,
+    const wanted = JSON.parse(key) as LayerSpec[][]
+    const read = (part: LayerSpec[]) =>
+      Promise.all(
+        part.map((spec) =>
+          loadItem(set, spec.id).then(
+            (item): DrawLayer | null => {
+              const clip =
+                item.file.clips.find((c) => c.name === (spec.clip ?? 'idle')) ??
+                (spec.clip ? undefined : item.file.clips[0])
+              return clip ? { ...item, clip, mask: spec.mask, cut: spec.cut } : null
+            },
+            (): DrawLayer | null => null,
+          ),
         ),
-      ),
-    ).then((read) => {
-      if (current) setLayers({ key, layers: read.filter((l): l is DrawLayer => l !== null) })
+      ).then((got) => got.filter((l): l is DrawLayer => l !== null))
+    void Promise.all(wanted.map(read)).then((got) => {
+      if (current) setLayers({ key, layers: got })
     })
     return () => {
       current = false
@@ -249,6 +254,13 @@ const BAND = { x: 48, y: 16, w: 312, h: 29 }
 // centred at y 34.5 less the text's lift, which is a little under the band's middle. A plate
 // puts it beside the badge; a band alone has none, and centres it between its round ends.
 const TITLE = { size: 22, y: 34.5 - textLift(22), width: 270 }
+// The canvases of a title on its band alone: the band and the room around it.
+const bandStyle: CSSProperties = {
+  left: `${(-OVER / BAND.w) * 100}%`,
+  top: `${(-OVER / BAND.h) * 100}%`,
+  width: `${((BAND.w + 2 * OVER) / BAND.w) * 100}%`,
+  height: `${((BAND.h + 2 * OVER) / BAND.h) * 100}%`,
+}
 
 /**
  * A title on its band alone: the strip a nameplate wears, its band, effect and icon as the game
@@ -265,10 +277,11 @@ export function TitleBandArt({
   className?: string
 }) {
   const set = useNameplateSet()
+  // The band under the title's name, its effect and icon over it.
   const specs = useMemo(() => {
     if (!set) return []
     const title = titleSpecs(set.catalog, layers)
-    return title.icon ? [...title.band, title.icon] : title.band
+    return [title.band, title.icon ? [...title.effect, title.icon] : title.effect]
   }, [set, layers])
   const drawn = useLayers(set, specs)
   const frame: PlateFrame = [
@@ -288,16 +301,7 @@ export function TitleBandArt({
       {/* Where there is no room for the height asked for, the band is as wide as there is room
           and keeps its shape, in the middle of the height. */}
       <span className="@container relative block aspect-[312/29] w-full">
-        <PlateLayers
-          layers={drawn}
-          frame={frame}
-          style={{
-            left: `${(-OVER / BAND.w) * 100}%`,
-            top: `${(-OVER / BAND.h) * 100}%`,
-            width: `${((BAND.w + 2 * OVER) / BAND.w) * 100}%`,
-            height: `${((BAND.h + 2 * OVER) / BAND.h) * 100}%`,
-          }}
-        />
+        <PlateLayers layers={drawn?.[0] ?? null} frame={frame} style={bandStyle} />
         <Squeezed
           className="font-bold text-black leading-none"
           style={{
@@ -311,6 +315,7 @@ export function TitleBandArt({
         >
           {name}
         </Squeezed>
+        <PlateLayers layers={drawn?.[1] ?? null} frame={frame} style={bandStyle} />
       </span>
     </span>
   )
@@ -324,6 +329,9 @@ const place = (x: number, y: number, w: number, h: number): CSSProperties => ({
   width: `${(w / VIEW.w) * 100}%`,
   height: `${(h / VIEW.h) * 100}%`,
 })
+// The canvases of a whole plate: the plate and the room above and below it.
+const PLATE_FRAME: PlateFrame = [0, -OVER, 408, 96 + OVER]
+const plateStyle = place(0, -OVER, 408, 96 + 2 * OVER)
 // Font sizes in canvas pixels, scaled with the plate (its width is VIEW.w canvas pixels).
 const px = (n: number) => `${(n / VIEW.w) * 100}cqw`
 
@@ -350,7 +358,8 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
   const specs = useMemo(() => {
     if (!set || !rows) return []
     const rank = dan ? rankPicture(dan.index, dan.gold, dan.combo) : null
-    return plateSpecs(set.catalog, rows, look, side === 2 ? '2p' : '1p', rank)
+    const { under, over } = plateSpecs(set.catalog, rows, look, side === 2 ? '2p' : '1p', rank)
+    return [under, over]
   }, [set, rows, look, side, dan])
   const drawn = useLayers(set, specs)
   // Before the catalog is read the text still goes where the plate puts it.
@@ -378,11 +387,9 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
       className={cn('@container relative aspect-[329/81] w-full max-w-md select-none', className)}
       data-testid="nameplate"
     >
-      <PlateLayers
-        layers={drawn}
-        frame={[0, -OVER, 408, 96 + OVER]}
-        style={place(0, -OVER, 408, 96 + 2 * OVER)}
-      />
+      {/* The title's name is printed on its band, under the title's effect and what the plate
+          draws after it (the outline, icon, badge and 段位). */}
+      <PlateLayers layers={drawn?.[0] ?? null} frame={PLATE_FRAME} style={plateStyle} />
       {dan && (
         <span
           role="img"
@@ -397,6 +404,7 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
           {title.name}
         </Squeezed>
       )}
+      <PlateLayers layers={drawn?.[1] ?? null} frame={PLATE_FRAME} style={plateStyle} />
       <Squeezed
         className="font-bold text-white leading-none [paint-order:stroke_fill]"
         style={{ ...box(nameRow), WebkitTextStroke: `${px(2 * (nameRow.stroke ?? 3))} #000` }}

@@ -274,7 +274,12 @@ export function usePlateCanvas(
   const [x0, y0, x1, y1] = frame
   useEffect(() => {
     const element = canvas.current
-    if (!element || !layers || layers.length === 0) return
+    if (!element || !layers) return
+    // Nothing to draw any more: take away what was drawn before.
+    if (layers.length === 0) {
+      element.getContext('2d')?.clearRect(0, 0, element.width, element.height)
+      return
+    }
     const entry: Entry = {
       canvas: element,
       frame: [x0, y0, x1, y1],
