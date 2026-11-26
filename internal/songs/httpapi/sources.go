@@ -15,9 +15,21 @@ var Fanmade = &Source{
 		{8, Category{ID: "classic", Title: "Classic", Genre: "CLASSICAL"}},
 		{16, Category{ID: "variety", Title: "Variety", Genre: "VARIETY"}},
 		{32, Category{ID: "anime", Title: "Anime", Genre: "ANIME"}},
+		// Fanmade's own (0027_fanmade_categories). The game draws a genre it does not know in
+		// its default frame.
+		{64, Category{ID: "touhou", Title: "Touhou Project", Genre: "TOUHOU"}},
+		{128, Category{ID: "gekichumai", Title: "GEKICHUMAI", Genre: "GEKICHUMAI"}},
+		{256, Category{ID: "bemani", Title: "BEMANI", Genre: "BEMANI"}},
+		{512, Category{ID: "project-sekai", Title: "Project Sekai", Genre: "PROJECT SEKAI"}},
+		{1024, Category{ID: "other-rhythm-games", Title: "Other Rhythm Games", Genre: "RHYTHM GAME"}},
+		{2048, Category{ID: "bms", Title: "BMS", Genre: "BMS"}},
+		{4096, Category{ID: "album", Title: "Album", Genre: "ALBUM"}},
+		{8192, Category{ID: "internet", Title: "Internet", Genre: "INTERNET"}},
 	},
-	CategoryIDsSorted:  true,
-	PlaylistCategories: map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classic", "daily": "variety"},
+	// Players suggest categories for its charts, which its managers decide (category_suggestions.go).
+	CategorySuggestions: true,
+	CategoryIDsSorted:   true,
+	PlaylistCategories:  map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classic", "daily": "variety"},
 	// Deep blue.
 	GenreFrame: 10,
 }

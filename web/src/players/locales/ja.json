@@ -512,7 +512,15 @@
         "pop": "ポップス",
         "classic": "クラシック",
         "variety": "バラエティ",
-        "anime": "アニメ"
+        "anime": "アニメ",
+        "touhou": "東方Project",
+        "gekichumai": "ゲキチュウマイ",
+        "bemani": "BEMANI",
+        "project-sekai": "プロジェクトセカイ",
+        "other-rhythm-games": "その他の音楽ゲーム",
+        "bms": "BMS",
+        "album": "アルバム曲",
+        "internet": "ネット・ミーム"
       },
       "official": {
         "namco": "ナムコオリジナル",
@@ -579,14 +587,9 @@
     "return": "差し戻す",
     "by": "{{name}} が処理"
   },
-  "tagAdmin": {
-    "heading": "タグ管理",
-    "intro": "プレイヤーが提案したタグです。タグ管理者とそのソースの管理者が決定します。採用・不採用を決めると、同じ曲の同じタグへの提案（今後のものも含む）はすべてその結果になります。",
-    "source": "ソース",
-    "sources": {
-      "fanmade": "創作",
-      "official": "公式"
-    },
+  "songAdmin": {
+    "heading": "楽曲管理",
+    "intro": "プレイヤーが創作譜面に提案したカテゴリです。創作ソースの管理者が決定します。採用・不採用を決めると、同じ曲の同じカテゴリへの提案（今後のものも含む）はすべてその結果になります。採用すると、バラエティーだけに入っていた曲はバラエティーから外れます。",
     "status": "状態",
     "statuses": {
       "pending": "確認待ち",
@@ -597,7 +600,7 @@
     "unknownChart": "（譜面は表示できません）",
     "suggestedBy_one": "{{count}} 人が提案",
     "suggestedBy_other": "{{count}} 人が提案",
-    "current": "現在のタグ：{{tags}}",
+    "current": "現在のカテゴリ：{{categories}}",
     "since": "最初の提案 {{at}}",
     "decided": "{{by}} が {{at}} に決定",
     "earlier": "以前の決定",

@@ -32,7 +32,6 @@ const build = () =>
     danOfficial: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/official`,
     danVote: (id: string) => `${API_ROOT}/dans/${encodeURIComponent(id)}/vote`,
     categories: `${API_ROOT}/categories`,
-    tags: `${API_ROOT}/tags`,
     uploadRules: `${API_ROOT}/upload-rules`,
     // The site has one sign-in, outside any source. It returns to a page of this source.
     logout: `${SITE_API_ROOT}/auth/logout`,
@@ -62,12 +61,13 @@ const build = () =>
     collaboration: (id: string, invitation: string) =>
       `${chartPath(id)}/collaborations/${encodeURIComponent(invitation)}`,
     chartOwnership: (id: string) => `${chartPath(id)}/owners/me`,
-    /** GET: the chart's tags and the viewer's part in them; PUT {tags}: set them. */
-    chartTags: (id: string) => `${chartPath(id)}/tags`,
-    /** POST {tag}: suggest one; DELETE …/{tag}: take back a suggestion still waiting. */
-    tagSuggestions: (id: string) => `${chartPath(id)}/tag-suggestions`,
-    tagSuggestion: (id: string, tag: string) =>
-      `${chartPath(id)}/tag-suggestions/${encodeURIComponent(tag)}`,
+    /**
+     * Fanmade: GET the viewer's part in a chart's categories, POST {category} to suggest one,
+     * DELETE …/{category} to take back a suggestion still waiting.
+     */
+    categorySuggestions: (id: string) => `${chartPath(id)}/category-suggestions`,
+    categorySuggestion: (id: string, category: string) =>
+      `${chartPath(id)}/category-suggestions/${encodeURIComponent(category)}`,
     chartFiles: (id: string) => `${chartPath(id)}/files`,
     /** PUT: the background movie on its own, with an optional movieOffset. */
     chartMovie: (id: string) => `${chartPath(id)}/movie`,

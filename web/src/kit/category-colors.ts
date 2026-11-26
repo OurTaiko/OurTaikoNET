@@ -13,6 +13,15 @@ const colors: Record<string, string> = {
   classics: '#fbbf24',
   kids: '#fde047',
   namco: '#f87171',
+  // Fanmade's own.
+  touhou: '#fb7185',
+  gekichumai: '#22d3ee',
+  bemani: '#a3e635',
+  'project-sekai': '#2dd4bf',
+  'other-rhythm-games': '#818cf8',
+  bms: '#94a3b8',
+  album: '#e879f9',
+  internet: '#fb923c',
 }
 
 export function categoryColor(id: string): string | undefined {

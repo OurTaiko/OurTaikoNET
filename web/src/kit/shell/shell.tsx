@@ -27,6 +27,7 @@ import {
   MagnifyingGlassIcon,
   MedalIcon,
   MegaphoneIcon,
+  MusicNotesIcon,
   PencilRulerIcon,
   PlaylistIcon,
   ShieldStarIcon,
@@ -254,16 +255,14 @@ export function Frame({ children }: { children: ReactNode }) {
               },
             ]
           : []),
-        // Tag managers, and each source's managers for theirs (players' page /manage/tags).
-        ...(['TAG_MANAGER', 'FANMADE_MANAGER', 'OFFICIAL_MANAGER'].some((group) =>
-          roles.groups.includes(group),
-        )
+        // Fanmade's managers decide the categories players suggest (乐曲管理).
+        ...(roles.groups.includes('FANMADE_MANAGER')
           ? [
               {
-                key: 'tagAdmin',
-                href: '/manage/tags',
-                label: t('shell.tagAdmin'),
-                icon: TagIcon,
+                key: 'songAdmin',
+                href: '/manage/songs',
+                label: t('shell.songAdmin'),
+                icon: MusicNotesIcon,
               },
             ]
           : []),

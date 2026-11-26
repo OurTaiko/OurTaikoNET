@@ -82,13 +82,17 @@ func TestCategoriesFlow(t *testing.T) {
 	}
 	w := call("GET", "/api/categories", "", "")
 	var catalog struct{ Items []Category }
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Items) != 6 {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Items) != 14 {
 		t.Fatal(w.Body.String())
 	}
 	wantCatalog := []Category{
 		{ID: "game", Title: "Game", Genre: "GAME"}, {ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"},
 		{ID: "pop", Title: "Pop", Genre: "J-POP"}, {ID: "classic", Title: "Classic", Genre: "CLASSICAL"},
 		{ID: "variety", Title: "Variety", Genre: "VARIETY"}, {ID: "anime", Title: "Anime", Genre: "ANIME"},
+		{ID: "touhou", Title: "Touhou Project", Genre: "TOUHOU"}, {ID: "gekichumai", Title: "GEKICHUMAI", Genre: "GEKICHUMAI"},
+		{ID: "bemani", Title: "BEMANI", Genre: "BEMANI"}, {ID: "project-sekai", Title: "Project Sekai", Genre: "PROJECT SEKAI"},
+		{ID: "other-rhythm-games", Title: "Other Rhythm Games", Genre: "RHYTHM GAME"}, {ID: "bms", Title: "BMS", Genre: "BMS"},
+		{ID: "album", Title: "Album", Genre: "ALBUM"}, {ID: "internet", Title: "Internet", Genre: "INTERNET"},
 	}
 	// No chart is published yet: every count is 0.
 	if !reflect.DeepEqual(catalog.Items, wantCatalog) {
@@ -147,7 +151,7 @@ func TestCategoriesFlow(t *testing.T) {
 		Charts     []Chart
 		Categories []Category
 	}
-	if err = json.Unmarshal(w.Body.Bytes(), &summary); err != nil || summary.ChartCount != 4 || len(summary.Charts) != 4 || len(summary.Categories) != 6 {
+	if err = json.Unmarshal(w.Body.Bytes(), &summary); err != nil || summary.ChartCount != 4 || len(summary.Charts) != 4 || len(summary.Categories) != 14 {
 		t.Fatal("server total must count unique charts", w.Body.String(), err)
 	}
 	wantCounts := map[string]int{"game": 1, "pop": 1, "variety": 3, "classic": 0, "virtual-singer": 0, "anime": 1}
@@ -166,7 +170,7 @@ func TestCategoriesFlow(t *testing.T) {
 		ChartCount int
 		Items      []Category
 	}
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &site) != nil || site.ChartCount != 4 || len(site.Items) != 6 {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &site) != nil || site.ChartCount != 4 || len(site.Items) != 14 {
 		t.Fatal("website catalog counts", w.Body.String())
 	}
 	for _, category := range site.Items {

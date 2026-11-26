@@ -512,7 +512,15 @@
         "pop": "Pop",
         "classic": "Classical",
         "variety": "Variety",
-        "anime": "Anime"
+        "anime": "Anime",
+        "touhou": "Touhou Project",
+        "gekichumai": "GEKICHUMAI",
+        "bemani": "BEMANI",
+        "project-sekai": "Project Sekai",
+        "other-rhythm-games": "Other rhythm games",
+        "bms": "BMS",
+        "album": "Album",
+        "internet": "Internet"
       },
       "official": {
         "namco": "Namco Original",
@@ -579,14 +587,9 @@
     "return": "Return",
     "by": "by {{name}}"
   },
-  "tagAdmin": {
-    "heading": "Manage tags",
-    "intro": "Tags players suggest, decided by tag managers and the source's managers. Accepting or rejecting one settles every suggestion of that tag for that song, including later ones.",
-    "source": "Source",
-    "sources": {
-      "fanmade": "Fanmade",
-      "official": "Official"
-    },
+  "songAdmin": {
+    "heading": "Manage songs",
+    "intro": "Categories players suggest for Fanmade's songs, decided by Fanmade's managers. Accepting or rejecting one settles every suggestion of that category for that song, including later ones; accepting takes a song that was only in Variety out of Variety.",
     "status": "Status",
     "statuses": {
       "pending": "Pending",
@@ -597,7 +600,7 @@
     "unknownChart": "(chart no longer visible)",
     "suggestedBy_one": "suggested by {{count}} player",
     "suggestedBy_other": "suggested by {{count}} players",
-    "current": "Current tags: {{tags}}",
+    "current": "Current categories: {{categories}}",
     "since": "First suggested {{at}}",
     "decided": "Decided by {{by}}, {{at}}",
     "earlier": "an earlier decision",

@@ -4,19 +4,12 @@ import { SortDescendingIcon } from '@phosphor-icons/react'
 import { ChoiceSelect } from './choice-select'
 import { SearchInput } from './search-input'
 import { categoryName, useCategories } from '../categories'
-import { tagName, useTags } from '../tags'
 import { cn } from '../lib/utils'
 import { categoryColor } from '../category-colors'
 
 export const filterCourses = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit'] as const
 /** The chart list's filters both sites have; '' is no filter (and the newest first). */
-export type ChartFilters = {
-  order: string
-  category: string
-  tag: string
-  course: string
-  level: string
-}
+export type ChartFilters = { order: string; category: string; course: string; level: string }
 
 /** The shared filters as the address has them, values the API would refuse dropped. */
 export function readChartFilters(params: URLSearchParams, orders: readonly string[]): ChartFilters {
@@ -26,7 +19,6 @@ export function readChartFilters(params: URLSearchParams, orders: readonly strin
   return {
     order: orders.includes(order) ? order : '',
     category: params.get('category') || '',
-    tag: params.get('tag') || '',
     course: (filterCourses as readonly string[]).includes(course) ? course : '',
     level: Number.isInteger(level) && level >= 1 && level <= 10 ? String(level) : '',
   }
@@ -65,8 +57,6 @@ export function ChartSearch({
 }) {
   const { t } = useTranslation()
   const { items: categories, chartCount } = useCategories()
-  const { items: tags } = useTags()
-  const { i18n } = useTranslation()
   const courseLabels: Record<string, string> = {
     Easy: t('messages.easy'),
     Normal: t('messages.normal'),
@@ -165,20 +155,6 @@ export function ChartSearch({
             })),
           ]}
           onValueChange={(value) => onChange({ level: value })}
-        />
-        <ChoiceSelect
-          label={t('tags.filter')}
-          value={filters.tag}
-          items={[
-            { value: '', label: t('tags.anyTag') },
-            ...(tags ?? []).map((tag) => ({
-              value: tag.id,
-              label: counts
-                ? `${tagName(tag, i18n.language)} (${tag.chartCount})`
-                : tagName(tag, i18n.language),
-            })),
-          ]}
-          onValueChange={(value) => onChange({ tag: value })}
         />
         {children}
       </div>
