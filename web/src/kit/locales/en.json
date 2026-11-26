@@ -89,6 +89,7 @@
     "unsavedChanges": "Unsaved changes",
     "makeChangesToSave": "Make changes to save",
     "cancel": "Cancel",
+    "confirmTitle": "Are you sure?",
     "saving2": "Saving…",
     "saveChanges": "Save changes",
     "pageNotFound": "Page not found",

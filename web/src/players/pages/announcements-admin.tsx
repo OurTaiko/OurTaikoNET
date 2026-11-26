@@ -16,6 +16,7 @@ import type { Announcement, AnnouncementDraft } from '@players/api/types'
 import { AnnouncementBody } from '@players/components/announcement-dialog'
 import { AnnouncementPager, Pinned, announcementAddress } from '@players/components/announcements'
 import { Notice } from '@players/notice'
+import { useNotification } from '@sitekit/notification-context'
 import { playerKeys, playerQueries } from '@players/queries'
 import { useSession } from '@players/session'
 import { announcementPageSize, usePageParam } from './announcements'
@@ -29,6 +30,7 @@ const blank: AnnouncementDraft = { title: '', body: '', pinned: false }
 // those there are. Only the site's administrator sees it; the server decides.
 export function AnnouncementsAdminPage() {
   const { t } = useTranslation()
+  const { confirm } = useNotification()
   const session = useSession()
   const allowed = !!session.user?.siteAdmin
   const [page, turn] = usePageParam()
@@ -89,7 +91,12 @@ export function AnnouncementsAdminPage() {
     }
   }
   const remove = async (item: Announcement) => {
-    if (!window.confirm(t('announcements.confirmDelete', { title: item.title }))) return
+    const yes = await confirm({
+      message: t('announcements.confirmDelete', { title: item.title }),
+      confirmLabel: t('announcements.delete'),
+      destructive: true,
+    })
+    if (!yes) return
     const removed = await send(
       () =>
         api(

@@ -93,7 +93,7 @@ function ReviewNote({ review }: { review: Review }) {
 export function MyTitlesPage() {
   const { t } = useTranslation()
   const session = useSession()
-  const { notify } = useNotification()
+  const { notify, confirm } = useNotification()
   const source = useSource()
   const user = session.user
   const id = user?.id ?? ''
@@ -149,8 +149,13 @@ export function MyTitlesPage() {
     act(() =>
       api<Plate>(endpoints.nameplate, jsonRequest('PUT', { titleId, showDan }, session.csrfToken)),
     )
-  const remove = (title: Title) => {
-    if (!window.confirm(t('titles.confirmDelete', { name: title.name }))) return
+  const remove = async (title: Title) => {
+    const yes = await confirm({
+      message: t('titles.confirmDelete', { name: title.name }),
+      confirmLabel: t('titles.delete'),
+      destructive: true,
+    })
+    if (!yes) return
     void act(() => api(endpoints.myTitle(title.id), jsonRequest('DELETE', {}, session.csrfToken)))
   }
   const withdraw = (review: Review) =>
@@ -314,7 +319,7 @@ export function MyTitlesPage() {
                         size="sm"
                         variant="destructive"
                         disabled={busy}
-                        onClick={() => remove(title)}
+                        onClick={() => void remove(title)}
                       >
                         <TrashIcon aria-hidden="true" />
                         {t('titles.delete')}

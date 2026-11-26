@@ -33,6 +33,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Modal, Notice } from './notifications'
+import { useNotification } from './notification-context'
 import { TitleBand, profileTitlesPage, useProfileTitles } from './profile-titles'
 import { Textarea } from './components/ui/textarea'
 import { useSession } from './session'
@@ -329,6 +330,7 @@ function DanView({ id }: { id: string }) {
   const [actionError, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [deleted, setDeleted] = useState(false)
+  const { confirm } = useNotification()
   const { titles: profileTitles, rules: catalogRules } = useProfileTitles()
   const read = useQuery({ ...danQueries.detail(id), enabled: !deleted })
   const dan = read.data ?? null
@@ -577,8 +579,13 @@ function DanView({ id }: { id: string }) {
                   <Button
                     variant="outline"
                     disabled={busy}
-                    onClick={() => {
-                      if (!window.confirm(t('dans.confirmFix'))) return
+                    onClick={async () => {
+                      const yes = await confirm({
+                        title: t('dans.fix'),
+                        message: t('dans.confirmFix'),
+                        confirmLabel: t('dans.fix'),
+                      })
+                      if (!yes) return
                       void run(async () => {
                         const fixed = await api<Dan>(
                           endpoints.danFix(dan.id),
@@ -596,8 +603,13 @@ function DanView({ id }: { id: string }) {
                   <Button
                     variant="outline"
                     disabled={busy}
-                    onClick={() => {
-                      if (!window.confirm(t('dans.confirmUnfix'))) return
+                    onClick={async () => {
+                      const yes = await confirm({
+                        title: t('dans.unfix'),
+                        message: t('dans.confirmUnfix'),
+                        confirmLabel: t('dans.unfix'),
+                      })
+                      if (!yes) return
                       void run(async () => {
                         const unfixed = await api<Dan>(
                           endpoints.danFix(dan.id),
@@ -615,8 +627,13 @@ function DanView({ id }: { id: string }) {
                   <Button
                     variant="destructive"
                     disabled={busy}
-                    onClick={() => {
-                      if (!window.confirm(t('dans.confirmDelete'))) return
+                    onClick={async () => {
+                      const yes = await confirm({
+                        message: t('dans.confirmDelete'),
+                        confirmLabel: t('dans.delete'),
+                        destructive: true,
+                      })
+                      if (!yes) return
                       void run(async () => {
                         await api(endpoints.dan(dan.id), {
                           ...jsonRequest('DELETE', {}, session.csrfToken),
