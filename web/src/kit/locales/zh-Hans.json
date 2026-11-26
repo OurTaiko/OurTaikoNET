@@ -508,6 +508,7 @@
     "noComments": "还没有评论。",
     "loadMoreComments": "加载更多评论",
     "characterCount": "{{count}} / {{max}} 字",
+    "markdownHint": "支持 Markdown",
     "posting": "正在发送…",
     "editPlaceholder": "修改评论内容",
     "save": "保存",

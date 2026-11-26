@@ -510,6 +510,7 @@
     "noComments": "No comments yet.",
     "loadMoreComments": "Load more comments",
     "characterCount": "{{count}} / {{max}} characters",
+    "markdownHint": "Markdown is supported",
     "posting": "Posting…",
     "editPlaceholder": "Edit your comment",
     "save": "Save",

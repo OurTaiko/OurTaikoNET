@@ -508,6 +508,7 @@
     "noComments": "まだコメントはありません。",
     "loadMoreComments": "さらにコメントを読み込む",
     "characterCount": "{{count}} / {{max}} 文字",
+    "markdownHint": "Markdown が使えます",
     "posting": "送信中…",
     "editPlaceholder": "コメントを編集",
     "save": "保存",
