@@ -512,7 +512,15 @@
         "pop": "팝",
         "classic": "클래식",
         "variety": "버라이어티",
-        "anime": "애니메이션"
+        "anime": "애니메이션",
+        "touhou": "동방 PROJECT",
+        "gekichumai": "GEKICHUMAI",
+        "bemani": "BEMANI",
+        "project-sekai": "프로젝트 세카이",
+        "other-rhythm-games": "기타 리듬 게임",
+        "bms": "BMS",
+        "album": "앨범 수록곡",
+        "internet": "인터넷 / 밈"
       },
       "official": {
         "namco": "남코 오리지널",
@@ -579,14 +587,9 @@
     "return": "반려",
     "by": "{{name}} 처리"
   },
-  "tagAdmin": {
-    "heading": "태그 관리",
-    "intro": "플레이어가 제안한 태그로, 태그 관리자와 해당 소스의 관리자가 처리합니다. 채택하거나 거절하면 같은 곡의 같은 태그에 대한 제안(이후 제안 포함)이 모두 그 결과로 처리됩니다.",
-    "source": "소스",
-    "sources": {
-      "fanmade": "창작",
-      "official": "공식"
-    },
+  "songAdmin": {
+    "heading": "곡 관리",
+    "intro": "플레이어가 창작 채보에 제안한 카테고리로, 창작 소스 관리자가 처리합니다. 채택하거나 거절하면 같은 곡의 같은 카테고리에 대한 제안(이후 제안 포함)이 모두 그 결과로 처리됩니다. 채택하면 버라이어티에만 있던 곡은 버라이어티에서 빠집니다.",
     "status": "상태",
     "statuses": {
       "pending": "대기 중",
@@ -597,7 +600,7 @@
     "unknownChart": "(볼 수 없는 채보)",
     "suggestedBy_one": "{{count}}명이 제안",
     "suggestedBy_other": "{{count}}명이 제안",
-    "current": "현재 태그: {{tags}}",
+    "current": "현재 카테고리: {{categories}}",
     "since": "첫 제안 {{at}}",
     "decided": "{{by}}, {{at}} 처리",
     "earlier": "이전 결정",

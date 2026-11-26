@@ -512,7 +512,15 @@
         "pop": "流行",
         "classic": "古典",
         "variety": "综合",
-        "anime": "动画"
+        "anime": "动画",
+        "touhou": "东方 PROJECT",
+        "gekichumai": "击中萌",
+        "bemani": "BEMANI",
+        "project-sekai": "世界计划",
+        "other-rhythm-games": "其他音乐游戏",
+        "bms": "BMS",
+        "album": "专辑曲",
+        "internet": "网络 / 梗曲"
       },
       "official": {
         "namco": "南梦宫原创",
@@ -579,14 +587,9 @@
     "return": "退回",
     "by": "由 {{name}} 处理"
   },
-  "tagAdmin": {
-    "heading": "TAG 管理",
-    "intro": "玩家提交的标签建议，由标签管理员和该曲库的管理员处理。采纳或拒绝后，同一首歌同一个标签的其他建议（包括以后再提交的）都会按这个结果处理。",
-    "source": "曲库",
-    "sources": {
-      "fanmade": "自制",
-      "official": "官方"
-    },
+  "songAdmin": {
+    "heading": "乐曲管理",
+    "intro": "玩家为自制谱面提交的分类建议，由自制曲库的管理员处理。采纳或拒绝后，同一首歌同一个分类的其他建议（包括以后再提交的）都会按这个结果处理；采纳时，只在「综合」里的歌会移出「综合」。",
     "status": "状态",
     "statuses": {
       "pending": "待处理",
@@ -597,7 +600,7 @@
     "unknownChart": "（谱面已不可见）",
     "suggestedBy_one": "{{count}} 人建议",
     "suggestedBy_other": "{{count}} 人建议",
-    "current": "现有标签：{{tags}}",
+    "current": "现有分类：{{categories}}",
     "since": "最早建议于 {{at}}",
     "decided": "{{by}} 于 {{at}} 处理",
     "earlier": "先前的决定",

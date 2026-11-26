@@ -23,7 +23,15 @@
     "pop": "Pop",
     "classic": "Classical",
     "variety": "Variety",
-    "anime": "Anime"
+    "anime": "Anime",
+    "touhou": "Touhou Project",
+    "gekichumai": "GEKICHUMAI",
+    "bemani": "BEMANI",
+    "project-sekai": "Project Sekai",
+    "other-rhythm-games": "Other rhythm games",
+    "bms": "BMS",
+    "album": "Album",
+    "internet": "Internet"
   },
   "meta": {
     "siteDescription": "Fan-made Taiko charts on OurTaikoNET: preview and download charts uploaded by players, with leaderboards, playlists and dan courses."

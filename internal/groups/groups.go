@@ -29,13 +29,14 @@ const (
 	// its dan courses and playlists, and moderates its comments.
 	OfficialManager Set = 1 << iota
 	// FanmadeManager edits or removes any chart, dan course or playlist of the fanmade source,
-	// marks its dan courses official, and moderates its comments.
+	// marks its dan courses official, moderates its comments, and decides the categories players
+	// suggest for its charts.
 	FanmadeManager
 	// TitleManager keeps the title catalog and gives or takes titles by hand.
 	TitleManager
-	// TagManager sets the tags of any chart of either source and decides the tags players
-	// suggest.
-	TagManager
+	// Bit 8 was TAG_MANAGER for a day (0026_chart_tags); 0027_fanmade_categories took it from
+	// everyone. It is not to be given another meaning.
+	_
 )
 
 // Group describes one group for the manage panel.
@@ -47,9 +48,8 @@ type Group struct {
 
 var all = []Group{
 	{"OFFICIAL_MANAGER", OfficialManager, "Adds, replaces, edits and removes charts of the official source, keeps its dan courses and playlists, and moderates its comments."},
-	{"FANMADE_MANAGER", FanmadeManager, "Edits or removes any chart, dan course or playlist of the fanmade source, marks its dan courses official, and moderates its comments."},
+	{"FANMADE_MANAGER", FanmadeManager, "Edits or removes any chart, dan course or playlist of the fanmade source, marks its dan courses official, moderates its comments, and decides the categories players suggest for its charts."},
 	{"TITLE_MANAGER", TitleManager, "Keeps the title catalog and gives or takes titles by hand."},
-	{"TAG_MANAGER", TagManager, "Sets the tags of any chart of either source and accepts or rejects the tags players suggest (the managers of a source do both on theirs)."},
 }
 
 // All lists the groups in the order of their bits.

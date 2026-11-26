@@ -25,7 +25,7 @@ import (
 // these, and put them into the TJA headers they hand out. The BPM is the TJA's
 // and can be set only on a song registered without files.
 func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
-	_, c, ok := s.managed(w, r)
+	editor, c, ok := s.managed(w, r)
 	if !ok {
 		return
 	}
@@ -190,6 +190,11 @@ func (s *Server) editMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		problem(w, 404, "CHART_NOT_FOUND", "谱面不存在或已删除")
+		return
+	}
+	// Categories the chart is now in answer the suggestions of them.
+	if e = settleSuggestions(r.Context(), tx, c.ID, flags&^flagsBefore, editor.User.ID); e != nil {
+		internal(w, e)
 		return
 	}
 	// A changed block refreshes the chart's update_at by trigger.

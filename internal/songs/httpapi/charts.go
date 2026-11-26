@@ -55,10 +55,8 @@ type Chart struct {
 	Duration    float64   `json:"duration"`
 	DemoEnd     float64   `json:"demoEnd"`
 	CategoryIDs []string  `json:"categoryIds"`
-	// Tags are the chart's tags (net.tags), in the catalog's order.
-	Tags      []string `json:"tags"`
-	TJAName   string   `json:"tjaName"`
-	AudioName string   `json:"audioName"`
+	TJAName     string    `json:"tjaName"`
+	AudioName   string    `json:"audioName"`
 	// The stored file's hash: object key and download check, not the chart's identity (that is
 	// each block's chartHash). Not in the JSON; the resource manifest carries it as sha256.
 	TJAHash string `json:"-"`
@@ -162,8 +160,7 @@ const chartSelect = `SELECT c.id,c.number_id,c.nijiiro_id,c.official_id,c.owner_
  COALESCE((SELECT upvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT downvotes FROM chart_stats WHERE chart_id=c.id),0),COALESCE((SELECT comment_count FROM chart_stats WHERE chart_id=c.id),0),
  (SELECT count(*) FROM scores sc JOIN chart_difficulties d ON d.id=sc.difficulty_id WHERE d.chart_id=c.id),
  c.movie_offset,COALESCE(mf.sha256,''),COALESCE(mf.byte_size,0),COALESCE(mf.storage_key,''),
- COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,''),COALESCE(c.scene_preset,''),
- ARRAY(SELECT ct.tag_id FROM chart_tags ct JOIN tags g ON g.id=ct.tag_id WHERE ct.chart_id=c.id ORDER BY g.position)
+ COALESCE(bf.sha256,''),COALESCE(bf.byte_size,0),COALESCE(bf.storage_key,''),COALESCE(cf.storage_key,''),COALESCE(c.scene_preset,'')
  FROM charts c LEFT JOIN chart_resources tf ON tf.id=c.tja_file LEFT JOIN chart_resources af ON af.id=c.audio_file
  LEFT JOIN chart_resources cf ON cf.id=c.cover_file LEFT JOIN chart_resources pf ON pf.id=c.preview_file
  LEFT JOIN chart_resources mf ON mf.id=c.movie_file LEFT JOIN chart_resources bf ON bf.id=c.bgimage_file `
@@ -178,7 +175,7 @@ func (s *Server) readChart(row pgx.Row) (Chart, error) {
 		&c.TJAName, &c.AudioName, &c.TJAHash, &c.TJASize, &c.AudioHash, &c.AudioSize, &c.TJAKey, &c.AudioKey, &c.CoverHash, &c.PreviewPath,
 		&c.Title, &c.Subtitle, &c.BPM, &c.Offset, &c.DemoStart, &c.Wave, &c.TitleTranslations, &c.SubtitleTranslations, &difficulties,
 		&c.Upvotes, &c.Downvotes, &c.CommentCount, &c.PlayCount, &c.MovieOffset, &c.MovieHash, &c.MovieSize, &c.MovieKey,
-		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey, &c.ScenePreset, &c.Tags)
+		&c.BackgroundHash, &c.BackgroundSize, &c.BackgroundKey, &coverKey, &c.ScenePreset)
 	if e == nil {
 		c.SongCoverPath = s.filePath(coverKey)
 		c.OwnerID = c.OwnerIDs[0]
@@ -290,7 +287,7 @@ const (
 	maxChartPageSize     = 100
 )
 
-// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category, tag, a
+// search pages the chart list, pageSize charts at a time. Filters: keyword, owner, category, a
 // course and star level that must hold for the same block (any side), whether the chart has a
 // Nijiiro ID, and whether it has files. Every filter and order is there on both sources; which
 // of them a source's website offers is the website's business.
@@ -322,18 +319,6 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
 		var ok bool
 		if flag, ok = s.source().categoryFlag(id); !ok {
 			problem(w, 400, "QUERY_INVALID", "分类不存在")
-			return
-		}
-	}
-	tag := query.Get("tag")
-	if tag != "" {
-		known, e := tagExists(r.Context(), s.DB, tag)
-		if e != nil {
-			internal(w, e)
-			return
-		}
-		if !known {
-			problem(w, 400, "QUERY_INVALID", "标签不存在")
 			return
 		}
 	}
@@ -396,15 +381,14 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, owner string) {
  AND (($4='' AND $5::int=0) OR EXISTS(SELECT 1 FROM chart_difficulties d
    WHERE d.chart_id=c.id AND ($4='' OR d.course=$4) AND ($5::int=0 OR d.level=$5)))
  AND ($6='' OR (c.nijiiro_id IS NOT NULL)=($6='yes'))
- AND ($8='' OR (c.tja_file IS NOT NULL)=($8='yes'))
- AND ($9='' OR EXISTS(SELECT 1 FROM chart_tags ct WHERE ct.chart_id=c.id AND ct.tag_id=$9))`
-	args := []any{q, owner, int(flag), course, level, mapped, number, files, tag}
+ AND ($8='' OR (c.tja_file IS NOT NULL)=($8='yes'))`
+	args := []any{q, owner, int(flag), course, level, mapped, number, files}
 	var total int
 	if e := s.DB.QueryRow(r.Context(), `SELECT count(*) FROM charts c`+where, args...).Scan(&total); e != nil {
 		internal(w, e)
 		return
 	}
-	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $10 OFFSET $11`, append(args, pageSize, (page-1)*pageSize)...)
+	rows, e := s.DB.Query(r.Context(), chartSelect+where+ordering+` LIMIT $9 OFFSET $10`, append(args, pageSize, (page-1)*pageSize)...)
 	if e != nil {
 		internal(w, e)
 		return

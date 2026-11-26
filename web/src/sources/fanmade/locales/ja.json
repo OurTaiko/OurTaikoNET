@@ -23,7 +23,15 @@
     "pop": "ポップス",
     "classic": "クラシック",
     "variety": "バラエティ",
-    "anime": "アニメ"
+    "anime": "アニメ",
+    "touhou": "東方Project",
+    "gekichumai": "ゲキチュウマイ",
+    "bemani": "BEMANI",
+    "project-sekai": "プロジェクトセカイ",
+    "other-rhythm-games": "その他の音楽ゲーム",
+    "bms": "BMS",
+    "album": "アルバム曲",
+    "internet": "ネット・ミーム"
   },
   "meta": {
     "siteDescription": "OurTaikoNET の創作譜面：プレイヤーが投稿した太鼓の創作譜面を試聴・ダウンロードし、ランキング、プレイリスト、段位道場を見られます。"

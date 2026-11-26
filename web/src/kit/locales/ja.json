@@ -1021,7 +1021,7 @@
     "announcements": "お知らせ管理",
     "editor": "OurTaikoEdit",
     "myTitles": "マイ称号",
-    "tagAdmin": "タグ管理"
+    "songAdmin": "楽曲管理"
   },
   "chat": {
     "title": "メッセージ",
@@ -1107,22 +1107,14 @@
     "toMine": "マイ称号を見る",
     "readOnly": "称号センターは閲覧専用で、返信はできません。"
   },
-  "tags": {
-    "heading": "タグ",
-    "filter": "タグ",
-    "anyTag": "すべてのタグ",
-    "add": "タグを追加",
-    "manage": "タグ",
-    "editTitle": "タグを編集",
-    "suggestTitle": "タグを提案",
-    "editHint": "この曲のタグにチェックを入れます。保存するとすぐに反映されます。",
-    "suggestHint": "この曲に付けるべきタグがあれば提案してください。タグ管理者が確認します。",
-    "loading": "タグを読み込み中…",
-    "save": "保存",
-    "close": "閉じる",
+  "categorySuggestions": {
+    "open": "カテゴリを提案",
+    "title": "カテゴリを提案",
+    "hint": "この曲が入るべきカテゴリがあれば提案してください。ソースの管理者が確認します。",
     "suggest": "提案",
     "withdraw": "取り下げ",
-    "onChart": "付与済み",
+    "close": "閉じる",
+    "inCategory": "このカテゴリに含まれます",
     "pending": "確認待ち",
     "accepted": "採用",
     "rejected": "不採用"

@@ -21,6 +21,9 @@ type Source struct {
 	// CategoryIDsSorted is whether a chart lists its categories by ID rather than in the
 	// catalog's order.
 	CategoryIDsSorted bool
+	// CategorySuggestions is whether players suggest categories for the source's charts, which
+	// its managers accept or reject (category_suggestions.go).
+	CategorySuggestions bool
 	// PlaylistCategories files each system playlist under a category, by their IDs.
 	PlaylistCategories map[string]string
 	// GenreFrame is the game's bar_genre frame (0-12) for this source's own song-select folder.

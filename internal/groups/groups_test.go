@@ -9,8 +9,8 @@ import (
 
 func TestNamesAndBits(t *testing.T) {
 	// The numbers are in the database: a group's bit never changes.
-	if OfficialManager != 1 || FanmadeManager != 2 || TitleManager != 4 || TagManager != 8 {
-		t.Fatal("a group changed its bit", OfficialManager, FanmadeManager, TitleManager, TagManager)
+	if OfficialManager != 1 || FanmadeManager != 2 || TitleManager != 4 {
+		t.Fatal("a group changed its bit", OfficialManager, FanmadeManager, TitleManager)
 	}
 	set, err := Parse([]string{"TITLE_MANAGER", "OFFICIAL_MANAGER"})
 	if err != nil || set != 5 || !set.Has(OfficialManager) || set.Has(FanmadeManager) || set.Has(OfficialManager|FanmadeManager) {
@@ -22,7 +22,7 @@ func TestNamesAndBits(t *testing.T) {
 	if _, err = Parse([]string{"ADMIN"}); err == nil {
 		t.Fatal("a name that is no group was accepted")
 	}
-	if len(Set(0).Names()) != 0 || Known() != 15 {
+	if len(Set(0).Names()) != 0 || Known() != 7 {
 		t.Fatal(Set(0).Names(), Known())
 	}
 }
