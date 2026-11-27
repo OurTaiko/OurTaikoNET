@@ -840,3 +840,43 @@ func TestPartsAndPresetsAreListed(t *testing.T) {
 		t.Fatal("presets", len(player), len(ai), listed.Presets[0])
 	}
 }
+
+// A plate is drawn from one answer: its layouts, and where the pictures are of the plate itself
+// and of every part.
+func TestTheNameplateSetSaysWhatAPlateIsDrawnFrom(t *testing.T) {
+	pool := testDB(t)
+	c := &client{t: t, handler: New(pool, Config{Origin: origin}).Handler()}
+	var set struct {
+		Version int
+		Layout  struct {
+			States          map[string][]struct{ Role, Clip string }
+			Ranks           []string
+			Blank, Badges   []string
+			BandBackingClip string
+		}
+		Files map[string]string
+	}
+	c.json("GET", "/api/nameplate/set", "", 200, &set)
+	if set.Version != 1 || len(set.Layout.States) != 36 || len(set.Layout.Ranks) != 114 || len(set.Layout.Blank) != 3 ||
+		len(set.Layout.Badges) != 2 || set.Layout.BandBackingClip == "" || len(set.Layout.States["1p_shougou"]) == 0 {
+		t.Fatal("layout", set.Version, len(set.Layout.States), len(set.Layout.Ranks))
+	}
+	// The plate's six pictures, and the 150 parts.
+	if len(set.Files) != 156 {
+		t.Fatal("files", len(set.Files))
+	}
+	for _, id := range []string{"composition/plates", "composition/badges", "composition/blank", "composition/dan-clear", "composition/dan-full", "composition/dan-donfull",
+		"band/lumen-title-wood", "effect/lumen-title-gold", "icon/jojo-jonathan-portrait", "band/lumen-ai-title-wood"} {
+		if len(set.Files[id]) != 64 {
+			t.Fatal("no picture of", id)
+		}
+	}
+	// A part's picture is the one its row names: a new hash there is a new picture here.
+	if _, err := pool.Exec(context.Background(), `UPDATE net.title_items SET hash=repeat('c',64) WHERE type='band' AND name='lumen-title-wood'`); err != nil {
+		t.Fatal(err)
+	}
+	c.json("GET", "/api/nameplate/set", "", 200, &set)
+	if set.Files["band/lumen-title-wood"] != strings.Repeat("c", 64) {
+		t.Fatal("the set does not follow the part")
+	}
+}

@@ -12,14 +12,14 @@ import { cn } from '../lib/utils'
 import { loadNameplateArt } from '../nameplate-art-source'
 import {
   loadItem,
-  loadLumen,
+  loadSet,
   plateSpecs,
   plateState,
   rankPicture,
   textLift,
   titleSpecs,
   type LayerSpec,
-  type Lumen,
+  type NameplateSet,
   type PlateRow,
   type TitleLayers,
 } from '../nameplate-layers'
@@ -174,16 +174,16 @@ export function DanEmblem({
 
 // What the layered plate is drawn from (lib nameplate-layers): the catalog once, and each item's
 // file and picture once, whoever asks.
-let lumenLoaded: Lumen | null = null
-/** The layered nameplate set (nameplate/lumen.json), null until it is read. */
-export function useNameplateSet(): Lumen | null {
-  const [value, setValue] = useState(lumenLoaded)
+let setLoaded: NameplateSet | null = null
+/** The layered nameplate set (GET /api/v2/nameplate/set), null until it is read. */
+export function useNameplateSet(): NameplateSet | null {
+  const [value, setValue] = useState(setLoaded)
   useEffect(() => {
     if (value) return
     let current = true
-    loadLumen()
+    loadSet()
       .then((set) => {
-        lumenLoaded = set
+        setLoaded = set
         if (current) setValue(set)
       })
       .catch(() => {})
@@ -198,7 +198,7 @@ export function useNameplateSet(): Lumen | null {
  * The pictures of each part of `parts`, read together, so that the canvases drawing them start
  * at once; null until they are. One that cannot be read is left out.
  */
-function useLayers(set: Lumen | null, parts: LayerSpec[][]): DrawLayer[][] | null {
+function useLayers(set: NameplateSet | null, parts: LayerSpec[][]): DrawLayer[][] | null {
   const key = JSON.stringify(parts)
   const [layers, setLayers] = useState<{ key: string; layers: DrawLayer[][] } | null>(null)
   useEffect(() => {
@@ -353,7 +353,7 @@ export type NameplateArtProps = {
 export function NameplateArt({ name, title, dan, side = 1, className }: NameplateArtProps) {
   const set = useNameplateSet()
   const state = plateState(!!title, !!dan, side)
-  const rows = set?.catalog.states[state] ?? null
+  const rows = set?.layout.states[state] ?? null
   const look = title?.layers ?? null
   const specs = useMemo(() => {
     if (!set || !rows) return []
