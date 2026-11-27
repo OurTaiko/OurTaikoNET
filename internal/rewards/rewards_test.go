@@ -27,7 +27,7 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 		}
 	}
 	exec(`INSERT INTO net.users(id) VALUES ($1),($2)`, player, other)
-	exec(`INSERT INTO net.titles(id,name,style,visibility,band_item,effect_item,name_translations) VALUES ('hello','はじめまして','gold','public','band/lumen-title-gold','effect/lumen-title-gold','{"en":"Hello"}'),('gone','x','wood','public',DEFAULT,NULL,'{}')`)
+	exec(`INSERT INTO net.titles(id,name,style,visibility,band_id,effect_id,effect_overflow,name_translations) VALUES ('hello','はじめまして','gold','public',net.title_item_id('band','lumen-title-gold'),net.title_item_id('effect','lumen-title-gold'),true,'{"en":"Hello"}'),('gone','x','wood','public',DEFAULT,NULL,DEFAULT,'{}')`)
 	exec(`INSERT INTO net.awards(service,request_key,user_id,course_title) VALUES ('fanmade','attempt-1',$1,'十段')`, player)
 	// A title of a 段位 course, one an administrator gives and takes back before it was seen,
 	// and a badge that gets better, then not.
@@ -99,14 +99,17 @@ func TestRewardsAreToldByAHeaderAndFetched(t *testing.T) {
 			ID, Name, Style  string
 			Visibility       string
 			NameTranslations map[string]string
-			Layers           struct{ Band, Effect, Icon *string }
+			Layers           struct {
+				Band, Effect, Icon *string
+				EffectOverflow     bool
+			}
 		}
 		Service, CourseTitle string
 	}
 	json.Unmarshal(got.Rewards[0].Data, &title)
 	layers := title.Title.Layers
 	if got.Rewards[0].Kind != "title" || title.Title.ID != "hello" || title.Title.Style != "gold" || title.Title.NameTranslations["en"] != "Hello" || title.Service != "fanmade" || title.CourseTitle != "十段" ||
-		layers.Band == nil || *layers.Band != "band/lumen-title-gold" || layers.Effect == nil || *layers.Effect != "effect/lumen-title-gold" || layers.Icon != nil {
+		layers.Band == nil || *layers.Band != "band/lumen-title-gold" || layers.Effect == nil || *layers.Effect != "effect/lumen-title-gold" || layers.Icon != nil || !layers.EffectOverflow {
 		t.Fatal(string(got.Rewards[0].Data))
 	}
 	// A title is told as private or public by its visibility, and by nothing else.

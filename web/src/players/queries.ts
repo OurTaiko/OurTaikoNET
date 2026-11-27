@@ -27,6 +27,7 @@ import type {
   ReviewPage,
   RewardRule,
   RuleCategories,
+  TitleParts,
   VisitReport,
 } from '@players/api/types'
 import { sourceApi } from '@players/components/song-tile'
@@ -59,6 +60,7 @@ export const playerKeys = {
   don: (id: string, mine: boolean) => [...playerKeys.user(id), 'don', mine] as const,
   donItems: (mine: boolean) => [...playerKeys.all(), 'don-items', mine] as const,
   titles: () => [...playerKeys.all(), 'titles'] as const,
+  titleParts: () => [...playerKeys.all(), 'title-parts'] as const,
   myTitles: () => [...playerKeys.all(), 'my-titles'] as const,
   adminTitles: () => [...playerKeys.all(), 'admin-titles'] as const,
   reviews: (status: 'pending' | 'decided', page: number) =>
@@ -108,6 +110,13 @@ export const playerQueries = {
       placeholderData: keepPreviousData,
     })
   },
+  /** The parts and presets: they change only when a part is added, so one read lasts the visit. */
+  titleParts: () =>
+    queryOptions({
+      queryKey: playerKeys.titleParts(),
+      queryFn: ({ signal }) => api<TitleParts>(endpoints.titleParts, { signal }),
+      staleTime: Infinity,
+    }),
   heldTitles: (id: string) =>
     queryOptions({
       queryKey: playerKeys.heldTitles(id),

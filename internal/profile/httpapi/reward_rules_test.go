@@ -18,7 +18,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 	c := &client{t: t, handler: app.Handler()}
 	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"site_login"}`, 401, nil)
 	c.signIn()
-	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして",`+c.look("lumen-title-wood", "", "", false)+`}`, 200, nil)
 	c.json("POST", "/api/admin/titles/none/rules", `{"kind":"site_login"}`, 404, nil)
 
 	// A rule gives its title at once to those who meet it: the administrator is signed in.
@@ -102,7 +102,7 @@ func TestAdministratorsKeepTheRulesOfTitles(t *testing.T) {
 
 	// A private title, its maker's alone, takes no rules.
 	var own Title
-	c.json("POST", "/api/me/titles", `{"name":"わたしの","layers":{"band":"band/lumen-title-wood"}}`, 201, &own)
+	c.json("POST", "/api/me/titles", `{"name":"わたしの",`+c.look("lumen-title-wood", "", "", false)+`}`, 201, &own)
 	c.json("POST", "/api/admin/titles/"+own.ID+"/rules", `{"kind":"site_login"}`, 422, nil)
 
 	// Anyone reads the rules with the catalog.
@@ -152,7 +152,7 @@ func TestTheBuiltInAccountEarnsNoUploadTitles(t *testing.T) {
  SELECT repeat('c',32),ARRAY[$1::text],'Song',120,10,10,(SELECT id FROM fanmade.chart_resources WHERE extension='tja'),(SELECT id FROM fanmade.chart_resources WHERE extension='ogg'),1`, account.SystemUserID); err != nil {
 		t.Fatal(err)
 	}
-	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして",`+c.look("lumen-title-wood", "", "", false)+`}`, 200, nil)
 	var made struct{ Granted int }
 	c.json("POST", "/api/admin/titles/first/rules", `{"kind":"charts_uploaded","count":1}`, 201, &made)
 	if made.Granted != 0 {
@@ -168,7 +168,7 @@ func TestARuleNamesAFixedDanCourse(t *testing.T) {
 	app := New(pool, Config{Origin: origin, DevUserID: player, Sources: []Source{{ID: "fanmade"}, {ID: "official"}}})
 	c := &client{t: t, handler: app.Handler()}
 	c.signIn()
-	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/first", `{"name":"はじめまして",`+c.look("lumen-title-wood", "", "", false)+`}`, 200, nil)
 	var made struct {
 		Rule    rules.Listed
 		Granted int

@@ -35,11 +35,20 @@ type Review struct {
 	DecidedAt        *time.Time      `json:"decidedAt"`
 }
 
-const reviewColumns = `r.id,r.title_id,r.user_id,r.kind,r.name,r.name_translations,r.description,r.band_item,r.effect_item,r.icon_item,r.request,r.status,r.reply,r.created_at,r.decided_at`
+// reviewColumns are a request's columns, read from title_reviews r with its parts joined
+// (layerJoins).
+var reviewColumns = `r.id,r.title_id,r.user_id,r.kind,r.name,r.name_translations,r.description,` + layerColumns("r") + `,r.request,r.status,r.reply,r.created_at,r.decided_at`
 
 // into is where a row's reviewColumns go.
 func (v *Review) into(translations *[]byte) []any {
-	return []any{&v.ID, &v.TitleID, &v.UserID, &v.Kind, &v.Name, translations, &v.Description, &v.Layers.Band, &v.Layers.Effect, &v.Layers.Icon, &v.Request, &v.Status, &v.Reply, &v.CreatedAt, &v.DecidedAt}
+	into := append([]any{&v.ID, &v.TitleID, &v.UserID, &v.Kind, &v.Name, translations, &v.Description}, v.Layers.into()...)
+	return append(into, &v.Request, &v.Status, &v.Reply, &v.CreatedAt, &v.DecidedAt)
+}
+
+// requested reads the request a statement writes (INSERT or UPDATE of title_reviews, without
+// its RETURNING), with its parts.
+func requested(statement string) string {
+	return `WITH r AS (` + statement + ` RETURNING *) SELECT ` + reviewColumns + ` FROM r` + layerJoins("r")
 }
 
 func scanReview(row rowScanner, extra ...any) (Review, error) {
@@ -113,9 +122,12 @@ func (s *Server) requestReview(w http.ResponseWriter, r *http.Request) {
 	if t.Visibility == public {
 		var valid, looks bool
 		translations, valid = body.text()
-		layers, _, looks = body.look()
+		layers, looks = body.look()
 		if !valid || !looks {
 			problem(w, 422, "TITLE_INVALID", "称号信息无效")
+			return
+		}
+		if _, ok := s.wearable(w, r, tx, layers); !ok {
 			return
 		}
 		kind, name, description = "change", body.Name, body.Description
@@ -123,9 +135,9 @@ func (s *Server) requestReview(w http.ResponseWriter, r *http.Request) {
 		problem(w, 422, "REVIEW_INVALID", "私有称号按现在的样子提审；要改先修改称号")
 		return
 	}
-	review, err := scanReview(tx.QueryRow(ctx, `INSERT INTO title_reviews AS r(id,title_id,user_id,kind,name,name_translations,description,band_item,effect_item,icon_item,request)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING `+reviewColumns,
-		web.NewID(), t.ID, v.User.ID, kind, name, translations, description, layers.Band, layers.Effect, layers.Icon, request))
+	review, err := scanReview(tx.QueryRow(ctx, requested(`INSERT INTO title_reviews AS r(id,title_id,user_id,kind,name,name_translations,description,band_id,effect_id,icon_id,effect_overflow,request)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`),
+		web.NewID(), t.ID, v.User.ID, kind, name, translations, description, layers.IDs.Band, layers.IDs.Effect, layers.IDs.Icon, layers.EffectOverflow, request))
 	if err != nil {
 		internal(w, err)
 		return
@@ -208,7 +220,7 @@ func (s *Server) listReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := tx.Query(ctx, `SELECT `+titleColumns+`,`+reviewColumns+`,COALESCE(u.nickname,''),COALESCE(d.nickname,'')
- FROM title_reviews r JOIN titles t ON t.id=r.title_id LEFT JOIN users u ON u.id=r.user_id LEFT JOIN users d ON d.id=r.reviewer_id
+ FROM title_reviews r`+layerJoins("r")+` JOIN titles t ON t.id=r.title_id`+layerJoins("t")+` LEFT JOIN users u ON u.id=r.user_id LEFT JOIN users d ON d.id=r.reviewer_id
  WHERE `+filter+` ORDER BY `+order+` LIMIT $1 OFFSET $2`, reviewPageSize, (page-1)*reviewPageSize)
 	if err != nil {
 		internal(w, err)
@@ -264,7 +276,7 @@ func (s *Server) decideReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	review, err := scanReview(tx.QueryRow(ctx, `SELECT `+reviewColumns+` FROM title_reviews r WHERE r.id=$1 FOR UPDATE`, r.PathValue("id")))
+	review, err := scanReview(tx.QueryRow(ctx, `SELECT `+reviewColumns+` FROM title_reviews r`+layerJoins("r")+` WHERE r.id=$1 FOR UPDATE OF r`, r.PathValue("id")))
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		problem(w, 404, "REVIEW_NOT_FOUND", "没有这份申请")
@@ -280,14 +292,14 @@ func (s *Server) decideReview(w http.ResponseWriter, r *http.Request) {
 	status, kind := "returned", "review_returned"
 	if *body.Approve {
 		status, kind = "approved", "review_approved"
-		t, err = scanTitle(tx.QueryRow(ctx, `UPDATE titles t SET name=$2,name_translations=$3,description=$4,style=$5,band_item=$6,effect_item=$7,icon_item=$8,visibility='public',obtain=$9
- WHERE t.id=$1 RETURNING `+titleColumns, review.TitleID, review.Name, []byte(review.NameTranslations), review.Description,
-			legacyStyle(review.Layers.Band), review.Layers.Band, review.Layers.Effect, review.Layers.Icon, obtain))
+		t, err = scanTitle(tx.QueryRow(ctx, written(`UPDATE titles t SET name=$2,name_translations=$3,description=$4,style=$5,band_id=$6,effect_id=$7,icon_id=$8,effect_overflow=$9,visibility='public',obtain=$10
+ WHERE t.id=$1`), review.TitleID, review.Name, []byte(review.NameTranslations), review.Description,
+			legacyStyle(review.Layers.Band), review.Layers.IDs.Band, review.Layers.IDs.Effect, review.Layers.IDs.Icon, review.Layers.EffectOverflow, obtain))
 	} else {
-		t, err = scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+` FROM titles t WHERE t.id=$1`, review.TitleID))
+		t, err = scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+titlesFrom+` WHERE t.id=$1`, review.TitleID))
 	}
 	if err == nil {
-		review, err = scanReview(tx.QueryRow(ctx, `UPDATE title_reviews r SET status=$2,reviewer_id=$3,reply=$4,decided_at=now() WHERE r.id=$1 RETURNING `+reviewColumns,
+		review, err = scanReview(tx.QueryRow(ctx, requested(`UPDATE title_reviews r SET status=$2,reviewer_id=$3,reply=$4,decided_at=now() WHERE r.id=$1`),
 			review.ID, status, v.User.ID, reply))
 	}
 	if err == nil && review.UserID != v.User.ID {

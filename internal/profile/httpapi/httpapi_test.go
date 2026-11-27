@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -79,6 +80,33 @@ func (c *client) json(method, path, body string, status int, out any, header ...
 }
 
 // signIn opens a development session for the player.
+// part is the number GET /api/title/items gives the part of that type and name.
+func (c *client) part(kind, name string) int {
+	c.t.Helper()
+	var listed struct{ Items []TitleItem }
+	c.json("GET", "/api/title/items", "", 200, &listed)
+	for _, item := range listed.Items {
+		if item.Type == kind && item.Name == name {
+			return item.ID
+		}
+	}
+	c.t.Fatal("no part ", kind, "/", name)
+	return 0
+}
+
+// look is how a request picks a title's layers: the parts of these names by their numbers ("" for
+// no effect or icon).
+func (c *client) look(band, effect, icon string, overflow bool) string {
+	c.t.Helper()
+	number := func(kind, name string) string {
+		if name == "" {
+			return "null"
+		}
+		return strconv.Itoa(c.part(kind, name))
+	}
+	return fmt.Sprintf(`"layers":{"ids":{"band":%d,"effect":%s,"icon":%s},"effectOverflow":%t}`, c.part("band", band), number("effect", effect), number("icon", icon), overflow)
+}
+
 func (c *client) signIn() {
 	c.t.Helper()
 	w := c.do("GET", "/api/auth/sso/login?returnTo=/me", "", nil)
@@ -110,17 +138,17 @@ func TestAwardsTitlesAndNameplates(t *testing.T) {
 
 	// A title manager (the development user is one) makes the site's own titles: public, with no
 	// maker, and the words for how each is obtained.
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 401, nil)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ",`+c.look("lumen-title-gold", "lumen-title-gold", "", false)+`}`, 401, nil)
 	c.signIn()
 	var kidou Title
-	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 200, &kidou)
+	c.json("PUT", "/api/admin/titles/kidou", `{"name":"太鼓の達人","nameTranslations":{"en":"Taiko Master"},"obtain":" 十段に合格 ",`+c.look("lumen-title-gold", "lumen-title-gold", "", false)+`}`, 200, &kidou)
 	if kidou.Visibility != public || kidou.OwnerID != nil || kidou.Obtain != "十段に合格" {
 		t.Fatal("a manager's title", kidou)
 	}
-	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン","layers":{"band":"band/lumen-title-wood"}}`, 200, nil)
-	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/fan", `{"name":"ファン",`+c.look("lumen-title-wood", "", "", false)+`}`, 200, nil)
+	c.json("PUT", "/api/admin/titles/Bad", `{"name":"x",`+c.look("lumen-title-wood", "", "", false)+`}`, 422, nil)
 	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","layers":{"band":"gold"}}`, 422, nil)
-	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","obtain":"`+strings.Repeat("長", 501)+`","layers":{"band":"band/lumen-title-wood"}}`, 422, nil)
+	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","obtain":"`+strings.Repeat("長", 501)+`",`+c.look("lumen-title-wood", "", "", false)+`}`, 422, nil)
 	c.json("PUT", "/api/admin/titles/odd", `{"name":"x","style":"gold"}`, 400, nil)
 	var catalog struct{ Titles []ListedTitle }
 	c.json("GET", "/api/titles", "", 200, &catalog)
@@ -253,40 +281,65 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	ctx := context.Background()
 	app := New(pool, Config{Origin: origin, DevUserID: player})
 	c := &client{t: t, handler: app.Handler()}
-	c.json("POST", "/api/me/titles", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 401, nil)
+	c.json("POST", "/api/me/titles", `{"name":"x",`+c.look("lumen-title-wood", "", "", false)+`}`, 401, nil)
 	c.json("GET", "/api/me/titles", "", 401, nil)
 	c.signIn()
 
 	// Up to five private titles, looking any way their maker likes: each layer an item of its
 	// own slot. The old style alone is not a look.
 	for _, body := range []string{
-		`{"name":" ","layers":{"band":"band/lumen-title-wood"}}`,
+		`{"name":" ",` + c.look("lumen-title-wood", "", "", false) + `}`,
 		`{"name":"x"}`,
-		`{"name":"x","layers":{"band":"icon/lumen-title-crown_gold"}}`,
-		`{"name":"x","layers":{"band":"band/Lumen Title"}}`,
-		`{"name":"x","layers":{"band":"band/lumen-title-wood","icon":"band/lumen-title-wood"}}`,
-		`{"name":"x","layers":{"band":"band/lumen-title-wood","effect":"effect/../x"}}`,
+		// A part is picked by its number: its name picks nothing, and there is no look without a band.
+		`{"name":"x","layers":{"band":"band/lumen-title-wood"}}`,
+		`{"name":"x","layers":{"ids":{"effect":1}}}`,
+		`{"name":"x","layers":{"ids":{"band":0}}}`,
 	} {
 		c.json("POST", "/api/me/titles", body, 422, nil)
 	}
+	// A part has to be one there is, of the layer it is picked for, and one cut for a player's
+	// plate: the AI plate's bands have another shape.
+	wood, gold := c.part("band", "lumen-title-wood"), c.part("band", "lumen-title-gold")
+	for _, ids := range []string{
+		`{"band":999999}`,
+		fmt.Sprintf(`{"band":%d,"effect":%d}`, wood, gold),
+		fmt.Sprintf(`{"band":%d,"icon":999999}`, wood),
+		fmt.Sprintf(`{"band":%d}`, c.part("icon", "lumen-title-wec")),
+		fmt.Sprintf(`{"band":%d}`, c.part("band", "lumen-ai-title-gold")),
+		fmt.Sprintf(`{"band":%d,"effect":%d}`, gold, c.part("effect", "lumen-ai-title-gold")),
+	} {
+		body := `{"name":"x","layers":{"ids":` + ids + `}}`
+		var refused struct{ Code string }
+		c.json("POST", "/api/me/titles", body, 422, &refused)
+		if refused.Code != "TITLE_PART_UNKNOWN" {
+			t.Fatal("unknown part", body, refused)
+		}
+	}
 	c.json("POST", "/api/me/titles", `{"name":"x","style":"gold"}`, 400, nil)
 	made := []Title{}
-	for _, look := range []struct{ body, style, band, effect, icon string }{
-		{`"layers":{"band":"band/lumen-title-rainbow"}`, "rainbow", "band/lumen-title-rainbow", "", ""},
-		{`"layers":{"band":"band/lumen-title-toho_y22","effect":"effect/lumen-title-gold","icon":"icon/lumen-title-crown_gold"}`, "wood", "band/lumen-title-toho_y22", "effect/lumen-title-gold", "icon/lumen-title-crown_gold"},
-		{`"layers":{"band":"band/lumen-title-wood","icon":"icon/lumen-title-wec"}`, "wood", "band/lumen-title-wood", "", "icon/lumen-title-wec"},
-		{`"layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}`, "gold", "band/lumen-title-gold", "effect/lumen-title-gold", ""},
-		{`"layers":{"band":"band/lumen-title-purple","effect":"","icon":null}`, "purple", "band/lumen-title-purple", "", ""},
+	// Whether the effect overflows the band is its maker's to say, and means nothing without one.
+	for _, look := range []struct {
+		body, style, band, effect, icon string
+		overflow                        bool
+	}{
+		{`` + c.look("lumen-title-rainbow", "", "", true) + ``, "rainbow", "band/lumen-title-rainbow", "", "", false},
+		{`` + c.look("lumen-title-toho_y22", "lumen-title-gold", "lumen-title-crown_gold", true) + ``, "wood", "band/lumen-title-toho_y22", "effect/lumen-title-gold", "icon/lumen-title-crown_gold", true},
+		{`` + c.look("lumen-title-wood", "", "lumen-title-wec", false) + ``, "wood", "band/lumen-title-wood", "", "icon/lumen-title-wec", false},
+		{`` + c.look("lumen-title-gold", "lumen-title-gold", "", false) + ``, "gold", "band/lumen-title-gold", "effect/lumen-title-gold", "", false},
+		{`` + c.look("lumen-title-purple", "", "", false) + ``, "purple", "band/lumen-title-purple", "", "", false},
 	} {
 		var title Title
 		c.json("POST", "/api/me/titles", `{"name":"称号","nameTranslations":{"en":"Title"},`+look.body+`}`, 201, &title)
 		if title.Visibility != private || title.OwnerID == nil || *title.OwnerID != player || !account.ValidSubject(title.ID) ||
-			title.Style != look.style || title.Layers.Band != look.band || str(title.Layers.Effect) != look.effect || str(title.Layers.Icon) != look.icon {
+			title.Style != look.style || title.Layers.Band != look.band || str(title.Layers.Effect) != look.effect || str(title.Layers.Icon) != look.icon ||
+			title.Layers.EffectOverflow != look.overflow ||
+			title.Layers.IDs.Band != c.part("band", strings.TrimPrefix(look.band, "band/")) || (look.effect == "") != (title.Layers.IDs.Effect == nil) || (look.icon == "") != (title.Layers.IDs.Icon == nil) ||
+			len(title.Layers.Hashes.Band) != 64 || (look.effect == "") != (title.Layers.Hashes.Effect == nil) || (look.icon == "") != (title.Layers.Hashes.Icon == nil) {
 			t.Fatal("made", look.body, title)
 		}
 		made = append(made, title)
 	}
-	c.json("POST", "/api/me/titles", `{"name":"六","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	c.json("POST", "/api/me/titles", `{"name":"六",`+c.look("lumen-title-wood", "", "", false)+`}`, 409, nil)
 
 	// A private title is its maker's alone. They hold it from the start, which is no reward, and
 	// wear it; it is not in the catalog, and nobody else can be given it, by a course, a rule or
@@ -320,11 +373,11 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	}
 	c.json("POST", "/api/admin/grants", `{"userId":"`+other+`","titleId":"`+made[2].ID+`"}`, 422, nil)
 	c.json("POST", "/api/admin/titles/"+made[2].ID+"/rules", `{"kind":"site_login"}`, 422, nil)
-	c.json("PUT", "/api/admin/titles/"+made[2].ID, `{"name":"管理员改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	c.json("PUT", "/api/admin/titles/"+made[2].ID, `{"name":"管理员改",`+c.look("lumen-title-wood", "", "", false)+`}`, 409, nil)
 
 	// The maker changes their private title as they like; another player's is not theirs.
 	var changed Title
-	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明","layers":{"band":"band/lumen-title-purple","effect":"effect/lumen-title-purple"}}`, 200, &changed)
+	c.json("PUT", "/api/me/titles/"+made[0].ID, `{"name":"改名","description":"说明",`+c.look("lumen-title-purple", "lumen-title-purple", "", false)+`}`, 200, &changed)
 	if changed.Name != "改名" || changed.Style != "purple" || changed.Description != "说明" || string(changed.NameTranslations) != `{}` || str(changed.Layers.Effect) != "effect/lumen-title-purple" {
 		t.Fatal("changed", changed)
 	}
@@ -332,7 +385,7 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO titles(id,name,style,visibility,owner_id) VALUES('theirs','他人','wood','private',$1)`, other); err != nil {
 		t.Fatal(err)
 	}
-	c.json("PUT", "/api/me/titles/theirs", `{"name":"x","layers":{"band":"band/lumen-title-wood"}}`, 404, nil)
+	c.json("PUT", "/api/me/titles/theirs", `{"name":"x",`+c.look("lumen-title-wood", "", "", false)+`}`, 404, nil)
 	c.json("DELETE", "/api/me/titles/theirs", "", 404, nil)
 	c.json("POST", "/api/me/titles/theirs/reviews", `{"request":"x"}`, 404, nil)
 
@@ -343,8 +396,8 @@ func TestPlayersMakeTheirOwnTitles(t *testing.T) {
 	if plate.Title != nil {
 		t.Fatal("still worn", plate)
 	}
-	c.json("POST", "/api/me/titles", `{"name":"七","layers":{"band":"band/lumen-title-wood"}}`, 201, nil)
-	c.json("POST", "/api/me/titles", `{"name":"八","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	c.json("POST", "/api/me/titles", `{"name":"七",`+c.look("lumen-title-wood", "", "", false)+`}`, 201, nil)
+	c.json("POST", "/api/me/titles", `{"name":"八",`+c.look("lumen-title-wood", "", "", false)+`}`, 409, nil)
 }
 
 // reviewWorld is a site with user groups: boss, who signs in, is a title manager, and so is
@@ -421,10 +474,10 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	}
 
 	var title Title
-	maker.json("POST", "/api/me/titles", `{"name":"写谱人","nameTranslations":{"en":"Charter"},"description":"说明","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 201, &title)
+	maker.json("POST", "/api/me/titles", `{"name":"写谱人","nameTranslations":{"en":"Charter"},"description":"说明",`+maker.look("lumen-title-gold", "lumen-title-gold", "", false)+`}`, 201, &title)
 
 	// The maker asks for a review, saying how the title should be obtained. It goes as it is.
-	for _, body := range []string{`{}`, `{"request":"  "}`, `{"request":"` + strings.Repeat("长", 501) + `"}`, `{"request":"x","name":"另一个"}`, `{"request":"x","layers":{"band":"band/lumen-title-wood"}}`} {
+	for _, body := range []string{`{}`, `{"request":"  "}`, `{"request":"` + strings.Repeat("长", 501) + `"}`, `{"request":"x","name":"另一个"}`, `{"request":"x",` + maker.look("lumen-title-wood", "", "", false) + `}`} {
 		maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", body, 422, nil)
 	}
 	var asked Review
@@ -435,7 +488,7 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	}
 	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"再来"}`, 409, nil)
 	// While it waits the title stays as it was asked to be reviewed.
-	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改",`+maker.look("lumen-title-wood", "", "", false)+`}`, 409, nil)
 	var mine struct {
 		Titles []OwnTitle
 		Used   int
@@ -494,7 +547,7 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	if len(told2) != 1 || told2[0].Kind != "review_returned" || read(told2[0]).Review.Reply != "名字太泛了" {
 		t.Fatalf("the maker is told %+v", told2)
 	}
-	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"十谱达人","description":"说明","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, 200, nil)
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"十谱达人","description":"说明",`+maker.look("lumen-title-gold", "lumen-title-gold", "", false)+`}`, 200, nil)
 
 	// A request taken back is no longer in the queue.
 	var again Review
@@ -527,7 +580,7 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	if told3, _ := notices(maker); len(told3) != 2 || told3[0].Kind != "review_approved" || read(told3[0]).Title.Visibility != public {
 		t.Fatalf("told of the approval %+v", told3)
 	}
-	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改","layers":{"band":"band/lumen-title-wood"}}`, 409, nil)
+	maker.json("PUT", "/api/me/titles/"+title.ID, `{"name":"偷改",`+maker.look("lumen-title-wood", "", "", false)+`}`, 409, nil)
 	maker.json("DELETE", "/api/me/titles/"+title.ID, "", 403, nil)
 	boss.json("GET", "/api/admin/title-reviews?status=decided", "", 200, &queue)
 	if queue.Total != 3 || queue.Items[0].ID != again.ID || queue.Items[0].ReviewerName != "Boss" {
@@ -541,8 +594,8 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	// A change to a public title is asked for whole, and the title changes when it is approved.
 	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"换个样子"}`, 422, nil)
 	var change Review
-	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"换个样子","name":"百谱达人","nameTranslations":{"en":"Hundred"},"description":"新说明","layers":{"band":"band/lumen-title-rainbow","icon":"icon/lumen-title-crown_gold"}}`, 201, &change)
-	if change.Kind != "change" || change.Name != "百谱达人" {
+	maker.json("POST", "/api/me/titles/"+title.ID+"/reviews", `{"request":"换个样子","name":"百谱达人","nameTranslations":{"en":"Hundred"},"description":"新说明",`+maker.look("lumen-title-rainbow", "lumen-title-purple", "lumen-title-crown_gold", true)+`}`, 201, &change)
+	if change.Kind != "change" || change.Name != "百谱达人" || !change.Layers.EffectOverflow {
 		t.Fatalf("a change %+v", change)
 	}
 	maker.json("GET", "/api/titles", "", 200, &catalog)
@@ -554,7 +607,7 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 		t.Fatalf("a change against the title as it is %+v", queue)
 	}
 	boss.json("POST", "/api/admin/title-reviews/"+change.ID, `{"approve":true,"obtain":"在自制曲源上传 100 张谱面"}`, 200, &decided)
-	if decided.Title.Name != "百谱达人" || decided.Title.Style != "rainbow" || decided.Title.Layers.Band != "band/lumen-title-rainbow" || decided.Title.Layers.Effect != nil ||
+	if decided.Title.Name != "百谱达人" || decided.Title.Style != "rainbow" || decided.Title.Layers.Band != "band/lumen-title-rainbow" || str(decided.Title.Layers.Effect) != "effect/lumen-title-purple" || !decided.Title.Layers.EffectOverflow ||
 		str(decided.Title.Layers.Icon) != "icon/lumen-title-crown_gold" || decided.Title.Description != "新说明" || decided.Title.Obtain != "在自制曲源上传 100 张谱面" || string(decided.Title.NameTranslations) != `{"en":"Hundred"}` {
 		t.Fatalf("changed %+v", decided.Title)
 	}
@@ -562,12 +615,12 @@ func TestATitleBecomesPublicByReview(t *testing.T) {
 	// A manager changes a public title directly, sees every title, and removes one: its maker is
 	// told, and the players who held it hold it no more.
 	var direct Title
-	boss.json("PUT", "/api/admin/titles/"+title.ID, `{"name":"千谱达人","obtain":"活动发放","layers":{"band":"band/lumen-title-wood"}}`, 200, &direct)
+	boss.json("PUT", "/api/admin/titles/"+title.ID, `{"name":"千谱达人","obtain":"活动发放",`+boss.look("lumen-title-wood", "", "", false)+`}`, 200, &direct)
 	if direct.Name != "千谱达人" || direct.Visibility != public || direct.OwnerID == nil || *direct.OwnerID != player {
 		t.Fatal("a manager's change keeps the maker", direct)
 	}
 	var kept Title
-	maker.json("POST", "/api/me/titles", `{"name":"自用","layers":{"band":"band/lumen-title-wood"}}`, 201, &kept)
+	maker.json("POST", "/api/me/titles", `{"name":"自用",`+maker.look("lumen-title-wood", "", "", false)+`}`, 201, &kept)
 	var all struct{ Titles []ListedTitle }
 	maker.json("GET", "/api/admin/titles", "", 403, nil)
 	boss.json("GET", "/api/admin/titles", "", 200, &all)
@@ -719,4 +772,71 @@ func str(item *string) string {
 		return ""
 	}
 	return *item
+}
+
+// The parts titles are made of and the looks to start from are the site's own rows: what the
+// arcade's set had when they were first written, and what was made since.
+func TestPartsAndPresetsAreListed(t *testing.T) {
+	pool := testDB(t)
+	c := &client{t: t, handler: New(pool, Config{Origin: origin}).Handler()}
+	var listed struct {
+		Items   []TitleItem
+		Presets []TitlePreset
+	}
+	c.json("GET", "/api/title/items", "", 200, &listed)
+	parts, hashes := map[string]TitleItem{}, map[string]bool{}
+	count := map[string]int{}
+	for n, item := range listed.Items {
+		// Numbered in the order they were added.
+		if item.ID != n+1 || item.Name == "" || len(item.Hash) != 64 || string(item.NameTranslations) != `{}` {
+			t.Fatal("part", item)
+		}
+		parts[item.Type+"/"+item.Name], hashes[item.Hash] = item, true
+		count[item.Type+" "+item.Kind+" "+item.Source]++
+	}
+	if len(parts) != len(listed.Items) || len(hashes) != len(listed.Items) {
+		t.Fatal("parts repeat", len(listed.Items), len(parts), len(hashes))
+	}
+	for group, want := range map[string]int{"band player arcade": 43, "effect player arcade": 22, "icon player arcade": 69,
+		"band ai arcade": 8, "effect ai arcade": 5, "band player custom": 1, "effect player custom": 1, "icon player custom": 1} {
+		if count[group] != want {
+			t.Fatal(group, count[group], "of", want, count)
+		}
+	}
+	if first := listed.Items[0]; first.Type != "band" || first.Kind != "player" || first.Source != "arcade" {
+		t.Fatal("first part", first)
+	}
+	// A part stays what it is: its type and its name are what titles are made of it by.
+	for _, change := range []string{`type='icon'`, `name='other'`} {
+		if _, err := pool.Exec(context.Background(), `UPDATE net.title_items SET `+change+` WHERE id=1`); err == nil {
+			t.Fatal("a part changed its", change)
+		}
+	}
+	if _, err := pool.Exec(context.Background(), `UPDATE net.title_items SET hash=repeat('a',64),name_translations='{"en":"Wood"}',name=name WHERE id=1`); err != nil {
+		t.Fatal("a part's picture and translations change:", err)
+	}
+	// Every preset wears parts of its own kind, and the two kinds have the same names where the AI
+	// plate has its own cut. The arcade's first, then what was added.
+	kinds := map[string][]TitlePreset{}
+	for _, p := range listed.Presets {
+		kinds[p.Kind] = append(kinds[p.Kind], p)
+		for _, id := range []*string{&p.Layers.Band, p.Layers.Effect, p.Layers.Icon} {
+			if id != nil && parts[*id].Kind != p.Kind {
+				t.Fatal("preset", p, "wears", *id)
+			}
+		}
+		if p.Layers.Hashes.Band != parts[p.Layers.Band].Hash || (p.Layers.Effect != nil && str(p.Layers.Hashes.Effect) != parts[*p.Layers.Effect].Hash) {
+			t.Fatal("preset", p, "does not say where its parts are")
+		}
+		if p.Layers.EffectOverflow && p.Layers.Effect == nil {
+			t.Fatal("overflow without an effect", p)
+		}
+	}
+	player, ai := kinds["player"], kinds["ai"]
+	if len(player) != 89 || len(ai) != 8 || len(listed.Presets) != 97 || listed.Presets[0].Name != "wood" || listed.Presets[0].ID != 1 || listed.Presets[0].Kind != "player" ||
+		player[2].Name != "gold" || !player[2].Layers.EffectOverflow || str(player[2].Layers.Effect) != "effect/lumen-title-gold" ||
+		player[88].Name != "jojo_1" || player[88].ID != 89 || player[88].Layers.Band != "band/jojo-dio-mansion" || !player[88].Layers.EffectOverflow ||
+		ai[2].Name != "gold" || ai[2].Layers.Band != "band/lumen-ai-title-gold" || ai[7].Name != "ai_4" || ai[7].ID != 97 {
+		t.Fatal("presets", len(player), len(ai), listed.Presets[0])
+	}
 }

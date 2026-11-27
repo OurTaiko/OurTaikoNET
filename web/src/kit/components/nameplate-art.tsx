@@ -280,7 +280,7 @@ export function TitleBandArt({
   // The band under the title's name, its effect and icon over it.
   const specs = useMemo(() => {
     if (!set) return []
-    const title = titleSpecs(set.catalog, layers)
+    const title = titleSpecs(layers)
     return [title.band, title.icon ? [...title.effect, title.icon] : title.effect]
   }, [set, layers])
   const drawn = useLayers(set, specs)
@@ -358,7 +358,7 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
   const specs = useMemo(() => {
     if (!set || !rows) return []
     const rank = dan ? rankPicture(dan.index, dan.gold, dan.combo) : null
-    const { under, over } = plateSpecs(set.catalog, rows, look, side === 2 ? '2p' : '1p', rank)
+    const { under, over } = plateSpecs(rows, look, side === 2 ? '2p' : '1p', rank)
     return [under, over]
   }, [set, rows, look, side, dan])
   const drawn = useLayers(set, specs)

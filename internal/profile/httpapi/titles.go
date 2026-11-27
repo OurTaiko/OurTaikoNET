@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"ourtaiko.dev/net/internal/files"
@@ -40,12 +41,67 @@ type Title struct {
 const private, public = "private", "public"
 
 // Layers are the band, the effect over it and the icon on its end that a nameplate wears for a
-// title (OurTaikoPlay's NameplateLayers): items of the public nameplate catalog
-// (nameplate/lumen.json), "<slot>/<name>". A title has a band; Effect and Icon may be none.
+// title (OurTaikoPlay's NameplateLayers): parts the site keeps (title_items). A title has a band;
+// its effect and icon may be none. Each part is told three ways: IDs is its number, which is how
+// a request picks it; Band, Effect and Icon name it "<type>/<name>", for the games that find its
+// picture by that name; Hashes says where its picture is, nameplate/items/<hash>.otanim under
+// the distribution root. EffectOverflow is the maker's choice of drawing the effect over the
+// whole plate instead of cutting it to the band. Of a request only IDs and EffectOverflow are
+// read.
 type Layers struct {
+	Band           string      `json:"band"`
+	Effect         *string     `json:"effect"`
+	Icon           *string     `json:"icon"`
+	EffectOverflow bool        `json:"effectOverflow"`
+	IDs            LayerIDs    `json:"ids"`
+	Hashes         LayerHashes `json:"hashes"`
+}
+
+// LayerIDs are the layers' parts by number (title_items.id), none where there is no layer.
+type LayerIDs struct {
+	Band   int  `json:"band"`
+	Effect *int `json:"effect"`
+	Icon   *int `json:"icon"`
+}
+
+// LayerHashes are the SHA-256 of each layer's file (title_items.hash), none where there is no
+// layer.
+type LayerHashes struct {
 	Band   string  `json:"band"`
 	Effect *string `json:"effect"`
 	Icon   *string `json:"icon"`
+}
+
+// into is where a row's layerColumns go.
+func (l *Layers) into() []any {
+	return []any{&l.Band, &l.Effect, &l.Icon, &l.EffectOverflow, &l.IDs.Band, &l.IDs.Effect, &l.IDs.Icon, &l.Hashes.Band, &l.Hashes.Effect, &l.Hashes.Icon}
+}
+
+// layerColumns reads a row's layers as the API names them, and each part's hash. The row is
+// `alias` (t a title, r a request, p a preset) and its parts are joined by layerJoins.
+func layerColumns(alias string) string {
+	return fmt.Sprintf(`'band/'||%[1]sb.name,'effect/'||%[1]se.name,'icon/'||%[1]si.name,%[1]s.effect_overflow,%[1]s.band_id,%[1]s.effect_id,%[1]s.icon_id,%[1]sb.hash,%[1]se.hash,%[1]si.hash`, alias)
+}
+
+// layerJoins joins the parts of the row `alias` for layerColumns: its band, and its effect and
+// icon where it has them.
+func layerJoins(alias string) string {
+	return fmt.Sprintf(` JOIN title_items %[1]sb ON %[1]sb.id=%[1]s.band_id LEFT JOIN title_items %[1]se ON %[1]se.id=%[1]s.effect_id LEFT JOIN title_items %[1]si ON %[1]si.id=%[1]s.icon_id`, alias)
+}
+
+// wearable is whether every part picked is one a title may be made of: a part there is, of the
+// layer it is picked for, cut for a player's plate (the AI plate's have another shape); and the
+// style older games draw for the band.
+func wearable(ctx context.Context, db queryer, ids LayerIDs) (style string, known bool, err error) {
+	var band *string
+	var effect, icon bool
+	err = db.QueryRow(ctx, `SELECT (SELECT name FROM title_items WHERE id=$1 AND type='band' AND kind='player'),
+ $2::int IS NULL OR EXISTS(SELECT 1 FROM title_items WHERE id=$2 AND type='effect' AND kind='player'),
+ $3::int IS NULL OR EXISTS(SELECT 1 FROM title_items WHERE id=$3 AND type='icon' AND kind='player')`, ids.Band, ids.Effect, ids.Icon).Scan(&band, &effect, &icon)
+	if err != nil || band == nil || !effect || !icon {
+		return "", false, err
+	}
+	return legacyStyle("band/" + *band), true, nil
 }
 
 // DanBadge is a player's best result of one 段位 (五級 6 .. 24 達人; 0–5 are not offered). The
@@ -81,15 +137,6 @@ type Nameplate struct {
 
 var titleID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
-// An item of the nameplate catalog, as the database allows it in each slot.
-var layerItem = map[string]*regexp.Regexp{}
-
-func init() {
-	for _, slot := range []string{"band", "effect", "icon"} {
-		layerItem[slot] = regexp.MustCompile(`^` + slot + `/[a-z0-9][a-z0-9_.-]{0,63}$`)
-	}
-}
-
 // legacyStyle is the band of the six that game versions released before the layers know (wood,
 // teal, wood2, purple, gold, rainbow) nearest a title's own: what such a game draws for it.
 func legacyStyle(band string) string {
@@ -105,14 +152,24 @@ func legacyStyle(band string) string {
 // public no longer takes a place.
 const playerTitleLimit = 5
 
-const titleColumns = `t.id,t.name,t.name_translations,t.description,t.obtain,t.style,t.band_item,t.effect_item,t.icon_item,t.visibility,t.owner_id`
+// titleColumns are a title's columns, read from titlesFrom (or titles t and its parts joined
+// another way).
+var titleColumns = `t.id,t.name,t.name_translations,t.description,t.obtain,t.style,` + layerColumns("t") + `,t.visibility,t.owner_id`
+var titlesFrom = ` FROM titles t` + layerJoins("t")
+
+// written reads the title a statement writes (INSERT, UPDATE or DELETE of titles, without its
+// RETURNING), with its parts.
+func written(statement string) string {
+	return `WITH t AS (` + statement + ` RETURNING *) SELECT ` + titleColumns + ` FROM t` + layerJoins("t")
+}
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanTitle(row rowScanner, extra ...any) (Title, error) {
 	var t Title
 	var translations []byte
-	err := row.Scan(append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Obtain, &t.Style, &t.Layers.Band, &t.Layers.Effect, &t.Layers.Icon, &t.Visibility, &t.OwnerID}, extra...)...)
+	into := append([]any{&t.ID, &t.Name, &translations, &t.Description, &t.Obtain, &t.Style}, t.Layers.into()...)
+	err := row.Scan(append(append(into, &t.Visibility, &t.OwnerID), extra...)...)
 	t.NameTranslations = translations
 	return t, err
 }
@@ -151,7 +208,7 @@ func (s *Server) nameplate(ctx context.Context, db queryer, id string) (Nameplat
 		return plate, err
 	}
 	if titleID != nil {
-		t, err := scanTitle(db.QueryRow(ctx, `SELECT `+titleColumns+` FROM titles t JOIN user_titles u ON u.title_id=t.id AND u.user_id=$2 WHERE t.id=$1`, *titleID, id))
+		t, err := scanTitle(db.QueryRow(ctx, `SELECT `+titleColumns+titlesFrom+` JOIN user_titles u ON u.title_id=t.id AND u.user_id=$2 WHERE t.id=$1`, *titleID, id))
 		if err == nil {
 			plate.Title = &t
 		} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -268,9 +325,8 @@ type ListedTitle struct {
 	Pending   bool   `json:"pending"`
 }
 
-const listedTitles = `SELECT ` + titleColumns + `,(SELECT count(*) FROM user_titles u WHERE u.title_id=t.id),COALESCE(o.nickname,''),
- EXISTS(SELECT 1 FROM title_reviews r WHERE r.title_id=t.id AND r.status='pending')
- FROM titles t LEFT JOIN users o ON o.id=t.owner_id`
+var listedTitles = `SELECT ` + titleColumns + `,(SELECT count(*) FROM user_titles u WHERE u.title_id=t.id),COALESCE(o.nickname,''),
+ EXISTS(SELECT 1 FROM title_reviews r WHERE r.title_id=t.id AND r.status='pending')` + titlesFrom + ` LEFT JOIN users o ON o.id=t.owner_id`
 
 // listTitles reads the titles query gives (listedTitles and what follows it).
 func listTitles(ctx context.Context, db queryer, query string, args ...any) ([]ListedTitle, error) {
@@ -338,7 +394,7 @@ func (s *Server) userTitles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.DB.Query(r.Context(), `SELECT `+titleColumns+`,u.granted_at,COALESCE(a.service,''),COALESCE(a.course_title,'')
- FROM user_titles u JOIN titles t ON t.id=u.title_id LEFT JOIN awards a ON a.id=u.award_id
+ FROM user_titles u JOIN titles t ON t.id=u.title_id`+layerJoins("t")+` LEFT JOIN awards a ON a.id=u.award_id
  WHERE u.user_id=$1 ORDER BY u.granted_at DESC,t.id`, id)
 	if err != nil {
 		internal(w, err)
@@ -475,29 +531,28 @@ type titleBody struct {
 	Layers           *Layers           `json:"layers"`
 }
 
-// look checks the layers and gives them with the style older games draw.
-func (b *titleBody) look() (Layers, string, bool) {
-	if b.Layers == nil {
-		return Layers{}, "", false
+// look gives the parts a request picks and whether it says which: a band at least. Whether there
+// are such parts is wearable's to say. Without an effect nothing overflows.
+func (b *titleBody) look() (Layers, bool) {
+	if b.Layers == nil || b.Layers.IDs.Band <= 0 {
+		return Layers{}, false
 	}
-	l := *b.Layers
-	for slot, item := range map[string]*string{"effect": l.Effect, "icon": l.Icon} {
-		if item != nil && *item == "" {
-			item = nil
-		}
-		if slot == "effect" {
-			l.Effect = item
-		} else {
-			l.Icon = item
-		}
-		if item != nil && !layerItem[slot].MatchString(*item) {
-			return Layers{}, "", false
-		}
+	ids := b.Layers.IDs
+	return Layers{IDs: ids, EffectOverflow: b.Layers.EffectOverflow && ids.Effect != nil}, true
+}
+
+// wearable answers for parts no title may be made of (TITLE_PART_UNKNOWN); else it gives the
+// style older games draw for them.
+func (s *Server) wearable(w http.ResponseWriter, r *http.Request, db queryer, l Layers) (string, bool) {
+	style, known, err := wearable(r.Context(), db, l.IDs)
+	if err != nil {
+		internal(w, err)
+		return "", false
 	}
-	if !layerItem["band"].MatchString(l.Band) {
-		return Layers{}, "", false
+	if !known {
+		problem(w, 422, "TITLE_PART_UNKNOWN", "称号的组件不存在")
 	}
-	return l, legacyStyle(l.Band), true
+	return style, known
 }
 
 // text checks the name, its translations and the description, and gives the translations as
@@ -544,16 +599,20 @@ func (s *Server) saveTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	translations, valid := body.text()
-	layers, style, looks := body.look()
+	layers, looks := body.look()
 	obtain, fits := note(body.Obtain)
 	if !valid || !looks || !fits || !titleID.MatchString(id) {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
 		return
 	}
-	t, err := scanTitle(s.DB.QueryRow(r.Context(), `INSERT INTO titles AS t(id,name,name_translations,description,obtain,style,band_item,effect_item,icon_item,visibility) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'public')
+	style, ok := s.wearable(w, r, s.DB, layers)
+	if !ok {
+		return
+	}
+	t, err := scanTitle(s.DB.QueryRow(r.Context(), written(`INSERT INTO titles AS t(id,name,name_translations,description,obtain,style,band_id,effect_id,icon_id,effect_overflow,visibility) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'public')
  ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_translations=EXCLUDED.name_translations,description=EXCLUDED.description,obtain=EXCLUDED.obtain,
- style=EXCLUDED.style,band_item=EXCLUDED.band_item,effect_item=EXCLUDED.effect_item,icon_item=EXCLUDED.icon_item
- WHERE t.visibility='public' RETURNING `+titleColumns, id, body.Name, translations, body.Description, obtain, style, layers.Band, layers.Effect, layers.Icon))
+ style=EXCLUDED.style,band_id=EXCLUDED.band_id,effect_id=EXCLUDED.effect_id,icon_id=EXCLUDED.icon_id,effect_overflow=EXCLUDED.effect_overflow
+ WHERE t.visibility='public'`), id, body.Name, translations, body.Description, obtain, style, layers.IDs.Band, layers.IDs.Effect, layers.IDs.Icon, layers.EffectOverflow))
 	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 409, "TITLE_PRIVATE", "私有称号只有它的创建者可以修改")
 		return
@@ -580,7 +639,7 @@ func (s *Server) deleteTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
-	t, err := scanTitle(tx.QueryRow(ctx, `DELETE FROM titles t WHERE t.id=$1 RETURNING `+titleColumns, r.PathValue("id")))
+	t, err := scanTitle(tx.QueryRow(ctx, written(`DELETE FROM titles t WHERE t.id=$1`), r.PathValue("id")))
 	if errors.Is(err, pgx.ErrNoRows) {
 		problem(w, 404, "TITLE_NOT_FOUND", "称号不存在")
 		return
@@ -610,9 +669,13 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	translations, valid := body.text()
-	layers, style, looks := body.look()
+	layers, looks := body.look()
 	if !valid || !looks {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
+		return
+	}
+	style, ok := s.wearable(w, r, s.DB, layers)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
@@ -636,8 +699,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 		problem(w, 409, "TITLE_LIMIT_REACHED", "每人最多 5 个私有称号")
 		return
 	}
-	t, err := scanTitle(tx.QueryRow(ctx, `INSERT INTO titles AS t(id,name,name_translations,description,style,band_item,effect_item,icon_item,visibility,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'private',$9)
- RETURNING `+titleColumns, web.NewID(), body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon, v.User.ID))
+	t, err := scanTitle(tx.QueryRow(ctx, written(`INSERT INTO titles AS t(id,name,name_translations,description,style,band_id,effect_id,icon_id,effect_overflow,visibility,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'private',$10)`), web.NewID(), body.Name, translations, body.Description, style, layers.IDs.Band, layers.IDs.Effect, layers.IDs.Icon, layers.EffectOverflow, v.User.ID))
 	if err == nil {
 		_, err = tx.Exec(ctx, `INSERT INTO user_titles(user_id,title_id) VALUES($1,$2)`, v.User.ID, t.ID)
 	}
@@ -655,7 +717,7 @@ func (s *Server) createOwnTitle(w http.ResponseWriter, r *http.Request) {
 // a change and a request for its review take turns. pending is whether a review of it is pending.
 // pgx.ErrNoRows: the player made no such title.
 func lockOwnTitle(ctx context.Context, tx pgx.Tx, id, maker string) (t Title, pending bool, err error) {
-	if t, err = scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+` FROM titles t WHERE t.id=$1 AND t.owner_id=$2 FOR UPDATE`, id, maker)); err != nil {
+	if t, err = scanTitle(tx.QueryRow(ctx, `SELECT `+titleColumns+titlesFrom+` WHERE t.id=$1 AND t.owner_id=$2 FOR UPDATE OF t`, id, maker)); err != nil {
 		return t, false, err
 	}
 	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM title_reviews WHERE title_id=$1 AND status='pending')`, id).Scan(&pending)
@@ -697,13 +759,17 @@ func (s *Server) saveOwnTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	translations, valid := body.text()
-	layers, style, looks := body.look()
+	layers, looks := body.look()
 	if !valid || !looks {
 		problem(w, 422, "TITLE_INVALID", "称号信息无效")
 		return
 	}
-	t, err = scanTitle(tx.QueryRow(ctx, `UPDATE titles t SET name=$2,name_translations=$3,description=$4,style=$5,band_item=$6,effect_item=$7,icon_item=$8 WHERE t.id=$1 RETURNING `+titleColumns,
-		t.ID, body.Name, translations, body.Description, style, layers.Band, layers.Effect, layers.Icon))
+	style, ok := s.wearable(w, r, tx, layers)
+	if !ok {
+		return
+	}
+	t, err = scanTitle(tx.QueryRow(ctx, written(`UPDATE titles t SET name=$2,name_translations=$3,description=$4,style=$5,band_id=$6,effect_id=$7,icon_id=$8,effect_overflow=$9 WHERE t.id=$1`),
+		t.ID, body.Name, translations, body.Description, style, layers.IDs.Band, layers.IDs.Effect, layers.IDs.Icon, layers.EffectOverflow))
 	if err == nil {
 		err = tx.Commit(ctx)
 	}
@@ -767,7 +833,7 @@ func (s *Server) myTitles(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (r.title_id) `+reviewColumns+` FROM title_reviews r WHERE r.user_id=$1 ORDER BY r.title_id,r.created_at DESC,r.id`, v.User.ID)
+	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (r.title_id) `+reviewColumns+` FROM title_reviews r`+layerJoins("r")+` WHERE r.user_id=$1 ORDER BY r.title_id,r.created_at DESC,r.id`, v.User.ID)
 	if err != nil {
 		internal(w, err)
 		return

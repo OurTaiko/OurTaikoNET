@@ -264,7 +264,8 @@
       "none": "なし",
       "loading": "ネームプレートの素材を読み込み中…",
       "unavailable": "ネームプレートの素材を読み込めません。",
-      "inTitles": "{{titles}} で使用"
+      "inTitles": "{{titles}} で使用",
+      "overflow": "エフェクトを帯の外まで描く"
     },
     "newTitle": "称号を新規作成",
     "tabs": {
