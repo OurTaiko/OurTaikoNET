@@ -8,7 +8,13 @@ const title: Title = {
   nameTranslations: { en: 'Ten-Chart Master', ko: '' },
   description: '说明',
   style: 'gold',
-  layers: { band: 'band/lumen-title-gold', effect: 'effect/lumen-title-gold', icon: null },
+  layers: {
+    band: 'band/lumen-title-gold',
+    effect: 'effect/lumen-title-gold',
+    icon: null,
+    effectOverflow: true,
+    ids: { band: 3, effect: 45, icon: null },
+  },
   visibility: 'public',
   obtain: '上传 10 张谱面',
   ownerId: 'a'.repeat(32),
@@ -21,7 +27,8 @@ describe('a title as a form keeps it', () => {
       // A language without a name is left out, as the server keeps it.
       nameTranslations: { en: 'Ten-Chart Master' },
       description: '说明',
-      layers: title.layers,
+      // Its parts by number, and whether the effect overflows: the rest is the server's.
+      layers: { ids: { band: 3, effect: 45, icon: null }, effectOverflow: true },
     })
   })
 
@@ -37,7 +44,7 @@ describe('a title as a form keeps it', () => {
       name: '—',
       visibility: 'private',
       ownerId: null,
-      layers: { band: 'band/lumen-title-wood', effect: null, icon: null },
+      layers: { band: 'band/lumen-title-wood', effect: null, icon: null, effectOverflow: false },
     })
     // A change to a title keeps what the form does not write.
     expect(draftTitle({ ...draftOf(title), name: '百谱达人' }, title)).toMatchObject({

@@ -264,7 +264,8 @@
       "none": "None",
       "loading": "Reading the nameplate parts…",
       "unavailable": "The nameplate parts cannot be read right now.",
-      "inTitles": "Used in {{titles}}"
+      "inTitles": "Used in {{titles}}",
+      "overflow": "Effect runs outside the band"
     },
     "newTitle": "New title",
     "tabs": {

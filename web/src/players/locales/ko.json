@@ -264,7 +264,8 @@
       "none": "없음",
       "loading": "이름표 소재를 읽는 중…",
       "unavailable": "이름표 소재를 지금 읽을 수 없습니다.",
-      "inTitles": "{{titles}}에 사용"
+      "inTitles": "{{titles}}에 사용",
+      "overflow": "효과를 띠 밖까지 그리기"
     },
     "newTitle": "새 칭호",
     "tabs": {

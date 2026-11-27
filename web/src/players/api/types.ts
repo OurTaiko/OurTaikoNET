@@ -47,6 +47,29 @@ export type Title = {
   // The player who made it; null for the titles the title managers make themselves.
   ownerId: string | null
 }
+/**
+ * A part titles are made of: a band, an effect over it or an icon on its end. `id` is its number;
+ * a title's layers name it `<type>/<name>`, which never change. A title is made only of the
+ * player's parts; the AI plate's are cut for another shape. Its picture is
+ * `nameplate/items/<hash>.otanim`.
+ */
+export type TitlePart = {
+  id: number
+  type: 'band' | 'effect' | 'icon'
+  name: string
+  kind: 'player' | 'ai'
+  source: 'arcade' | 'custom'
+  nameTranslations: Record<string, string>
+  hash: string
+}
+/** A look a title's maker starts from, under its name; `kind` as a part's. */
+export type TitlePreset = {
+  id: number
+  name: string
+  kind: 'player' | 'ai'
+  layers: TitleLayers
+}
+export type TitleParts = { items: TitlePart[]; presets: TitlePreset[] }
 /** A title in a list: with how many hold it, its maker's nickname and whether a review waits. */
 export type ListedTitle = Title & { holders: number; ownerName: string; pending: boolean }
 /**

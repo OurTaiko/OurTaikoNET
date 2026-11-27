@@ -49,7 +49,8 @@ export function draftBody(draft: TitleDraft) {
       languages.filter((l) => draft[l].trim()).map((l) => [l, draft[l].trim()]),
     ),
     description: draft.description,
-    layers: draft.layers,
+    // The parts are picked by number; the rest of a look is the server's to say.
+    layers: { ids: draft.layers.ids, effectOverflow: draft.layers.effectOverflow },
   }
 }
 
@@ -62,6 +63,7 @@ export function draftTitle(draft: TitleDraft, from?: Title): Title {
     obtain: from?.obtain ?? '',
     ownerId: from?.ownerId ?? null,
     ...draftBody(draft),
+    layers: draft.layers,
     name: draft.name.trim() || '—',
   }
 }

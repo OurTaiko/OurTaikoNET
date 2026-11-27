@@ -264,7 +264,8 @@
       "none": "无",
       "loading": "正在读取名牌素材…",
       "unavailable": "名牌素材暂时读不到。",
-      "inTitles": "用于 {{titles}}"
+      "inTitles": "用于 {{titles}}",
+      "overflow": "特效溢出底条"
     },
     "newTitle": "新建称号",
     "tabs": {

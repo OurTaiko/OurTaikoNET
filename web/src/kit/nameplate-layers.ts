@@ -12,7 +12,19 @@ export type Slot = 'band' | 'effect' | 'icon'
 export const slots: Slot[] = ['band', 'effect', 'icon']
 
 /** How a title looks: items of the set, "<slot>/<name>"; a title has a band, the rest may be none. */
-export type TitleLayers = { band: string; effect: string | null; icon: string | null }
+export type TitleLayers = {
+  band: string
+  effect: string | null
+  icon: string | null
+  // Its maker's choice of drawing the effect over the whole plate instead of cutting it to the
+  // band. False without an effect.
+  effectOverflow: boolean
+  // The parts by their numbers (GET /api/v1/title/items), which is how a request picks them.
+  // Absent on a look the server did not give: a new title's before its parts are read, a reward
+  // from before the parts had numbers.
+  ids?: LayerIds
+}
+export type LayerIds = { band: number; effect: number | null; icon: number | null }
 
 /** One thing a layout draws, in order: a picture (role) or a text box (text_title, text_name). */
 export type PlateRow = {
@@ -26,12 +38,10 @@ export type PlateRow = {
   stroke?: number
 }
 
+// What the site reads of the set's catalog: the plate's layouts. Which parts and presets there
+// are is the site's own to say (GET /api/v1/title/items).
 export type LumenCatalog = {
   states: Record<string, PlateRow[]>
-  titles: Record<string, TitleLayers>
-  aiTitles: Record<string, TitleLayers>
-  // Effects that run outside the band; every other effect is cut to the band's shape.
-  unclipped: string[]
 }
 
 export type Lumen = { catalog: LumenCatalog; files: Record<string, ResourceFile> }
@@ -40,25 +50,6 @@ const itemId = /^(band|effect|icon|composition)\/[a-z0-9][a-z0-9_.-]{0,63}$/
 const filePath =
   /^lumen\/(band|effect|icon|composition)\/[a-z0-9][a-z0-9_.-]{0,63}-[a-f0-9]{12}\.otanim$/
 
-function readTitles(value: unknown): Record<string, TitleLayers> {
-  if (!value || typeof value !== 'object') throw new Error('NAMEPLATE_LAYERS_INVALID')
-  const titles: Record<string, TitleLayers> = {}
-  for (const [label, parts] of Object.entries(value as Record<string, Record<string, unknown>>)) {
-    const band = parts?.band
-    if (typeof band !== 'string' || !band.startsWith('band/'))
-      throw new Error('NAMEPLATE_LAYERS_INVALID')
-    const optional = (slot: Slot) => {
-      const item = parts[slot]
-      if (item === undefined || item === null) return null
-      if (typeof item !== 'string' || !item.startsWith(slot + '/'))
-        throw new Error('NAMEPLATE_LAYERS_INVALID')
-      return item
-    }
-    titles[label] = { band, effect: optional('effect'), icon: optional('icon') }
-  }
-  return titles
-}
-
 /** Checks lumen.json and gives every file its addresses from the visitor's root. */
 export async function readLumen(value: unknown): Promise<Lumen> {
   const data = value as { version?: number; catalog?: Record<string, unknown>; files?: unknown }
@@ -66,12 +57,7 @@ export async function readLumen(value: unknown): Promise<Lumen> {
     throw new Error('NAMEPLATE_LAYERS_INVALID')
   const states = data.catalog.states
   if (!states || typeof states !== 'object') throw new Error('NAMEPLATE_LAYERS_INVALID')
-  const catalog: LumenCatalog = {
-    states: states as Record<string, PlateRow[]>,
-    titles: readTitles(data.catalog.titles),
-    aiTitles: readTitles(data.catalog.aiTitles),
-    unclipped: Array.isArray(data.catalog.unclipped) ? (data.catalog.unclipped as string[]) : [],
-  }
+  const catalog: LumenCatalog = { states: states as Record<string, PlateRow[]> }
   const source = await askSource()
   const files: Record<string, ResourceFile> = {}
   for (const [id, file] of Object.entries(
@@ -143,37 +129,29 @@ export function loadItem(set: Lumen, id: string): Promise<LayerItem> {
 }
 
 /** A new title's look until one is picked: the plain wood band. */
-export const plainLook: TitleLayers = { band: 'band/lumen-title-wood', effect: null, icon: null }
+export const plainLook: TitleLayers = {
+  band: 'band/lumen-title-wood',
+  effect: null,
+  icon: null,
+  effectOverflow: false,
+}
 
 /** How a title saved before the layers looks (the database gave every such title these too). */
 export function legacyLayers(style: string): TitleLayers {
   const named = style === 'gold' || style === 'purple' || style === 'rainbow' ? style : 'wood'
+  // The two glints sweep over the whole plate.
+  const glint = named === 'gold' || named === 'purple'
   return {
     band: `band/lumen-title-${named}`,
-    effect: named === 'gold' || named === 'purple' ? `effect/lumen-title-${named}` : null,
+    effect: glint ? `effect/lumen-title-${named}` : null,
     icon: null,
+    effectOverflow: glint,
   }
 }
 
 /** A title's layers, or those of its style when it came from before them (an old reward). */
 export function layersOf(title: { layers?: TitleLayers | null; style?: string }): TitleLayers {
   return title.layers?.band ? title.layers : legacyLayers(title.style ?? 'wood')
-}
-
-/**
- * The items a title may be made of in one slot: the parts of the catalog's titles (not the AI
- * ones, which are cut for the AI plate), each with the titles it comes from, in catalog order.
- */
-export function partsOf(catalog: LumenCatalog, slot: Slot): { id: string; titles: string[] }[] {
-  const found = new Map<string, string[]>()
-  for (const [label, parts] of Object.entries(catalog.titles)) {
-    const id = parts[slot]
-    if (!id) continue
-    const titles = found.get(id) ?? []
-    titles.push(label)
-    found.set(id, titles)
-  }
-  return [...found].map(([id, titles]) => ({ id, titles }))
 }
 
 /** An item's name without its slot and the set's prefix: "toho_y22" for band/lumen-title-toho_y22. */
@@ -215,16 +193,17 @@ export type LayerSpec = { id: string; clip?: string; mask?: boolean; cut?: boole
 export const bandShape = 'band/lumen-title-wood'
 
 /**
- * A title's band; its effect (with the band's shape it is cut to, if it stays inside the band),
+ * A title's band; its effect (with the band's shape it is cut to, unless it overflows),
  * which goes over the title's text printed on the band; and its icon, which the plate draws later.
  */
-export function titleSpecs(
-  catalog: LumenCatalog,
-  look: TitleLayers,
-): { band: LayerSpec[]; effect: LayerSpec[]; icon: LayerSpec | null } {
+export function titleSpecs(look: TitleLayers): {
+  band: LayerSpec[]
+  effect: LayerSpec[]
+  icon: LayerSpec | null
+} {
   const effect: LayerSpec[] = !look.effect
     ? []
-    : catalog.unclipped.includes(look.effect)
+    : look.effectOverflow
       ? [{ id: look.effect }]
       : [
           { id: bandShape, mask: true },
@@ -241,13 +220,12 @@ export function titleSpecs(
  * without a title has all its pictures under.
  */
 export function plateSpecs(
-  catalog: LumenCatalog,
   rows: PlateRow[],
   look: TitleLayers | null,
   badge: '1p' | '2p',
   rank: { id: string; clip: string } | null,
 ): { under: LayerSpec[]; over: LayerSpec[] } {
-  const title = look ? titleSpecs(catalog, look) : null
+  const title = look ? titleSpecs(look) : null
   const hasBadge = rows.some((row) => row.role === 'plate_player_no')
   const under: LayerSpec[] = []
   const over: LayerSpec[] = []

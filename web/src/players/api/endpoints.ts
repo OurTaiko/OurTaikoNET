@@ -18,6 +18,8 @@ export const endpoints = {
   myDon: `${API_ROOT}/me/don`,
   userDon: (id: string) => `${API_ROOT}/users/${id}/don`,
   titles: `${API_ROOT}/titles`,
+  // The parts titles are made of and the looks to start from.
+  titleParts: `${API_ROOT}/title/items`,
   // What players have just done on either source, for the home page.
   activity: `${API_ROOT}/activity`,
   // The playlists the home page recommends, and where its administrator sets them (PUT).
