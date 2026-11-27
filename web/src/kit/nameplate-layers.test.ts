@@ -6,9 +6,9 @@ import {
   plateSpecs,
   plateState,
   rankPicture,
-  readLumen,
+  readSet,
   titleSpecs,
-  type LumenCatalog,
+  type PlateLayout,
 } from './nameplate-layers'
 
 const canonicalRoot = 'https://distrib.ourtaiko.org/'
@@ -39,7 +39,7 @@ const looks = {
   },
 }
 
-const catalog: LumenCatalog = {
+const layout: PlateLayout = {
   states: {
     '1p_shougou_dani': [
       { role: 'base', clip: '1p_shougou_dani/3' },
@@ -69,22 +69,12 @@ it('reads the set and gives every file its address from the visitor root and the
       Response.json({ mirror: true, baseUrl: mirrorRoot, canonicalBaseUrl: canonicalRoot }),
     ),
   )
-  const set = await readLumen({
-    version: 1,
-    catalog,
-    files: {
-      'band/lumen-title-wood': {
-        path: 'lumen/band/lumen-title-wood-0123456789ab.otanim',
-        size: 10,
-        sha256,
-      },
-    },
-  })
-  expect(Object.keys(set.catalog.states)).toContain('1p_shougou_dani')
+  const set = await readSet({ version: 1, layout, files: { 'band/lumen-title-wood': sha256 } })
+  expect(Object.keys(set.layout.states)).toContain('1p_shougou_dani')
+  // A picture is named by its hash, and checked against it.
   expect(set.files['band/lumen-title-wood']).toEqual({
-    url: mirrorRoot + 'nameplate/lumen/band/lumen-title-wood-0123456789ab.otanim',
-    fallbackUrl: canonicalRoot + 'nameplate/lumen/band/lumen-title-wood-0123456789ab.otanim',
-    size: 10,
+    url: mirrorRoot + `nameplate/items/${sha256}.otanim`,
+    fallbackUrl: canonicalRoot + `nameplate/items/${sha256}.otanim`,
     sha256,
   })
 })
@@ -96,16 +86,15 @@ it('refuses a set whose files or layouts are not what the game carries', async (
       Response.json({ mirror: false, baseUrl: canonicalRoot, canonicalBaseUrl: canonicalRoot }),
     ),
   )
-  const file = { path: 'lumen/band/x-0123456789ab.otanim', size: 10, sha256 }
   for (const bad of [
-    { version: 2, catalog, files: {} },
-    { version: 1, catalog, files: { 'band/x': { ...file, path: '../x.otanim' } } },
-    { version: 1, catalog, files: { 'hat/x': file } },
-    { version: 1, catalog, files: { 'band/x': { ...file, size: 0 } } },
+    { version: 2, layout, files: {} },
+    { version: 1, layout, files: { 'band/x': '../x' } },
+    { version: 1, layout, files: { 'hat/x': sha256 } },
+    { version: 1, layout, files: { 'band/x': { sha256 } } },
     // Without the plate's layouts there is nothing to draw a plate by.
-    { version: 1, catalog: {}, files: {} },
+    { version: 1, layout: {}, files: {} },
   ])
-    await expect(readLumen(bad)).rejects.toThrow('NAMEPLATE_LAYERS_INVALID')
+    await expect(readSet(bad)).rejects.toThrow('NAMEPLATE_LAYERS_INVALID')
 })
 
 it('dresses a title from before the layers as its band did', () => {
@@ -166,7 +155,7 @@ it('cuts an effect to the band’s shape unless its title lets it run over the p
 
 it('draws a plate in its layout’s order, the icon over the outline and under the badge', () => {
   const specs = plateSpecs(
-    catalog.states['1p_shougou_dani'],
+    layout.states['1p_shougou_dani'],
     looks.toho_y22_1,
     '1p',
     rankPicture(10, false, 1),
@@ -186,7 +175,7 @@ it('draws a plate in its layout’s order, the icon over the outline and under t
     ],
   })
   // A layout without a badge puts the icon right after the band.
-  expect(plateSpecs(catalog.states.newentry_shougou, looks.toho_y22_2, '1p', null)).toEqual({
+  expect(plateSpecs(layout.states.newentry_shougou, looks.toho_y22_2, '1p', null)).toEqual({
     under: [
       { id: 'composition/plates', clip: 'newentry_shougou/3' },
       { id: 'band/lumen-title-toho_y22' },
@@ -196,7 +185,7 @@ it('draws a plate in its layout’s order, the icon over the outline and under t
 })
 
 it('puts the title’s effect over its name and the rest of the plate over the effect', () => {
-  const { under, over } = plateSpecs(catalog.states['1p_shougou_dani'], looks.ai_3, '1p', null)
+  const { under, over } = plateSpecs(layout.states['1p_shougou_dani'], looks.ai_3, '1p', null)
   expect(under.at(-1)).toEqual({ id: 'band/lumen-title-ai_3' })
   expect(over.slice(0, 3)).toEqual([
     { id: 'band/lumen-title-wood', mask: true },
@@ -204,7 +193,7 @@ it('puts the title’s effect over its name and the rest of the plate over the e
     { id: 'composition/plates', clip: '1p_shougou_dani/8' },
   ])
   // Without a title there is no name to put anything over.
-  const plain = plateSpecs(catalog.states.newentry_shougou, null, '1p', null)
+  const plain = plateSpecs(layout.states.newentry_shougou, null, '1p', null)
   expect(plain).toEqual({
     under: [{ id: 'composition/plates', clip: 'newentry_shougou/3' }],
     over: [],

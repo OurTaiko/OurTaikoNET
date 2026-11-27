@@ -1,12 +1,13 @@
-import { askSource, fallbackFileUrl, fetchFile, fileUrl } from './distribution'
+import { SITE_API_ROOT } from './api/config'
+import { askSource, fallbackFileUrl, fileUrl } from './distribution'
 import { parseOtanim, type Otanim } from './don3d/otanim'
 import { verifiedResource, type ResourceFile } from './resource-download'
 
-// The layered nameplate the game draws (the set OurTaikoPlay's Tools/nameplate-samples/lumen
-// bakes, published to the bucket's nameplate/ by tools/nameplate/publish-lumen.sh, where the game
-// downloads it from as well): every title is a band, an effect over it and an icon on its end,
-// each an .otanim drawn on the whole 408x96 plate canvas, and the plate itself is a list of
-// layouts saying what to draw in which order and where the text goes.
+// The layered nameplate the game draws: every title is a band, an effect over it and an icon on
+// its end, each an .otanim drawn on the whole 408x96 plate canvas, and the plate itself is a list
+// of layouts saying what to draw in which order and where the text goes. The site says what
+// there is (GET /api/v2/nameplate/set: the layouts, and each picture's hash); the pictures are
+// under the distribution root by that hash, where the game gets them too.
 
 export type Slot = 'band' | 'effect' | 'icon'
 export const slots: Slot[] = ['band', 'effect', 'icon']
@@ -38,65 +39,55 @@ export type PlateRow = {
   stroke?: number
 }
 
-// What the site reads of the set's catalog: the plate's layouts. Which parts and presets there
-// are is the site's own to say (GET /api/v1/title/items).
-export type LumenCatalog = {
+/** The plate's layouts: what a plate in each state draws, in order, and where its text goes. */
+export type PlateLayout = {
   states: Record<string, PlateRow[]>
 }
 
-export type Lumen = { catalog: LumenCatalog; files: Record<string, ResourceFile> }
+export type NameplateSet = { layout: PlateLayout; files: Record<string, ResourceFile> }
 
 const itemId = /^(band|effect|icon|composition)\/[a-z0-9][a-z0-9_.-]{0,63}$/
-const filePath =
-  /^lumen\/(band|effect|icon|composition)\/[a-z0-9][a-z0-9_.-]{0,63}-[a-f0-9]{12}\.otanim$/
 
-/** Checks lumen.json and gives every file its addresses from the visitor's root. */
-export async function readLumen(value: unknown): Promise<Lumen> {
-  const data = value as { version?: number; catalog?: Record<string, unknown>; files?: unknown }
-  if (data?.version !== 1 || !data.catalog || !data.files || typeof data.files !== 'object')
+/** Where the picture of that hash is, under the distribution root. */
+export const itemPath = (hash: string) => `nameplate/items/${hash}.otanim`
+
+/** Checks the set the site answers and gives every picture its addresses from the visitor's root. */
+export async function readSet(value: unknown): Promise<NameplateSet> {
+  const data = value as { version?: number; layout?: Record<string, unknown>; files?: unknown }
+  if (data?.version !== 1 || !data.layout || !data.files || typeof data.files !== 'object')
     throw new Error('NAMEPLATE_LAYERS_INVALID')
-  const states = data.catalog.states
+  const states = data.layout.states
   if (!states || typeof states !== 'object') throw new Error('NAMEPLATE_LAYERS_INVALID')
-  const catalog: LumenCatalog = { states: states as Record<string, PlateRow[]> }
+  const layout: PlateLayout = { states: states as Record<string, PlateRow[]> }
   const source = await askSource()
   const files: Record<string, ResourceFile> = {}
-  for (const [id, file] of Object.entries(
-    data.files as Record<string, { path: string; size: number; sha256: string }>,
-  )) {
-    if (
-      !itemId.test(id) ||
-      !filePath.test(file?.path) ||
-      !/^[a-f0-9]{64}$/.test(file.sha256) ||
-      !Number.isSafeInteger(file.size) ||
-      file.size <= 0 ||
-      file.size > 8 * 1024 * 1024
-    )
+  for (const [id, hash] of Object.entries(data.files as Record<string, unknown>)) {
+    if (!itemId.test(id) || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash))
       throw new Error('NAMEPLATE_LAYERS_INVALID')
-    const path = 'nameplate/' + file.path
+    const path = itemPath(hash)
     files[id] = {
       url: fileUrl(path, source),
       fallbackUrl: fallbackFileUrl(path, source) || undefined,
-      size: file.size,
-      sha256: file.sha256,
+      sha256: hash,
     }
   }
-  return { catalog, files }
+  return { layout, files }
 }
 
-// One read of lumen.json per page load; a failed read is tried again next time it is asked for.
-let lumen: Promise<Lumen> | undefined
-export function loadLumen(): Promise<Lumen> {
-  lumen ??= fetchFile('nameplate/lumen.json', { credentials: 'omit' })
+// One read of the set per page load; a failed read is tried again next time it is asked for.
+let loading: Promise<NameplateSet> | undefined
+export function loadSet(): Promise<NameplateSet> {
+  loading ??= fetch(`${SITE_API_ROOT}/nameplate/set`)
     .then((response) => {
       if (!response.ok) throw new Error('NAMEPLATE_LAYERS_UNAVAILABLE')
       return response.json()
     })
-    .then(readLumen)
+    .then(readSet)
     .catch((error: unknown) => {
-      lumen = undefined
+      loading = undefined
       throw error
     })
-  return lumen
+  return loading
 }
 
 /** An item of the set and its picture, ready to draw. */
@@ -105,7 +96,7 @@ export type LayerItem = { file: Otanim; picture: ImageBitmap }
 const items = new Map<string, Promise<LayerItem>>()
 
 /** The item `id` ("band/lumen-title-gold"), read and checked once per page load. */
-export function loadItem(set: Lumen, id: string): Promise<LayerItem> {
+export function loadItem(set: NameplateSet, id: string): Promise<LayerItem> {
   let item = items.get(id)
   if (!item) {
     const file = set.files[id]

@@ -425,11 +425,23 @@ COMMENT ON COLUMN net.title_reviews.effect_id IS 'The effect drawn over the band
 COMMENT ON COLUMN net.title_reviews.icon_id IS 'The icon on the band''s end (title_items, type icon), or none.';
 COMMENT ON COLUMN net.title_reviews.effect_overflow IS 'Whether the effect is drawn over the whole plate instead of being cut to the band. Its maker''s choice; false without an effect.';
 
-COMMENT ON COLUMN net.titles.band_item IS 'Unread since title_items (band_id); kept for the release before, dropped by the next change.';
-COMMENT ON COLUMN net.titles.effect_item IS 'Unread since title_items (effect_id).';
-COMMENT ON COLUMN net.titles.icon_item IS 'Unread since title_items (icon_id).';
--- A request made by the release before, while this ran, has no band_item of its own any more.
-ALTER TABLE net.title_reviews ALTER COLUMN band_item SET DEFAULT 'band/lumen-title-wood';
+-- While the old names are still there (0030 drops them, and this is run again on databases that
+-- have none, or have them on titles alone, where 0022 run again puts them back): they are said to
+-- be unread, and a request made by the release before, while this ran, has no band_item of its
+-- own any more.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'net' AND table_name = 'titles' AND column_name = 'band_item') THEN
+    COMMENT ON COLUMN net.titles.band_item IS 'Unread since title_items (band_id); kept for the release before, dropped by the next change.';
+    COMMENT ON COLUMN net.titles.effect_item IS 'Unread since title_items (effect_id).';
+    COMMENT ON COLUMN net.titles.icon_item IS 'Unread since title_items (icon_id).';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'net' AND table_name = 'title_reviews' AND column_name = 'band_item') THEN
+    ALTER TABLE net.title_reviews ALTER COLUMN band_item SET DEFAULT 'band/lumen-title-wood';
+  END IF;
+END $$;
 
 -- A title given is told as it looks now, with where its pictures are. One given before and not
 -- seen yet is told the same way: nothing reads a title without them any more.
