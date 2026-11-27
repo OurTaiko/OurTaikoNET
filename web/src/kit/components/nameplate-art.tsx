@@ -91,15 +91,18 @@ function sprite(
   }
 }
 
-// draw_in_box: text centred in its box and squeezed horizontally, never shrunk, to the box's width.
+// draw_in_box: text centred in its box and, when wider than the box, squeezed horizontally to its
+// width (names); `even` shrinks it evenly instead, keeping its shape (titles, as the game draws them).
 function Squeezed({
   children,
   style,
   className,
+  even = false,
 }: {
   children: ReactNode
   style: CSSProperties
   className?: string
+  even?: boolean
 }) {
   const box = useRef<HTMLSpanElement>(null)
   const text = useRef<HTMLSpanElement>(null)
@@ -126,7 +129,9 @@ function Squeezed({
       <span
         ref={text}
         className="inline-block whitespace-nowrap"
-        style={{ transform: scale < 1 ? `scaleX(${scale})` : undefined }}
+        style={{
+          transform: scale < 1 ? (even ? `scale(${scale})` : `scaleX(${scale})`) : undefined,
+        }}
       >
         {children}
       </span>
@@ -303,6 +308,7 @@ export function TitleBandArt({
       <span className="@container relative block aspect-[312/29] w-full">
         <PlateLayers layers={drawn?.[0] ?? null} frame={frame} style={bandStyle} />
         <Squeezed
+          even
           className="font-bold text-black leading-none"
           style={{
             left: `${((BAND.w - TITLE.width) / 2 / BAND.w) * 100}%`,
@@ -400,7 +406,7 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
         />
       )}
       {title && (
-        <Squeezed className="font-bold text-black leading-none" style={box(titleRow)}>
+        <Squeezed even className="font-bold text-black leading-none" style={box(titleRow)}>
           {title.name}
         </Squeezed>
       )}
