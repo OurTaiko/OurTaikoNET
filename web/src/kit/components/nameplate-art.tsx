@@ -11,12 +11,14 @@ import { cn } from '../lib/utils'
 
 import { loadNameplateArt } from '../nameplate-art-source'
 import {
+  itemIconLeft,
   loadItem,
   loadSet,
   plateSpecs,
   plateState,
   rankPicture,
   textLift,
+  titleRoom,
   titleSpecs,
   type LayerSpec,
   type NameplateSet,
@@ -93,16 +95,19 @@ function sprite(
 
 // draw_in_box: text centred in its box and, when wider than the box, squeezed horizontally to its
 // width (names); `even` shrinks it evenly instead, keeping its shape (titles, as the game draws them).
+// `room` is how wide the text may be, as a fraction of the box's width, still centred.
 function Squeezed({
   children,
   style,
   className,
   even = false,
+  room = 1,
 }: {
   children: ReactNode
   style: CSSProperties
   className?: string
   even?: boolean
+  room?: number
 }) {
   const box = useRef<HTMLSpanElement>(null)
   const text = useRef<HTMLSpanElement>(null)
@@ -113,13 +118,13 @@ function Squeezed({
     if (!outer || !inner) return
     const measure = () => {
       const width = inner.offsetWidth
-      setScale(width > 0 ? Math.min(1, outer.clientWidth / width) : 1)
+      setScale(width > 0 ? Math.min(1, (outer.clientWidth * room) / width) : 1)
     }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(outer)
     return () => observer.disconnect()
-  }, [children])
+  }, [children, room])
   return (
     <span
       ref={box}
@@ -234,6 +239,25 @@ function useLayers(set: NameplateSet | null, parts: LayerSpec[][]): DrawLayer[][
   return layers?.key === key ? layers.layers : null
 }
 
+/** Where the icon `id` really starts on the plate (iconLeft); null without one, or until it is read. */
+function useIconLeft(set: NameplateSet | null, id: string | null): number | null {
+  const [left, setLeft] = useState<{ id: string; left: number } | null>(null)
+  useEffect(() => {
+    if (!set || !id) return
+    let current = true
+    loadItem(set, id).then(
+      (item) => {
+        if (current) setLeft({ id, left: itemIconLeft(item) })
+      },
+      () => {},
+    )
+    return () => {
+      current = false
+    }
+  }, [set, id])
+  return id && left?.id === id ? left.left : null
+}
+
 /** A canvas drawing `layers` over `frame` of the plate, placed by `style`. */
 function PlateLayers({
   layers,
@@ -289,6 +313,9 @@ export function TitleBandArt({
     return [title.band, title.icon ? [...title.effect, title.icon] : title.effect]
   }, [set, layers])
   const drawn = useLayers(set, specs)
+  // A band alone centres the title between its round ends, and keeps it clear of the icon too.
+  const iconLeft = useIconLeft(set, layers.icon)
+  const room = titleRoom(BAND.x + BAND.w / 2, TITLE.width, iconLeft) / TITLE.width
   const frame: PlateFrame = [
     BAND.x - OVER,
     BAND.y - OVER,
@@ -309,6 +336,7 @@ export function TitleBandArt({
         <PlateLayers layers={drawn?.[0] ?? null} frame={frame} style={bandStyle} />
         <Squeezed
           even
+          room={room}
           className="font-bold text-black leading-none"
           style={{
             left: `${((BAND.w - TITLE.width) / 2 / BAND.w) * 100}%`,
@@ -388,6 +416,9 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
   }
   const titleRow = text('text_title')
   const nameRow = text('text_name')
+  const iconLeft = useIconLeft(set, look?.icon ?? null)
+  const titleWidth = titleRow.width ?? 190
+  const titleFits = titleRoom(titleRow.x ?? 0, titleWidth, iconLeft) / titleWidth
   return (
     <div
       className={cn('@container relative aspect-[329/81] w-full max-w-md select-none', className)}
@@ -406,7 +437,12 @@ export function NameplateArt({ name, title, dan, side = 1, className }: Nameplat
         />
       )}
       {title && (
-        <Squeezed even className="font-bold text-black leading-none" style={box(titleRow)}>
+        <Squeezed
+          even
+          room={titleFits}
+          className="font-bold text-black leading-none"
+          style={box(titleRow)}
+        >
           {title.name}
         </Squeezed>
       )}

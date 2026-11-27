@@ -1,6 +1,6 @@
 import { SITE_API_ROOT } from './api/config'
 import { askSource, fallbackFileUrl, fileUrl } from './distribution'
-import { parseOtanim, type Otanim } from './don3d/otanim'
+import { otanimOpaqueColumns, parseOtanim, type Otanim } from './don3d/otanim'
 import { verifiedResource, type ResourceFile } from './resource-download'
 
 // The layered nameplate the game draws: every title is a band, an effect over it and an icon on
@@ -117,6 +117,81 @@ export function loadItem(set: NameplateSet, id: string): Promise<LayerItem> {
     items.set(id, item)
   }
   return item
+}
+
+// A title's icon stands on the band's right end, from x 280 on (the set's own rule); the title's
+// text keeps ICON_GAP left of where the icon's picture really starts, and is never squeezed
+// further than an icon starting at ICON_FROM would. As the game's NameplateLayout.
+export const ICON_FROM = 280
+export const ICON_GAP = 4
+// The title text's rows on the plate canvas (y down): text_title's 22 pixels about y 32.
+const TITLE_TOP = 34.5 - 2.5 - 11
+const TITLE_BOTTOM = 34.5 - 2.5 + 11
+const ICON_LEFT_SAMPLES = 32
+
+/**
+ * How wide a title's text may be in its box (centre x and width, canvas pixels): the whole box,
+ * or with an icon starting at `iconLeft` only as wide as stays clear of it, still centred on x.
+ */
+export function titleRoom(x: number, boxWidth: number, iconLeft: number | null): number {
+  if (iconLeft === null) return boxWidth
+  return Math.max(0, Math.min(boxWidth, 2 * (Math.max(iconLeft, ICON_FROM) - ICON_GAP - x)))
+}
+
+/**
+ * Where an icon's picture really starts on the plate (canvas x) across the title text's rows: the
+ * leftmost column that is opaque at least half the time over the clip it plays, so a glint
+ * sweeping across the band now and then does not count. `pixels` is its picture (RGBA rows from
+ * the top). The game's NameplateItems.IconLeft measures the same.
+ */
+export function iconLeft(
+  file: Otanim,
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+): number {
+  const clip = file.clips.find((c) => c.name === 'idle') ?? file.clips[0]
+  const plate = 408
+  if (!clip || clip.frames.length === 0) return plate
+  const n = clip.frames.length
+  const samples = Math.min(n, ICON_LEFT_SAMPLES)
+  const covered = new Uint16Array(plate)
+  const columns = new Uint8Array(plate)
+  const viewHeight = 96
+  for (let i = 0; i < samples; i++) {
+    columns.fill(0)
+    otanimOpaqueColumns(
+      file,
+      clip,
+      Math.floor((i * n) / samples),
+      pixels,
+      width,
+      height,
+      viewHeight - TITLE_BOTTOM,
+      viewHeight - TITLE_TOP,
+      columns,
+    )
+    for (let x = 0; x < plate; x++) covered[x] += columns[x]
+  }
+  for (let x = 0; x < plate; x++) if (2 * covered[x] >= samples) return x
+  return plate
+}
+
+const iconLefts = new WeakMap<LayerItem, number>()
+
+/** iconLeft of an item read with loadItem, measured once from its picture. */
+export function itemIconLeft(item: LayerItem): number {
+  let left = iconLefts.get(item)
+  if (left === undefined) {
+    const { width, height } = item.picture
+    const canvas = new OffscreenCanvas(width, height)
+    const context = canvas.getContext('2d')
+    if (!context) return ICON_FROM
+    context.drawImage(item.picture, 0, 0)
+    left = iconLeft(item.file, context.getImageData(0, 0, width, height).data, width, height)
+    iconLefts.set(item, left)
+  }
+  return left
 }
 
 /** A new title's look until one is picked: the plain wood band. */

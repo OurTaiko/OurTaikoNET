@@ -327,6 +327,64 @@ export function otanimMesh(
   return { positions, uvs, colors, indices }
 }
 
+// Marks in `columns` (one per view unit from the view's left) the columns where the clip's frame
+// draws an opaque pixel between view heights `bottom` and `top` (y up): normal-blend parts only,
+// alpha (the picture's times the draw's) at least `opacity`. `pixels` is the file's picture as
+// RGBA rows from the top, `width` x `height`. The game's Otanim.MarkOpaqueColumns does the same.
+export function otanimOpaqueColumns(
+  file: Otanim,
+  clip: OtanimClip,
+  frame: number,
+  pixels: Uint8ClampedArray | Uint8Array,
+  width: number,
+  height: number,
+  bottom: number,
+  top: number,
+  columns: Uint8Array,
+  opacity = 0.5,
+): void {
+  const p = clip.positions
+  const left = file.view[0]
+  for (const d of clip.frames[frame]) {
+    const part = file.parts[d.part]
+    if (part.blend !== 0 || d.color[3] === 0) continue
+    const at = (i: number) => [p[d.offset + 2 * i], p[d.offset + 2 * i + 1]]
+    for (let t = 0; t + 2 < part.indices.length; t += 3) {
+      const a = part.indices[t]
+      const b = part.indices[t + 1]
+      const c = part.indices[t + 2]
+      const [ax, ay] = at(a)
+      const [bx, by] = at(b)
+      const [cx, cy] = at(c)
+      const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
+      if (Math.abs(area) < 1e-6) continue
+      const c0 = Math.max(0, Math.floor(Math.min(ax, bx, cx) - left))
+      const c1 = Math.min(columns.length - 1, Math.floor(Math.max(ax, bx, cx) - left))
+      const y0 = Math.max(bottom, Math.min(ay, by, cy))
+      const y1 = Math.min(top, Math.max(ay, by, cy))
+      for (let column = c0; column <= c1; column++) {
+        if (columns[column]) continue
+        const x = left + column + 0.5
+        for (let y = Math.floor(y0) + 0.5; y <= y1; y++) {
+          // Barycentric weights of (x, y): all three non-negative inside the triangle.
+          const wb = ((x - ax) * (cy - ay) - (cx - ax) * (y - ay)) / area
+          const wc = ((bx - ax) * (y - ay) - (x - ax) * (by - ay)) / area
+          const wa = 1 - wb - wc
+          if (wa < 0 || wb < 0 || wc < 0) continue
+          const u = part.uvs[2 * a] * wa + part.uvs[2 * b] * wb + part.uvs[2 * c] * wc
+          const v = part.uvs[2 * a + 1] * wa + part.uvs[2 * b + 1] * wb + part.uvs[2 * c + 1] * wc
+          const px = Math.min(width - 1, Math.max(0, Math.trunc(u * width)))
+          const py = Math.min(height - 1, Math.max(0, Math.trunc(v * height)))
+          if (pixels[4 * (py * width + px) + 3] * d.color[3] >= opacity * 255 * 255) {
+            columns[column] = 1
+            break
+          }
+        }
+      }
+    }
+  }
+}
+
 // How many times the clip has come round by `seconds`: a loop's first pass (its intro and its
 // loop) is 0, each loop after it one more; a one-shot plays whole each time.
 export function otanimPass(clip: OtanimClip, seconds: number): number {

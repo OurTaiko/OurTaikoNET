@@ -1,5 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import type { Otanim } from './don3d/otanim'
 import {
+  ICON_FROM,
+  ICON_GAP,
+  iconLeft,
   itemName,
   layersOf,
   legacyLayers,
@@ -7,6 +11,7 @@ import {
   plateState,
   rankPicture,
   readSet,
+  titleRoom,
   titleSpecs,
   type PlateLayout,
 } from './nameplate-layers'
@@ -198,4 +203,64 @@ it('puts the title’s effect over its name and the rest of the plate over the e
     under: [{ id: 'composition/plates', clip: 'newentry_shougou/3' }],
     over: [],
   })
+})
+
+// An icon whose idle clip draws one opaque square 100 units wide and as tall as the plate, its left
+// edge at `lefts[i]` in frame i (the game's OtanimFixture squares).
+function squares(lefts: number[]): Otanim {
+  const positions: number[] = []
+  const frames = lefts.map((x, i) => {
+    positions.push(x, 0, x + 100, 0, x + 100, 96, x, 96)
+    return [
+      { part: 0, color: [255, 255, 255, 255] as [number, number, number, number], offset: 8 * i },
+    ]
+  })
+  return {
+    name: 'squares',
+    premultiplied: false,
+    view: [0, 0, 408, 96],
+    unit: 1,
+    texture: new Uint8Array(),
+    parts: [
+      {
+        name: 'square',
+        blend: 0,
+        uvs: Float32Array.from([0, 1, 1, 1, 1, 0, 0, 0]),
+        indices: Uint16Array.from([0, 1, 2, 0, 2, 3]),
+      },
+    ],
+    clips: [
+      {
+        name: 'idle',
+        fps: 30,
+        loop: true,
+        loopStart: 0,
+        frames,
+        positions: Float32Array.from(positions),
+      },
+    ],
+  }
+}
+
+it.each([
+  [[300], 300],
+  [[300, 300, 60], 300],
+  [[320, 310, 330], 320],
+  // a streak sweeping over the band in a frame or two does not count
+  [[300, 60, 300, 300, 180], 300],
+])("an icon's left edge is where its picture usually starts (%j)", (lefts, left) => {
+  const opaque = new Uint8ClampedArray(4 * 4 * 4).fill(255)
+  expect(iconLeft(squares(lefts), opaque, 4, 4)).toBe(left)
+})
+
+it("a transparent icon's picture does not count", () => {
+  expect(iconLeft(squares([300]), new Uint8ClampedArray(4 * 4 * 4), 4, 4)).toBe(408)
+})
+
+it("a title's room is centred and clear of its icon", () => {
+  expect(titleRoom(226.5, 215, null)).toBe(215)
+  expect(titleRoom(226.5, 215, 408)).toBe(215)
+  expect(titleRoom(226.5, 215, 302)).toBeCloseTo(2 * (302 - ICON_GAP - 226.5))
+  // never squeezed further than an icon from the set's own x 280 would
+  expect(titleRoom(226.5, 215, 100)).toBeCloseTo(2 * (ICON_FROM - ICON_GAP - 226.5))
 })
