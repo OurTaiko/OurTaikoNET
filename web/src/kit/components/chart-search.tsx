@@ -1,15 +1,22 @@
 import { useTranslation } from 'react-i18next'
-import type { ReactNode } from 'react'
-import { SortDescendingIcon } from '@phosphor-icons/react'
+import type { ComponentProps, ReactNode } from 'react'
+import { HashIcon, SortDescendingIcon } from '@phosphor-icons/react'
 import { ChoiceSelect } from './choice-select'
 import { SearchInput } from './search-input'
 import { categoryName, useCategories } from '../categories'
+import { tagName, useTags } from '../tags'
 import { cn } from '../lib/utils'
 import { categoryColor } from '../category-colors'
 
 export const filterCourses = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit'] as const
 /** The chart list's filters both sites have; '' is no filter (and the newest first). */
-export type ChartFilters = { order: string; category: string; course: string; level: string }
+export type ChartFilters = {
+  order: string
+  category: string
+  tag: string
+  course: string
+  level: string
+}
 
 /** The shared filters as the address has them, values the API would refuse dropped. */
 export function readChartFilters(params: URLSearchParams, orders: readonly string[]): ChartFilters {
@@ -19,9 +26,39 @@ export function readChartFilters(params: URLSearchParams, orders: readonly strin
   return {
     order: orders.includes(order) ? order : '',
     category: params.get('category') || '',
+    tag: params.get('tag') || '',
     course: (filterCourses as readonly string[]).includes(course) ? course : '',
     level: Number.isInteger(level) && level >= 1 && level <= 10 ? String(level) : '',
   }
+}
+
+/** A filter's choice as a chip of the rows under the search box, with its charts counted. */
+function FilterChip({
+  active,
+  count,
+  children,
+  ...props
+}: ComponentProps<'button'> & { active: boolean; count?: number }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cn(
+        chipClassName,
+        active
+          ? 'border-foreground bg-foreground text-background'
+          : 'bg-background/70 text-foreground hover:bg-muted',
+      )}
+      {...props}
+    >
+      {children}
+      {count !== undefined && (
+        <span className={cn('text-xs tabular-nums', !active && 'text-muted-foreground')}>
+          {count}
+        </span>
+      )}
+    </button>
+  )
 }
 
 const chipClassName =
@@ -55,8 +92,11 @@ export function ChartSearch({
   counts?: boolean
   children?: ReactNode
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { items: categories, chartCount } = useCategories()
+  const { items: tags } = useTags()
+  // Only official tags filter the list.
+  const officialTags = (tags ?? []).filter((tag) => tag.status === 'official')
   const courseLabels: Record<string, string> = {
     Easy: t('messages.easy'),
     Normal: t('messages.normal'),
@@ -97,43 +137,53 @@ export function ChartSearch({
         className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 py-1"
       >
         {[{ id: '', title: t('messages.allCategories'), chartCount }, ...(categories ?? [])].map(
-          (category) => {
-            const active = filters.category === category.id
-            return (
-              <li key={category.id}>
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  data-category={category.id}
-                  className={cn(
-                    chipClassName,
-                    active
-                      ? 'border-foreground bg-foreground text-background'
-                      : 'bg-background/70 text-foreground hover:bg-muted',
-                  )}
-                  onClick={() => onChange({ category: category.id })}
-                >
-                  {categoryColor(category.id) && (
-                    <span
-                      aria-hidden="true"
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ background: categoryColor(category.id) }}
-                    />
-                  )}
-                  {category.id ? categoryName(category) : category.title}
-                  {counts && (
-                    <span
-                      className={cn('text-xs tabular-nums', !active && 'text-muted-foreground')}
-                    >
-                      {category.chartCount}
-                    </span>
-                  )}
-                </button>
-              </li>
-            )
-          },
+          (category) => (
+            <li key={category.id}>
+              <FilterChip
+                active={filters.category === category.id}
+                count={counts ? category.chartCount : undefined}
+                data-category={category.id}
+                onClick={() => onChange({ category: category.id })}
+              >
+                {categoryColor(category.id) && (
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: categoryColor(category.id) }}
+                  />
+                )}
+                {category.id ? categoryName(category) : category.title}
+              </FilterChip>
+            </li>
+          ),
         )}
       </ul>
+      {/* One tag at a time, as with the categories; no row while there is no official tag. */}
+      {officialTags.length > 0 && (
+        <ul
+          aria-label={t('tags.heading')}
+          className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 py-1"
+        >
+          <li>
+            <FilterChip active={!filters.tag} data-tag="" onClick={() => onChange({ tag: '' })}>
+              {t('tags.anyTag')}
+            </FilterChip>
+          </li>
+          {officialTags.map((tag) => (
+            <li key={tag.id}>
+              <FilterChip
+                active={filters.tag === tag.id}
+                count={counts ? tag.chartCount : undefined}
+                data-tag={tag.id}
+                onClick={() => onChange({ tag: tag.id })}
+              >
+                <HashIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-60" />
+                {tagName(tag, i18n.language)}
+              </FilterChip>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <ChoiceSelect
           label={t('messages.filterCourse')}

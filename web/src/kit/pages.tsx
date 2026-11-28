@@ -47,6 +47,7 @@ import { Modal, Notice } from './notifications'
 import { useNotification } from './notification-context'
 import { CategoryLabels } from './categories'
 import { SuggestCategories } from './category-suggestions'
+import { ChartTags } from './tags'
 import { CommentSection, chartSubject } from './comments'
 import { VoteControl } from './components/vote-control'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -564,6 +565,7 @@ export function Detail() {
           <CategoryLabels ids={chart.categoryIds} />
           <SuggestCategories chart={chart} />
         </div>
+        <ChartTags chart={chart} />
         <h1
           id="chart-title"
           className="text-3xl leading-[1.18] font-extrabold tracking-tight wrap-anywhere sm:text-4xl"

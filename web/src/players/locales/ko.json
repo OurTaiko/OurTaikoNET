@@ -510,20 +510,14 @@
     },
     "categories": {
       "fanmade": {
-        "game": "게임",
-        "virtual-singer": "버추얼 싱어",
+        "game": "리듬 게임 외 게임",
+        "vocaloid": "버추얼 싱어",
         "pop": "팝",
-        "classic": "클래식",
+        "classics": "클래식",
         "variety": "버라이어티",
         "anime": "애니메이션",
-        "touhou": "동방 PROJECT",
-        "gekichumai": "GEKICHUMAI",
-        "bemani": "BEMANI",
-        "project-sekai": "프로젝트 세카이",
-        "other-rhythm-games": "기타 리듬 게임",
-        "bms": "BMS",
-        "album": "앨범 수록곡",
-        "internet": "인터넷 / 밈"
+        "rhythm-game": "리듬 게임",
+        "kids": "키즈"
       },
       "official": {
         "namco": "남코 오리지널",
@@ -634,5 +628,47 @@
     "reply": "답변(반려 시 필수)",
     "approve": "승인",
     "return": "반려"
+  },
+  "tagAdmin": {
+    "heading": "태그 관리",
+    "intro": "플레이어가 곡에 붙인 태그입니다. 여기서 신고를 처리하고, 두 곡 라이브러리가 함께 쓰는 태그 목록을 관리합니다.",
+    "source": "곡 라이브러리",
+    "reports": "신고",
+    "status": "상태",
+    "statuses": {
+      "pending": "대기 중",
+      "upheld": "제거됨",
+      "dismissed": "기각됨"
+    },
+    "noReports": "신고가 없습니다.",
+    "unknownChart": "(보이지 않는 채보)",
+    "reportedBy_one": "{{count}}명 신고",
+    "reportedBy_other": "{{count}}명 신고",
+    "votes_one": "{{count}}명이 추가",
+    "votes_other": "{{count}}명이 추가",
+    "since": "첫 신고: {{at}}",
+    "decided": "{{by}} 님이 {{at}}에 처리",
+    "someone": "관리자",
+    "uphold": "태그 제거",
+    "dismiss": "기각",
+    "pages": "페이지",
+    "catalog": "태그 목록",
+    "catalogIntro": "정식 태그는 모든 곡에 붙일 수 있습니다. 대기 태그는 플레이어가 만들며, 3명이 사용하면 자동으로 정식이 됩니다. 이름 변경, 병합, 삭제는 두 라이브러리에 모두 적용되고, 곡 수는 현재 라이브러리 기준입니다.",
+    "newTag": "정식 태그 만들기",
+    "create": "만들기",
+    "songs_one": "{{count}}곡",
+    "songs_other": "{{count}}곡",
+    "makeOfficial": "정식으로",
+    "rename": "이름 변경",
+    "merge": "병합",
+    "delete": "삭제",
+    "confirmDelete": "태그 \"{{name}}\"을(를) 삭제할까요? 두 라이브러리의 모든 곡에서 투표와 신고와 함께 삭제되며 되돌릴 수 없습니다.",
+    "renameHint": "영어 이름은 필수이며, 비워 둔 언어에서는 영어 이름을 보여 줍니다.",
+    "mergeTitle": "\"{{name}}\"을(를) 다른 태그에 병합",
+    "mergeHint": "이 태그의 투표와 신고가 선택한 태그로 옮겨지고 이 태그는 삭제됩니다. 되돌릴 수 없습니다.",
+    "mergeInto": "병합 대상",
+    "choose": "태그 선택",
+    "save": "저장",
+    "cancel": "취소"
   }
 }

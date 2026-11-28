@@ -510,20 +510,14 @@
     },
     "categories": {
       "fanmade": {
-        "game": "ゲーム",
-        "virtual-singer": "バーチャルシンガー",
+        "game": "音ゲー以外のゲーム",
+        "vocaloid": "バーチャルシンガー",
         "pop": "ポップス",
-        "classic": "クラシック",
+        "classics": "クラシック",
         "variety": "バラエティ",
         "anime": "アニメ",
-        "touhou": "東方Project",
-        "gekichumai": "ゲキチュウマイ",
-        "bemani": "BEMANI",
-        "project-sekai": "プロジェクトセカイ",
-        "other-rhythm-games": "その他の音楽ゲーム",
-        "bms": "BMS",
-        "album": "アルバム曲",
-        "internet": "ネット・ミーム"
+        "rhythm-game": "音ゲー",
+        "kids": "キッズ"
       },
       "official": {
         "namco": "ナムコオリジナル",
@@ -634,5 +628,47 @@
     "reply": "返信（差し戻す場合は必須）",
     "approve": "承認",
     "return": "差し戻す"
+  },
+  "tagAdmin": {
+    "heading": "タグ管理",
+    "intro": "プレイヤーが曲に付けたタグです。ここで通報を処理し、両方の曲庫で共通のタグ一覧を管理します。",
+    "source": "曲庫",
+    "reports": "通報",
+    "status": "状態",
+    "statuses": {
+      "pending": "未処理",
+      "upheld": "削除済み",
+      "dismissed": "却下"
+    },
+    "noReports": "通報はありません。",
+    "unknownChart": "（譜面は表示できません）",
+    "reportedBy_one": "{{count}} 件の通報",
+    "reportedBy_other": "{{count}} 件の通報",
+    "votes_one": "{{count}} 人が追加",
+    "votes_other": "{{count}} 人が追加",
+    "since": "最初の通報：{{at}}",
+    "decided": "{{by}} が {{at}} に処理",
+    "someone": "管理者",
+    "uphold": "タグを外す",
+    "dismiss": "却下",
+    "pages": "ページ",
+    "catalog": "タグ一覧",
+    "catalogIntro": "正式タグはどの曲にも付けられます。仮タグはプレイヤーが作成し、3 人が使うと自動で正式になります。名前の変更・統合・削除は両方の曲庫に反映され、曲数はこの曲庫のものです。",
+    "newTag": "正式タグを作成",
+    "create": "作成",
+    "songs_one": "{{count}} 曲",
+    "songs_other": "{{count}} 曲",
+    "makeOfficial": "正式にする",
+    "rename": "名前を変更",
+    "merge": "統合",
+    "delete": "削除",
+    "confirmDelete": "タグ「{{name}}」を削除しますか？両方の曲庫のすべての曲から、投票と通報ごと削除され、元に戻せません。",
+    "renameHint": "英語名は必須です。空欄の言語では英語名を表示します。",
+    "mergeTitle": "「{{name}}」を別のタグに統合",
+    "mergeHint": "このタグの投票と通報は選んだタグに移り、このタグは削除されます。元に戻せません。",
+    "mergeInto": "統合先",
+    "choose": "タグを選択",
+    "save": "保存",
+    "cancel": "キャンセル"
   }
 }

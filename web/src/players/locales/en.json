@@ -510,20 +510,14 @@
     },
     "categories": {
       "fanmade": {
-        "game": "Game",
-        "virtual-singer": "Virtual Singer",
+        "game": "Non-rhythm games",
+        "vocaloid": "Virtual Singer",
         "pop": "Pop",
-        "classic": "Classical",
+        "classics": "Classical",
         "variety": "Variety",
         "anime": "Anime",
-        "touhou": "Touhou Project",
-        "gekichumai": "GEKICHUMAI",
-        "bemani": "BEMANI",
-        "project-sekai": "Project Sekai",
-        "other-rhythm-games": "Other rhythm games",
-        "bms": "BMS",
-        "album": "Album",
-        "internet": "Internet"
+        "rhythm-game": "Rhythm games",
+        "kids": "Kids"
       },
       "official": {
         "namco": "Namco Original",
@@ -634,5 +628,47 @@
     "reply": "Reply (required to return)",
     "approve": "Approve",
     "return": "Return"
+  },
+  "tagAdmin": {
+    "heading": "Manage tags",
+    "intro": "The tags players put on songs. Decide reports here, and keep the tag catalog both sources share.",
+    "source": "Source",
+    "reports": "Reports",
+    "status": "Status",
+    "statuses": {
+      "pending": "Waiting",
+      "upheld": "Removed",
+      "dismissed": "Dismissed"
+    },
+    "noReports": "No reports here.",
+    "unknownChart": "(song no longer visible)",
+    "reportedBy_one": "{{count}} report",
+    "reportedBy_other": "{{count}} reports",
+    "votes_one": "added by {{count}} player",
+    "votes_other": "added by {{count}} players",
+    "since": "First reported {{at}}",
+    "decided": "Decided by {{by}}, {{at}}",
+    "someone": "a manager",
+    "uphold": "Remove tag",
+    "dismiss": "Dismiss",
+    "pages": "Pages",
+    "catalog": "Tag catalog",
+    "catalogIntro": "Official tags can go on any song. Pending tags are made by players and become official once 3 players have used them. Renaming, merging and deleting apply to both sources; song counts are of this source.",
+    "newTag": "New official tag",
+    "create": "Create",
+    "songs_one": "{{count}} song",
+    "songs_other": "{{count}} songs",
+    "makeOfficial": "Make official",
+    "rename": "Rename",
+    "merge": "Merge",
+    "delete": "Delete",
+    "confirmDelete": "Delete the tag “{{name}}”? It is removed from every song of both sources with its votes and reports, and cannot be restored.",
+    "renameHint": "The English name is required; languages left empty show it.",
+    "mergeTitle": "Merge “{{name}}” into another tag",
+    "mergeHint": "This tag’s votes and reports go to the tag you choose, then this tag is deleted. This cannot be undone.",
+    "mergeInto": "Merge into",
+    "choose": "Choose a tag",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }

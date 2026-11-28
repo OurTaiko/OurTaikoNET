@@ -18,20 +18,14 @@
     "orderUpdated": "最近の変更"
   },
   "categories": {
-    "game": "ゲーム",
-    "virtual-singer": "バーチャルシンガー",
+    "game": "音ゲー以外のゲーム",
+    "vocaloid": "バーチャルシンガー",
     "pop": "ポップス",
-    "classic": "クラシック",
+    "classics": "クラシック",
     "variety": "バラエティ",
     "anime": "アニメ",
-    "touhou": "東方Project",
-    "gekichumai": "ゲキチュウマイ",
-    "bemani": "BEMANI",
-    "project-sekai": "プロジェクトセカイ",
-    "other-rhythm-games": "その他の音楽ゲーム",
-    "bms": "BMS",
-    "album": "アルバム曲",
-    "internet": "ネット・ミーム"
+    "rhythm-game": "音ゲー",
+    "kids": "キッズ"
   },
   "meta": {
     "siteDescription": "OurTaikoNET の創作譜面：プレイヤーが投稿した太鼓の創作譜面を試聴・ダウンロードし、ランキング、プレイリスト、段位道場を見られます。"

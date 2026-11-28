@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"ourtaiko.dev/net/internal/web"
 )
 
@@ -23,7 +24,12 @@ const (
 
 func suggestionServer(t *testing.T, src *Source) func(actor, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	pool := testDB(t, src)
+	return suggestionServerOn(t, testDB(t, src), src)
+}
+
+// suggestionServerOn is suggestionServer on a database the test has already put rows in.
+func suggestionServerOn(t *testing.T, pool *pgxpool.Pool, src *Source) func(actor, method, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
 	ctx := context.Background()
 	_, err := pool.Exec(ctx, `INSERT INTO test_sso_users(id,username,password_hash,is_admin) VALUES
  ($1,'owner','unused',false),($2,'player','unused',false),($3,'player2','unused',false),($4,'admin','unused',true)`,
@@ -98,12 +104,12 @@ func TestFanmadeCategories(t *testing.T) {
 	for _, item := range body["items"].([]any) {
 		ids = append(ids, item.(map[string]any)["id"].(string))
 	}
-	if got := strings.Join(ids, ","); got != "game,virtual-singer,pop,classic,variety,anime,touhou,gekichumai,bemani,project-sekai,other-rhythm-games,bms,album,internet" {
-		t.Fatal("Fanmade's fourteen categories in the order of their bits:", got)
+	if got := strings.Join(ids, ","); got != "game,vocaloid,pop,classics,variety,anime,rhythm-game,kids" {
+		t.Fatal("Fanmade's eight categories in the order of their bits:", got)
 	}
 	// The widest bit fits the database.
-	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["internet","touhou"]}`), 200)
-	if got := categoriesOf(t, call); got != "internet,touhou" {
+	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["kids","rhythm-game"]}`), 200)
+	if got := categoriesOf(t, call); got != "kids,rhythm-game" {
 		t.Fatal(got)
 	}
 }
@@ -122,17 +128,17 @@ func TestOfficialTakesNoSuggestions(t *testing.T) {
 
 func TestCategorySuggestions(t *testing.T) {
 	call := suggestionServer(t, Fanmade)
-	wantStatus(t, call("", "POST", chartSuggestions, `{"category":"touhou"}`), 401)
+	wantStatus(t, call("", "POST", chartSuggestions, `{"category":"rhythm-game"}`), 401)
 	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"nope"}`), 422)
 	for _, who := range []string{suggestPlayer, suggestPlayer2} {
-		if body := wantStatus(t, call(who, "POST", chartSuggestions, `{"category":"touhou"}`), 200); body["status"] != "pending" {
+		if body := wantStatus(t, call(who, "POST", chartSuggestions, `{"category":"rhythm-game"}`), 200); body["status"] != "pending" {
 			t.Fatal("a suggestion waits", body)
 		}
 	}
-	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"bms"}`), 200)
-	wantStatus(t, call(suggestPlayer2, "POST", chartSuggestions, `{"category":"album"}`), 200)
+	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"kids"}`), 200)
+	wantStatus(t, call(suggestPlayer2, "POST", chartSuggestions, `{"category":"classics"}`), 200)
 	// Suggesting again changes nothing.
-	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"touhou"}`), 200)
+	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"rhythm-game"}`), 200)
 	mine := wantStatus(t, call(suggestPlayer, "GET", chartSuggestions, ""), 200)
 	if mine["canEdit"] != false || mine["canReview"] != false || len(mine["suggestions"].([]any)) != 2 {
 		t.Fatal("a player sees their own suggestions", mine)
@@ -146,28 +152,28 @@ func TestCategorySuggestions(t *testing.T) {
 
 	// Only the source's managers see and decide the queue.
 	wantStatus(t, call(suggestPlayer, "GET", "/api/category-suggestions", ""), 403)
-	wantStatus(t, call(suggestOwner, "POST", "/api/category-suggestions/decision", decision("touhou", true)), 403)
+	wantStatus(t, call(suggestOwner, "POST", "/api/category-suggestions/decision", decision("rhythm-game", true)), 403)
 	queue := wantStatus(t, call(suggestAdmin, "GET", "/api/category-suggestions", ""), 200)
 	items := queue["items"].([]any)
 	if queue["total"].(float64) != 3 || len(items) != 3 {
 		t.Fatal("suggestions are grouped by chart and category", queue)
 	}
 	first := items[0].(map[string]any)
-	if first["category"] != "touhou" || first["count"].(float64) != 2 || len(first["suggesters"].([]any)) != 2 || first["chart"].(map[string]any)["title"] != "Song" {
+	if first["category"] != "rhythm-game" || first["count"].(float64) != 2 || len(first["suggesters"].([]any)) != 2 || first["chart"].(map[string]any)["title"] != "Song" {
 		t.Fatal("the oldest group comes first, with its players and chart", first)
 	}
 
 	// Accepting puts the chart in the category, out of Variety that was its only one, and answers
 	// every suggestion of it, and those made later.
-	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("touhou", true)), 200)
-	if got := categoriesOf(t, call); got != "touhou" {
+	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("rhythm-game", true)), 200)
+	if got := categoriesOf(t, call); got != "rhythm-game" {
 		t.Fatal("the chart left Variety for the accepted category", got)
 	}
-	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("bms", true)), 200)
-	if got := categoriesOf(t, call); got != "bms,touhou" {
+	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("kids", true)), 200)
+	if got := categoriesOf(t, call); got != "kids,rhythm-game" {
 		t.Fatal("a second category is added beside the first", got)
 	}
-	if late := wantStatus(t, call(suggestOwner, "POST", chartSuggestions, `{"category":"touhou"}`), 200); late["status"] != "accepted" {
+	if late := wantStatus(t, call(suggestOwner, "POST", chartSuggestions, `{"category":"rhythm-game"}`), 200); late["status"] != "accepted" {
 		t.Fatal("a later suggestion of an accepted category is filed accepted", late)
 	}
 	accepted := wantStatus(t, call(suggestAdmin, "GET", "/api/category-suggestions?status=accepted", ""), 200)
@@ -176,18 +182,18 @@ func TestCategorySuggestions(t *testing.T) {
 	}
 	var group map[string]any
 	for _, item := range accepted["items"].([]any) {
-		if item.(map[string]any)["category"] == "touhou" {
+		if item.(map[string]any)["category"] == "rhythm-game" {
 			group = item.(map[string]any)
 		}
 	}
 	if group == nil || group["count"].(float64) != 3 || group["decidedBy"].(map[string]any)["id"] != suggestAdmin {
 		t.Fatal("the accepted group holds every suggestion and who decided", group)
 	}
-	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("touhou", false)), 409)
+	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("rhythm-game", false)), 409)
 
 	// Rejecting answers every suggestion, and those made later.
-	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("album", false)), 200)
-	if late := wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"album"}`), 200); late["status"] != "rejected" {
+	wantStatus(t, call(suggestAdmin, "POST", "/api/category-suggestions/decision", decision("classics", false)), 200)
+	if late := wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"classics"}`), 200); late["status"] != "rejected" {
 		t.Fatal("a later suggestion of a rejected category is filed rejected", late)
 	}
 	if pending := wantStatus(t, call(suggestAdmin, "GET", "/api/category-suggestions", ""), 200); pending["total"].(float64) != 0 {
@@ -196,23 +202,23 @@ func TestCategorySuggestions(t *testing.T) {
 
 	// The owner putting the chart in a category answers its waiting suggestions and forgets a
 	// rejection.
-	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"internet"}`), 200)
-	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["album","bms","internet","touhou"]}`), 200)
+	wantStatus(t, call(suggestPlayer, "POST", chartSuggestions, `{"category":"pop"}`), 200)
+	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["classics","kids","pop","rhythm-game"]}`), 200)
 	mine = wantStatus(t, call(suggestPlayer, "GET", chartSuggestions, ""), 200)
 	for _, s := range mine["suggestions"].([]any) {
-		if suggestion := s.(map[string]any); suggestion["category"] == "internet" && suggestion["status"] != "accepted" {
+		if suggestion := s.(map[string]any); suggestion["category"] == "pop" && suggestion["status"] != "accepted" {
 			t.Fatal("an edit that adds the category accepts its suggestion", suggestion)
 		}
 	}
-	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["bms","touhou"]}`), 200)
+	wantStatus(t, call(suggestOwner, "PATCH", "/api/charts/"+suggestChart, `{"categoryIds":["kids","rhythm-game"]}`), 200)
 	if again := wantStatus(t, call(suggestPlayer2, "POST", chartSuggestions, `{"category":"anime"}`), 200); again["status"] != "pending" {
 		t.Fatal(again)
 	}
-	if again := wantStatus(t, call(suggestOwner, "POST", chartSuggestions, `{"category":"album"}`), 200); again["status"] != "pending" {
+	if again := wantStatus(t, call(suggestOwner, "POST", chartSuggestions, `{"category":"classics"}`), 200); again["status"] != "pending" {
 		t.Fatal("a category set and taken off again waits for a decision", again)
 	}
 
 	// A player takes back a suggestion while it waits, not after.
 	wantStatus(t, call(suggestPlayer2, "DELETE", chartSuggestions+"/anime", ""), 204)
-	wantStatus(t, call(suggestPlayer2, "DELETE", chartSuggestions+"/touhou", ""), 404)
+	wantStatus(t, call(suggestPlayer2, "DELETE", chartSuggestions+"/rhythm-game", ""), 404)
 }

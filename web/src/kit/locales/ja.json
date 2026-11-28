@@ -435,6 +435,12 @@
     "stars_other": "★{{count}}"
   },
   "errors": {
+    "TAG_NOT_FOUND": "タグが見つかりません。",
+    "TAG_REJECTED": "管理者がこの曲にはこのタグを付けないと判断しました。",
+    "TAG_LIMIT": "仮タグが上限に達しています。正式になるか取り下げてから作成してください。",
+    "TAG_NAME_INVALID": "タグ名は 1〜24 文字です。",
+    "TAG_EXISTS": "同じ名前のタグがすでにあります。",
+    "TAG_NOT_ON_CHART": "この曲にそのタグは付いていません。",
     "UNAUTHORIZED": "ログインしてください。",
     "FORBIDDEN": "この操作を行う権限がありません。",
     "CSRF_INVALID": "セッションが更新されました。ページを再読み込みしてください。",
@@ -1038,7 +1044,8 @@
     "editor": "OurTaikoEdit",
     "myTitles": "マイ称号",
     "songAdmin": "楽曲管理",
-    "danAdmin": "段位の審査"
+    "danAdmin": "段位の審査",
+    "tagAdmin": "タグ管理"
   },
   "chat": {
     "title": "メッセージ",
@@ -1135,5 +1142,34 @@
     "pending": "確認待ち",
     "accepted": "採用",
     "rejected": "不採用"
+  },
+  "tags": {
+    "heading": "タグ",
+    "open": "タグ",
+    "title": "タグ",
+    "hint": "この曲にタグを付けたり、自分が付けたタグを取り下げたりできます。他の人が付けたタグは外せません。合わないと思うタグは通報すると、管理者が判断します。",
+    "find": "タグを探す、または新しい名前を入力",
+    "loading": "タグを読み込み中…",
+    "none": "タグが見つかりません。",
+    "add": "付ける",
+    "remove": "外す",
+    "create": "作成して付ける",
+    "newHint": "新しいタグは仮タグとして始まり、3 人が使うと正式になります。",
+    "newOfficialHint": "管理者なので、新しいタグはすぐ正式になります。",
+    "pending": "仮",
+    "pendingHint": "仮タグ：3 人が使うと正式になります",
+    "songs_one": "{{count}} 曲",
+    "songs_other": "{{count}} 曲",
+    "votes_one": "{{count}} 人が追加",
+    "votes_other": "{{count}} 人が追加",
+    "votesHere_one": "この曲で {{count}} 人",
+    "votesHere_other": "この曲で {{count}} 人",
+    "report": "通報",
+    "reportOf": "タグ「{{name}}」を通報",
+    "reported": "通報済み",
+    "reason": "理由（任意）",
+    "sendReport": "通報する",
+    "close": "閉じる",
+    "anyTag": "すべてのタグ"
   }
 }

@@ -437,6 +437,12 @@
     "stars_one": "{{count}} star"
   },
   "errors": {
+    "TAG_NOT_FOUND": "That tag does not exist.",
+    "TAG_REJECTED": "A manager decided this song does not have that tag.",
+    "TAG_LIMIT": "You have too many pending tags. Wait until some become official, or take some back.",
+    "TAG_NAME_INVALID": "A tag name is 1 to 24 characters.",
+    "TAG_EXISTS": "A tag with that name already exists.",
+    "TAG_NOT_ON_CHART": "This song does not have that tag.",
     "UNAUTHORIZED": "Please sign in.",
     "FORBIDDEN": "You do not have permission for this action.",
     "CSRF_INVALID": "Session changed. Refresh the page and retry.",
@@ -1049,7 +1055,8 @@
     "editor": "OurTaikoEdit",
     "myTitles": "My titles",
     "songAdmin": "Manage songs",
-    "danAdmin": "Review Dan courses"
+    "danAdmin": "Review Dan courses",
+    "tagAdmin": "Manage tags"
   },
   "chat": {
     "title": "Messages",
@@ -1147,5 +1154,34 @@
     "pending": "Pending",
     "accepted": "Accepted",
     "rejected": "Rejected"
+  },
+  "tags": {
+    "heading": "Tags",
+    "open": "Tags",
+    "title": "Tags",
+    "hint": "Add tags to this song, or take back the ones you added. You cannot remove a tag someone else added; report it if it does not belong, and a manager will decide.",
+    "find": "Find a tag, or type a new name",
+    "loading": "Loading tags…",
+    "none": "No tags found.",
+    "add": "Add",
+    "remove": "Remove",
+    "create": "Create and add",
+    "newHint": "A new tag starts as pending and becomes official once 3 players have used it.",
+    "newOfficialHint": "You are a manager: the new tag is official at once.",
+    "pending": "pending",
+    "pendingHint": "Pending: becomes official once 3 players have used it",
+    "songs_one": "{{count}} song",
+    "songs_other": "{{count}} songs",
+    "votes_one": "added by {{count}} player",
+    "votes_other": "added by {{count}} players",
+    "votesHere_one": "{{count}} here",
+    "votesHere_other": "{{count}} here",
+    "report": "Report",
+    "reportOf": "Report the tag “{{name}}”",
+    "reported": "Reported",
+    "reason": "Reason (optional)",
+    "sendReport": "Send report",
+    "close": "Close",
+    "anyTag": "All tags"
   }
 }

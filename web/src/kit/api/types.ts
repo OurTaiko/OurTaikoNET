@@ -25,6 +25,28 @@ export type MySuggestion = { category: string; status: SuggestionStatus }
  * themselves (an owner or a manager) or decides suggestions (a manager), and what they suggested.
  */
 export type ChartSuggestions = { canEdit: boolean; canReview: boolean; suggestions: MySuggestion[] }
+/** official: of the catalog; pending: named by a player and not yet used by three. */
+export type TagStatus = 'pending' | 'official'
+/**
+ * A tag: what a song is beside its categories (東方Project, BMS…), the same for both sources.
+ * names has the tag's name in the languages it has, en always (a player's tag has only that);
+ * chartCount is how many published charts of the source have it.
+ */
+export type Tag = {
+  id: string
+  names: Record<string, string>
+  status: TagStatus
+  chartCount: number
+}
+/** GET /tags: the official tags in the catalog's order, then the pending ones. */
+export type TagList = { items: Tag[] }
+/** A tag on a chart: how many players voted for it, and whether the viewer did. */
+export type ChartTag = Pick<Tag, 'id' | 'names' | 'status'> & { count: number; mine: boolean }
+/**
+ * GET /charts/{id}/tags: the chart's tags, the most voted first, the tags the viewer has
+ * reported there and is waiting on, and whether the viewer decides reports (a manager).
+ */
+export type ChartTagState = { tags: ChartTag[]; reported: string[]; canReview: boolean }
 
 export type Side = 'single' | 'p1' | 'p2'
 /**
@@ -83,6 +105,8 @@ export type ChartBase = {
   wave: string
   difficulties: Difficulty[]
   categoryIds: string[]
+  /** The official tags players put on the chart (Tag ids), the most voted first. */
+  tags?: string[]
   ownerIds?: string[]
   owners?: { id: string; nickname: string; avatarPath?: string }[]
   /** Original uploader; use ownerIds for ownership. */

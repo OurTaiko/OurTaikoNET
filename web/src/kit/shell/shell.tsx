@@ -22,6 +22,7 @@ import {
   HouseIcon,
   ChatsCircleIcon,
   SealCheckIcon,
+  HashIcon,
   IdentificationCardIcon,
   ListIcon,
   MagnifyingGlassIcon,
@@ -275,6 +276,13 @@ export function Frame({ children }: { children: ReactNode }) {
                 href: '/manage/dans',
                 label: t('shell.danAdmin'),
                 icon: LockSimpleIcon,
+              },
+              // And the reports of the tags on its songs, with the catalog of tags (标签管理).
+              {
+                key: 'tagAdmin',
+                href: '/manage/tags',
+                label: t('shell.tagAdmin'),
+                icon: HashIcon,
               },
             ]
           : []),
