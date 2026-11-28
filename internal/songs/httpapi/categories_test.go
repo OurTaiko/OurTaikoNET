@@ -86,7 +86,7 @@ func TestCategoriesFlow(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	wantCatalog := []Category{
-		{ID: "game", Title: "Game", Genre: "GAME"}, {ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"},
+		{ID: "game", Title: "Non-Rhythm Game", Genre: "GAME"}, {ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"},
 		{ID: "pop", Title: "Pop", Genre: "J-POP"}, {ID: "classics", Title: "Classics", Genre: "CLASSICAL"},
 		{ID: "variety", Title: "Variety", Genre: "VARIETY"}, {ID: "anime", Title: "Anime", Genre: "ANIME"},
 		{ID: "rhythm-game", Title: "Rhythm Game", Genre: "NAMCO"}, {ID: "kids", Title: "Kids", Genre: "CHILDREN"},

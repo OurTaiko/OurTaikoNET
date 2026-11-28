@@ -14,7 +14,7 @@ var Fanmade = &Source{
 	// bits 64, 128, 256, 512, 2048, 4096 and 8192 were categories once and are never used again;
 	// what those said of a song its tags say (tags.go).
 	Categories: []categoryEntry{
-		{1, Category{ID: "game", Title: "Game", Genre: "GAME"}},
+		{1, Category{ID: "game", Title: "Non-Rhythm Game", Genre: "GAME"}},
 		{2, Category{ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"}},
 		{4, Category{ID: "pop", Title: "Pop", Genre: "J-POP"}},
 		{8, Category{ID: "classics", Title: "Classics", Genre: "CLASSICAL"}},
