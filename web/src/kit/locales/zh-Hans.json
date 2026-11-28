@@ -435,6 +435,12 @@
     "stars_other": "{{count}} 星"
   },
   "errors": {
+    "TAG_NOT_FOUND": "标签不存在。",
+    "TAG_REJECTED": "管理员已认定这首歌不属于这个标签。",
+    "TAG_LIMIT": "你创建的待定标签已达上限，等它们转正或撤回后再创建。",
+    "TAG_NAME_INVALID": "标签名须为 1–24 个字符。",
+    "TAG_EXISTS": "已经有这个名字的标签。",
+    "TAG_NOT_ON_CHART": "这首歌没有这个标签。",
     "UNAUTHORIZED": "请先登录。",
     "FORBIDDEN": "你没有执行此操作的权限。",
     "CSRF_INVALID": "会话已更新，请刷新页面后重试。",
@@ -1037,8 +1043,8 @@
     "announcements": "公告管理",
     "editor": "OurTaikoEdit",
     "myTitles": "我的称号",
-    "songAdmin": "乐曲管理",
-    "danAdmin": "段位审核"
+    "danAdmin": "段位审核",
+    "tagAdmin": "标签管理"
   },
   "chat": {
     "title": "消息",
@@ -1124,16 +1130,33 @@
     "toMine": "查看我的称号",
     "readOnly": "称号中心只能查看，不能回复。"
   },
-  "categorySuggestions": {
-    "open": "建议分类",
-    "title": "建议分类",
-    "hint": "觉得这首歌还应该在哪个分类里，可以提交建议，由曲库管理员处理。",
-    "suggest": "建议",
-    "withdraw": "撤回",
+  "tags": {
+    "heading": "标签",
+    "open": "标签",
+    "title": "标签",
+    "hint": "给这首歌添加标签，或撤回你自己添加的。别人添加的标签不能直接移除；觉得不合适可以举报，由曲库管理员处理。",
+    "find": "查找标签，或输入新标签名",
+    "loading": "正在读取标签…",
+    "none": "没有找到标签。",
+    "add": "添加",
+    "remove": "移除",
+    "create": "创建并添加",
+    "newHint": "新标签先是待定状态，有 3 位玩家用过后转正。",
+    "newOfficialHint": "你是管理员，新标签直接成为正式标签。",
+    "pending": "待定",
+    "pendingHint": "待定标签：有 3 位玩家用过后转正",
+    "songs_one": "{{count}} 首",
+    "songs_other": "{{count}} 首",
+    "votes_one": "{{count}} 人添加",
+    "votes_other": "{{count}} 人添加",
+    "votesHere_one": "本曲 {{count}} 人添加",
+    "votesHere_other": "本曲 {{count}} 人添加",
+    "report": "举报",
+    "reportOf": "举报标签「{{name}}」",
+    "reported": "已举报",
+    "reason": "理由（可不填）",
+    "sendReport": "提交举报",
     "close": "关闭",
-    "inCategory": "已在此分类",
-    "pending": "待处理",
-    "accepted": "已采纳",
-    "rejected": "已拒绝"
+    "anyTag": "全部标签"
   }
 }

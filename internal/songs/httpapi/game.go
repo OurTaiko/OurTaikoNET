@@ -108,6 +108,11 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
+	tags, err := gameTags(r.Context(), tx)
+	if err != nil {
+		internal(w, err)
+		return
+	}
 	if err = tx.Commit(r.Context()); err != nil {
 		internal(w, err)
 		return
@@ -133,6 +138,8 @@ func (s *Server) gameCatalog(w http.ResponseWriter, r *http.Request) {
 		"categories": categories, "charts": charts, "chartCount": len(charts), "playlists": playlists, "playlistVersion": 1,
 		"chartSlotVersion": 1, "resourceDownloadVersion": 1, "scoreReplayVersion": 1, "danVersion": 1, "danResultsVersion": 1,
 		"genreFrame": s.source().GenreFrame,
+		// The official tags, in the catalog's order: what the IDs in a chart's tags name.
+		"tags": tags,
 	}
 	// Where charts carry their preview clip (audioPreview).
 	if !s.source().Official {

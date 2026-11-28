@@ -22,13 +22,13 @@ import {
   HouseIcon,
   ChatsCircleIcon,
   SealCheckIcon,
+  HashIcon,
   IdentificationCardIcon,
   ListIcon,
   MagnifyingGlassIcon,
   MedalIcon,
   MegaphoneIcon,
   LockSimpleIcon,
-  MusicNotesIcon,
   PencilRulerIcon,
   PlaylistIcon,
   ShieldStarIcon,
@@ -256,17 +256,6 @@ export function Frame({ children }: { children: ReactNode }) {
               },
             ]
           : []),
-        // Fanmade's managers decide the categories players suggest (乐曲管理).
-        ...(roles.groups.includes('FANMADE_MANAGER')
-          ? [
-              {
-                key: 'songAdmin',
-                href: '/manage/songs',
-                label: t('shell.songAdmin'),
-                icon: MusicNotesIcon,
-              },
-            ]
-          : []),
         // Each source's managers decide the changes asked for its fixed 段位 courses (段位审核).
         ...(roles.groups.includes('FANMADE_MANAGER') || roles.groups.includes('OFFICIAL_MANAGER')
           ? [
@@ -275,6 +264,13 @@ export function Frame({ children }: { children: ReactNode }) {
                 href: '/manage/dans',
                 label: t('shell.danAdmin'),
                 icon: LockSimpleIcon,
+              },
+              // And the reports of the tags on its songs, with the catalog of tags (标签管理).
+              {
+                key: 'tagAdmin',
+                href: '/manage/tags',
+                label: t('shell.tagAdmin'),
+                icon: HashIcon,
               },
             ]
           : []),

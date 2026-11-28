@@ -510,20 +510,14 @@
     },
     "categories": {
       "fanmade": {
-        "game": "Game",
-        "virtual-singer": "Virtual Singer",
+        "game": "Non-rhythm games",
+        "vocaloid": "Virtual Singer",
         "pop": "Pop",
-        "classic": "Classical",
+        "classics": "Classical",
         "variety": "Variety",
         "anime": "Anime",
-        "touhou": "Touhou Project",
-        "gekichumai": "GEKICHUMAI",
-        "bemani": "BEMANI",
-        "project-sekai": "Project Sekai",
-        "other-rhythm-games": "Other rhythm games",
-        "bms": "BMS",
-        "album": "Album",
-        "internet": "Internet"
+        "rhythm-game": "Rhythm games",
+        "kids": "Kids"
       },
       "official": {
         "namco": "Namco Original",
@@ -603,27 +597,6 @@
     "return": "Return",
     "by": "by {{name}}"
   },
-  "songAdmin": {
-    "heading": "Manage songs",
-    "intro": "Categories players suggest for Fanmade's songs, decided by Fanmade's managers. Accepting or rejecting one settles every suggestion of that category for that song, including later ones; accepting takes a song that was only in Variety out of Variety.",
-    "status": "Status",
-    "statuses": {
-      "pending": "Pending",
-      "accepted": "Accepted",
-      "rejected": "Rejected"
-    },
-    "empty": "No suggestions here.",
-    "unknownChart": "(chart no longer visible)",
-    "suggestedBy_one": "suggested by {{count}} player",
-    "suggestedBy_other": "suggested by {{count}} players",
-    "current": "Current categories: {{categories}}",
-    "since": "First suggested {{at}}",
-    "decided": "Decided by {{by}}, {{at}}",
-    "earlier": "an earlier decision",
-    "accept": "Accept",
-    "reject": "Reject",
-    "pages": "Pages"
-  },
   "danAdmin": {
     "heading": "Review Dan courses",
     "intro": "Changing the songs or conditions of a course with fixed songs takes a request, which the managers of its library decide. Approving gives the course what was asked; it stays fixed from when it was, and earlier attempts still count for rules. Returning needs a reply. The maker is notified either way.",
@@ -634,5 +607,47 @@
     "reply": "Reply (required to return)",
     "approve": "Approve",
     "return": "Return"
+  },
+  "tagAdmin": {
+    "heading": "Manage tags",
+    "intro": "The tags players put on songs. Decide reports here, and keep the tag catalog both sources share.",
+    "source": "Source",
+    "reports": "Reports",
+    "status": "Status",
+    "statuses": {
+      "pending": "Waiting",
+      "upheld": "Removed",
+      "dismissed": "Dismissed"
+    },
+    "noReports": "No reports here.",
+    "unknownChart": "(song no longer visible)",
+    "reportedBy_one": "{{count}} report",
+    "reportedBy_other": "{{count}} reports",
+    "votes_one": "added by {{count}} player",
+    "votes_other": "added by {{count}} players",
+    "since": "First reported {{at}}",
+    "decided": "Decided by {{by}}, {{at}}",
+    "someone": "a manager",
+    "uphold": "Remove tag",
+    "dismiss": "Dismiss",
+    "pages": "Pages",
+    "catalog": "Tag catalog",
+    "catalogIntro": "Official tags can go on any song. Pending tags are made by players and become official once 3 players have used them. Renaming, merging and deleting apply to both sources; song counts are of this source.",
+    "newTag": "New official tag",
+    "create": "Create",
+    "songs_one": "{{count}} song",
+    "songs_other": "{{count}} songs",
+    "makeOfficial": "Make official",
+    "rename": "Rename",
+    "merge": "Merge",
+    "delete": "Delete",
+    "confirmDelete": "Delete the tag “{{name}}”? It is removed from every song of both sources with its votes and reports, and cannot be restored.",
+    "renameHint": "The English name is required; languages left empty show it.",
+    "mergeTitle": "Merge “{{name}}” into another tag",
+    "mergeHint": "This tag’s votes and reports go to the tag you choose, then this tag is deleted. This cannot be undone.",
+    "mergeInto": "Merge into",
+    "choose": "Choose a tag",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }

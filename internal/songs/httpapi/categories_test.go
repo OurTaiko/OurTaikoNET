@@ -82,17 +82,14 @@ func TestCategoriesFlow(t *testing.T) {
 	}
 	w := call("GET", "/api/categories", "", "")
 	var catalog struct{ Items []Category }
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Items) != 14 {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &catalog) != nil || len(catalog.Items) != 8 {
 		t.Fatal(w.Body.String())
 	}
 	wantCatalog := []Category{
-		{ID: "game", Title: "Game", Genre: "GAME"}, {ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"},
-		{ID: "pop", Title: "Pop", Genre: "J-POP"}, {ID: "classic", Title: "Classic", Genre: "CLASSICAL"},
+		{ID: "game", Title: "Non-Rhythm Game", Genre: "GAME"}, {ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"},
+		{ID: "pop", Title: "Pop", Genre: "J-POP"}, {ID: "classics", Title: "Classics", Genre: "CLASSICAL"},
 		{ID: "variety", Title: "Variety", Genre: "VARIETY"}, {ID: "anime", Title: "Anime", Genre: "ANIME"},
-		{ID: "touhou", Title: "Touhou Project", Genre: "TOUHOU"}, {ID: "gekichumai", Title: "GEKICHUMAI", Genre: "GEKICHUMAI"},
-		{ID: "bemani", Title: "BEMANI", Genre: "BEMANI"}, {ID: "project-sekai", Title: "Project Sekai", Genre: "PROJECT SEKAI"},
-		{ID: "other-rhythm-games", Title: "Other Rhythm Games", Genre: "RHYTHM GAME"}, {ID: "bms", Title: "BMS", Genre: "BMS"},
-		{ID: "album", Title: "Album", Genre: "ALBUM"}, {ID: "internet", Title: "Internet", Genre: "INTERNET"},
+		{ID: "rhythm-game", Title: "Rhythm Game", Genre: "NAMCO"}, {ID: "kids", Title: "Kids", Genre: "CHILDREN"},
 	}
 	// No chart is published yet: every count is 0.
 	if !reflect.DeepEqual(catalog.Items, wantCatalog) {
@@ -119,7 +116,7 @@ func TestCategoriesFlow(t *testing.T) {
 	if retry.ID != c.ID {
 		t.Fatal("duplicate upload")
 	}
-	if w = post(`["classic"]`, key); w.Code != 409 {
+	if w = post(`["classics"]`, key); w.Code != 409 {
 		t.Fatal("category change reused upload key", w.Code, w.Body.String())
 	}
 	for _, raw := range []string{`"game"`, `["missing"]`, `[null]`, `[1]`, `{}`} {
@@ -151,10 +148,10 @@ func TestCategoriesFlow(t *testing.T) {
 		Charts     []Chart
 		Categories []Category
 	}
-	if err = json.Unmarshal(w.Body.Bytes(), &summary); err != nil || summary.ChartCount != 4 || len(summary.Charts) != 4 || len(summary.Categories) != 14 {
+	if err = json.Unmarshal(w.Body.Bytes(), &summary); err != nil || summary.ChartCount != 4 || len(summary.Charts) != 4 || len(summary.Categories) != 8 {
 		t.Fatal("server total must count unique charts", w.Body.String(), err)
 	}
-	wantCounts := map[string]int{"game": 1, "pop": 1, "variety": 3, "classic": 0, "virtual-singer": 0, "anime": 1}
+	wantCounts := map[string]int{"game": 1, "pop": 1, "variety": 3, "classics": 0, "vocaloid": 0, "anime": 1}
 	for _, category := range summary.Categories {
 		if category.ID == "anime" && (category.Title != "Anime" || category.Genre != "ANIME") {
 			t.Fatal("game Anime metadata", category)
@@ -170,7 +167,7 @@ func TestCategoriesFlow(t *testing.T) {
 		ChartCount int
 		Items      []Category
 	}
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &site) != nil || site.ChartCount != 4 || len(site.Items) != 14 {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &site) != nil || site.ChartCount != 4 || len(site.Items) != 8 {
 		t.Fatal("website catalog counts", w.Body.String())
 	}
 	for _, category := range site.Items {
@@ -236,7 +233,7 @@ func TestCategoriesFlow(t *testing.T) {
 			t.Fatal(id, charts)
 		}
 	}
-	if len(categoryCharts("classic")) != 0 {
+	if len(categoryCharts("classics")) != 0 {
 		t.Fatal("empty category")
 	}
 	guest := call("GET", "/api/game/catalog", "", "")
@@ -261,7 +258,7 @@ func TestCategoriesFlow(t *testing.T) {
 		t.Fatal("the per-category list has been removed", w.Code, w.Body.String())
 	}
 	path := "/api/charts/" + c.ID
-	if w = call("PATCH", path, `{"categoryIds":["classic"]}`, otherToken); w.Code != 403 {
+	if w = call("PATCH", path, `{"categoryIds":["classics"]}`, otherToken); w.Code != 403 {
 		t.Fatal("nonowner changed categories")
 	}
 	if w = call("PATCH", path, `{"title":"Should roll back","categoryIds":["missing"]}`, token); w.Code != 422 {
@@ -278,22 +275,22 @@ func TestCategoriesFlow(t *testing.T) {
  RETURNING score`, c.ID).Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	after = decodeChart(call("PATCH", path, `{"categoryIds":["classic","virtual-singer"]}`, token), 200)
+	after = decodeChart(call("PATCH", path, `{"categoryIds":["classics","vocaloid"]}`, token), 200)
 	if err = pool.QueryRow(ctx, `SELECT category_flags FROM charts WHERE id=$1`, c.ID).Scan(&flags); err != nil || flags != 10 {
 		t.Fatal("category edit must replace, not accumulate bits", flags, err)
 	}
 	if after.ID != c.ID || after.TJAHash != c.TJAHash || after.AudioHash != c.AudioHash {
 		t.Fatal("classification changed content identity")
 	}
-	if len(categoryCharts("game")) != 0 || len(categoryCharts("pop")) != 0 || len(categoryCharts("anime")) != 0 || len(categoryCharts("classic")) != 1 {
+	if len(categoryCharts("game")) != 0 || len(categoryCharts("pop")) != 0 || len(categoryCharts("anime")) != 0 || len(categoryCharts("classics")) != 1 {
 		t.Fatal("membership replacement failed")
 	}
 	after = decodeChart(call("PATCH", path, `{"title":"Renamed"}`, token), 200)
-	if !reflect.DeepEqual(after.CategoryIDs, []string{"classic", "virtual-singer"}) {
+	if !reflect.DeepEqual(after.CategoryIDs, []string{"classics", "vocaloid"}) {
 		t.Fatal("omitted PATCH categories reset selection")
 	}
 	after = decodeChart(call("PATCH", path, `{"categoryIds":["anime"]}`, token), 200)
-	if !reflect.DeepEqual(after.CategoryIDs, []string{"anime"}) || len(categoryCharts("anime")) != 1 || len(categoryCharts("classic")) != 0 {
+	if !reflect.DeepEqual(after.CategoryIDs, []string{"anime"}) || len(categoryCharts("anime")) != 1 || len(categoryCharts("classics")) != 0 {
 		t.Fatal("editing into Anime failed", after.CategoryIDs)
 	}
 	if after.ID != c.ID || after.TJAHash != c.TJAHash || after.AudioHash != c.AudioHash {

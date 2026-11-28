@@ -18,20 +18,14 @@
     "orderUpdated": "Recently changed"
   },
   "categories": {
-    "game": "Game",
-    "virtual-singer": "Virtual Singer",
+    "game": "Non-rhythm games",
+    "vocaloid": "Virtual Singer",
     "pop": "Pop",
-    "classic": "Classical",
+    "classics": "Classical",
     "variety": "Variety",
     "anime": "Anime",
-    "touhou": "Touhou Project",
-    "gekichumai": "GEKICHUMAI",
-    "bemani": "BEMANI",
-    "project-sekai": "Project Sekai",
-    "other-rhythm-games": "Other rhythm games",
-    "bms": "BMS",
-    "album": "Album",
-    "internet": "Internet"
+    "rhythm-game": "Rhythm games",
+    "kids": "Kids"
   },
   "meta": {
     "siteDescription": "Fan-made Taiko charts on OurTaikoNET: preview and download charts uploaded by players, with leaderboards, playlists and dan courses."

@@ -24,8 +24,8 @@ import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
 import { MyTitlesPage } from './pages/my-titles'
 import { VisitsPage } from './pages/visits'
-import { SongsPage } from './pages/songs'
 import { DanChangesPage } from './pages/dan-changes'
+import { TagsPage } from './pages/tags'
 import '../styles.css'
 
 function NotFound() {
@@ -144,18 +144,18 @@ function App() {
                   }
                 />
                 <Route
-                  path="songs"
-                  element={
-                    <Private title={t('songAdmin.heading')}>
-                      <SongsPage />
-                    </Private>
-                  }
-                />
-                <Route
                   path="dans"
                   element={
                     <Private title={t('danAdmin.heading')}>
                       <DanChangesPage />
+                    </Private>
+                  }
+                />
+                <Route
+                  path="tags"
+                  element={
+                    <Private title={t('tagAdmin.heading')}>
+                      <TagsPage />
                     </Private>
                   }
                 />

@@ -44,6 +44,7 @@ export const site: Site = {
       filters={{
         order: filters.order,
         category: filters.category,
+        tag: filters.tag,
         course: filters.course,
         level: filters.level,
         nijiiro: filters.nijiiro,

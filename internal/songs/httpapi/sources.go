@@ -8,28 +8,23 @@ var Fanmade = &Source{
 	SessionCookie: "ourtaiko_session",
 	OIDCCookie:    "ourtaiko_oidc",
 	DefaultReturn: "/upload",
+	// Eight, one for each of the official source's (0032_fanmade_eight_categories): rhythm-game
+	// stands where that has namco, and game is the games that are not rhythm games. The game
+	// draws a category in the frame of its genre, so each has the genre of its counterpart. The
+	// bits 64, 128, 256, 512, 2048, 4096 and 8192 were categories once and are never used again;
+	// what those said of a song its tags say (tags.go).
 	Categories: []categoryEntry{
-		{1, Category{ID: "game", Title: "Game", Genre: "GAME"}},
-		{2, Category{ID: "virtual-singer", Title: "Virtual Singer", Genre: "VOCALOID"}},
+		{1, Category{ID: "game", Title: "Non-Rhythm Game", Genre: "GAME"}},
+		{2, Category{ID: "vocaloid", Title: "Vocaloid", Genre: "VOCALOID"}},
 		{4, Category{ID: "pop", Title: "Pop", Genre: "J-POP"}},
-		{8, Category{ID: "classic", Title: "Classic", Genre: "CLASSICAL"}},
+		{8, Category{ID: "classics", Title: "Classics", Genre: "CLASSICAL"}},
 		{16, Category{ID: "variety", Title: "Variety", Genre: "VARIETY"}},
 		{32, Category{ID: "anime", Title: "Anime", Genre: "ANIME"}},
-		// Fanmade's own (0027_fanmade_categories). The game draws a genre it does not know in
-		// its default frame.
-		{64, Category{ID: "touhou", Title: "Touhou Project", Genre: "TOUHOU"}},
-		{128, Category{ID: "gekichumai", Title: "GEKICHUMAI", Genre: "GEKICHUMAI"}},
-		{256, Category{ID: "bemani", Title: "BEMANI", Genre: "BEMANI"}},
-		{512, Category{ID: "project-sekai", Title: "Project Sekai", Genre: "PROJECT SEKAI"}},
-		{1024, Category{ID: "other-rhythm-games", Title: "Other Rhythm Games", Genre: "RHYTHM GAME"}},
-		{2048, Category{ID: "bms", Title: "BMS", Genre: "BMS"}},
-		{4096, Category{ID: "album", Title: "Album", Genre: "ALBUM"}},
-		{8192, Category{ID: "internet", Title: "Internet", Genre: "INTERNET"}},
+		{1024, Category{ID: "rhythm-game", Title: "Rhythm Game", Genre: "NAMCO"}},
+		{16384, Category{ID: "kids", Title: "Kids", Genre: "CHILDREN"}},
 	},
-	// Players suggest categories for its charts, which its managers decide (category_suggestions.go).
-	CategorySuggestions: true,
-	CategoryIDsSorted:   true,
-	PlaylistCategories:  map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classic", "daily": "variety"},
+	CategoryIDsSorted:  true,
+	PlaylistCategories: map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classics", "daily": "variety"},
 	// Deep blue.
 	GenreFrame: 10,
 }

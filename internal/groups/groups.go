@@ -26,11 +26,12 @@ type Set uint32
 // The groups. A bit, once given a meaning, keeps it: the numbers are in the database.
 const (
 	// OfficialManager adds, replaces, edits and removes charts of the official source, keeps
-	// its dan courses and playlists, and moderates its comments.
+	// its dan courses and playlists, moderates its comments, and decides the reports of the tags
+	// on its charts.
 	OfficialManager Set = 1 << iota
 	// FanmadeManager edits or removes any chart, dan course or playlist of the fanmade source,
-	// marks its dan courses official, moderates its comments, and decides the categories players
-	// suggest for its charts.
+	// marks its dan courses official, moderates its comments, and decides the reports of the tags
+	// on its charts.
 	FanmadeManager
 	// TitleManager keeps the title catalog and gives or takes titles by hand.
 	TitleManager
@@ -47,8 +48,8 @@ type Group struct {
 }
 
 var all = []Group{
-	{"OFFICIAL_MANAGER", OfficialManager, "Adds, replaces, edits and removes charts of the official source, keeps its dan courses and playlists, and moderates its comments."},
-	{"FANMADE_MANAGER", FanmadeManager, "Edits or removes any chart, dan course or playlist of the fanmade source, marks its dan courses official, moderates its comments, and decides the categories players suggest for its charts."},
+	{"OFFICIAL_MANAGER", OfficialManager, "Adds, replaces, edits and removes charts of the official source, keeps its dan courses and playlists, moderates its comments, and decides the reports of the tags on its charts."},
+	{"FANMADE_MANAGER", FanmadeManager, "Edits or removes any chart, dan course or playlist of the fanmade source, marks its dan courses official, moderates its comments, and decides the reports of the tags on its charts."},
 	{"TITLE_MANAGER", TitleManager, "Keeps the title catalog and gives or takes titles by hand."},
 }
 

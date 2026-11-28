@@ -18,20 +18,14 @@
     "orderUpdated": "最近更改"
   },
   "categories": {
-    "game": "游戏",
-    "virtual-singer": "虚拟歌手",
+    "game": "非音游",
+    "vocaloid": "虚拟歌手",
     "pop": "流行",
-    "classic": "古典",
+    "classics": "古典",
     "variety": "综合",
     "anime": "动画",
-    "touhou": "东方 PROJECT",
-    "gekichumai": "击中萌",
-    "bemani": "BEMANI",
-    "project-sekai": "世界计划",
-    "other-rhythm-games": "其他音乐游戏",
-    "bms": "BMS",
-    "album": "专辑曲",
-    "internet": "网络 / 梗曲"
+    "rhythm-game": "音游",
+    "kids": "儿童"
   },
   "meta": {
     "siteDescription": "OurTaikoNET 自制曲源：试听、下载玩家上传的太鼓自制谱面，查看排行榜、歌单和段位道场。"

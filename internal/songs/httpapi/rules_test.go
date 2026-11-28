@@ -143,7 +143,7 @@ func TestRulesGiveTitles(t *testing.T) {
 	expect(bob, "game", "genre", "genre-oni", "uploader")
 
 	// A chart put in another category is judged at once for everyone: bob has cleared the
-	// "pop" chart, now the only chart of "classic" (8).
+	// "pop" chart, now the only chart of "classics" (8).
 	if _, err := pool.Exec(ctx, `INSERT INTO net.titles(id,name,style,visibility) VALUES('classic','classic','wood','public')`); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestRulesGiveTitles(t *testing.T) {
 	if n, err := rules.Backfill(ctx, pool, rule); err != nil || n != 0 {
 		t.Fatal(n, err)
 	}
-	if code := c.do("owner", "PATCH", "/api/charts/"+cc, `{"categoryIds":["classic"]}`, nil); code != 200 {
+	if code := c.do("owner", "PATCH", "/api/charts/"+cc, `{"categoryIds":["classics"]}`, nil); code != 200 {
 		t.Fatal(code)
 	}
 	expect(bob, "classic", "game", "genre", "genre-oni", "uploader")

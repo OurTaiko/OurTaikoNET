@@ -7,21 +7,12 @@ const colors: Record<string, string> = {
   anime: '#f472b6',
   game: '#c084fc',
   vocaloid: '#9ca3af',
-  'virtual-singer': '#9ca3af',
   variety: '#4ade80',
-  classic: '#fbbf24',
   classics: '#fbbf24',
   kids: '#fde047',
   namco: '#f87171',
-  // Fanmade's own.
-  touhou: '#fb7185',
-  gekichumai: '#22d3ee',
-  bemani: '#a3e635',
-  'project-sekai': '#2dd4bf',
-  'other-rhythm-games': '#818cf8',
-  bms: '#94a3b8',
-  album: '#e879f9',
-  internet: '#fb923c',
+  // Fanmade's, where the official source has namco, and in its colour.
+  'rhythm-game': '#f87171',
 }
 
 export function categoryColor(id: string): string | undefined {

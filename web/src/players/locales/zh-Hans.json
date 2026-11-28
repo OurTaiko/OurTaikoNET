@@ -510,20 +510,14 @@
     },
     "categories": {
       "fanmade": {
-        "game": "游戏",
-        "virtual-singer": "虚拟歌手",
+        "game": "非音游",
+        "vocaloid": "虚拟歌手",
         "pop": "流行",
-        "classic": "古典",
+        "classics": "古典",
         "variety": "综合",
         "anime": "动画",
-        "touhou": "东方 PROJECT",
-        "gekichumai": "击中萌",
-        "bemani": "BEMANI",
-        "project-sekai": "世界计划",
-        "other-rhythm-games": "其他音乐游戏",
-        "bms": "BMS",
-        "album": "专辑曲",
-        "internet": "网络 / 梗曲"
+        "rhythm-game": "音游",
+        "kids": "儿童"
       },
       "official": {
         "namco": "南梦宫原创",
@@ -603,27 +597,6 @@
     "return": "退回",
     "by": "由 {{name}} 处理"
   },
-  "songAdmin": {
-    "heading": "乐曲管理",
-    "intro": "玩家为自制谱面提交的分类建议，由自制曲库的管理员处理。采纳或拒绝后，同一首歌同一个分类的其他建议（包括以后再提交的）都会按这个结果处理；采纳时，只在「综合」里的歌会移出「综合」。",
-    "status": "状态",
-    "statuses": {
-      "pending": "待处理",
-      "accepted": "已采纳",
-      "rejected": "已拒绝"
-    },
-    "empty": "这里没有建议。",
-    "unknownChart": "（谱面已不可见）",
-    "suggestedBy_one": "{{count}} 人建议",
-    "suggestedBy_other": "{{count}} 人建议",
-    "current": "现有分类：{{categories}}",
-    "since": "最早建议于 {{at}}",
-    "decided": "{{by}} 于 {{at}} 处理",
-    "earlier": "先前的决定",
-    "accept": "采纳",
-    "reject": "拒绝",
-    "pages": "翻页"
-  },
   "danAdmin": {
     "heading": "段位审核",
     "intro": "已固定曲目的段位，修改曲目或合格条件需要提交申请，由该曲库的管理员处理。通过后段位改为申请的曲目和条件，固定时间不变，之前的挑战仍计入发放条件；退回需要写回复。创建者会收到通知。",
@@ -634,5 +607,47 @@
     "reply": "回复（退回时必填）",
     "approve": "通过",
     "return": "退回"
+  },
+  "tagAdmin": {
+    "heading": "标签管理",
+    "intro": "玩家给歌曲添加的标签。这里处理举报，并维护两个曲库共用的标签目录。",
+    "source": "曲库",
+    "reports": "举报",
+    "status": "状态",
+    "statuses": {
+      "pending": "待处理",
+      "upheld": "已移除",
+      "dismissed": "已驳回"
+    },
+    "noReports": "这里没有举报。",
+    "unknownChart": "（谱面已不可见）",
+    "reportedBy_one": "{{count}} 人举报",
+    "reportedBy_other": "{{count}} 人举报",
+    "votes_one": "{{count}} 人添加",
+    "votes_other": "{{count}} 人添加",
+    "since": "最早举报于 {{at}}",
+    "decided": "{{by}} 于 {{at}} 处理",
+    "someone": "管理员",
+    "uphold": "移除标签",
+    "dismiss": "驳回",
+    "pages": "翻页",
+    "catalog": "标签目录",
+    "catalogIntro": "正式标签所有歌都能用；待定标签由玩家创建，有 3 位玩家用过后自动转正。改名、合并和删除对两个曲库同时生效，歌曲数是当前曲库的。",
+    "newTag": "新建正式标签",
+    "create": "创建",
+    "songs_one": "{{count}} 首",
+    "songs_other": "{{count}} 首",
+    "makeOfficial": "转正",
+    "rename": "改名",
+    "merge": "合并",
+    "delete": "删除",
+    "confirmDelete": "删除标签「{{name}}」？两个曲库里所有歌上的这个标签、它的票和举报都会一起删除，不能恢复。",
+    "renameHint": "英文名必填；没有填写的语言显示英文名。",
+    "mergeTitle": "把「{{name}}」并入另一个标签",
+    "mergeHint": "这个标签的票和举报都会转到选中的标签，然后这个标签被删除，不能恢复。",
+    "mergeInto": "并入",
+    "choose": "选择标签",
+    "save": "保存",
+    "cancel": "取消"
   }
 }

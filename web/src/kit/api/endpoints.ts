@@ -36,6 +36,16 @@ const build = () =>
     danChange: (id: string, change: string) =>
       `${API_ROOT}/dans/${encodeURIComponent(id)}/changes/${encodeURIComponent(change)}`,
     categories: `${API_ROOT}/categories`,
+    /** GET: the tag catalog. For a manager, POST {names} adds an official tag. */
+    tags: `${API_ROOT}/tags`,
+    /** For a manager: PATCH {names?, official?}, DELETE. */
+    tag: (tag: string) => `${API_ROOT}/tags/${encodeURIComponent(tag)}`,
+    /** For a manager: POST {into} gives the tag's votes to another and deletes it. */
+    tagMerge: (tag: string) => `${API_ROOT}/tags/${encodeURIComponent(tag)}/merge`,
+    /** For a manager: GET ?status=&page= the reports by chart and tag. */
+    tagReports: `${API_ROOT}/tag-reports`,
+    /** For a manager: POST {chartId, tag, uphold}. */
+    tagReportDecision: `${API_ROOT}/tag-reports/decision`,
     uploadRules: `${API_ROOT}/upload-rules`,
     // The site has one sign-in, outside any source. It returns to a page of this source.
     logout: `${SITE_API_ROOT}/auth/logout`,
@@ -65,13 +75,13 @@ const build = () =>
     collaboration: (id: string, invitation: string) =>
       `${chartPath(id)}/collaborations/${encodeURIComponent(invitation)}`,
     chartOwnership: (id: string) => `${chartPath(id)}/owners/me`,
-    /**
-     * Fanmade: GET the viewer's part in a chart's categories, POST {category} to suggest one,
-     * DELETE …/{category} to take back a suggestion still waiting.
-     */
-    categorySuggestions: (id: string) => `${chartPath(id)}/category-suggestions`,
-    categorySuggestion: (id: string, category: string) =>
-      `${chartPath(id)}/category-suggestions/${encodeURIComponent(category)}`,
+    /** GET: the chart's tags and the viewer's part in them; POST {name}: add the tag so named. */
+    chartTags: (id: string) => `${chartPath(id)}/tags`,
+    /** PUT {vote: 1 | 0}: the viewer's own vote for the tag on the chart. */
+    chartTag: (id: string, tag: string) => `${chartPath(id)}/tags/${encodeURIComponent(tag)}`,
+    /** POST {reason}: the viewer says the tag does not belong on the chart. */
+    chartTagReports: (id: string, tag: string) =>
+      `${chartPath(id)}/tags/${encodeURIComponent(tag)}/reports`,
     chartFiles: (id: string) => `${chartPath(id)}/files`,
     /** PUT: the background movie on its own, with an optional movieOffset. */
     chartMovie: (id: string) => `${chartPath(id)}/movie`,

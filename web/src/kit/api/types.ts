@@ -17,14 +17,28 @@ export type Session<U extends UserBase = UserBase> = { user: U | null; csrfToken
 export type Category = { id: string; title: string; genre: string; chartCount: number }
 /** GET /categories: the catalog and the published charts in all. */
 export type CategoryList = { items: Category[]; chartCount: number }
-export type SuggestionStatus = 'pending' | 'accepted' | 'rejected'
-/** One of the viewer's suggestions of a category for a chart. */
-export type MySuggestion = { category: string; status: SuggestionStatus }
+/** official: of the catalog; pending: named by a player and not yet used by three. */
+export type TagStatus = 'pending' | 'official'
 /**
- * GET /charts/{id}/category-suggestions (Fanmade): whether the viewer sets the chart's categories
- * themselves (an owner or a manager) or decides suggestions (a manager), and what they suggested.
+ * A tag: what a song is beside its categories (東方Project, BMS…), the same for both sources.
+ * names has the tag's name in the languages it has, en always (a player's tag has only that);
+ * chartCount is how many published charts of the source have it.
  */
-export type ChartSuggestions = { canEdit: boolean; canReview: boolean; suggestions: MySuggestion[] }
+export type Tag = {
+  id: string
+  names: Record<string, string>
+  status: TagStatus
+  chartCount: number
+}
+/** GET /tags: the official tags in the catalog's order, then the pending ones. */
+export type TagList = { items: Tag[] }
+/** A tag on a chart: how many players voted for it, and whether the viewer did. */
+export type ChartTag = Pick<Tag, 'id' | 'names' | 'status'> & { count: number; mine: boolean }
+/**
+ * GET /charts/{id}/tags: the chart's tags, the most voted first, the tags the viewer has
+ * reported there and is waiting on, and whether the viewer decides reports (a manager).
+ */
+export type ChartTagState = { tags: ChartTag[]; reported: string[]; canReview: boolean }
 
 export type Side = 'single' | 'p1' | 'p2'
 /**
@@ -83,6 +97,8 @@ export type ChartBase = {
   wave: string
   difficulties: Difficulty[]
   categoryIds: string[]
+  /** The official tags players put on the chart (Tag ids), the most voted first. */
+  tags?: string[]
   ownerIds?: string[]
   owners?: { id: string; nickname: string; avatarPath?: string }[]
   /** Original uploader; use ownerIds for ownership. */
