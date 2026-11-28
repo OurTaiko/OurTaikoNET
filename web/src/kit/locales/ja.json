@@ -1043,7 +1043,6 @@
     "announcements": "お知らせ管理",
     "editor": "OurTaikoEdit",
     "myTitles": "マイ称号",
-    "songAdmin": "楽曲管理",
     "danAdmin": "段位の審査",
     "tagAdmin": "タグ管理"
   },
@@ -1130,18 +1129,6 @@
     "toReviews": "審査する",
     "toMine": "マイ称号を見る",
     "readOnly": "称号センターは閲覧専用で、返信はできません。"
-  },
-  "categorySuggestions": {
-    "open": "カテゴリを提案",
-    "title": "カテゴリを提案",
-    "hint": "この曲が入るべきカテゴリがあれば提案してください。ソースの管理者が確認します。",
-    "suggest": "提案",
-    "withdraw": "取り下げ",
-    "close": "閉じる",
-    "inCategory": "このカテゴリに含まれます",
-    "pending": "確認待ち",
-    "accepted": "採用",
-    "rejected": "不採用"
   },
   "tags": {
     "heading": "タグ",

@@ -29,7 +29,6 @@ import {
   MedalIcon,
   MegaphoneIcon,
   LockSimpleIcon,
-  MusicNotesIcon,
   PencilRulerIcon,
   PlaylistIcon,
   ShieldStarIcon,
@@ -254,17 +253,6 @@ export function Frame({ children }: { children: ReactNode }) {
                 href: '/manage/titles',
                 label: t('shell.titleAdmin'),
                 icon: ShieldStarIcon,
-              },
-            ]
-          : []),
-        // Fanmade's managers decide the categories players suggest (乐曲管理).
-        ...(roles.groups.includes('FANMADE_MANAGER')
-          ? [
-              {
-                key: 'songAdmin',
-                href: '/manage/songs',
-                label: t('shell.songAdmin'),
-                icon: MusicNotesIcon,
               },
             ]
           : []),

@@ -24,7 +24,6 @@ import { FeaturedPage } from './pages/featured'
 import { ManagePage } from './pages/manage'
 import { MyTitlesPage } from './pages/my-titles'
 import { VisitsPage } from './pages/visits'
-import { SongsPage } from './pages/songs'
 import { DanChangesPage } from './pages/dan-changes'
 import { TagsPage } from './pages/tags'
 import '../styles.css'
@@ -141,14 +140,6 @@ function App() {
                   element={
                     <Private title={t('shell.titleAdmin')}>
                       <AdminPage />
-                    </Private>
-                  }
-                />
-                <Route
-                  path="songs"
-                  element={
-                    <Private title={t('songAdmin.heading')}>
-                      <SongsPage />
                     </Private>
                   }
                 />

@@ -436,6 +436,24 @@ const (
 	reportDismissed = "dismissed"
 )
 
+// ReportedChart is what the queue shows of a chart.
+type ReportedChart struct {
+	ID                   string            `json:"id"`
+	NumberID             int64             `json:"numberId"`
+	Title                string            `json:"title"`
+	Subtitle             string            `json:"subtitle"`
+	TitleTranslations    map[string]string `json:"titleTranslations"`
+	SubtitleTranslations map[string]string `json:"subtitleTranslations"`
+	SongCoverPath        string            `json:"songCoverPath,omitempty"`
+	CategoryIDs          []string          `json:"categoryIds"`
+}
+
+const (
+	reportPageSize = 30
+	// maxReporters is how many of a group's players the queue names.
+	maxReporters = 5
+)
+
 // TagReporter is a player who reported a tag, with what they said.
 type TagReporter struct {
 	NotificationActor
@@ -444,11 +462,11 @@ type TagReporter struct {
 
 // TagReportGroup is every report of one tag on one chart, as the managers see them.
 type TagReportGroup struct {
-	Chart     SuggestedChart `json:"chart"`
-	Tag       Tag            `json:"tag"`
-	Status    string         `json:"status"`
-	Count     int            `json:"count"`
-	Reporters []TagReporter  `json:"reporters"`
+	Chart     ReportedChart `json:"chart"`
+	Tag       Tag           `json:"tag"`
+	Status    string        `json:"status"`
+	Count     int           `json:"count"`
+	Reporters []TagReporter `json:"reporters"`
 	// Votes is how many players' votes for the tag stand on the chart.
 	Votes     int                `json:"votes"`
 	FirstAt   time.Time          `json:"firstAt"`
@@ -495,10 +513,10 @@ func (s *Server) tagReports(w http.ResponseWriter, r *http.Request) {
 	}
 	// The decider of a group is whoever decided its latest decided report that names one.
 	rows, e := s.DB.Query(ctx, `SELECT p.chart_id,g.id,g.names,g.status,count(*),min(p.created_at),max(p.created_at),
- (array_agg(p.user_id ORDER BY p.created_at))[1:`+strconv.Itoa(maxSuggesters)+`],(array_agg(p.reason ORDER BY p.created_at))[1:`+strconv.Itoa(maxSuggesters)+`],
+ (array_agg(p.user_id ORDER BY p.created_at))[1:`+strconv.Itoa(maxReporters)+`],(array_agg(p.reason ORDER BY p.created_at))[1:`+strconv.Itoa(maxReporters)+`],
  max(p.decided_at),(array_agg(p.decided_by ORDER BY p.decided_at DESC) FILTER (WHERE p.decided_by IS NOT NULL))[1],
  (SELECT count(*) FROM chart_tag_votes v WHERE v.chart_id=p.chart_id AND v.tag_id=g.id AND v.vote=1)`+
-		from+` GROUP BY p.chart_id,g.id ORDER BY `+ordering+` LIMIT $2 OFFSET $3`, status, suggestionPageSize, (page-1)*suggestionPageSize)
+		from+` GROUP BY p.chart_id,g.id ORDER BY `+ordering+` LIMIT $2 OFFSET $3`, status, reportPageSize, (page-1)*reportPageSize)
 	if e != nil {
 		internal(w, e)
 		return
@@ -535,9 +553,9 @@ func (s *Server) tagReports(w http.ResponseWriter, r *http.Request) {
 		internal(w, e)
 		return
 	}
-	byID := map[string]SuggestedChart{}
+	byID := map[string]ReportedChart{}
 	for _, c := range charts {
-		byID[c.ID] = SuggestedChart{ID: c.ID, NumberID: c.NumberID, Title: c.Title, Subtitle: c.Subtitle,
+		byID[c.ID] = ReportedChart{ID: c.ID, NumberID: c.NumberID, Title: c.Title, Subtitle: c.Subtitle,
 			TitleTranslations: c.TitleTranslations, SubtitleTranslations: c.SubtitleTranslations, SongCoverPath: c.SongCoverPath, CategoryIDs: c.CategoryIDs}
 	}
 	profiles := s.profiles(ctx, people)
@@ -558,7 +576,7 @@ func (s *Server) tagReports(w http.ResponseWriter, r *http.Request) {
 		}
 		items = append(items, x.group)
 	}
-	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": suggestionPageSize})
+	web.Respond(w, 200, map[string]any{"items": items, "total": total, "page": page, "pageSize": reportPageSize})
 }
 
 // decideTagReport answers POST /tag-reports/decision {"chartId","tag","uphold"}, for the source's

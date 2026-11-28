@@ -17,6 +17,10 @@
 --   album 4096     -> variety when it is in no other category
 --
 -- and a chart in rhythm-game leaves game, which is the games that are not rhythm games now.
+--
+-- Players no longer suggest categories (0027's category_suggestions and category_rejections):
+-- what a player says of a song is a tag now. Nothing reads those two tables; they are left for
+-- a later migration to drop, because the release before this one reads them while it is replaced.
 
 -- A retired category and the tag it becomes.
 CREATE TEMPORARY TABLE category_tags (bit integer PRIMARY KEY, tag_id text NOT NULL) ON COMMIT DROP;
@@ -26,29 +30,10 @@ INSERT INTO category_tags VALUES (64, 'touhou'), (128, 'gekichumai'), (2048, 'bm
 DELETE FROM fanmade.tag_rejections r USING fanmade.charts c, category_tags t
 WHERE r.chart_id = c.id AND r.tag_id = t.tag_id AND c.category_flags & t.bit <> 0;
 
--- The tag is the vote of who put the chart there: its first owner, and the players whose
--- suggestion of the category waits or was accepted.
+-- The tag is the vote of who put the chart there: its first owner.
 INSERT INTO fanmade.chart_tag_votes (chart_id, tag_id, user_id, vote)
 SELECT c.id, t.tag_id, c.owner_ids[1], 1 FROM fanmade.charts c JOIN category_tags t ON c.category_flags & t.bit <> 0
 ON CONFLICT (chart_id, tag_id, user_id) DO UPDATE SET vote = 1, updated_at = now();
-
-INSERT INTO fanmade.chart_tag_votes (chart_id, tag_id, user_id, vote, created_at)
-SELECT s.chart_id, t.tag_id, s.user_id, 1, s.created_at
-FROM fanmade.category_suggestions s JOIN category_tags t ON t.bit = s.category_flag
-WHERE s.status IN ('pending', 'accepted')
-  AND NOT EXISTS (SELECT 1 FROM fanmade.category_rejections r WHERE r.chart_id = s.chart_id AND r.category_flag = s.category_flag)
-ON CONFLICT (chart_id, tag_id, user_id) DO UPDATE SET vote = 1, updated_at = now();
-
--- A manager's decision that a chart is not in the category is the decision that it has not the tag.
-INSERT INTO fanmade.tag_rejections (chart_id, tag_id, rejected_by, rejected_at)
-SELECT r.chart_id, t.tag_id, r.rejected_by, r.rejected_at FROM fanmade.category_rejections r JOIN category_tags t ON t.bit = r.category_flag
-ON CONFLICT (chart_id, tag_id) DO NOTHING;
-
--- A pending tag these votes brought to three players is official, as a vote would have made it.
-UPDATE net.tags g SET status = 'official'
-WHERE g.status = 'pending' AND (SELECT count(DISTINCT user_id) FROM (
-    SELECT user_id FROM fanmade.chart_tag_votes WHERE tag_id = g.id AND vote = 1
-    UNION SELECT user_id FROM official.chart_tag_votes WHERE tag_id = g.id AND vote = 1) u) >= 3;
 
 -- The charts. 2944 is gekichumai, bemani, project-sekai and bms; 3968 those and rhythm-game;
 -- 15296 every retired bit. A chart left in no category (it was in album or internet alone) is in
@@ -67,17 +52,6 @@ WHERE c.id = n.id;
 UPDATE fanmade.playlists SET category_flag = CASE WHEN category_flag & 2944 <> 0 THEN 1024 ELSE 16 END
 WHERE category_flag & 15296 <> 0;
 
--- A suggestion of gekichumai, bemani, project-sekai or bms that waits is one of rhythm-game, for
--- a chart that is not in it yet; the suggestions and decisions of retired categories go.
-INSERT INTO fanmade.category_suggestions (chart_id, category_flag, user_id, created_at)
-SELECT s.chart_id, 1024, s.user_id, min(s.created_at)
-FROM fanmade.category_suggestions s JOIN fanmade.charts c ON c.id = s.chart_id
-WHERE s.status = 'pending' AND s.category_flag & 2944 <> 0 AND c.category_flags & 1024 = 0
-GROUP BY s.chart_id, s.user_id
-ON CONFLICT (chart_id, category_flag, user_id) DO NOTHING;
-DELETE FROM fanmade.category_suggestions WHERE category_flag & 15296 <> 0;
-DELETE FROM fanmade.category_rejections WHERE category_flag & 15296 <> 0;
-
 -- A reward rule for clearing a category of Fanmade: of the four that became rhythm-game it is
 -- of rhythm-game, where no rule says the same already; of touhou, album or internet it has no
 -- category left to be of and goes (what it gave stays given).
@@ -93,5 +67,9 @@ DELETE FROM net.reward_rules WHERE source = 'fanmade' AND category_flag & 15296 
 -- 17471 is the eight bits.
 ALTER TABLE fanmade.charts DROP CONSTRAINT IF EXISTS charts_category_flags_check,
     ADD CONSTRAINT charts_category_flags_check CHECK (category_flags >= 0 AND (category_flags & 17471) = category_flags);
+COMMENT ON TABLE fanmade.category_suggestions IS 'Unread since 0032_fanmade_eight_categories (players no longer suggest categories); to be dropped.';
+COMMENT ON TABLE fanmade.category_rejections IS 'Unread since 0032_fanmade_eight_categories (players no longer suggest categories); to be dropped.';
+COMMENT ON TABLE official.category_suggestions IS 'Unread since 0032_fanmade_eight_categories (players no longer suggest categories); to be dropped.';
+COMMENT ON TABLE official.category_rejections IS 'Unread since 0032_fanmade_eight_categories (players no longer suggest categories); to be dropped.';
 ALTER TABLE fanmade.playlists DROP CONSTRAINT IF EXISTS playlists_category_flag_check,
     ADD CONSTRAINT playlists_category_flag_check CHECK (category_flag IN (1, 2, 4, 8, 16, 32, 1024, 16384));

@@ -1043,7 +1043,6 @@
     "announcements": "공지 관리",
     "editor": "OurTaikoEdit",
     "myTitles": "내 칭호",
-    "songAdmin": "곡 관리",
     "danAdmin": "단위 심사",
     "tagAdmin": "태그 관리"
   },
@@ -1130,18 +1129,6 @@
     "toReviews": "심사하러 가기",
     "toMine": "내 칭호 보기",
     "readOnly": "칭호 센터는 보기 전용이며 답장할 수 없습니다."
-  },
-  "categorySuggestions": {
-    "open": "카테고리 제안",
-    "title": "카테고리 제안",
-    "hint": "이 곡이 들어가야 할 카테고리가 있다면 제안해 주세요. 소스 관리자가 검토합니다.",
-    "suggest": "제안",
-    "withdraw": "철회",
-    "close": "닫기",
-    "inCategory": "이 카테고리에 있음",
-    "pending": "대기 중",
-    "accepted": "채택됨",
-    "rejected": "거절됨"
   },
   "tags": {
     "heading": "태그",

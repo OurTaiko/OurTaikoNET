@@ -814,12 +814,12 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 		t.Fatalf("members: %d %+v", status, listed)
 	}
 
-	// Only Fanmade takes category suggestions, which its managers decide.
-	if status := call(someone, "GET", "/api/v1/sources/official/category-suggestions", "", nil); status != 404 {
-		t.Fatal("the official source answered category suggestions:", status)
+	// A source's managers decide the reports of the tags on its charts.
+	if status := call(someone, "GET", "/api/v1/sources/official/tag-reports", "", nil); status != 200 {
+		t.Fatal("an official manager could not read the official tag reports:", status)
 	}
-	if status := call(someone, "GET", "/api/v1/sources/fanmade/category-suggestions", "", nil); status != 403 {
-		t.Fatal("an official manager read the fanmade category suggestions:", status)
+	if status := call(someone, "GET", "/api/v1/sources/fanmade/tag-reports", "", nil); status != 403 {
+		t.Fatal("an official manager read the fanmade tag reports:", status)
 	}
 
 	// The other two groups, then none.
@@ -827,8 +827,8 @@ func TestGroupsDecideWhoMayDoWhat(t *testing.T) {
 	if got := manages(someone); got != "/api/v1/sources/fanmade/me,/api/v1/me" {
 		t.Fatal("FANMADE_MANAGER and TITLE_MANAGER manage", got)
 	}
-	if status := call(someone, "GET", "/api/v1/sources/fanmade/category-suggestions", "", nil); status != 200 {
-		t.Fatal("a fanmade manager could not read the category suggestions:", status)
+	if status := call(someone, "GET", "/api/v1/sources/fanmade/tag-reports", "", nil); status != 200 {
+		t.Fatal("a fanmade manager could not read the fanmade tag reports:", status)
 	}
 	if status := call(someone, "PUT", "/api/v1/admin/titles/some-title", `{"name":"T","layers":{"band":"band/lumen-title-gold","effect":"effect/lumen-title-gold"}}`, nil); status == 403 {
 		t.Fatal("a title manager may not keep the catalog")

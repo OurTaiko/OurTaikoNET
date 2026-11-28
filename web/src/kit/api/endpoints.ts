@@ -82,13 +82,6 @@ const build = () =>
     /** POST {reason}: the viewer says the tag does not belong on the chart. */
     chartTagReports: (id: string, tag: string) =>
       `${chartPath(id)}/tags/${encodeURIComponent(tag)}/reports`,
-    /**
-     * Fanmade: GET the viewer's part in a chart's categories, POST {category} to suggest one,
-     * DELETE …/{category} to take back a suggestion still waiting.
-     */
-    categorySuggestions: (id: string) => `${chartPath(id)}/category-suggestions`,
-    categorySuggestion: (id: string, category: string) =>
-      `${chartPath(id)}/category-suggestions/${encodeURIComponent(category)}`,
     chartFiles: (id: string) => `${chartPath(id)}/files`,
     /** PUT: the background movie on its own, with an optional movieOffset. */
     chartMovie: (id: string) => `${chartPath(id)}/movie`,

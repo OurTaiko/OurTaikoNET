@@ -17,14 +17,6 @@ export type Session<U extends UserBase = UserBase> = { user: U | null; csrfToken
 export type Category = { id: string; title: string; genre: string; chartCount: number }
 /** GET /categories: the catalog and the published charts in all. */
 export type CategoryList = { items: Category[]; chartCount: number }
-export type SuggestionStatus = 'pending' | 'accepted' | 'rejected'
-/** One of the viewer's suggestions of a category for a chart. */
-export type MySuggestion = { category: string; status: SuggestionStatus }
-/**
- * GET /charts/{id}/category-suggestions (Fanmade): whether the viewer sets the chart's categories
- * themselves (an owner or a manager) or decides suggestions (a manager), and what they suggested.
- */
-export type ChartSuggestions = { canEdit: boolean; canReview: boolean; suggestions: MySuggestion[] }
 /** official: of the catalog; pending: named by a player and not yet used by three. */
 export type TagStatus = 'pending' | 'official'
 /**

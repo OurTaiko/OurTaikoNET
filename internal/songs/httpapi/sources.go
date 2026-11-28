@@ -23,10 +23,8 @@ var Fanmade = &Source{
 		{1024, Category{ID: "rhythm-game", Title: "Rhythm Game", Genre: "NAMCO"}},
 		{16384, Category{ID: "kids", Title: "Kids", Genre: "CHILDREN"}},
 	},
-	// Players suggest categories for its charts, which its managers decide (category_suggestions.go).
-	CategorySuggestions: true,
-	CategoryIDsSorted:   true,
-	PlaylistCategories:  map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classics", "daily": "variety"},
+	CategoryIDsSorted:  true,
+	PlaylistCategories: map[string]string{"liked": "pop", "popular": "game", "acclaimed": "classics", "daily": "variety"},
 	// Deep blue.
 	GenreFrame: 10,
 }

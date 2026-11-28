@@ -1043,7 +1043,6 @@
     "announcements": "公告管理",
     "editor": "OurTaikoEdit",
     "myTitles": "我的称号",
-    "songAdmin": "乐曲管理",
     "danAdmin": "段位审核",
     "tagAdmin": "标签管理"
   },
@@ -1130,18 +1129,6 @@
     "toReviews": "去审核",
     "toMine": "查看我的称号",
     "readOnly": "称号中心只能查看，不能回复。"
-  },
-  "categorySuggestions": {
-    "open": "建议分类",
-    "title": "建议分类",
-    "hint": "觉得这首歌还应该在哪个分类里，可以提交建议，由曲库管理员处理。",
-    "suggest": "建议",
-    "withdraw": "撤回",
-    "close": "关闭",
-    "inCategory": "已在此分类",
-    "pending": "待处理",
-    "accepted": "已采纳",
-    "rejected": "已拒绝"
   },
   "tags": {
     "heading": "标签",

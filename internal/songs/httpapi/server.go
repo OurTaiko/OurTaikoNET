@@ -131,13 +131,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/charts/{id}/tags", s.addTag)
 	mux.HandleFunc("PUT /api/charts/{id}/tags/{tag}", s.voteTag)
 	mux.HandleFunc("POST /api/charts/{id}/tags/{tag}/reports", s.reportTag)
-	if s.source().CategorySuggestions {
-		mux.HandleFunc("GET /api/category-suggestions", s.categorySuggestions)
-		mux.HandleFunc("POST /api/category-suggestions/decision", s.decideSuggestion)
-		mux.HandleFunc("GET /api/charts/{id}/category-suggestions", s.chartSuggestions)
-		mux.HandleFunc("POST /api/charts/{id}/category-suggestions", s.suggestCategory)
-		mux.HandleFunc("DELETE /api/charts/{id}/category-suggestions/{category}", s.withdrawSuggestion)
-	}
 	mux.HandleFunc("GET /api/auth/sso/login", func(w http.ResponseWriter, r *http.Request) { s.sessions().Login(w, r) })
 	mux.HandleFunc("GET /api/auth/sso/callback", func(w http.ResponseWriter, r *http.Request) { s.sessions().Callback(w, r) })
 	mux.HandleFunc("GET /api/auth/account/{page}", func(w http.ResponseWriter, r *http.Request) { s.sessions().AccountRedirect(w, r) })

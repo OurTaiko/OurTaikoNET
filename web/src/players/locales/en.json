@@ -597,27 +597,6 @@
     "return": "Return",
     "by": "by {{name}}"
   },
-  "songAdmin": {
-    "heading": "Manage songs",
-    "intro": "Categories players suggest for Fanmade's songs, decided by Fanmade's managers. Accepting or rejecting one settles every suggestion of that category for that song, including later ones; accepting takes a song that was only in Variety out of Variety.",
-    "status": "Status",
-    "statuses": {
-      "pending": "Pending",
-      "accepted": "Accepted",
-      "rejected": "Rejected"
-    },
-    "empty": "No suggestions here.",
-    "unknownChart": "(chart no longer visible)",
-    "suggestedBy_one": "suggested by {{count}} player",
-    "suggestedBy_other": "suggested by {{count}} players",
-    "current": "Current categories: {{categories}}",
-    "since": "First suggested {{at}}",
-    "decided": "Decided by {{by}}, {{at}}",
-    "earlier": "an earlier decision",
-    "accept": "Accept",
-    "reject": "Reject",
-    "pages": "Pages"
-  },
   "danAdmin": {
     "heading": "Review Dan courses",
     "intro": "Changing the songs or conditions of a course with fixed songs takes a request, which the managers of its library decide. Approving gives the course what was asked; it stays fixed from when it was, and earlier attempts still count for rules. Returning needs a reply. The maker is notified either way.",

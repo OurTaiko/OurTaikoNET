@@ -1054,7 +1054,6 @@
     "announcements": "Announcements",
     "editor": "OurTaikoEdit",
     "myTitles": "My titles",
-    "songAdmin": "Manage songs",
     "danAdmin": "Review Dan courses",
     "tagAdmin": "Manage tags"
   },
@@ -1142,18 +1141,6 @@
     "toReviews": "Review it",
     "toMine": "See my titles",
     "readOnly": "Title Center is read-only: you cannot reply here."
-  },
-  "categorySuggestions": {
-    "open": "Suggest categories",
-    "title": "Suggest categories",
-    "hint": "If this song belongs in another category, suggest it and a manager of the source will review it.",
-    "suggest": "Suggest",
-    "withdraw": "Withdraw",
-    "close": "Close",
-    "inCategory": "In this category",
-    "pending": "Pending",
-    "accepted": "Accepted",
-    "rejected": "Rejected"
   },
   "tags": {
     "heading": "Tags",

@@ -597,27 +597,6 @@
     "return": "退回",
     "by": "由 {{name}} 处理"
   },
-  "songAdmin": {
-    "heading": "乐曲管理",
-    "intro": "玩家为自制谱面提交的分类建议，由自制曲库的管理员处理。采纳或拒绝后，同一首歌同一个分类的其他建议（包括以后再提交的）都会按这个结果处理；采纳时，只在「综合」里的歌会移出「综合」。",
-    "status": "状态",
-    "statuses": {
-      "pending": "待处理",
-      "accepted": "已采纳",
-      "rejected": "已拒绝"
-    },
-    "empty": "这里没有建议。",
-    "unknownChart": "（谱面已不可见）",
-    "suggestedBy_one": "{{count}} 人建议",
-    "suggestedBy_other": "{{count}} 人建议",
-    "current": "现有分类：{{categories}}",
-    "since": "最早建议于 {{at}}",
-    "decided": "{{by}} 于 {{at}} 处理",
-    "earlier": "先前的决定",
-    "accept": "采纳",
-    "reject": "拒绝",
-    "pages": "翻页"
-  },
   "danAdmin": {
     "heading": "段位审核",
     "intro": "已固定曲目的段位，修改曲目或合格条件需要提交申请，由该曲库的管理员处理。通过后段位改为申请的曲目和条件，固定时间不变，之前的挑战仍计入发放条件；退回需要写回复。创建者会收到通知。",
